@@ -299,8 +299,8 @@ export default function ImportCycleDiagnostics() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/settings">
             <Button variant="ghost" size="icon" data-testid="button-back-settings">
@@ -363,7 +363,7 @@ export default function ImportCycleDiagnostics() {
           <CardContent className="pt-4 space-y-4">
             {/* Formula visualization */}
             <div className="bg-muted p-4 rounded-lg font-mono text-sm">
-              <div className="grid grid-cols-5 gap-2 items-center text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-center text-center">
                 <div className="p-3 bg-green-100 dark:bg-green-900 rounded">
                   <div className="text-xs text-muted-foreground mb-1">Assets</div>
                   <div className="font-bold text-green-700 dark:text-green-300">

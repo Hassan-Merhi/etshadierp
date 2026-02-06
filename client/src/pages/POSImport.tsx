@@ -419,10 +419,10 @@ export default function POSImport() {
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
             {isCreditSale ? <CreditCard className="h-8 w-8" /> : <ShoppingCart className="h-8 w-8" />}
             {isCreditSale ? "Credit Sales Import" : "POS Import"}
           </h1>
@@ -444,7 +444,7 @@ export default function POSImport() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+          <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-muted/50">
             <div className="flex items-center gap-2">
               <Switch
                 id="creditSale"
@@ -579,7 +579,7 @@ export default function POSImport() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleParse}
               disabled={!file || parseMutation.isPending}

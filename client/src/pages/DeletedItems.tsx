@@ -243,10 +243,10 @@ export default function DeletedItems() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
             <div>
               <CardTitle className="flex items-center gap-2" data-testid="title-deleted-items">
                 <Trash2 className="h-5 w-5" />
@@ -259,7 +259,7 @@ export default function DeletedItems() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Filter:</span>
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[180px]" data-testid="select-filter-type">
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -293,6 +293,8 @@ export default function DeletedItems() {
               </p>
             </div>
           ) : (
+            <>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -386,6 +388,58 @@ export default function DeletedItems() {
                 })}
               </TableBody>
             </Table>
+            </div>
+            <div className="md:hidden space-y-3">
+              {items.map((item) => {
+                const IconComponent = typeIcons[item.type] || Package;
+                return (
+                  <Card
+                    key={`${item.type}-${item.id}`}
+                    className="p-4 cursor-pointer hover-elevate"
+                    onClick={() => setDetailItem(item)}
+                    data-testid={`card-deleted-${item.type}-${item.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <IconComponent className="h-4 w-4 text-muted-foreground" />
+                        <Badge variant="outline">
+                          {typeLabels[item.type] || item.type}
+                        </Badge>
+                      </div>
+                      <span className="font-mono text-xs text-muted-foreground">{item.code || "-"}</span>
+                    </div>
+                    <p className="font-medium text-sm">{item.name}</p>
+                    {item.accountType && <p className="text-xs text-muted-foreground">{item.accountType}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {item.deletedAt ? format(new Date(item.deletedAt), "MMM d, yyyy h:mm a") : "-"}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {item.type !== "orphanedPosSale" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleRestore(item); }}
+                          disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Restore
+                        </Button>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handlePermanentDelete(item); }}
+                        disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -447,7 +501,7 @@ export default function DeletedItems() {
       </AlertDialog>
 
       <Sheet open={!!detailItem} onOpenChange={(open) => !open && setDetailItem(null)}>
-        <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetContent className="w-[95vw] sm:w-[400px] md:w-[540px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               {detailItem && (() => {

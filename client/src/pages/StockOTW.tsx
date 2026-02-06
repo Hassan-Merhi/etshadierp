@@ -201,12 +201,12 @@ export default function StockOTW() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold" data-testid="heading-stock-otw">
+        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="heading-stock-otw">
           Stock On The Way
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           View all stock items from containers currently in transit
         </p>
       </div>
@@ -302,7 +302,7 @@ export default function StockOTW() {
             <CardTitle>Stock Items ({uniqueItemCount})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-md">
+            <div className="border rounded-md hidden md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -388,18 +388,72 @@ export default function StockOTW() {
                 </TableBody>
               </Table>
             </div>
+
+            <div className="md:hidden space-y-2">
+              {filteredItems.map((item, index) => {
+                const isExpanded = expandedItems.has(item.stockItemName);
+                const uniqueSuppliers = Array.from(new Set(item.containers.map(c => c.supplierName)));
+                return (
+                  <div key={item.stockItemName} data-testid={`row-item-${index}`}>
+                    <div
+                      className="p-3 rounded-md border cursor-pointer hover-elevate"
+                      onClick={() => toggleItemExpanded(item.stockItemName)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate">{item.stockItemName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''} | {uniqueSuppliers.length === 1 ? uniqueSuppliers[0] : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between mt-2 text-sm pl-6">
+                        <span className="text-muted-foreground">Qty: <span className="font-mono font-semibold text-foreground">{Math.round(item.totalQuantity).toLocaleString()}</span></span>
+                        <span className="font-mono">{formatAmount(item.totalCost)}</span>
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="ml-6 mt-1 space-y-1">
+                        {item.containers.map((container, containerIndex) => (
+                          <div
+                            key={containerIndex}
+                            className="p-2 rounded-md bg-muted/30 text-xs flex justify-between"
+                            data-testid={`row-container-${index}-${containerIndex}`}
+                          >
+                            <div>
+                              <span className="text-muted-foreground">{container.containerNumber}</span>
+                              <span className="ml-2">{container.supplierName}</span>
+                            </div>
+                            <div className="font-mono">
+                              {Math.round(container.quantity).toLocaleString()} | {formatAmount(container.cost)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
             
             <div className="mt-4 pt-4 border-t">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-right">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                <div className="flex justify-between sm:justify-end gap-2">
                   <span className="text-sm text-muted-foreground">Total Quantity:</span>
-                  <span className="ml-2 font-mono font-semibold" data-testid="text-summary-quantity">
+                  <span className="font-mono font-semibold" data-testid="text-summary-quantity">
                     {Math.round(totalQuantity).toLocaleString()}
                   </span>
                 </div>
-                <div className="text-right">
+                <div className="flex justify-between sm:justify-end gap-2">
                   <span className="text-sm text-muted-foreground">Total Value:</span>
-                  <span className="ml-2 font-mono font-semibold" data-testid="text-summary-value">
+                  <span className="font-mono font-semibold" data-testid="text-summary-value">
                     {formatAmount(totalValue)}
                   </span>
                 </div>

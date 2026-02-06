@@ -332,7 +332,7 @@ export default function POImport() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">PO Import (Excel)</h1>
         <Button
           variant="outline"
@@ -354,7 +354,7 @@ export default function POImport() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="file-upload">Step 1: Select & Parse Excel File (.xlsx)</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 id="file-upload"
                 type="file"
@@ -553,7 +553,7 @@ export default function POImport() {
               </div>
             ))}
 
-            <div className="flex gap-2 justify-end mt-4">
+            <div className="flex flex-wrap gap-2 justify-end mt-4">
               <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">
                 Cancel
               </Button>

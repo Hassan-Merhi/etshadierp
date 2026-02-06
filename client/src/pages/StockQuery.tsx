@@ -34,10 +34,10 @@ export default function StockQuery() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Stock Query</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">Stock Query</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Click on any item to view purchase history, sales history, and current inventory locations
         </p>
       </div>
@@ -66,46 +66,75 @@ export default function StockQuery() {
           {stockItemsLoading ? (
             <div className="p-8 text-center text-muted-foreground">Loading stock items...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center text-muted-foreground">
+                          No items found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredItems.map((item) => (
+                        <TableRow
+                          key={item.id}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => handleItemClick(item)}
+                          data-testid={`row-stock-item-${item.id}`}
+                        >
+                          <TableCell>
+                            <button
+                              className="text-primary hover:underline text-left"
+                              data-testid={`button-item-name-${item.id}`}
+                            >
+                              {item.name}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={item.active ? "default" : "secondary"}>
+                              {item.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="md:hidden p-3 space-y-2">
                 {filteredItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
-                      No items found
-                    </TableCell>
-                  </TableRow>
+                  <p className="text-center text-muted-foreground py-4">No items found</p>
                 ) : (
                   filteredItems.map((item) => (
-                    <TableRow
+                    <div
                       key={item.id}
-                      className="cursor-pointer hover-elevate"
+                      className="flex items-center justify-between p-3 rounded-md border cursor-pointer hover-elevate"
                       onClick={() => handleItemClick(item)}
                       data-testid={`row-stock-item-${item.id}`}
                     >
-                      <TableCell>
-                        <button
-                          className="text-primary hover:underline text-left"
-                          data-testid={`button-item-name-${item.id}`}
-                        >
-                          {item.name}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.active ? "default" : "secondary"}>
-                          {item.active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+                      <button
+                        className="text-primary hover:underline text-left text-sm font-medium"
+                        data-testid={`button-item-name-${item.id}`}
+                      >
+                        {item.name}
+                      </button>
+                      <Badge variant={item.active ? "default" : "secondary"}>
+                        {item.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
                   ))
                 )}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

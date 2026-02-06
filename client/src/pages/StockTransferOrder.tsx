@@ -544,14 +544,14 @@ export default function StockTransferOrder() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <Label className="text-sm whitespace-nowrap">Destination:</Label>
             <Select
               value={destinationLocationId?.toString() || ""}
               onValueChange={(v) => setDestinationLocationId(parseInt(v))}
             >
-              <SelectTrigger className="w-[200px]" data-testid="select-destination">
+              <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination">
                 <SelectValue placeholder="Choose destination" />
               </SelectTrigger>
               <SelectContent>
@@ -611,7 +611,7 @@ export default function StockTransferOrder() {
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[140px] justify-start text-left font-normal",
+                  "w-full sm:w-[140px] justify-start text-left font-normal",
                   !transferDate && "text-muted-foreground"
                 )}
                 data-testid="button-select-date"
@@ -685,8 +685,8 @@ export default function StockTransferOrder() {
         </Card>
       )}
 
-      <div className="flex gap-4">
-        <Card className="flex-[3]">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <Card className="lg:flex-[3]">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
@@ -820,7 +820,7 @@ export default function StockTransferOrder() {
           </CardContent>
         </Card>
 
-        <div className="flex-1 flex flex-col gap-4 min-w-[300px]">
+        <div className="flex-1 flex flex-col gap-4 lg:min-w-[300px]">
           {destinationLocationId && (
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="py-3">

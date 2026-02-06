@@ -679,13 +679,13 @@ export default function Containers() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Container Tracking"
         subtitle="Track containers and manage offloading"
       >
         {activeTab === "active" && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               onClick={exportToExcel}
               variant="outline"
@@ -693,7 +693,7 @@ export default function Containers() {
               data-testid="button-export-excel"
             >
               <Download className="h-4 w-4" />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </Button>
             <Button
               onClick={exportAllContainersFull}
@@ -702,7 +702,8 @@ export default function Containers() {
               data-testid="button-export-all-full"
             >
               <Download className="h-4 w-4" />
-              Export All (Full)
+              <span className="hidden sm:inline">Export All (Full)</span>
+              <span className="sm:hidden">All</span>
             </Button>
             <Button
               onClick={() => setAddDialogOpen(true)}
@@ -711,18 +712,20 @@ export default function Containers() {
               data-testid="button-add-container"
             >
               <Plus className="h-4 w-4" />
-              Add Container
+              <span className="hidden sm:inline">Add Container</span>
+              <span className="sm:hidden">Add</span>
             </Button>
             <Link href="/po-import">
               <Button className="gap-2" data-testid="button-import-po">
                 <Plus className="h-4 w-4" />
-                Import PO
+                <span className="hidden sm:inline">Import PO</span>
+                <span className="sm:hidden">Import</span>
               </Button>
             </Link>
           </div>
         )}
         {activeTab === "otw" && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {hasAnyChanges && (
               <Button
                 onClick={saveAllTracking}
@@ -743,7 +746,8 @@ export default function Containers() {
               data-testid="button-export-otw"
             >
               <Download className="h-4 w-4" />
-              Export OTW
+              <span className="hidden sm:inline">Export OTW</span>
+              <span className="sm:hidden">Export</span>
             </Button>
             <Button
               onClick={downloadImportTemplate}
@@ -752,7 +756,7 @@ export default function Containers() {
               data-testid="button-download-template"
             >
               <FileSpreadsheet className="h-4 w-4" />
-              Template
+              <span className="hidden sm:inline">Template</span>
             </Button>
             <Button
               onClick={handleImportClick}
@@ -762,7 +766,8 @@ export default function Containers() {
               data-testid="button-import-otw"
             >
               <Upload className="h-4 w-4" />
-              {isImporting ? "Importing..." : "Import Excel"}
+              <span className="hidden sm:inline">{isImporting ? "Importing..." : "Import Excel"}</span>
+              <span className="sm:hidden">{isImporting ? "..." : "Import"}</span>
             </Button>
             <input
               ref={fileInputRef}
@@ -960,7 +965,7 @@ export default function Containers() {
               </div>
 
               <Card>
-                <CardContent className="p-0 overflow-x-auto">
+                <CardContent className="p-0 overflow-x-auto hidden md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1024,6 +1029,36 @@ export default function Containers() {
                     </TableBody>
                   </Table>
                 </CardContent>
+                <div className="md:hidden p-3 space-y-2">
+                  {containers.map((container) => (
+                    <Link key={container.id} href={`/containers/${container.id}`}>
+                      <div
+                        className="p-3 rounded-md border cursor-pointer hover-elevate"
+                        data-testid={`row-container-${container.id}`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono font-medium text-sm">{container.containerNumber}</span>
+                          <Badge
+                            variant={container.status === "OTW" ? "default" : "secondary"}
+                          >
+                            {container.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground mb-1">
+                          {getSupplierName(container.supplierId)}
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="font-mono font-semibold">
+                            {formatAmount(parseFloat(container.grandTotal || "0"))}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(container.importDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </Card>
             </>
           )}
@@ -1046,7 +1081,7 @@ export default function Containers() {
               onValueChange={setOtwSupplierFilter}
             >
               <SelectTrigger
-                className="w-[130px]"
+                className="w-full sm:w-[130px]"
                 data-testid="select-otw-supplier"
               >
                 <SelectValue placeholder="Supplier" />
@@ -1065,7 +1100,7 @@ export default function Containers() {
               onValueChange={setOtwLocationFilter}
             >
               <SelectTrigger
-                className="w-[130px]"
+                className="w-full sm:w-[130px]"
                 data-testid="select-otw-location"
               >
                 <SelectValue placeholder="Location" />
@@ -1081,7 +1116,7 @@ export default function Containers() {
             </Select>
             <Select value={otwAgentFilter} onValueChange={setOtwAgentFilter}>
               <SelectTrigger
-                className="w-[100px]"
+                className="w-full sm:w-[100px]"
                 data-testid="select-otw-agent"
               >
                 <SelectValue placeholder="Agent" />
@@ -1100,7 +1135,7 @@ export default function Containers() {
               onValueChange={setOtwTransporterFilter}
             >
               <SelectTrigger
-                className="w-[120px]"
+                className="w-full sm:w-[120px]"
                 data-testid="select-otw-transporter"
               >
                 <SelectValue placeholder="Transporter" />
@@ -1118,7 +1153,7 @@ export default function Containers() {
               value={otwDocReceivedFilter}
               onValueChange={setOtwDocReceivedFilter}
             >
-              <SelectTrigger className="w-[100px]" data-testid="select-otw-doc">
+              <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-doc">
                 <SelectValue placeholder="Doc" />
               </SelectTrigger>
               <SelectContent>
@@ -1582,7 +1617,7 @@ export default function Containers() {
             </Card>
           ) : (
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1650,6 +1685,36 @@ export default function Containers() {
                   </TableBody>
                 </Table>
               </CardContent>
+              <div className="md:hidden p-3 space-y-2">
+                {filteredSoldContainers.map((sale) => (
+                  <Link key={sale.saleId} href={`/containers/${sale.containerId}`}>
+                    <div
+                      className="p-3 rounded-md border cursor-pointer hover-elevate"
+                      data-testid={`row-sale-${sale.saleId}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-mono font-medium text-sm">{sale.containerNumber}</span>
+                        <span className="text-xs text-muted-foreground" data-testid={`text-sale-date-${sale.saleId}`}>
+                          {new Date(sale.saleDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-1" data-testid={`text-customer-${sale.saleId}`}>
+                        {sale.customerName}
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="font-mono font-semibold" data-testid={`text-sale-price-${sale.saleId}`}>
+                          {formatAmount(parseFloat(sale.totalAmount))}
+                        </span>
+                        {parseFloat(sale.commission || "0") > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Commission: {formatAmount(parseFloat(sale.commission || "0"))}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </Card>
           )}
         </TabsContent>

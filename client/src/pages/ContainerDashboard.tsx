@@ -366,7 +366,7 @@ export default function ContainerDashboard() {
             <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Offloaded Containers (Balance Owed)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-muted/50">
                   <tr>
@@ -406,6 +406,33 @@ export default function ContainerDashboard() {
                 )}
               </table>
             </div>
+            <div className="md:hidden space-y-2 p-2">
+              {agentData.offloadedContainers?.length > 0 ? (
+                agentData.offloadedContainers.map((container: any) => (
+                  <div key={container.id} className="border rounded-md p-2.5 text-xs space-y-1" data-testid={`card-offloaded-mobile-${container.id}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-semibold">{container.containerNumber}</span>
+                      <span className="font-bold">{formatAmount(parseFloat(container.dutyFee || "0"))}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                      <div><span className="text-muted-foreground">Supplier:</span> {container.supplierName || "-"}</div>
+                      <div><span className="text-muted-foreground">Plate:</span> {container.numberPlate || "-"}</div>
+                      <div><span className="text-muted-foreground">Border:</span> {formatDate(container.borderDate)}</div>
+                      <div><span className="text-muted-foreground">Transporter:</span> {container.transporter || "-"}</div>
+                      <div><span className="text-muted-foreground">Location:</span> {container.trackingLocation || "-"}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground text-xs py-2">No offloaded containers</p>
+              )}
+              {agentData.offloadedContainers?.length > 0 && (
+                <div className="bg-green-100 dark:bg-green-900/30 rounded-md p-2 flex justify-between text-xs font-bold">
+                  <span>Total Balance Owed</span>
+                  <span>{formatAmount(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</span>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -414,7 +441,7 @@ export default function ContainerDashboard() {
             <CardTitle className="text-sm font-medium text-yellow-700 dark:text-yellow-400">OTW Containers (Pending)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-muted/50">
                   <tr>
@@ -453,6 +480,33 @@ export default function ContainerDashboard() {
                   </tfoot>
                 )}
               </table>
+            </div>
+            <div className="md:hidden space-y-2 p-2">
+              {agentData.containers.length > 0 ? (
+                agentData.containers.map((container: any) => (
+                  <div key={container.id} className="border rounded-md p-2.5 text-xs space-y-1" data-testid={`card-otw-mobile-${container.id}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-semibold">{container.containerNumber}</span>
+                      <span className="font-bold">{formatAmount(parseFloat(container.dutyFee || "0"))}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                      <div><span className="text-muted-foreground">Supplier:</span> {container.supplierName || "-"}</div>
+                      <div><span className="text-muted-foreground">Plate:</span> {container.numberPlate || "-"}</div>
+                      <div><span className="text-muted-foreground">Border:</span> {formatDate(container.borderDate)}</div>
+                      <div><span className="text-muted-foreground">Transporter:</span> {container.transporter || "-"}</div>
+                      <div><span className="text-muted-foreground">Location:</span> {container.trackingLocation || "-"}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground text-xs py-2">No OTW containers</p>
+              )}
+              {agentData.containers.length > 0 && (
+                <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-md p-2 flex justify-between text-xs font-bold">
+                  <span>Total OTW</span>
+                  <span>{formatAmount(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -648,7 +702,7 @@ export default function ContainerDashboard() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <CardContent className="p-0">
-                                <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+                                <div className="hidden md:block overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
                                   <table className="w-full text-[11px]">
                                   <thead className="bg-muted/50">
                                     <tr>
@@ -712,6 +766,49 @@ export default function ContainerDashboard() {
                                     ))}
                                   </tbody>
                                   </table>
+                                </div>
+                                <div className="md:hidden space-y-2 p-2">
+                                  {sortContainersByLocationAndEta(containers).map((container, idx) => (
+                                    <div
+                                      key={container.id}
+                                      className={cn(
+                                        "border rounded-md p-2.5 cursor-pointer text-xs space-y-1.5",
+                                        container.docReceived && "bg-green-500/10",
+                                        isOverdue(container.eta) && !container.docReceived && "bg-yellow-500/10"
+                                      )}
+                                      onClick={() => handleContainerClick(container.companyId)}
+                                      data-testid={`card-container-mobile-${container.id}`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span
+                                          className="font-mono text-primary underline cursor-pointer text-sm font-semibold"
+                                          onClick={(e) => handleContainerNumberClick(e, container.id)}
+                                        >
+                                          {container.containerNumber}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          {container.docReceived ? (
+                                            <FileCheck className="h-3.5 w-3.5 text-green-600" />
+                                          ) : (
+                                            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+                                          )}
+                                          <span className="font-bold">{formatAmount(parseFloat(container.grandTotal || "0"))}</span>
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                                        <div><span className="text-muted-foreground">Supplier:</span> {container.supplierName || "-"}</div>
+                                        <div className={cn(isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}><span className="text-muted-foreground">ETA:</span> {formatDate(container.eta)}</div>
+                                        <div><span className="text-muted-foreground">Plate:</span> {container.numberPlate || "-"}</div>
+                                        <div><span className="text-muted-foreground">Location:</span> {container.trackingLocation || "-"}</div>
+                                        <div><span className="text-muted-foreground">Border:</span> {formatDate(container.borderDate)}</div>
+                                        <div><span className="text-muted-foreground">Offload:</span> {formatDate(container.offloadDate)}</div>
+                                        <div><span className="text-muted-foreground">Transporter:</span> {container.transporter || "-"}</div>
+                                        <div><span className="text-muted-foreground">Fee:</span> {container.transportFee ? formatAmount(parseFloat(container.transportFee)) : "-"}</div>
+                                        <div><span className="text-muted-foreground">Agent:</span> {container.agent || "-"}</div>
+                                        <div><span className="text-muted-foreground">Duty:</span> {container.dutyFee ? formatAmount(parseFloat(container.dutyFee)) : "-"}</div>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </CardContent>
                             </CollapsibleContent>
@@ -830,7 +927,7 @@ export default function ContainerDashboard() {
       </Tabs>
 
       <Dialog open={poDialogOpen} onOpenChange={setPoDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
@@ -844,7 +941,7 @@ export default function ContainerDashboard() {
             </div>
           ) : poData ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Status:</span>
                   <Badge variant={poData.container.status === "OFFLOADED" ? "default" : "secondary"} className="ml-2">

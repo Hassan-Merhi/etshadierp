@@ -507,7 +507,7 @@ export default function SalesReport() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Sales</CardDescription>
@@ -558,7 +558,7 @@ export default function SalesReport() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label htmlFor="grouping">View By</Label>
               <Select
@@ -668,7 +668,8 @@ export default function SalesReport() {
               No sales transactions found. Try adjusting your filters.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -747,13 +748,90 @@ export default function SalesReport() {
                 </TableBody>
               </Table>
             </div>
+            <div className="md:hidden space-y-3">
+              {filteredGroupedData.map((group) => (
+                <Card 
+                  key={group.date}
+                  data-testid={`row-sale-${group.date}`}
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => handleRowClick(group)}
+                >
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{group.displayDate}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Items: </span>
+                        <span className="font-mono">{formatNumber(group.itemCount)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Qty: </span>
+                        <span className="font-mono">{formatNumber(group.totalQty)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Sales: </span>
+                        <span className="font-mono">{formatAmount(group.totalSales)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Cost: </span>
+                        <span className="font-mono">{formatAmount(group.totalCost)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Cost Profit: </span>
+                        <span className={`font-mono font-semibold ${group.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {group.costProfit < 0 ? '-' : ''}{formatAmount(group.costProfit)}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Config Profit: </span>
+                        <span className={`font-mono font-semibold ${group.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {group.configuredProfit < 0 ? '-' : ''}{formatAmount(group.configuredProfit)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              <Card className="bg-muted/50">
+                <CardContent className="p-4">
+                  <div className="font-bold text-sm mb-2">TOTAL</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Sales: </span>
+                      <span className="font-mono font-semibold">{formatAmount(totals.totalSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cost: </span>
+                      <span className="font-mono font-semibold">{formatAmount(totals.totalCost)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cost Profit: </span>
+                      <span className={`font-mono font-semibold ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {totals.costProfit < 0 ? '-' : ''}{formatAmount(totals.costProfit)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Config Profit: </span>
+                      <span className={`font-mono font-semibold ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {totals.configuredProfit < 0 ? '-' : ''}{formatAmount(totals.configuredProfit)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Details Dialog */}
       <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] md:w-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Sales Details - {selectedDaySummary?.displayDate}</DialogTitle>
             <DialogDescription>
@@ -818,7 +896,7 @@ export default function SalesReport() {
               </div>
 
               {/* Items Table */}
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -837,7 +915,6 @@ export default function SalesReport() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {/* Sort items by location name to group same locations together */}
                     {[...selectedDaySummary.items].sort((a, b) => {
                       const locA = a.locationName || '';
                       const locB = b.locationName || '';
@@ -883,6 +960,51 @@ export default function SalesReport() {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="md:hidden space-y-3">
+                {[...selectedDaySummary.items].sort((a, b) => {
+                  const locA = a.locationName || '';
+                  const locB = b.locationName || '';
+                  return locA.localeCompare(locB);
+                }).map((item) => {
+                  const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                  return (
+                    <Card key={item.id}>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-sm">{item.stockItemName}</span>
+                          <span className="text-xs text-muted-foreground">{item.locationName || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Qty: </span>
+                            <span className="font-mono">{formatNumericValue(item.quantity)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Sold: </span>
+                            <span className="font-mono">{formatAmount(item.actualSellingPrice)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Cost: </span>
+                            <span className="font-mono">{formatAmount(item.costPrice)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Total Cost: </span>
+                            <span className="font-mono">{formatAmount(item.totalCost)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
+                          <span className={`font-mono font-semibold ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            Cost: {parseFloat(item.costProfit) < 0 ? '-' : ''}{formatAmount(item.costProfit)} ({item.costProfitPercentage.toFixed(1)}%)
+                          </span>
+                          <span className={`font-mono font-semibold ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            Config: {item.configuredProfit < 0 ? '-' : ''}{formatAmount(item.configuredProfit)} ({item.configuredProfitPercentage.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}

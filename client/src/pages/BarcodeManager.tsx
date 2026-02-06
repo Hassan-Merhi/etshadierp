@@ -262,16 +262,16 @@ export default function BarcodeManager() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
             <Barcode className="h-8 w-8" />
             Barcode Manager
           </h1>
           <p className="text-muted-foreground">Import, print, and manage barcode labels for bales</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -290,14 +290,14 @@ export default function BarcodeManager() {
         </div>
       </div>
 
-      <Card className="p-6">
+      <Card className="p-4 md:p-6">
         <h2 className="text-lg font-semibold mb-4">Add Barcode Manually</h2>
-        <form onSubmit={handleManualAdd} className="flex gap-2">
+        <form onSubmit={handleManualAdd} className="flex flex-col sm:flex-row gap-2">
           <Input
             placeholder="Enter barcode..."
             value={manualBarcode}
             onChange={(e) => setManualBarcode(e.target.value)}
-            className="max-w-md font-mono"
+            className="sm:max-w-md font-mono"
             data-testid="input-manual-barcode"
           />
           <Button type="submit" disabled={!manualBarcode.trim()} data-testid="button-add-barcode">
@@ -306,8 +306,8 @@ export default function BarcodeManager() {
         </form>
       </Card>
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="p-4 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="text-lg font-semibold">
             Pending Barcodes ({unusedBarcodes.length})
           </h2>
@@ -335,6 +335,7 @@ export default function BarcodeManager() {
             <p className="text-muted-foreground">No pending barcodes. Import from Excel or add manually.</p>
           </div>
         ) : (
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -386,11 +387,48 @@ export default function BarcodeManager() {
               ))}
             </TableBody>
           </Table>
+          </div>
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox
+                checked={selectedIds.length === unusedBarcodes.length && unusedBarcodes.length > 0}
+                onCheckedChange={handleSelectAll}
+              />
+              <span className="text-sm text-muted-foreground">Select All</span>
+            </div>
+            {unusedBarcodes.map((barcode) => (
+              <Card key={barcode.id} className="p-3" data-testid={`card-barcode-${barcode.id}`}>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={selectedIds.includes(barcode.id)}
+                    onCheckedChange={(checked) => handleSelectOne(barcode.id, !!checked)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-medium text-sm">{barcode.barcode}</span>
+                      <Button variant="ghost" size="icon" onClick={() => deleteBarcode.mutate(barcode.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {barcode.printed ? (
+                        <Badge variant="secondary"><Check className="h-3 w-3 mr-1" />Printed</Badge>
+                      ) : (
+                        <Badge variant="outline">Not Printed</Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">{new Date(barcode.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
       </Card>
 
       {usedBarcodes.length > 0 && (
-        <Card className="p-6">
+        <Card className="p-4 md:p-6">
           <h2 className="text-lg font-semibold mb-4">Used Barcodes ({usedBarcodes.length})</h2>
           <p className="text-sm text-muted-foreground mb-4">
             These barcodes have been scanned and added to inventory

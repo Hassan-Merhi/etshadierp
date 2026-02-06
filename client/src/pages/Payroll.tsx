@@ -1272,7 +1272,7 @@ export default function Payroll() {
       <h1 className="text-2xl font-semibold">Payroll</h1>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid grid-cols-3 w-[600px]">
+        <TabsList className="grid grid-cols-3 w-full sm:w-[600px]">
           <TabsTrigger value="employees" data-testid="tab-employees">
             Employees ({employeeStaff.length})
           </TabsTrigger>
@@ -1287,7 +1287,7 @@ export default function Payroll() {
         <TabsContent value="employees">
           <Card className="p-6">
             <div className="space-y-4">
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                 <div>
                   <h2 className="text-lg font-semibold">Warehouse Staff (Employees)</h2>
                   <p className="text-sm text-muted-foreground">
@@ -1307,7 +1307,7 @@ export default function Payroll() {
               {selectedEmployeesForDeposit.length > 0 && (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="flex items-center justify-between">
+                  <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span>
                       <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {formatAmount(bulkDepositTotal)}
                     </span>
@@ -1325,7 +1325,7 @@ export default function Payroll() {
 
               {/* Bulk Bonus & Withdrawal Buttons */}
               {employeeStaff.length > 0 && (
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -1358,7 +1358,8 @@ export default function Payroll() {
                   <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
                 </div>
               ) : (
-                <div className="border rounded-md overflow-x-auto">
+                <>
+                <div className="hidden md:block border rounded-md overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1478,6 +1479,86 @@ export default function Payroll() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className="md:hidden space-y-3">
+                  <div className="flex items-center gap-2 pb-2">
+                    <Checkbox
+                      checked={employeeStaff.length > 0 && employeeStaff.every(emp => bulkDepositSelections[emp.id])}
+                      onCheckedChange={handleSelectAllEmployees}
+                      data-testid="checkbox-select-all-employees-mobile"
+                    />
+                    <span className="text-sm text-muted-foreground">Select All</span>
+                  </div>
+                  {employeeStaff.map((employee) => {
+                    const balance = parseFloat(employee.calculatedBalance || "0");
+                    return (
+                      <Card key={employee.id} data-testid={`card-employee-${employee.id}`} className={bulkDepositSelections[employee.id] ? "bg-muted/50" : ""}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={bulkDepositSelections[employee.id] || false}
+                                onCheckedChange={() => handleToggleEmployeeDeposit(employee.id)}
+                                data-testid={`checkbox-employee-mobile-${employee.id}`}
+                              />
+                              <button
+                                onClick={() => setStatementEmployee(employee)}
+                                className="text-primary hover:underline cursor-pointer font-medium"
+                                data-testid={`link-employee-statement-mobile-${employee.id}`}
+                              >
+                                {employee.firstName} {employee.lastName}
+                              </button>
+                            </div>
+                            <Badge variant={employee.active ? "default" : "secondary"}>
+                              {employee.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground block">Salary</span>
+                              <span className="font-mono">{formatAmount(parseFloat(employee.monthlySalary))}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-muted-foreground block">Balance</span>
+                              <span className="font-mono font-semibold">{formatAmount(balance)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block">Deposits</span>
+                              <span className="font-mono text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-muted-foreground block">Withdrawals</span>
+                              <span className="font-mono text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1 border-t">
+                            <Button size="sm" variant="outline" onClick={() => handleDeposit(employee)} data-testid={`button-deposit-mobile-${employee.id}`}>
+                              <TrendingUp className="h-4 w-4 mr-1" /> Deposit
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleBonus(employee)} data-testid={`button-bonus-mobile-${employee.id}`}>
+                              <DollarSign className="h-4 w-4 mr-1" /> Bonus
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} disabled={balance <= 0} data-testid={`button-withdraw-mobile-${employee.id}`}>
+                              <TrendingDown className="h-4 w-4 mr-1" /> Withdraw
+                            </Button>
+                            <ConfirmationDialog
+                              trigger={
+                                <Button size="sm" variant="outline" data-testid={`button-delete-mobile-${employee.id}`}>
+                                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                </Button>
+                              }
+                              title="Delete Employee"
+                              description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
+                              confirmText="Delete"
+                              variant="destructive"
+                              onConfirm={() => handleDeleteEmployee(employee)}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                </>
               )}
             </div>
           </Card>
@@ -1486,7 +1567,7 @@ export default function Payroll() {
         <TabsContent value="workers">
           {/* Worker Payment Summary */}
           <Card className="p-6 mb-4">
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
               <h3 className="text-lg font-semibold">Worker Payment Summary</h3>
               <Button
                 onClick={() => setNewWorkerDialogOpen(true)}
@@ -1956,7 +2037,7 @@ export default function Payroll() {
 
           {/* Manage Worker Group Members Dialog */}
           <Dialog open={workerGroupMembersDialogOpen} onOpenChange={setWorkerGroupMembersDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
                 <DialogDescription>
@@ -2046,7 +2127,7 @@ export default function Payroll() {
             return (
               <>
                 {/* Summary Statistics */}
-                <div className="grid gap-4 md:grid-cols-3 mb-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-4">
                   <Card className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -2087,7 +2168,7 @@ export default function Payroll() {
                 {/* Worker Management Section */}
                 <Card className="p-6 mb-4">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-semibold">Manage Workers</h2>
                         <p className="text-sm text-muted-foreground">
@@ -2118,10 +2199,10 @@ export default function Payroll() {
                           return (
                             <div
                               key={worker.id}
-                              className="flex items-center justify-between p-3 border rounded-md hover-elevate"
+                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border rounded-md hover-elevate"
                               data-testid={`worker-row-${worker.id}`}
                             >
-                              <div className="flex items-center gap-4">
+                              <div className="flex flex-wrap items-center gap-4">
                                 <div>
                                   <div className="font-medium">
                                     {worker.firstName} {worker.lastName}
@@ -2180,7 +2261,7 @@ export default function Payroll() {
 
                 <Card className="p-6">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-semibold">Salary Advances (Workers Only)</h2>
                         <p className="text-sm text-muted-foreground">
@@ -2209,7 +2290,8 @@ export default function Payroll() {
                         <p className="text-sm mt-2">Click "New Advance" to record a salary advance for a worker</p>
                       </div>
                     ) : (
-                      <div className="border rounded-md">
+                      <>
+                      <div className="hidden md:block border rounded-md">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -2262,6 +2344,33 @@ export default function Payroll() {
                           </TableBody>
                         </Table>
                       </div>
+                      <div className="md:hidden space-y-3">
+                        {workerAdvancesList.map((advance) => (
+                          <Card key={advance.id} data-testid={`card-advance-${advance.id}`}>
+                            <CardContent className="p-4 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="font-medium">{advance.employeeName}</div>
+                                  <div className="text-sm text-muted-foreground">{advance.employeeCode} - {formatDisplayDate(new Date(advance.advanceDate))}</div>
+                                </div>
+                                <Badge variant={advance.fullyPaid ? "default" : "secondary"}>
+                                  {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Amount: <span className="font-mono text-foreground">{formatAmount(parseFloat(advance.amount))}</span></span>
+                                <span className="text-muted-foreground">Remaining: <span className="font-mono font-semibold text-foreground">{formatAmount(parseFloat(advance.remainingBalance))}</span></span>
+                              </div>
+                              {!advance.fullyPaid && (
+                                <Button size="sm" variant="outline" className="w-full" onClick={() => handleRecordDeduction(advance)} data-testid={`button-record-deduction-mobile-${advance.id}`}>
+                                  Record Deduction
+                                </Button>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      </>
                     )}
                   </div>
                 </Card>
@@ -2586,7 +2695,7 @@ export default function Payroll() {
 
       {/* Bulk Payment Dialog */}
       <Dialog open={bulkPaymentDialogOpen} onOpenChange={setBulkPaymentDialogOpen}>
-        <DialogContent data-testid="dialog-bulk-payment" className="max-w-2xl">
+        <DialogContent data-testid="dialog-bulk-payment" className="max-w-2xl w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Process Bulk Payment</DialogTitle>
             <DialogDescription>
@@ -2734,7 +2843,7 @@ export default function Payroll() {
 
       {/* New Salary Advance Dialog */}
       <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
-        <DialogContent data-testid="dialog-new-advance" className="max-w-lg">
+        <DialogContent data-testid="dialog-new-advance" className="max-w-lg w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>New Salary Advance</DialogTitle>
             <DialogDescription>
@@ -3041,7 +3150,7 @@ export default function Payroll() {
 
           <Form {...newWorkerForm}>
             <form onSubmit={newWorkerForm.handleSubmit((data) => createWorkerMutation.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={newWorkerForm.control}
                   name="firstName"
@@ -3170,7 +3279,7 @@ export default function Payroll() {
                 updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
               }
             })} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editWorkerForm.control}
                   name="firstName"
@@ -3330,7 +3439,7 @@ export default function Payroll() {
 
           <Form {...createEmployeeForm}>
             <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={createEmployeeForm.control}
                   name="firstName"
@@ -3702,7 +3811,7 @@ export default function Payroll() {
 
       {/* Bulk Withdrawal Dialog */}
       <Dialog open={bulkWithdrawalDialogOpen} onOpenChange={setBulkWithdrawalDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-withdrawal">
+        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-withdrawal">
           <DialogHeader>
             <DialogTitle>Bulk Withdrawal</DialogTitle>
             <DialogDescription>
@@ -3711,7 +3820,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Withdrawal Date</Label>
                 <Input
@@ -3803,7 +3912,7 @@ export default function Payroll() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Withdrawal: </span>
                 <span className="font-semibold font-mono">
@@ -3837,7 +3946,7 @@ export default function Payroll() {
 
       {/* Bulk Bonus Dialog */}
       <Dialog open={bulkBonusDialogOpen} onOpenChange={setBulkBonusDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
+        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
           <DialogHeader>
             <DialogTitle>Bulk Bonus Deposit</DialogTitle>
             <DialogDescription>
@@ -3846,7 +3955,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Bonus Date</Label>
                 <Input
@@ -3902,7 +4011,7 @@ export default function Payroll() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Bonus: </span>
                 <span className="font-semibold font-mono">
@@ -3936,13 +4045,13 @@ export default function Payroll() {
 
       {/* Employee Statement Dialog */}
       <Dialog open={!!statementEmployee} onOpenChange={(open) => !open && setStatementEmployee(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl w-[95vw] md:w-auto max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               {statementEmployee?.firstName} {statementEmployee?.lastName} - Statement
             </DialogTitle>
-            <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-4 pt-2 text-sm text-muted-foreground">
               <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(parseFloat(statementEmployee?.calculatedBalance || "0"))}</span></span>
               <Badge variant="secondary">
                 {parseFloat(statementEmployee?.calculatedBalance || "0") >= 0 ? "Cr (Owed to employee)" : "Dr"}
@@ -3966,6 +4075,7 @@ export default function Payroll() {
                 <div className="text-sm text-muted-foreground">
                   Showing {employeeTransactions.length} transaction{employeeTransactions.length !== 1 ? "s" : ""}
                 </div>
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -4006,6 +4116,33 @@ export default function Payroll() {
                       ))}
                   </TableBody>
                 </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {[...employeeTransactions]
+                    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .map((txn: any) => (
+                      <Card key={txn.id || `${txn.voucherId}-${txn.date}`}>
+                        <CardContent className="p-3 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-sm">{txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}</span>
+                            <Badge variant={txn.isDebit ? "secondary" : "default"}>
+                              {txn.isDebit ? "Dr" : "Cr"}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{txn.voucherType || "-"}</Badge>
+                              <span className="font-mono">{txn.voucherNumber || "-"}</span>
+                            </div>
+                            <span className="font-mono font-medium">{formatAmount(parseFloat(txn.amount || "0"))}</span>
+                          </div>
+                          {(txn.narration || txn.description) && (
+                            <div className="text-sm text-muted-foreground truncate">{txn.narration || txn.description}</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
 
                 {/* Summary */}
                 <div className="border-t pt-4 flex justify-between items-center">

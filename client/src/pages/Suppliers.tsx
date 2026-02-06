@@ -186,9 +186,9 @@ export default function Suppliers() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Active Suppliers
             </CardTitle>
@@ -206,7 +206,7 @@ export default function Suppliers() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Total Containers
             </CardTitle>
@@ -224,7 +224,7 @@ export default function Suppliers() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Total Outstanding
             </CardTitle>
@@ -271,7 +271,8 @@ export default function Suppliers() {
               No suppliers found. Create suppliers in the Master Data page.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -329,22 +330,65 @@ export default function Suppliers() {
                 </TableBody>
               </Table>
             </div>
+            <div className="md:hidden space-y-3">
+              {sortedSuppliers.map((supplier) => (
+                <Card key={supplier.id} data-testid={`row-supplier-${supplier.id}`}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        variant="ghost"
+                        className="p-0 h-auto font-medium hover:underline text-left"
+                        onClick={() => handleSupplierClick(supplier)}
+                        data-testid={`button-supplier-name-${supplier.id}`}
+                      >
+                        {supplier.legalName}
+                      </Button>
+                      <Badge variant={supplier.active ? "default" : "secondary"}>
+                        {supplier.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Container className="h-3 w-3" />
+                        <span>{supplier.containerCount} containers</span>
+                      </div>
+                      <span className={`font-mono font-semibold ${supplier.balance > 0 ? "text-red-600" : supplier.balance < 0 ? "text-green-600" : ""}`} data-testid={`text-balance-${supplier.id}`}>
+                        {formatAmount(Math.abs(supplier.balance))}
+                        {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
+                      </span>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
+                        data-testid={`button-edit-supplier-${supplier.id}`}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Supplier Details Dialog */}
       <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl w-[95vw] md:w-auto max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {selectedSupplier?.legalName}
             </DialogTitle>
-            <div className="flex items-center gap-4 pt-2">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Filter by Company:</label>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-sm text-muted-foreground whitespace-nowrap">Filter by Company:</label>
                 <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                  <SelectTrigger className="w-48" data-testid="select-company-filter">
+                  <SelectTrigger className="w-full sm:w-48" data-testid="select-company-filter">
                     <SelectValue placeholder="All Companies" />
                   </SelectTrigger>
                   <SelectContent>
@@ -404,52 +448,87 @@ export default function Suppliers() {
                       ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
                       : " from all companies"}
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...unifiedLedger]
-                        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map((txn: any, idx: number) => {
-                          const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
-                          return (
-                            <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                              <TableCell className="font-mono text-sm">
-                                {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                <Badge variant="secondary">{txn.companyName}</Badge>
-                              </TableCell>
-                              <TableCell>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...unifiedLedger]
+                          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map((txn: any, idx: number) => {
+                            const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                            return (
+                              <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                                <TableCell className="font-mono text-sm">
+                                  {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <Badge variant="secondary">{txn.companyName}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={isPayment ? "default" : "outline"}>
+                                    {isPayment ? "Payment" : txn.voucherType}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <button
+                                    onClick={() => handleTransactionClick(txn)}
+                                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                    data-testid={`link-transaction-${idx}`}
+                                  >
+                                    <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                  </button>
+                                </TableCell>
+                                <TableCell className="text-right font-mono font-semibold">
+                                  {formatAmount(txn.balance)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-3">
+                    {[...unifiedLedger]
+                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((txn: any, idx: number) => {
+                        const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                        return (
+                          <Card key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                                </span>
                                 <Badge variant={isPayment ? "default" : "outline"}>
                                   {isPayment ? "Payment" : txn.voucherType}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <button
-                                  onClick={() => handleTransactionClick(txn)}
-                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                  data-testid={`link-transaction-${idx}`}
-                                >
-                                  <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                </button>
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-semibold">
-                                {formatAmount(txn.balance)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
+                              </div>
+                              <button
+                                onClick={() => handleTransactionClick(txn)}
+                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                data-testid={`link-transaction-${idx}`}
+                              >
+                                <span className="truncate">{txn.description || txn.docNumber || "-"}</span>
+                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                              </button>
+                              <div className="flex items-center justify-between gap-2">
+                                <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
+                                <span className="font-mono font-semibold">{formatAmount(txn.balance)}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
                   
                   {/* Summary */}
                   <div className="border-t pt-4 flex justify-end">
@@ -488,59 +567,98 @@ export default function Suppliers() {
                       ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
                       : " from all companies"}
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Container</TableHead>
-                        <TableHead>PO Number</TableHead>
-                        <TableHead>Import Date</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead className="text-right">Total Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...purchaseOrders]
-                        .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
-                        .map((po: any, idx: number) => {
-                          // Calculate total: items + charges - discount
-                          const itemsTotal = parseFloat(po.itemsTotal || "0");
-                          const freight = parseFloat(po.freight || "0");
-                          const surcharge = parseFloat(po.surcharge || "0");
-                          const fumigation = parseFloat(po.fumigation || "0");
-                          const documentCharges = parseFloat(po.documentCharges || "0");
-                          const discount = parseFloat(po.discount || "0");
-                          const otherCharges = parseFloat(po.otherCharges || "0");
-                          const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-                          
-                          return (
-                            <TableRow key={po.id}>
-                              <TableCell className="font-mono font-semibold">
-                                {po.containerNumber || "-"}
-                              </TableCell>
-                              <TableCell>
-                                <button
-                                  onClick={() => handlePOClick(po)}
-                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
-                                  data-testid={`link-po-${idx}`}
-                                >
-                                  {po.poNumber || `PO-${po.id}`}
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                </button>
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                <Badge variant="secondary">{po.companyName}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-semibold">
-                                {formatAmount(totalAmount)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Container</TableHead>
+                          <TableHead>PO Number</TableHead>
+                          <TableHead>Import Date</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead className="text-right">Total Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...purchaseOrders]
+                          .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
+                          .map((po: any, idx: number) => {
+                            const itemsTotal = parseFloat(po.itemsTotal || "0");
+                            const freight = parseFloat(po.freight || "0");
+                            const surcharge = parseFloat(po.surcharge || "0");
+                            const fumigation = parseFloat(po.fumigation || "0");
+                            const documentCharges = parseFloat(po.documentCharges || "0");
+                            const discount = parseFloat(po.discount || "0");
+                            const otherCharges = parseFloat(po.otherCharges || "0");
+                            const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+                            
+                            return (
+                              <TableRow key={po.id}>
+                                <TableCell className="font-mono font-semibold">
+                                  {po.containerNumber || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <button
+                                    onClick={() => handlePOClick(po)}
+                                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
+                                    data-testid={`link-po-${idx}`}
+                                  >
+                                    {po.poNumber || `PO-${po.id}`}
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                  </button>
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <Badge variant="secondary">{po.companyName}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-mono font-semibold">
+                                  {formatAmount(totalAmount)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-3">
+                    {[...purchaseOrders]
+                      .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
+                      .map((po: any, idx: number) => {
+                        const itemsTotal = parseFloat(po.itemsTotal || "0");
+                        const freight = parseFloat(po.freight || "0");
+                        const surcharge = parseFloat(po.surcharge || "0");
+                        const fumigation = parseFloat(po.fumigation || "0");
+                        const documentCharges = parseFloat(po.documentCharges || "0");
+                        const discount = parseFloat(po.discount || "0");
+                        const otherCharges = parseFloat(po.otherCharges || "0");
+                        const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+                        return (
+                          <Card key={po.id}>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-semibold text-sm">{po.containerNumber || "-"}</span>
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handlePOClick(po)}
+                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium text-sm"
+                                data-testid={`link-po-${idx}`}
+                              >
+                                {po.poNumber || `PO-${po.id}`}
+                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                              </button>
+                              <div className="flex items-center justify-between gap-2">
+                                <Badge variant="secondary" className="text-xs">{po.companyName}</Badge>
+                                <span className="font-mono font-semibold">{formatAmount(totalAmount)}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
             </TabsContent>

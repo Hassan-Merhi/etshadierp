@@ -178,10 +178,10 @@ export default function Customers() {
 
   return (
     <div className="flex flex-col h-full p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">Manage customer accounts and receivables</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Customers</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Manage customer accounts and receivables</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
@@ -301,7 +301,7 @@ export default function Customers() {
         </div>
       </div>
 
-      <Card className="overflow-x-auto">
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -352,6 +352,42 @@ export default function Customers() {
           </TableBody>
         </Table>
       </Card>
+      <div className="md:hidden space-y-3">
+        {filteredCustomers.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            {searchQuery ? "No customers found matching your search" : "No customers yet"}
+          </div>
+        ) : (
+          filteredCustomers.map((customer) => (
+            <Card key={customer.id} data-testid={`row-customer-${customer.id}`}>
+              <div className="p-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => setStatementCustomer(customer)}
+                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm font-medium"
+                    data-testid={`link-customer-statement-${customer.id}`}
+                  >
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    {customer.legalName}
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditClick(customer)}
+                    data-testid={`button-edit-customer-${customer.id}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Badge variant="secondary">{customer.balanceSide || "Dr"}</Badge>
+                  <span className="font-mono font-semibold">{formatAmount(customer.balance || 0)}</span>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Edit Customer Dialog */}
       <Dialog open={isEditOpen} onOpenChange={(open) => {
@@ -463,13 +499,13 @@ export default function Customers() {
 
       {/* Customer Statement Dialog */}
       <Dialog open={!!statementCustomer} onOpenChange={(open) => !open && setStatementCustomer(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl w-[95vw] md:w-auto max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               {statementCustomer?.legalName} - Statement
             </DialogTitle>
-            <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-sm text-muted-foreground">
               <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
               <Badge variant={statementCustomer?.balanceSide === "Cr" ? "default" : "secondary"}>
                 {statementCustomer?.balanceSide || "Dr"}
@@ -493,49 +529,77 @@ export default function Customers() {
                 <div className="text-sm text-muted-foreground">
                   Showing {customerSales.length} transaction{customerSales.length !== 1 ? "s" : ""}
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...customerSales]
-                      .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
-                      .map((sale: any, idx: number) => (
-                        <TableRow key={sale.id}>
-                          <TableCell className="font-mono text-sm">
-                            {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
-                          </TableCell>
-                          <TableCell className="font-mono font-medium">
-                            {sale.containerNumber || "-"}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {sale.invoiceNumber || "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(sale.totalAmount || 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(sale.paidAmount || 0)}
-                          </TableCell>
-                          <TableCell>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Container</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...customerSales]
+                        .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
+                        .map((sale: any, idx: number) => (
+                          <TableRow key={sale.id}>
+                            <TableCell className="font-mono text-sm">
+                              {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
+                            </TableCell>
+                            <TableCell className="font-mono font-medium">
+                              {sale.containerNumber || "-"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {sale.invoiceNumber || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatAmount(sale.totalAmount || 0)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatAmount(sale.paidAmount || 0)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
+                                {sale.paymentStatus || "PENDING"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {[...customerSales]
+                    .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
+                    .map((sale: any, idx: number) => (
+                      <Card key={sale.id}>
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
+                            </span>
                             <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
                               {sale.paymentStatus || "PENDING"}
                             </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="font-mono font-medium">{sale.containerNumber || "-"}</span>
+                            <span className="text-muted-foreground">{sale.invoiceNumber || "-"}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="text-muted-foreground">Amount: <span className="font-mono text-foreground">{formatAmount(sale.totalAmount || 0)}</span></span>
+                            <span className="text-muted-foreground">Paid: <span className="font-mono text-foreground">{formatAmount(sale.paidAmount || 0)}</span></span>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                </div>
 
                 {/* Summary */}
-                <div className="border-t pt-4 flex justify-between items-center">
+                <div className="border-t pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                   <div className="text-sm text-muted-foreground">
                     Total: {customerSales.length} container sale{customerSales.length !== 1 ? "s" : ""}
                   </div>

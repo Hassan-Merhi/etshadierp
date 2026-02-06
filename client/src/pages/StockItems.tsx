@@ -287,7 +287,7 @@ export default function StockItems() {
         title="Stock Items" 
         subtitle="Manage all stock items in your company"
       >
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {selectedIds.length > 0 && (
             <Button 
               variant="destructive" 
@@ -296,7 +296,7 @@ export default function StockItems() {
               data-testid="button-delete-selected"
             >
               <Trash2 className="h-4 w-4" />
-              Delete {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
+              <span className="hidden sm:inline">Delete</span> {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
             </Button>
           )}
           <DropdownMenu>
@@ -330,7 +330,7 @@ export default function StockItems() {
       </PageHeader>
 
       <Card className="p-4">
-        <div className="flex gap-4 mb-4">
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
@@ -347,7 +347,7 @@ export default function StockItems() {
               const val = e.target.value;
               setSelectedGroupFilter(val === "all" ? null : val === "uncategorized" ? "uncategorized" : parseInt(val));
             }}
-            className="px-3 py-2 border rounded-md text-sm"
+            className="w-full md:w-auto px-3 py-2 border rounded-md text-sm"
             data-testid="select-stock-group"
           >
             <option value="all">All Groups</option>
@@ -365,7 +365,8 @@ export default function StockItems() {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : (
-          <div className="rounded-md border overflow-hidden overflow-x-auto">
+          <>
+          <div className="hidden md:block rounded-md border overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="h-12">
@@ -452,6 +453,89 @@ export default function StockItems() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile card view */}
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Checkbox
+                checked={allFilteredSelected}
+                onCheckedChange={handleSelectAll}
+                data-testid="checkbox-select-all-mobile"
+              />
+              <span className="text-sm text-muted-foreground">Select All</span>
+            </div>
+            {filteredStockItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchTerm ? "No items found matching your search" : "No stock items found"}
+              </div>
+            ) : (
+              filteredStockItems.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                return (
+                  <Card
+                    key={item.id}
+                    className="p-3"
+                    data-testid={`card-stock-item-${item.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                          data-testid={`checkbox-mobile-${item.id}`}
+                        />
+                      </div>
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => handleStockItemClick(item.id, item.name)}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium truncate" data-testid={`name-mobile-${item.id}`}>
+                            {item.name}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mt-2">
+                          <div>
+                            <span className="text-muted-foreground">Code: </span>
+                            <span>{item.code}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">UOM: </span>
+                            <span>{item.uom}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Group: </span>
+                            <span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Price: </span>
+                            <span>{formatAmount(item.sellingPrice)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <Badge variant={item.active ? "default" : "secondary"} data-testid={`status-mobile-${item.id}`}>
+                            {item.active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => handleEditClick(item.id, e)}
+                        data-testid={`button-edit-mobile-${item.id}`}
+                        className="gap-1 shrink-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+          </>
         )}
 
         {!isLoading && filteredStockItems.length > 0 && (

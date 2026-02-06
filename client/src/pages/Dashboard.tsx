@@ -353,7 +353,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <PageHeader
           title="Dashboard"
@@ -413,7 +413,7 @@ export default function Dashboard() {
       </div>
 
       {/* Net Position Breakdown: What We Have vs What We Owe vs Expenses */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         <h3 className="text-lg font-medium mb-4">Net Position Breakdown</h3>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
@@ -543,7 +543,7 @@ export default function Dashboard() {
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
         {/* Available Cash */}
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <ArrowDownLeft className="h-5 w-5 text-green-600" />
@@ -682,7 +682,7 @@ export default function Dashboard() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="ml-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => removeAccountMutation.mutate(dca.id)}
                       data-testid={`button-remove-cash-account-${dca.id}`}
                     >
@@ -719,7 +719,7 @@ export default function Dashboard() {
         </Card>
 
         {/* To Pay */}
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <ArrowUpRight className="h-5 w-5 text-red-600" />
@@ -856,7 +856,7 @@ export default function Dashboard() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="ml-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() =>
                       removePayableAccountMutation.mutate(account.id)
                     }

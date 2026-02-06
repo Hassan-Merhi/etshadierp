@@ -383,7 +383,7 @@ function StockItemCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
           <CommandInput placeholder="Search stock items..." className="bg-popover text-popover-foreground" />
           <CommandList className="bg-popover text-popover-foreground">
@@ -468,7 +468,7 @@ function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
           <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
           <CommandList className="bg-popover text-popover-foreground">
@@ -1298,7 +1298,7 @@ export default function VoucherEdit() {
           <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold">Edit Voucher</h1>
+          <h1 className="text-xl md:text-3xl font-bold">Edit Voucher</h1>
         </div>
         <Card>
           <CardContent className="py-8">
@@ -1325,7 +1325,7 @@ export default function VoucherEdit() {
           <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold">Edit Voucher</h1>
+          <h1 className="text-xl md:text-3xl font-bold">Edit Voucher</h1>
         </div>
         <Card>
           <CardContent className="py-8">
@@ -1362,7 +1362,7 @@ export default function VoucherEdit() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
               Edit Sales Invoice
             </h1>
             <p className="text-muted-foreground mt-1">
@@ -1380,7 +1380,7 @@ export default function VoucherEdit() {
             <Form {...salesForm}>
               <form onSubmit={salesForm.handleSubmit(onSubmitSales)} className="space-y-6">
                 {/* Header section with date and location */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-stretch md:items-start justify-between gap-4">
                   {/* Date picker */}
                   <FormField
                     control={salesForm.control}
@@ -1394,7 +1394,7 @@ export default function VoucherEdit() {
                               <Button
                                 variant="outline"
                                 className={cn(
-                                  "w-[200px] justify-start text-left font-normal",
+                                  "w-full md:w-[200px] justify-start text-left font-normal",
                                   !field.value && "text-muted-foreground"
                                 )}
                                 data-testid="button-date-picker"
@@ -1450,7 +1450,90 @@ export default function VoucherEdit() {
                 {/* Line items table */}
                 <div>
                   <FormLabel className="mb-2 block">Line Items</FormLabel>
-                  <div className="border rounded-md overflow-hidden">
+
+                  {/* Mobile card view */}
+                  <div className="md:hidden space-y-3">
+                    {salesFields.map((field, index) => {
+                      const qty = parseFloat(salesForm.watch(`items.${index}.quantity`)) || 0;
+                      const price = parseFloat(salesForm.watch(`items.${index}.sellingPrice`)) || 0;
+                      const lineTotal = qty * price;
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                            {salesFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => salesRemove(index)} data-testid={`button-remove-mobile-${index}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={salesForm.control}
+                            name={`items.${index}.stockItemId`}
+                            render={({ field: itemField }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Stock Item</FormLabel>
+                                <FormControl>
+                                  <StockItemCombobox
+                                    value={salesForm.watch(`items.${index}.stockItemId`) > 0 ? { id: salesForm.watch(`items.${index}.stockItemId`), name: salesForm.watch(`items.${index}.stockItemName`) } : null}
+                                    onChange={(id, name) => { salesForm.setValue(`items.${index}.stockItemId`, id); salesForm.setValue(`items.${index}.stockItemName`, name); }}
+                                    stockItems={stockItems}
+                                    rowIndex={index}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={salesForm.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Quantity</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={salesForm.control}
+                              name={`items.${index}.sellingPrice`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Price</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-price-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">Total</span>
+                            <span className="font-mono font-medium" data-testid={`text-total-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => salesAppend({ stockItemId: 0, stockItemName: "", quantity: "", sellingPrice: "" })} data-testid="button-add-row-mobile">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Grand Total</div>
+                        <div className="font-bold font-mono">{formatAmount(salesGrandTotal)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block border rounded-md overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
@@ -1623,7 +1706,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -1667,7 +1750,7 @@ export default function VoucherEdit() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
               Edit Purchase Order
             </h1>
             <p className="text-muted-foreground mt-1">
@@ -1685,7 +1768,7 @@ export default function VoucherEdit() {
             <Form {...purchaseForm}>
               <form onSubmit={purchaseForm.handleSubmit(onSubmitPurchase)} className="space-y-6">
                 {/* Header section with date and readonly fields */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
                   <FormField
                     control={purchaseForm.control}
@@ -1774,7 +1857,90 @@ export default function VoucherEdit() {
                 {/* Line items table */}
                 <div>
                   <FormLabel className="mb-2 block">Line Items</FormLabel>
-                  <div className="border rounded-md overflow-hidden">
+
+                  {/* Mobile card view */}
+                  <div className="md:hidden space-y-3">
+                    {purchaseFields.map((field, index) => {
+                      const qty = parseFloat(purchaseForm.watch(`items.${index}.quantity`)) || 0;
+                      const rate = parseFloat(purchaseForm.watch(`items.${index}.rate`)) || 0;
+                      const lineTotal = qty * rate;
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                            {purchaseFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => purchaseRemove(index)} data-testid={`button-remove-purchase-mobile-${index}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={purchaseForm.control}
+                            name={`items.${index}.stockItemId`}
+                            render={({ field: itemField }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Stock Item</FormLabel>
+                                <FormControl>
+                                  <StockItemCombobox
+                                    value={purchaseForm.watch(`items.${index}.stockItemId`) > 0 ? { id: purchaseForm.watch(`items.${index}.stockItemId`), name: purchaseForm.watch(`items.${index}.stockItemName`) } : null}
+                                    onChange={(id, name) => { purchaseForm.setValue(`items.${index}.stockItemId`, id); purchaseForm.setValue(`items.${index}.stockItemName`, name); }}
+                                    stockItems={stockItems}
+                                    rowIndex={index}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={purchaseForm.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Quantity</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-purchase-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={purchaseForm.control}
+                              name={`items.${index}.rate`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Rate</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-rate-purchase-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">Total</span>
+                            <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => purchaseAppend({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })} data-testid="button-add-row-purchase-mobile">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Grand Total</div>
+                        <div className="font-bold font-mono">{formatAmount(purchaseGrandTotal)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block border rounded-md overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
@@ -1947,7 +2113,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -1992,7 +2158,7 @@ export default function VoucherEdit() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
               Edit {voucherType} Voucher
             </h1>
             <p className="text-muted-foreground mt-1">
@@ -2010,7 +2176,7 @@ export default function VoucherEdit() {
             <Form {...adjustmentForm}>
               <form onSubmit={adjustmentForm.handleSubmit(onSubmitAdjustment)} className="space-y-6">
                 {/* Header section with date and location */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
                   <FormField
                     control={adjustmentForm.control}
@@ -2024,7 +2190,7 @@ export default function VoucherEdit() {
                               <Button
                                 variant="outline"
                                 className={cn(
-                                  "w-[200px] justify-start text-left font-normal",
+                                  "w-full md:w-[200px] justify-start text-left font-normal",
                                   !field.value && "text-muted-foreground"
                                 )}
                                 data-testid="button-date-picker"
@@ -2080,7 +2246,90 @@ export default function VoucherEdit() {
                 {/* Line items table */}
                 <div>
                   <FormLabel className="mb-2 block">Line Items</FormLabel>
-                  <div className="border rounded-md overflow-hidden">
+
+                  {/* Mobile card view */}
+                  <div className="md:hidden space-y-3">
+                    {adjustmentFields.map((field, index) => {
+                      const qty = parseFloat(adjustmentForm.watch(`items.${index}.quantity`)) || 0;
+                      const rate = parseFloat(adjustmentForm.watch(`items.${index}.rate`)) || 0;
+                      const lineTotal = qty * rate;
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                            {adjustmentFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => adjustmentRemove(index)} data-testid={`button-remove-adj-mobile-${index}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={adjustmentForm.control}
+                            name={`items.${index}.stockItemId`}
+                            render={({ field: itemField }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Stock Item</FormLabel>
+                                <FormControl>
+                                  <StockItemCombobox
+                                    value={adjustmentForm.watch(`items.${index}.stockItemId`) > 0 ? { id: adjustmentForm.watch(`items.${index}.stockItemId`), name: adjustmentForm.watch(`items.${index}.stockItemName`) } : null}
+                                    onChange={(id, name) => { adjustmentForm.setValue(`items.${index}.stockItemId`, id); adjustmentForm.setValue(`items.${index}.stockItemName`, name); }}
+                                    stockItems={stockItems}
+                                    rowIndex={index}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={adjustmentForm.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Quantity</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-adj-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={adjustmentForm.control}
+                              name={`items.${index}.rate`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Rate</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-rate-adj-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">Total</span>
+                            <span className="font-mono font-medium" data-testid={`text-total-adj-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => adjustmentAppend({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })} data-testid="button-add-row-adj-mobile">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Grand Total</div>
+                        <div className="font-bold font-mono">{formatAmount(adjustmentGrandTotal)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block border rounded-md overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
@@ -2253,7 +2502,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -2340,13 +2589,13 @@ export default function VoucherEdit() {
     
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
                 Edit Stock Transfer
               </h1>
               <p className="text-muted-foreground mt-1">
@@ -2375,7 +2624,7 @@ export default function VoucherEdit() {
             <Form {...transferForm}>
               <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="space-y-6">
                 {/* Header section with date and locations */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
                   <FormField
                     control={transferForm.control}
@@ -2455,7 +2704,91 @@ export default function VoucherEdit() {
                 {/* Line items table */}
                 <div>
                   <FormLabel className="mb-2 block">Line Items</FormLabel>
-                  <div className="border rounded-md overflow-hidden">
+
+                  {/* Mobile card view */}
+                  <div className="md:hidden space-y-3">
+                    {transferFields.map((field, index) => {
+                      const qty = parseFloat(transferForm.watch(`items.${index}.quantity`)) || 0;
+                      const rate = parseFloat(transferForm.watch(`items.${index}.rate`)) || 0;
+                      const lineTotal = qty * rate;
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                            {transferFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => transferRemove(index)} data-testid={`button-remove-transfer-mobile-${index}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={transferForm.control}
+                            name={`items.${index}.stockItemId`}
+                            render={({ field: itemField }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Stock Item</FormLabel>
+                                <FormControl>
+                                  <StockItemCombobox
+                                    value={transferForm.watch(`items.${index}.stockItemId`) > 0 ? { id: transferForm.watch(`items.${index}.stockItemId`), name: transferForm.watch(`items.${index}.stockItemName`) } : null}
+                                    onChange={(id, name) => { transferForm.setValue(`items.${index}.stockItemId`, id); transferForm.setValue(`items.${index}.stockItemName`, name); }}
+                                    stockItems={stockItems}
+                                    rowIndex={index}
+                                    testIdPrefix="button-stock-item-transfer"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={transferForm.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Quantity</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-transfer-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={transferForm.control}
+                              name={`items.${index}.rate`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Rate</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-rate-transfer-mobile-${index}`} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">Total</span>
+                            <span className="font-mono font-medium" data-testid={`text-total-transfer-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between gap-2 pt-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => transferAppend({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })} data-testid="button-add-row-transfer-mobile">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Grand Total</div>
+                        <div className="font-bold font-mono">{formatAmount(transferGrandTotal)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block border rounded-md overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
@@ -2629,7 +2962,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -2675,7 +3008,7 @@ export default function VoucherEdit() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
+          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
             Edit {voucherType} Voucher
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -2694,7 +3027,7 @@ export default function VoucherEdit() {
             <Form {...paymentForm}>
               <form onSubmit={paymentForm.handleSubmit(onSubmitPaymentReceipt)} className="space-y-6">
                 {/* Header section */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-stretch md:items-start justify-between gap-4">
                   {/* Left: Payment account selector */}
                   <FormField
                     control={paymentForm.control}
@@ -2746,7 +3079,7 @@ export default function VoucherEdit() {
                               <Button
                                 variant="outline"
                                 className={cn(
-                                  "w-[200px] justify-start text-left font-normal",
+                                  "w-full md:w-[200px] justify-start text-left font-normal",
                                   !field.value && "text-muted-foreground"
                                 )}
                                 data-testid="button-date-picker"
@@ -2789,8 +3122,72 @@ export default function VoucherEdit() {
                   />
                 </div>
 
-                {/* Entries table */}
-                <div className="border rounded-md overflow-hidden">
+                {/* Entries - Mobile card view */}
+                <div className="md:hidden space-y-3">
+                  {paymentFields.map((field, index) => (
+                    <div key={field.id} className="border rounded-md p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Entry {index + 1}</span>
+                        {paymentFields.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => paymentRemove(index)} data-testid={`button-remove-payment-mobile-${index}`}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <FormField
+                        control={paymentForm.control}
+                        name={`entries.${index}.accountId`}
+                        render={({ field: accountField }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Account</FormLabel>
+                            <FormControl>
+                              <AccountAutocomplete
+                                value={paymentForm.watch(`entries.${index}.accountId`) > 0 ? { type: paymentForm.watch(`entries.${index}.accountType`), id: paymentForm.watch(`entries.${index}.accountId`), name: paymentForm.watch(`entries.${index}.accountName`) } : null}
+                                onChange={(type, id, name) => {
+                                  if (type === "ledger" || type === "bank" || type === "supplier") {
+                                    paymentForm.setValue(`entries.${index}.accountType`, type);
+                                    paymentForm.setValue(`entries.${index}.accountId`, id);
+                                    paymentForm.setValue(`entries.${index}.accountName`, name);
+                                  }
+                                }}
+                                allAccounts={allAccountsWithBalances}
+                                rowIndex={index}
+                                testId={`input-account-payment-mobile-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={paymentForm.control}
+                        name={`entries.${index}.amount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Amount</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-amount-payment-mobile-${index}`} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => paymentAppend({ accountType: "ledger", accountId: 0, accountName: "", amount: "" })} data-testid="button-add-row-payment-mobile">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Row
+                    </Button>
+                    <div className="text-right">
+                      <div className="text-sm text-muted-foreground">Total</div>
+                      <div className="font-bold font-mono">{formatAmount(paymentTotal)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entries - Desktop table view */}
+                <div className="hidden md:block border rounded-md overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
@@ -2820,7 +3217,6 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        // Only ledger, bank, supplier are allowed in payment forms
                                         if (type === "ledger" || type === "bank" || type === "supplier") {
                                           paymentForm.setValue(`entries.${index}.accountType`, type);
                                           paymentForm.setValue(`entries.${index}.accountId`, id);
@@ -2927,7 +3323,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -2973,7 +3369,7 @@ export default function VoucherEdit() {
                             <Button
                               variant="outline"
                               className={cn(
-                                "w-[200px] justify-start text-left font-normal",
+                                "w-full md:w-[200px] justify-start text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
                               data-testid="button-date-picker"
@@ -3015,8 +3411,98 @@ export default function VoucherEdit() {
                   )}
                 />
 
-                {/* Entries table */}
-                <div className="border rounded-md overflow-hidden">
+                {/* Entries - Mobile card view */}
+                <div className="md:hidden space-y-3">
+                  {journalFields.map((field, index) => (
+                    <div key={field.id} className="border rounded-md p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Entry {index + 1}</span>
+                        {journalFields.length > 2 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => journalRemove(index)} data-testid={`button-remove-journal-mobile-${index}`}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={journalForm.control}
+                          name={`entries.${index}.type`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid={`select-type-journal-mobile-${index}`}>
+                                    <SelectValue placeholder="Type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="DR">DR</SelectItem>
+                                  <SelectItem value="CR">CR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={journalForm.control}
+                          name={`entries.${index}.amount`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Amount</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-amount-journal-mobile-${index}`} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={journalForm.control}
+                        name={`entries.${index}.accountId`}
+                        render={({ field: accountField }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Account</FormLabel>
+                            <FormControl>
+                              <AccountAutocomplete
+                                value={journalForm.watch(`entries.${index}.accountId`) > 0 ? { type: journalForm.watch(`entries.${index}.accountType`), id: journalForm.watch(`entries.${index}.accountId`), name: journalForm.watch(`entries.${index}.accountName`) } : null}
+                                onChange={(type, id, name) => {
+                                  if (type === "ledger" || type === "bank" || type === "supplier") {
+                                    journalForm.setValue(`entries.${index}.accountType`, type);
+                                    journalForm.setValue(`entries.${index}.accountId`, id);
+                                    journalForm.setValue(`entries.${index}.accountName`, name);
+                                  }
+                                }}
+                                allAccounts={allAccountsWithBalances}
+                                rowIndex={index}
+                                testId={`input-account-journal-mobile-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => journalAppend({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })} data-testid="button-add-row-journal-mobile">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Row
+                    </Button>
+                    <div className="text-right text-sm">
+                      <div className="text-muted-foreground">DR: {formatAmount(journalDRTotal)}</div>
+                      <div className="text-muted-foreground">CR: {formatAmount(journalCRTotal)}</div>
+                      <div className={cn("font-bold font-mono mt-1", Math.abs(journalDRTotal - journalCRTotal) > 0.01 && "text-destructive")}>
+                        Diff: {formatAmount(Math.abs(journalDRTotal - journalCRTotal))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entries - Desktop table view */}
+                <div className="hidden md:block border rounded-md overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
@@ -3069,7 +3555,6 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        // Only ledger, bank, supplier are allowed in journal forms
                                         if (type === "ledger" || type === "bank" || type === "supplier") {
                                           journalForm.setValue(`entries.${index}.accountType`, type);
                                           journalForm.setValue(`entries.${index}.accountId`, id);
@@ -3188,7 +3673,7 @@ export default function VoucherEdit() {
                 />
 
                 {/* Action buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"

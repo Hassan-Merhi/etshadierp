@@ -228,9 +228,9 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">POS Dashboard</h1>
           <p className="text-muted-foreground">

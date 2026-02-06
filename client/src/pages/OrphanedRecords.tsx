@@ -188,21 +188,21 @@ export default function OrphanedRecordsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center gap-3">
         <AlertCircle className="h-8 w-8 text-orange-500" />
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-orphaned-records">Orphaned Records</h1>
+          <h1 className="text-2xl md:text-3xl font-bold" data-testid="heading-orphaned-records">Orphaned Records</h1>
           <p className="text-muted-foreground">Records with deleted locations or accounting imbalances</p>
         </div>
       </div>
 
       {/* Unbalanced Vouchers Section */}
-      <Card className="p-6">
+      <Card className="p-4 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <AlertTriangle className="h-6 w-6 text-red-500" />
           <div>
-            <h2 className="text-xl font-semibold" data-testid="heading-unbalanced-vouchers">Unbalanced Vouchers</h2>
+            <h2 className="text-lg md:text-xl font-semibold" data-testid="heading-unbalanced-vouchers">Unbalanced Vouchers</h2>
             <p className="text-sm text-muted-foreground">Vouchers where debits do not equal credits</p>
           </div>
         </div>
@@ -216,6 +216,8 @@ export default function OrphanedRecordsPage() {
             <p className="text-muted-foreground">No accounting imbalances detected</p>
           </div>
         ) : (
+          <>
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -256,6 +258,34 @@ export default function OrphanedRecordsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
+          <div className="md:hidden space-y-3">
+            {unbalancedRecords.map((voucher) => (
+              <Card key={voucher.id} className="p-3" data-testid={`card-unbalanced-${voucher.id}`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
+                  <Badge variant="outline">{voucher.voucherType}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
+                <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Debits</p>
+                    <p className="font-mono">{formatAmount(voucher.totalDebits)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Credits</p>
+                    <p className="font-mono">{formatAmount(voucher.totalCredits)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Imbalance</p>
+                    <p className="font-mono text-red-600 font-bold">{formatAmount(voucher.imbalance)}</p>
+                  </div>
+                </div>
+                {voucher.description && <p className="text-xs text-muted-foreground mt-2 truncate">{voucher.description}</p>}
+              </Card>
+            ))}
+          </div>
+          </>
         )}
       </Card>
 
@@ -289,8 +319,8 @@ export default function OrphanedRecordsPage() {
         </Card>
       )}
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      <Card className="p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-6 w-6 text-orange-500" />
             <div>
@@ -321,6 +351,8 @@ export default function OrphanedRecordsPage() {
             <p className="text-muted-foreground">All your records have valid locations assigned</p>
           </div>
         ) : (
+          <>
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -371,11 +403,43 @@ export default function OrphanedRecordsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox 
+                checked={selectedVouchers.length === orphanedRecords.length && orphanedRecords.length > 0}
+                onCheckedChange={handleSelectAll}
+                data-testid="checkbox-select-all-mobile"
+              />
+              <span className="text-sm text-muted-foreground">Select All</span>
+            </div>
+            {orphanedRecords.map((voucher) => (
+              <Card key={voucher.id} className="p-3" data-testid={`card-voucher-${voucher.id}`}>
+                <div className="flex items-start gap-3">
+                  <Checkbox 
+                    checked={selectedVouchers.includes(voucher.id)}
+                    onCheckedChange={() => handleToggleVoucher(voucher.id)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
+                      <Badge variant="outline">{voucher.voucherType}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
+                    {voucher.locationName && <p className="text-sm">{voucher.locationName}</p>}
+                    <p className="text-sm font-mono text-right mt-1">{formatAmount(voucher.totalAmount)}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          </>
         )}
       </Card>
 
       {/* Archived Stock Groups Section */}
-      <Card className="p-6">
+      <Card className="p-4 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <Archive className="h-6 w-6 text-blue-500" />
           <div>
@@ -393,6 +457,8 @@ export default function OrphanedRecordsPage() {
             <p className="text-muted-foreground">Archive stock groups from Location Inventory to clear and backup inventory data</p>
           </div>
         ) : (
+          <>
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -454,6 +520,43 @@ export default function OrphanedRecordsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
+          <div className="md:hidden space-y-3">
+            {stockGroupArchives.map((archive) => (
+              <Card key={archive.id} className="p-3" data-testid={`card-archive-${archive.id}`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="font-medium text-sm">{archive.stockGroupName}</span>
+                  <span className="text-sm text-muted-foreground">{archive.locationName}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Items</p>
+                    <p>{archive.itemCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Qty</p>
+                    <p className="font-mono">{parseFloat(archive.totalQuantity).toFixed(3)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Value</p>
+                    <p className="font-mono">{formatAmount(archive.totalValue)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">{formatDisplayDate(archive.archivedAt)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => restoreArchiveMutation.mutate(archive.id)} disabled={restoreArchiveMutation.isPending}>
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Restore
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })} disabled={deleteArchiveMutation.isPending}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+          </>
         )}
       </Card>
 

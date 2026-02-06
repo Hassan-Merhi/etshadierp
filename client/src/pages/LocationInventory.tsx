@@ -681,12 +681,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full min-w-0">
+    <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6 w-full min-w-0">
       <PageHeader 
         title="Location Inventory" 
         subtitle="Manage inventory across all locations"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Label className="text-sm text-muted-foreground">As of Date:</Label>
           <DatePickerInput
             value={asOfDate}
@@ -786,13 +786,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Location List View */}
       {!selectedLocationLocal && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">Location Inventory</h1>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <h1 className="text-xl md:text-3xl font-bold">Location Inventory</h1>
             <Button
               variant="default"
               onClick={() => setCreateLocationDialogOpen(true)}
               data-testid="button-create-location"
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <MapPin className="w-4 h-4" />
               Create Location
@@ -874,51 +874,54 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Stock Group List View */}
       {selectedLocationLocal && !selectedGroup && !viewAllItems && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
+            <h1 className="text-xl md:text-3xl font-bold">
               {selectedLocationLocal.name} - Stock Groups
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               <Button
                 onClick={() => {
                   setViewAllItems(true);
-                  // Give the view time to render before printing
                   setTimeout(() => handlePrint(), 100);
                 }}
                 data-testid="button-print-inventory-quick"
                 variant="outline"
-                className="gap-2"
+                className="gap-2 flex-1 md:flex-none"
               >
                 <Printer className="w-4 h-4" />
-                Print Inventory
+                <span className="hidden sm:inline">Print Inventory</span>
+                <span className="sm:hidden">Print</span>
               </Button>
               <Button
                 onClick={() => setViewAllItems(true)}
                 data-testid="button-view-all-items"
                 variant="outline"
-                className="gap-2"
+                className="gap-2 flex-1 md:flex-none"
               >
                 <List className="w-4 h-4" />
-                View All Stock Items
+                <span className="hidden sm:inline">View All Stock Items</span>
+                <span className="sm:hidden">View All</span>
               </Button>
               {!posUser && (
                 <>
                   <Button
                     onClick={() => handleUseLocation(selectedLocationLocal)}
                     data-testid="button-use-location"
-                    className="gap-2"
+                    className="gap-2 flex-1 md:flex-none"
                   >
                     <ShoppingCart className="w-4 h-4" />
-                    Use Location for POS
+                    <span className="hidden sm:inline">Use Location for POS</span>
+                    <span className="sm:hidden">POS</span>
                   </Button>
                   <Button
                     onClick={() => setDeleteDialogOpen(true)}
                     data-testid="button-delete-location"
                     variant="destructive"
-                    className="gap-2"
+                    className="gap-2 flex-1 md:flex-none"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete Location
+                    <span className="hidden sm:inline">Delete Location</span>
+                    <span className="sm:hidden">Delete</span>
                   </Button>
                 </>
               )}
@@ -971,7 +974,74 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 No inventory found at this location.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden w-full min-w-0">
+              <>
+                {/* Mobile card view */}
+                <div className="md:hidden space-y-3">
+                {filteredStockGroups.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No stock groups found matching your search
+                  </div>
+                ) : (
+                  <>
+                    {filteredStockGroups.map((group) => {
+                      const isNegative = group.totalQuantity < 0;
+                      return (
+                        <Card
+                          key={group.groupId || 0}
+                          className={`p-3 cursor-pointer ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}
+                          onClick={() => setSelectedGroup(group)}
+                          data-testid={`row-group-${group.groupId || 'uncategorized'}`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <Layers className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium" data-testid={`name-${group.groupId}`}>{group.groupName}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Items: </span>
+                              <span data-testid={`items-${group.groupId}`}>{group.itemCount.toLocaleString()}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-muted-foreground">Qty: </span>
+                              <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                                {Math.floor(group.totalQuantity).toLocaleString()} BL
+                              </span>
+                            </div>
+                            {!posUser && (
+                              <>
+                                <div>
+                                  <span className="text-muted-foreground">Avg Rate: </span>
+                                  <span className="font-mono" data-testid={`rate-${group.groupId}`}>{formatAmount(group.averageRate)}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-muted-foreground">Value: </span>
+                                  <span className="font-mono font-medium" data-testid={`value-${group.groupId}`}>{formatAmount(group.totalValue)}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                    {filteredStockGroups.length > 0 && !itemSearchTerm && (
+                      <Card className="p-3 bg-muted/50">
+                        <div className="flex items-center justify-between font-bold text-sm">
+                          <span>Total ({filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()} items)</span>
+                          <span className="font-mono">{Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL</span>
+                        </div>
+                        {!posUser && (
+                          <div className="text-right text-sm font-mono font-bold mt-1">
+                            {formatAmount(filteredStockGroups.reduce((sum, g) => sum + g.totalValue, 0))}
+                          </div>
+                        )}
+                      </Card>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block rounded-md border overflow-hidden w-full min-w-0">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     <col />
@@ -1013,26 +1083,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             key={group.groupId || 0}
                             className={`border-t cursor-pointer h-12 ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}
                             onClick={() => setSelectedGroup(group)}
-                            data-testid={`row-group-${group.groupId || 'uncategorized'}`}
+                            data-testid={`row-group-desktop-${group.groupId || 'uncategorized'}`}
                           >
-                            <td className="px-3 font-medium" data-testid={`name-${group.groupId}`}>
+                            <td className="px-3 font-medium" data-testid={`name-desktop-${group.groupId}`}>
                               <div className="flex items-center gap-2">
                                 <Layers className="h-4 w-4 text-muted-foreground" />
                                 {group.groupName}
                               </div>
                             </td>
-                            <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
+                            <td className="px-3 text-right" data-testid={`items-desktop-${group.groupId}`}>
                               {group.itemCount.toLocaleString()}
                             </td>
-                            <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                            <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-desktop-${group.groupId}`}>
                               {Math.floor(group.totalQuantity).toLocaleString()}<span className="ml-3">BL</span>
                             </td>
                             {!posUser && (
                               <>
-                                <td className="px-3 text-right font-mono" data-testid={`rate-${group.groupId}`}>
+                                <td className="px-3 text-right font-mono" data-testid={`rate-desktop-${group.groupId}`}>
                                   {formatAmount(group.averageRate)}
                                 </td>
-                                <td className="px-3 text-right font-mono font-medium" data-testid={`value-${group.groupId}`}>
+                                <td className="px-3 text-right font-mono font-medium" data-testid={`value-desktop-${group.groupId}`}>
                                   {formatAmount(group.totalValue)}
                                 </td>
                               </>
@@ -1061,6 +1131,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
             {!inventoryLoading && filteredStockGroups.length > 0 && (
               <div className="mt-4 text-sm text-muted-foreground">
@@ -1074,8 +1145,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Stock Items Table View (Single Group) */}
       {selectedLocationLocal && selectedGroup && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <h1 className="text-xl md:text-3xl font-bold">
               {selectedGroup.groupName} - Stock Items
             </h1>
             {!posUser && (
@@ -1083,6 +1154,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 variant="outline"
                 onClick={() => setArchiveDialogOpen(true)}
                 data-testid="button-archive-stock-group"
+                className="w-full sm:w-auto"
               >
                 <Archive className="h-4 w-4 mr-2" />
                 Archive Stock Group
@@ -1090,7 +1162,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             )}
           </div>
 
-          <Card className="p-4 w-full">
+          <Card className="p-3 md:p-4 w-full">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -1102,7 +1174,80 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               />
             </div>
 
-            <div className="rounded-md border overflow-hidden w-full min-w-0">
+            {/* Mobile card view */}
+            <div className="md:hidden space-y-3">
+              {filteredStockItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
+                </div>
+              ) : (
+                <>
+                  {filteredStockItems.map((item, index) => {
+                    const itemQty = parseFloat(item.quantity || "0");
+                    const isNegative = itemQty < 0;
+                    return (
+                      <Card
+                        key={item.inventoryId}
+                        data-testid={`row-item-${item.stockItemId}`}
+                        className={`p-3 ${
+                          index === selectedRowIndex
+                            ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent")
+                            : (isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate")
+                        }`}
+                        onClick={() => setSelectedRowIndex(index)}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
+                          }}
+                          className="text-left text-primary hover:underline cursor-pointer font-medium mb-2 block"
+                          data-testid={`link-item-${item.stockItemId}`}
+                        >
+                          {item.stockItemName}
+                        </button>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Qty: </span>
+                            <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                              {Math.floor(itemQty).toLocaleString()} BL
+                            </span>
+                          </div>
+                          {!posUser && (
+                            <>
+                              <div className="text-right">
+                                <span className="text-muted-foreground">Rate: </span>
+                                <span className="font-mono">{formatAmount(parseFloat(item.averageRate))}</span>
+                              </div>
+                              <div className="col-span-2 text-right">
+                                <span className="text-muted-foreground">Value: </span>
+                                <span className="font-mono font-medium">{formatAmount(parseFloat(item.totalValue))}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  {filteredStockItems.length > 0 && (
+                    <Card className="p-3 bg-muted/50">
+                      <div className="flex items-center justify-between font-bold text-sm">
+                        <span>Total</span>
+                        <span className="font-mono">{Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL</span>
+                      </div>
+                      {!posUser && (
+                        <div className="text-right text-sm font-mono font-bold mt-1">
+                          {formatAmount(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}
+                        </div>
+                      )}
+                    </Card>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden md:block rounded-md border overflow-hidden w-full min-w-0">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col />
@@ -1140,7 +1285,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       return (
                         <tr
                           key={item.inventoryId}
-                          data-testid={`row-item-${item.stockItemId}`}
+                          data-testid={`row-item-desktop-${item.stockItemId}`}
                           className={`border-t h-12 ${
                             index === selectedRowIndex 
                               ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent") 
@@ -1155,7 +1300,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
                               }}
                               className="text-left text-primary hover:underline cursor-pointer"
-                              data-testid={`link-item-${item.stockItemId}`}
+                              data-testid={`link-item-desktop-${item.stockItemId}`}
                             >
                               {item.stockItemName}
                             </button>
@@ -1210,15 +1355,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* All Stock Items View */}
       {selectedLocationLocal && viewAllItems && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <h1 className="text-xl md:text-3xl font-bold">
               {selectedLocationLocal.name} - All Stock Items
             </h1>
             <Button
               onClick={handlePrint}
               data-testid="button-print-inventory"
               variant="default"
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <Printer className="w-4 h-4" />
               Print Inventory
@@ -1399,8 +1544,68 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                   return (
                     <>
-                      {/* Screen view - Spreadsheet table */}
-                      <div className="screen-only w-full min-w-0">
+                      {/* Screen view - Mobile cards */}
+                      <div className="screen-only md:hidden space-y-4">
+                        {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => (
+                          <div key={`mobile-group-${groupCode}`}>
+                            <div className="font-bold text-sm bg-muted/30 px-3 py-2 rounded-md mb-2">{name}</div>
+                            <div className="space-y-2">
+                              {items.map((item) => {
+                                const itemQty = parseFloat(item.quantity || "0");
+                                const isNegative = itemQty < 0;
+                                return (
+                                  <Card
+                                    key={item.inventoryId}
+                                    className={`p-3 ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}
+                                  >
+                                    <button
+                                      onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
+                                      className="text-left text-primary hover:underline cursor-pointer font-medium mb-2 block"
+                                      data-testid={`link-all-item-${item.stockItemId}`}
+                                    >
+                                      {item.stockItemName}
+                                    </button>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                      <div>
+                                        <span className="text-muted-foreground">Qty: </span>
+                                        <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                                          {Math.floor(itemQty).toLocaleString()} BL
+                                        </span>
+                                      </div>
+                                      {!posUser && (
+                                        <>
+                                          <div className="text-right">
+                                            <span className="text-muted-foreground">Rate: </span>
+                                            <span className="font-mono">{formatAmount(parseFloat(item.averageRate))}</span>
+                                          </div>
+                                          <div className="col-span-2 text-right">
+                                            <span className="text-muted-foreground">Value: </span>
+                                            <span className="font-mono font-medium">{formatAmount(parseFloat(item.totalValue))}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                        <Card className="p-3 bg-muted/50">
+                          <div className="flex items-center justify-between font-bold text-sm">
+                            <span>Grand Total</span>
+                            <span className="font-mono">{Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL</span>
+                          </div>
+                          {!posUser && (
+                            <div className="text-right text-sm font-mono font-bold mt-1">
+                              {formatAmount(inventory.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}
+                            </div>
+                          )}
+                        </Card>
+                      </div>
+
+                      {/* Screen view - Desktop table */}
+                      <div className="screen-only hidden md:block w-full min-w-0">
                         <Card className="w-full">
                           <div className="rounded-md border overflow-hidden w-full min-w-0">
                             <table className="w-full table-fixed text-sm">
@@ -1429,13 +1634,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               <tbody>
                                 {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => (
                                   <>
-                                    {/* Group header row */}
                                     <tr key={`header-${groupCode}`} className="bg-muted/30">
                                       <td colSpan={posUser ? 2 : 4} className="px-3 py-2 font-bold">
                                         {name}
                                       </td>
                                     </tr>
-                                    {/* Group items */}
                                     {items.map((item) => {
                                       const itemQty = parseFloat(item.quantity || "0");
                                       const isNegative = itemQty < 0;
@@ -1445,7 +1648,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                             <button
                                               onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
                                               className="text-left text-primary hover:underline cursor-pointer"
-                                              data-testid={`link-all-item-${item.stockItemId}`}
+                                              data-testid={`link-all-item-desktop-${item.stockItemId}`}
                                             >
                                               {item.stockItemName}
                                             </button>
@@ -1468,7 +1671,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                     })}
                                   </>
                                 ))}
-                                {/* Grand Totals Row */}
                                 <tr className="bg-muted/50 border-t-2 font-semibold h-12">
                                   <td className="px-3 font-bold">Grand Total</td>
                                   <td className="px-3 text-right font-mono font-bold">

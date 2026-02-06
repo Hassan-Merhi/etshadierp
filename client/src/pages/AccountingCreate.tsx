@@ -276,7 +276,7 @@ export default function AccountingCreate() {
         value={selectedEntity}
         onValueChange={(v) => setSelectedEntity(v as EntityType)}
       >
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="location" data-testid="tab-location">
             Location
           </TabsTrigger>
@@ -326,7 +326,7 @@ function LocationForm({
   });
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -504,7 +504,7 @@ function LedgerAccountForm({
   };
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
@@ -645,7 +645,7 @@ function LedgerAccountForm({
                           <Plus className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="w-[95vw] max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>Create Parent Account</DialogTitle>
                         </DialogHeader>
@@ -745,7 +745,7 @@ function LedgerAccountForm({
                                 )}
                               />
                             </div>
-                            <div className="flex gap-2 justify-end border-t pt-4">
+                            <div className="flex flex-wrap gap-2 justify-end border-t pt-4">
                               <Button
                                 type="button"
                                 variant="outline"
@@ -857,7 +857,7 @@ function EmployeeForm({
   isPending: boolean;
 }) {
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
@@ -1010,7 +1010,7 @@ function SupplierForm({
   isPending: boolean;
 }) {
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
@@ -1096,7 +1096,7 @@ function StockGroupForm({
   isPending: boolean;
 }) {
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
@@ -1194,7 +1194,7 @@ function StockItemForm({
   }, [openingQty, openingRate]);
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
@@ -1418,7 +1418,7 @@ function FormButtons({
   isPending: boolean;
 }) {
   return (
-    <div className="flex gap-2 justify-end border-t pt-4">
+    <div className="flex flex-wrap gap-2 justify-end border-t pt-4">
       <Button
         type="button"
         variant="outline"

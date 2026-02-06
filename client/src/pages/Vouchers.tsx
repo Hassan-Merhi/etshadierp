@@ -329,7 +329,7 @@ function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
           <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
           <CommandList className="bg-popover text-popover-foreground">
@@ -402,7 +402,7 @@ function StockItemCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
           <CommandInput placeholder="Search stock items..." className="bg-popover text-popover-foreground" />
           <CommandList className="bg-popover text-popover-foreground">
@@ -3558,7 +3558,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           <TabsContent value="payment" className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
-              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput
                   value={transactionRate}
@@ -3605,7 +3605,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           <TabsContent value="receipt" className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
-              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput
                   value={transactionRate}
@@ -3653,7 +3653,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           <TabsContent value="journal" className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
-              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput
                   value={transactionRate}
@@ -3672,7 +3672,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 <Form {...journalForm}>
                   <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
                     {/* Header section */}
-                    <div className="flex items-start justify-end gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-end gap-4">
                     <FormField
                       control={journalForm.control}
                       name="voucherDate"
@@ -3685,7 +3685,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 <Button
                                   variant="outline"
                                   className={cn(
-                                    "w-[200px] justify-start text-left font-normal",
+                                    "w-full sm:w-[200px] justify-start text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                   )}
                                   data-testid="button-journal-date-picker"
@@ -3711,8 +3711,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
 
                   {/* Spreadsheet table */}
-                  <div className="border rounded-md overflow-hidden">
-                    <table className="w-full">
+                  <div className="border rounded-md overflow-hidden overflow-x-auto">
+                    <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/50">
                         <tr>
                           <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
@@ -4068,7 +4068,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   />
 
                     {/* Submit and Export buttons */}
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -4106,9 +4106,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
               {/* Right Panel - Account Search Sidebar */}
               {showAccountSidebar && (
-                <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                   <div className="p-4 border-b">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       <h3 className="text-sm font-semibold">Search Accounts</h3>
                       <div className="flex items-center gap-2">
                         {!isFactoryCompany && (
@@ -4259,7 +4259,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               });
             })}>
               {/* Header Row */}
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
                 {isPOS && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">From:</span>
@@ -4278,7 +4278,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         onValueChange={(value) => field.onChange(parseInt(value))}
                       >
                         <FormControl>
-                          <SelectTrigger className="w-[200px]" data-testid="select-destination-location">
+                          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination-location">
                             <SelectValue placeholder="Select destination..." />
                           </SelectTrigger>
                         </FormControl>
@@ -4309,7 +4309,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <Button
                               variant="outline"
                               className={cn(
-                                "w-[160px] justify-start text-left font-normal",
+                                "w-full sm:w-[160px] justify-start text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
                               data-testid="button-transfer-date-picker"
@@ -4789,7 +4789,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                   {/* Total Section */}
                   <div className="border-t bg-muted/20 p-4">
-                    <div className="flex justify-end items-center gap-8 max-w-lg ml-auto">
+                    <div className="flex flex-wrap justify-end items-center gap-2 sm:gap-8 max-w-lg ml-auto">
                       <div className="text-xs text-muted-foreground">Total Items:</div>
                       <div className="text-xs font-mono font-medium">
                         {transferEntries.filter(e => e.stockItemId > 0).length}
@@ -4812,9 +4812,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                 {/* Right Panel - Item Search */}
                 {showItemSidebar && (
-                <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                   <div className="p-4 border-b">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       <h3 className="text-sm font-semibold">Search Items</h3>
                       <button onClick={() => setShowItemSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-item-sidebar">✕</button>
                     </div>
@@ -4940,9 +4940,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                 {/* Right Panel - Source Location Search */}
                 {!isPOS && showSourceSidebar && (
-                  <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                  <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                     <div className="p-4 border-b">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between gap-2 mb-2">
                         <h3 className="text-sm font-semibold">Select Source</h3>
                         <button onClick={() => setShowSourceSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-source-sidebar">✕</button>
                       </div>
@@ -5027,7 +5027,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </div>
 
               {/* Notes and Options */}
-              <div className="mt-4 flex items-start gap-4">
+              <div className="mt-4 flex flex-wrap items-start gap-2 sm:gap-4">
                 <FormField
                   control={stockTransferForm.control}
                   name="notes"
@@ -5107,7 +5107,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               <Form {...stockAdjustmentForm}>
                 <form onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
                   {/* Header section */}
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                     <FormField
                       control={stockAdjustmentForm.control}
                       name="locationId"
@@ -5148,7 +5148,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 <Button
                                   variant="outline"
                                   className={cn(
-                                    "w-[200px] justify-start text-left font-normal",
+                                    "w-full sm:w-[200px] justify-start text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                   )}
                                   data-testid="button-adjustment-date-picker"
@@ -5436,7 +5436,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                       {/* Total Section */}
                       <div className="border-t bg-muted/20 p-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap justify-between items-center gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -5456,7 +5456,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <Plus className="h-4 w-4 mr-2" />
                             Add Row
                           </Button>
-                          <div className="flex items-center gap-6">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-6">
                             <div className="text-xs text-muted-foreground">Total Qty:</div>
                             <div className="text-xs font-mono font-medium">
                               {formatNumber(adjustmentEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0))}
@@ -5480,9 +5480,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                     {/* Right Panel - Item Search Sidebar */}
                     {showAdjustmentSidebar && (
-                      <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                      <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                         <div className="p-4 border-b">
-                          <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center justify-between gap-2 mb-2">
                             <h3 className="text-sm font-semibold">Search Items</h3>
                             <button 
                               onClick={() => setShowAdjustmentSidebar(false)} 
@@ -5614,7 +5614,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   />
 
                   {/* Submit button */}
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -5674,7 +5674,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       {/* Stock Transfer Import Dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
@@ -5686,8 +5686,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex-1 w-full sm:w-auto">
                 <Label htmlFor="import-file">Excel File</Label>
                 <Input
                   id="import-file"
@@ -5812,7 +5812,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 <div className="p-3 border-b bg-muted/50">
                   <p className="font-medium">Preview ({importPreview.items.length} items)</p>
                 </div>
-                <div className="max-h-60 overflow-y-auto overflow-x-auto">
+                {/* Desktop table */}
+                <div className="hidden sm:block max-h-60 overflow-y-auto overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -5864,6 +5865,50 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       })}
                     </TableBody>
                   </Table>
+                </div>
+                {/* Mobile card list */}
+                <div className="sm:hidden max-h-60 overflow-y-auto p-2 space-y-2">
+                  {importPreview.items.map((item: any, index: number) => {
+                    const validation = importValidationResult?.validatedItems?.[index];
+                    const hasError = validation?.error;
+
+                    return (
+                      <div
+                        key={index}
+                        className={cn(
+                          "p-3 rounded-md border text-sm space-y-1",
+                          hasError ? "bg-destructive/10 border-destructive/30" : "bg-background"
+                        )}
+                        data-testid={`import-preview-card-${index}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium truncate">
+                            {validation?.stockItemName || (
+                              <span className="text-muted-foreground italic">Unknown</span>
+                            )}
+                          </span>
+                          {validation ? (
+                            hasError ? (
+                              <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                            )
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>Source: {item.sourceLocation || "-"}</span>
+                          <span className="font-mono">Code: {item.barcode}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                          <span>Qty: <span className="font-mono">{item.quantity}</span></span>
+                          <span>Avail: <span className="font-mono">{validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}</span></span>
+                        </div>
+                        {hasError && (
+                          <div className="text-xs text-destructive">{validation.error}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

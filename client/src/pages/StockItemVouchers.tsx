@@ -108,27 +108,22 @@ export default function StockItemVouchers() {
     
     const vchType = txn.vchType.toLowerCase();
     
-    // Purchase Import - navigate to PO edit page
     if (vchType === 'purchase import') {
       return txn.poId ? `/purchase-orders/${txn.poId}/edit` : null;
     }
     
-    // Production/Consumption - navigate to voucher edit page
     if (vchType === 'production' || vchType === 'consumption') {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
     
-    // POS sales - navigate to POS edit page
     if (vchType.startsWith('pos') || vchType.includes('pos')) {
       return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
     }
     
-    // Stock Transfer - navigate to voucher edit page
     if (vchType.startsWith('stock transfer')) {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
     
-    // Generic Sales - navigate to voucher edit page
     if (vchType === 'sales') {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
@@ -145,7 +140,7 @@ export default function StockItemVouchers() {
   
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-3 sm:p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -153,9 +148,9 @@ export default function StockItemVouchers() {
   }
   
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 flex-wrap">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -165,11 +160,11 @@ export default function StockItemVouchers() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            <h1 className="text-lg sm:text-2xl font-bold" data-testid="text-page-title">
               Stock Item Vouchers
             </h1>
             {data?.stockItem && (
-              <p className="text-muted-foreground" data-testid="text-item-name">
+              <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code}) - {data.monthName} {data.year}
               </p>
             )}
@@ -189,7 +184,7 @@ export default function StockItemVouchers() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow>
@@ -276,6 +271,87 @@ export default function StockItemVouchers() {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          <div className="md:hidden space-y-2">
+            {data?.transactions.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                No transactions found for this month
+              </p>
+            )}
+            {data?.transactions.map((txn, idx) => (
+              <div
+                key={idx}
+                className={`p-3 rounded-md border text-sm ${txn.isOpeningBalance ? "bg-muted/30" : ""}`}
+                data-testid={`row-txn-${idx}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    {getTransactionEditUrl(txn) ? (
+                      <button
+                        onClick={() => handleParticularsClick(txn)}
+                        className="text-left text-primary hover:underline cursor-pointer font-medium truncate block w-full"
+                        data-testid={`link-particulars-${idx}`}
+                      >
+                        {txn.particulars}
+                      </button>
+                    ) : (
+                      <span className={`block truncate ${txn.isOpeningBalance ? "font-semibold" : "font-medium"}`}>
+                        {txn.particulars}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                      {!txn.isOpeningBalance && <span>{formatDate(txn.date)}</span>}
+                      <span>{txn.vchType}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {(txn.inwardQty > 0 || txn.isOpeningBalance) && (
+                    <div>
+                      <div className="text-muted-foreground">In</div>
+                      <div className="font-mono">{formatNumber(txn.inwardQty, 0)} @ {formatAmount(txn.inwardRate)}</div>
+                    </div>
+                  )}
+                  {txn.outwardQty > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Out</div>
+                      <div className="font-mono">
+                        {formatNumber(txn.outwardQty, 0)} @ {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-muted-foreground">Closing</div>
+                    <div className="font-mono font-medium">{formatNumber(txn.closingQty, 0)}</div>
+                    <div className="font-mono text-muted-foreground">{formatAmount(txn.closingValue)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {data && data.transactions.length > 0 && (
+              <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
+                <div className="mb-2">Totals</div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground font-normal">Inward</div>
+                    <div className="font-mono">{formatNumber(data.totals.inwardQty, 0)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.inwardValue)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">Outward</div>
+                    <div className="font-mono">{formatNumber(data.totals.outwardQty, 0)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.outwardValue)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">Closing</div>
+                    <div className="font-mono">{formatNumber(data.totals.closingQty, 0)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.closingValue)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

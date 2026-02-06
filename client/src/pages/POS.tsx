@@ -772,11 +772,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const columns = [
-    { key: "itemName", label: "Item", width: "flex-1 min-w-[120px]" },
-    { key: "quantity", label: "Qty", width: "w-16 sm:w-20" },
-    { key: "rate", label: "Rate", width: "w-20 sm:w-24" },
-    { key: "amount", label: "Amt", width: "w-20 sm:w-28" },
-    { key: "delete", label: "", width: "w-10 sm:w-12" },
+    { key: "itemName", label: "Item", width: "flex-1 min-w-[80px] sm:min-w-[120px]" },
+    { key: "quantity", label: "Qty", width: "w-14 sm:w-20" },
+    { key: "rate", label: "Rate", width: "w-16 sm:w-24" },
+    { key: "amount", label: "Amt", width: "w-18 sm:w-28" },
+    { key: "delete", label: "", width: "w-9 sm:w-12" },
   ];
 
   const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-]/g, "");
@@ -1365,7 +1365,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Hide cash account selector when credit sale is ON */}
         {!isCreditSale && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 col-span-2 sm:col-span-1 flex-wrap">
             <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             {posUser?.cashAccountId && assignedCashAccount ? (
               <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
@@ -1384,7 +1384,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   </SelectContent>
                 </Select>
                 <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                  <SelectTrigger className="w-28 sm:w-44" data-testid="select-payment-account">
+                  <SelectTrigger className="flex-1 min-w-0 sm:w-44 sm:flex-none" data-testid="select-payment-account">
                     <SelectValue placeholder={paymentAccountType === "bank" ? "Bank" : "Cash"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1423,7 +1423,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Customer Selector (shown when credit sale is enabled) */}
         {isCreditSale && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
             <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
               <SelectTrigger className="w-full sm:w-44" data-testid="select-customer">
@@ -1440,7 +1440,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
         )}
 
-        <div className="w-full sm:flex-1 flex items-center gap-2 order-last sm:order-none">
+        <div className="col-span-2 sm:col-span-1 sm:flex-1 flex items-center gap-2 order-last sm:order-none">
           <Textarea
             placeholder="Notes (optional)"
             value={notes}
@@ -1455,16 +1455,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         {/* Main Spreadsheet Area */}
         <Card className="flex-1 overflow-hidden min-w-0">
           <div className="overflow-x-auto">
-            <div className="min-w-[500px]">
+            <div className="min-w-[340px] sm:min-w-[500px]">
               {/* Header */}
               <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-10">
-                <div className="w-10 sm:w-12 flex items-center justify-center border-r border-muted h-9 sm:h-10 text-xs text-muted-foreground">
+                <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted h-9 sm:h-10 text-xs text-muted-foreground">
                   #
                 </div>
                 {columns.map((col) => (
                   <div
                     key={col.key}
-                    className={`${col.width} flex items-center px-2 sm:px-3 border-r border-muted h-9 sm:h-10 text-xs sm:text-sm text-muted-foreground`}
+                    className={`${col.width} flex items-center px-1.5 sm:px-3 border-r border-muted h-9 sm:h-10 text-xs sm:text-sm text-muted-foreground`}
                   >
                     {col.label}
                   </div>
@@ -1474,89 +1474,122 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {/* Rows */}
               <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                 {rows.map((row, rowIndex) => (
-                  <div key={row.id} className="flex border-b border-muted/50 hover-elevate">
-                    <div className="w-10 sm:w-12 flex items-center justify-center border-r border-muted/50 h-9 sm:h-10 text-xs text-muted-foreground">
-                      {rowIndex + 1}
-                    </div>
-                    {columns.map((col, colIndex) => (
-                      <div
-                        key={col.key}
-                        className={`${col.width} border-r h-9 sm:h-10 ${
-                          col.key === "amount" ? "bg-muted/30" : ""
-                        }`}
-                      >
-                        {col.key === "delete" ? (
-                          <div className="flex items-center justify-center h-full">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteRow(rowIndex)}
-                              className="h-8 w-8"
-                              data-testid={`button-delete-row-${rowIndex}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <input
-                            ref={(el) => {
-                              if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
-                            }}
-                            type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
-                            value={
-                              col.key === "amount"
-                                ? formatDisplayAmount(row.amount)
-                                : col.key === "quantity" || col.key === "rate"
-                                  ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
-                                  : row[col.key as keyof SaleRow]
-                            }
-                            onChange={(e) => {
-                              if (col.key !== "amount") {
-                                updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                  <div key={row.id}>
+                    <div className="flex border-b border-muted/50 hover-elevate">
+                      <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted/50 h-10 sm:h-10 text-xs text-muted-foreground">
+                        {rowIndex + 1}
+                      </div>
+                      {columns.map((col, colIndex) => (
+                        <div
+                          key={col.key}
+                          className={`${col.width} border-r h-10 sm:h-10 ${
+                            col.key === "amount" ? "bg-muted/30" : ""
+                          }`}
+                        >
+                          {col.key === "delete" ? (
+                            <div className="flex items-center justify-center h-full">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteRow(rowIndex)}
+                                className="h-8 w-8"
+                                data-testid={`button-delete-row-${rowIndex}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <input
+                              ref={(el) => {
+                                if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
+                              }}
+                              type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
+                              inputMode={col.key === "quantity" || col.key === "rate" ? "decimal" : undefined}
+                              value={
+                                col.key === "amount"
+                                  ? formatDisplayAmount(row.amount)
+                                  : col.key === "quantity" || col.key === "rate"
+                                    ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
+                                    : row[col.key as keyof SaleRow]
                               }
-                            }}
-                            onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                            onFocus={() => {
-                              setSelectedCell({ row: rowIndex, col: colIndex });
-                              if (col.key === "itemName") {
-                                setActiveRow(rowIndex);
-                                setSearchTerm(row.itemName);
-                                setHighlightedIndex(0);
-                              } else if ((col.key === "quantity" || col.key === "rate") && row.itemName?.trim() && !row.stockItemId) {
-                                toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
-                                setTimeout(() => {
-                                  setSelectedCell({ row: rowIndex, col: 0 });
-                                  focusCell(rowIndex, 0);
+                              onChange={(e) => {
+                                if (col.key !== "amount") {
+                                  updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                                }
+                              }}
+                              onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                              onFocus={() => {
+                                setSelectedCell({ row: rowIndex, col: colIndex });
+                                if (col.key === "itemName") {
                                   setActiveRow(rowIndex);
                                   setSearchTerm(row.itemName);
                                   setHighlightedIndex(0);
-                                }, 0);
-                                return;
+                                } else if ((col.key === "quantity" || col.key === "rate") && row.itemName?.trim() && !row.stockItemId) {
+                                  toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+                                  setTimeout(() => {
+                                    setSelectedCell({ row: rowIndex, col: 0 });
+                                    focusCell(rowIndex, 0);
+                                    setActiveRow(rowIndex);
+                                    setSearchTerm(row.itemName);
+                                    setHighlightedIndex(0);
+                                  }, 0);
+                                  return;
+                                }
+                              }}
+                              onBlur={() => {
+                                if (col.key === "itemName") {
+                                  setTimeout(() => {
+                                    setActiveRow(null);
+                                  }, 200);
+                                }
+                              }}
+                              readOnly={col.key === "amount"}
+                              className={`w-full h-full px-1.5 sm:px-3 bg-transparent outline-none focus:bg-accent/20 text-xs sm:text-sm ${
+                                col.key === "quantity" || col.key === "rate" || col.key === "amount"
+                                  ? "font-mono text-right"
+                                  : ""
+                              } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
+                              placeholder={
+                                col.key === "itemName"
+                                  ? "Type to search..."
+                                  : ""
                               }
-                            }}
-                            onBlur={() => {
-                              if (col.key === "itemName") {
-                                setTimeout(() => {
-                                  setActiveRow(null);
-                                }, 200);
-                              }
-                            }}
-                            readOnly={col.key === "amount"}
-                            className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 ${
-                              col.key === "quantity" || col.key === "rate" || col.key === "amount"
-                                ? "font-mono text-right"
-                                : ""
-                            } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
-                            placeholder={
-                              col.key === "itemName"
-                                ? "Type to search..."
-                                : ""
-                            }
-                            data-testid={`input-${col.key}-${rowIndex}`}
-                          />
-                        )}
+                              style={col.key === "quantity" || col.key === "rate" ? { fontSize: "16px" } : undefined}
+                              data-testid={`input-${col.key}-${rowIndex}`}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Mobile inline autocomplete dropdown */}
+                    {activeRow === rowIndex && filteredItems.length > 0 && (
+                      <div className="lg:hidden border-b border-muted bg-background shadow-md max-h-48 overflow-y-auto z-20 relative">
+                        {filteredItems.slice(0, 8).map((item, idx) => (
+                          <button
+                            key={item.code}
+                            onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
+                            className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-2 border-b border-muted/30 active-elevate-2 ${
+                              item.stock === 0 ? "opacity-60" : ""
+                            } ${idx === highlightedIndex ? "bg-accent" : ""}`}
+                            data-testid={`mobile-item-${idx}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm">{item.name}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{item.code}</div>
+                            </div>
+                            <div className={`text-xs font-medium px-2 py-0.5 rounded shrink-0 ${
+                              item.stock === 0 
+                                ? "bg-destructive/10 text-destructive" 
+                                : item.stock < 10
+                                ? "bg-chart-3/10 text-chart-3"
+                                : "bg-chart-2/10 text-chart-2"
+                            }`}>
+                              {item.stock === 0 ? "Out" : `${item.stock}`}
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 ))}
               </div>
@@ -1565,16 +1598,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
           {/* Total Section */}
           <div className="border-t border-muted bg-muted/20 p-2 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:justify-end items-end sm:items-center gap-2 sm:gap-6 max-w-md ml-auto">
-              <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-md ml-auto">
+              <div className="flex items-center justify-between sm:justify-start gap-2 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Items:</span>
                 <span className="font-mono">{rows.filter((r) => r.amount > 0).length}</span>
                 <span className="text-muted-foreground ml-2">Qty:</span>
                 <span className="font-mono" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-sm sm:text-lg font-medium">Total:</span>
-                <span className="text-xl sm:text-2xl font-semibold font-mono" data-testid="text-grand-total">
+                <span className="text-lg sm:text-2xl font-semibold font-mono" data-testid="text-grand-total">
                   {formatDisplayAmount(total)}
                 </span>
               </div>

@@ -468,7 +468,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-200px)]">
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-200px)]">
       <Card className="flex-1 flex flex-col">
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -691,7 +691,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                 )}
               />
 
-              <div className="flex justify-between items-center pt-4 border-t">
+              <div className="flex flex-wrap justify-between items-center pt-4 border-t gap-2">
                 <div className="space-y-1">
                   <div className="text-lg font-semibold">
                     Refund Total: <span className="font-mono text-primary">{formatNumber(totalRefund)}</span>
@@ -711,7 +711,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
         </CardContent>
       </Card>
 
-      <Card className="w-80 flex flex-col">
+      <Card className="w-full lg:w-80 flex flex-col">
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center gap-2 mb-3">
             <MapPin className="h-4 w-4" />

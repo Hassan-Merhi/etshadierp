@@ -893,7 +893,7 @@ export default function Accounts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Accounts Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -920,7 +920,7 @@ export default function Accounts() {
           }
         }}
       >
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md w-[95vw] sm:w-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {bankToEdit ? "Edit Bank Account" : "Create Bank Account"}
@@ -1427,7 +1427,7 @@ export default function Accounts() {
                           Printed on: {formatDisplayDate(new Date())}
                         </p>
                       </div>
-                      <div className="rounded-md border overflow-x-auto print:border-0">
+                      <div className="rounded-md border overflow-x-auto print:border-0 hidden md:block print:!block">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -1603,8 +1603,94 @@ export default function Accounts() {
                         </Table>
                       </div>
 
+                      {/* Mobile Card View for Ledger */}
+                      <div className="md:hidden print:!hidden space-y-2">
+                        <Card className="bg-accent/30">
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-sm">Opening Balance</span>
+                              <span className="font-mono text-sm font-semibold">
+                                {formatAmount(Math.abs(openingBalance))}{" "}
+                                {selectedAccount?.type === "supplier"
+                                  ? openingBalance > 0 ? "Cr" : "Dr"
+                                  : openingBalance >= 0 ? "Dr" : "Cr"}
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        {vouchersWithBalance.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                            <p>No transactions found for this account</p>
+                          </div>
+                        ) : (
+                          vouchersWithBalance.map((voucher) => (
+                            <Card
+                              key={voucher.voucherId}
+                              className="hover-elevate"
+                              data-testid={`row-voucher-${voucher.voucherId}`}
+                            >
+                              <CardContent className="p-3 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Checkbox
+                                      checked={selectedVoucherIds.has(voucher.voucherId)}
+                                      onCheckedChange={() => toggleVoucherSelection(voucher.voucherId)}
+                                      data-testid={`checkbox-voucher-${voucher.voucherId}`}
+                                    />
+                                    <div className="min-w-0">
+                                      <button
+                                        onClick={() => handleVoucherClick(voucher)}
+                                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
+                                        data-testid={`link-voucher-${voucher.voucherId}`}
+                                      >
+                                        <span className="truncate">
+                                          {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
+                                        </span>
+                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    {voucher.voucherType}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span className="font-mono">
+                                    {voucher.voucherDate ? formatDisplayDate(new Date(voucher.voucherDate)) : "-"}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                                  <div>
+                                    <span className="text-muted-foreground block">Debit</span>
+                                    <span className="font-mono">
+                                      {voucher.totalDebit > 0 ? formatAmount(voucher.totalDebit) : "-"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground block">Credit</span>
+                                    <span className="font-mono">
+                                      {voucher.totalCredit > 0 ? formatAmount(voucher.totalCredit) : "-"}
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-muted-foreground block">Balance</span>
+                                    <span className="font-mono font-medium">
+                                      {formatAmount(Math.abs(voucher.runningBalance ?? 0))}{" "}
+                                      {selectedAccount?.type === "supplier"
+                                        ? (voucher.runningBalance ?? 0) > 0 ? "Cr" : "Dr"
+                                        : (voucher.runningBalance ?? 0) >= 0 ? "Dr" : "Cr"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+
                       {/* Tally-style Footer Summary */}
-                      <div className="mt-4 border rounded-md overflow-hidden">
+                      <div className="mt-4 border rounded-md overflow-hidden hidden md:block print:!block">
                         <Table>
                           <TableBody>
                             <TableRow className="bg-muted/30">
@@ -1687,6 +1773,37 @@ export default function Accounts() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                      </div>
+                      {/* Mobile Footer Summary */}
+                      <div className="mt-4 border rounded-md md:hidden print:!hidden">
+                        <div className="p-3 space-y-2 text-sm">
+                          <div className="flex justify-between bg-muted/30 p-2 rounded">
+                            <span className="font-medium">Opening Balance:</span>
+                            <span className="font-mono">
+                              {formatAmount(Math.abs(openingBalance))}{" "}
+                              {selectedAccount?.type === "supplier"
+                                ? openingBalance > 0 ? "Cr" : "Dr"
+                                : openingBalance >= 0 ? "Dr" : "Cr"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between p-2">
+                            <span className="font-medium">Total Debit:</span>
+                            <span className="font-mono font-semibold">{formatAmount(transactionTotals.totalDebit)}</span>
+                          </div>
+                          <div className="flex justify-between p-2">
+                            <span className="font-medium">Total Credit:</span>
+                            <span className="font-mono font-semibold">{formatAmount(transactionTotals.totalCredit)}</span>
+                          </div>
+                          <div className="flex justify-between bg-accent/50 p-2 rounded border-t-2">
+                            <span className="font-bold">Closing Balance:</span>
+                            <span className="font-mono font-bold">
+                              {formatAmount(Math.abs(closingBalance))}{" "}
+                              {selectedAccount?.type === "supplier"
+                                ? closingBalance > 0 ? "Cr" : "Dr"
+                                : closingBalance >= 0 ? "Dr" : "Cr"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}

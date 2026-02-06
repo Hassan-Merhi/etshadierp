@@ -389,7 +389,7 @@ export default function LocationSummary() {
 
   return (
     <div className="w-full h-screen flex flex-col overflow-hidden" data-testid="location-summary-container">
-      <div className="flex items-center justify-between gap-4 flex-wrap p-4 flex-shrink-0 border-b">
+      <div className="flex items-center justify-between gap-4 flex-wrap p-3 md:p-4 flex-shrink-0 border-b">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Summary</h1>
           <p className="text-sm text-muted-foreground">

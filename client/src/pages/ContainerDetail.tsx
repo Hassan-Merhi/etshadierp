@@ -293,24 +293,26 @@ export default function ContainerDetail() {
   }, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4 flex-wrap">
+    <div className="space-y-4 p-3 sm:p-0">
+      <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
         <Link href={backUrl}>
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold" data-testid="text-container-number">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-2xl font-semibold truncate" data-testid="text-container-number">
             Container {container.containerNumber}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Imported on {new Date(container.importDate).toLocaleDateString()}
           </p>
         </div>
         <Badge variant={container.status === "OTW" ? "default" : "secondary"} data-testid="badge-status">
           {container.status}
         </Badge>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
         {!containerSale && (
           <Button
             onClick={() => setShowSellDialog(true)}
@@ -318,7 +320,8 @@ export default function ContainerDetail() {
             data-testid="button-sell-container"
           >
             <HandCoins className="w-4 h-4" />
-            Sell Container
+            <span className="hidden sm:inline">Sell Container</span>
+            <span className="sm:hidden">Sell</span>
           </Button>
         )}
         {container.status !== "OFFLOADED" && (
@@ -328,7 +331,8 @@ export default function ContainerDetail() {
             data-testid="button-offload-container"
           >
             <Truck className="w-4 h-4" />
-            Offload Container
+            <span className="hidden sm:inline">Offload Container</span>
+            <span className="sm:hidden">Offload</span>
           </Button>
         )}
         {container.status === "OFFLOADED" && (
@@ -340,7 +344,8 @@ export default function ContainerDetail() {
               data-testid="button-edit-offload"
             >
               <Edit className="w-4 h-4" />
-              Edit Offload
+              <span className="hidden sm:inline">Edit Offload</span>
+              <span className="sm:hidden">Edit</span>
             </Button>
             <Button
               onClick={() => {
@@ -354,7 +359,8 @@ export default function ContainerDetail() {
               data-testid="button-reverse-offload"
             >
               <RotateCcw className="w-4 h-4" />
-              Reverse Offload
+              <span className="hidden sm:inline">Reverse Offload</span>
+              <span className="sm:hidden">Reverse</span>
             </Button>
           </>
         )}
@@ -365,7 +371,7 @@ export default function ContainerDetail() {
           data-testid="button-print-container"
         >
           <Printer className="w-4 h-4" />
-          Print
+          <span className="hidden sm:inline">Print</span>
         </Button>
         <Button
           variant="outline"
@@ -374,7 +380,7 @@ export default function ContainerDetail() {
           data-testid="button-export-container"
         >
           <Download className="w-4 h-4" />
-          Export
+          <span className="hidden sm:inline">Export</span>
         </Button>
         <Button
           variant="destructive"
@@ -384,7 +390,8 @@ export default function ContainerDetail() {
           data-testid="button-delete-container"
         >
           <Trash2 className="w-4 h-4" />
-          Delete Container
+          <span className="hidden sm:inline">Delete Container</span>
+          <span className="sm:hidden">Delete</span>
         </Button>
       </div>
 
@@ -501,15 +508,15 @@ export default function ContainerDetail() {
             <div className="space-y-6">
               {pos.map((po: any) => (
                 <div key={po.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold" data-testid={`text-po-${po.poNumber}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h3 className="text-base sm:text-lg font-semibold" data-testid={`text-po-${po.poNumber}`}>
                       PO: {po.poNumber}
                     </h3>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                       <div className="text-sm">
                         <span className="text-muted-foreground">Currency: </span>
                         <span className="font-medium">{po.currency}</span>
-                        <span className="text-muted-foreground ml-4">Total: </span>
+                        <span className="text-muted-foreground ml-2 sm:ml-4">Total: </span>
                         <span className="font-semibold">{formatAmount(po.itemsTotal)}</span>
                       </div>
                       <Button
@@ -532,7 +539,7 @@ export default function ContainerDetail() {
                     </div>
                   </div>
 
-                  <div className="rounded-md border">
+                  <div className="rounded-md border hidden md:block">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -556,6 +563,27 @@ export default function ContainerDetail() {
                       </TableBody>
                     </Table>
                   </div>
+                  <div className="md:hidden space-y-2">
+                    {po.items.map((item: any) => (
+                      <div key={item.id} className="p-3 rounded-md border text-sm" data-testid={`row-item-${item.id}`}>
+                        <div className="font-medium mb-1">{item.itemName}</div>
+                        <div className="grid grid-cols-3 gap-2 text-muted-foreground">
+                          <div>
+                            <div className="text-xs">Qty</div>
+                            <div className="font-mono">{item.quantity}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs">Rate</div>
+                            <div className="font-mono">{formatAmount(item.rate)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs">Total</div>
+                            <div className="font-mono font-semibold">{formatAmount(item.lineTotal)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -569,7 +597,7 @@ export default function ContainerDetail() {
             <CardTitle>Extra Charges</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-md border hidden md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -594,6 +622,20 @@ export default function ContainerDetail() {
                   </TableRow>
                 </TableBody>
               </Table>
+            </div>
+            <div className="md:hidden space-y-2">
+              {charges.map((charge: any) => (
+                <div key={charge.id} className="flex justify-between items-center p-2 rounded-md border text-sm" data-testid={`row-charge-${(charge.chargeType || "").toLowerCase().replace(/\s/g, "-")}`}>
+                  <span className="font-medium">{charge.chargeType}</span>
+                  <span className={`font-mono font-semibold ${parseFloat(charge.amount) < 0 ? "text-red-500" : ""}`}>
+                    {formatAmount(charge.amount)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center p-2 rounded-md border bg-muted/50 text-sm font-bold">
+                <span>Total Charges</span>
+                <span className="font-mono">{formatAmount(chargesTotal)}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

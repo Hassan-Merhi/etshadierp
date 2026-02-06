@@ -313,7 +313,7 @@ function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+      <PopoverContent className="w-[min(400px,calc(100vw-2rem))] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
           <CommandInput
             placeholder="Search accounts..."
@@ -1185,14 +1185,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Book className="w-8 h-8" />
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+            <Book className="w-6 h-6 md:w-8 md:h-8" />
             Daybook
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">
             View all accounting transactions chronologically
           </p>
         </div>
@@ -1293,7 +1293,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 flex-1 min-w-[200px]">
+            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
               <Label htmlFor="search">Search</Label>
               <Input
                 id="search"
@@ -1355,7 +1355,85 @@ export default function Daybook({ user }: { user?: any } = {}) {
               )}
             </div>
           ) : (
-            <div className="border rounded-md overflow-x-auto">
+            <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {filteredVouchers.map((voucher) => (
+                <div
+                  key={voucher.id}
+                  className="border rounded-md p-3 space-y-2"
+                  data-testid={`card-voucher-${voucher.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant={getVoucherTypeBadgeVariant(voucher.voucherType)}
+                        data-testid={`badge-type-${voucher.id}`}
+                      >
+                        {voucher.voucherType}
+                      </Badge>
+                      {voucher.optional && (
+                        <Badge
+                          variant="outline"
+                          data-testid={`badge-optional-${voucher.id}`}
+                          className="text-xs"
+                        >
+                          Optional
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="font-mono font-medium text-sm whitespace-nowrap">
+                      {formatAmount(voucher.totalAmount)}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatDisplayDate(parseISO(voucher.voucherDate))}
+                    <span className="ml-2 text-xs">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                  </div>
+                  <p className="text-sm truncate">
+                    {voucher.description ||
+                      (voucher.voucherType === "Payment" ||
+                      voucher.voucherType === "Receipt" ||
+                      voucher.voucherType === "Journal"
+                        ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
+                        : "-")}
+                  </p>
+                  <div className="flex items-center gap-1 pt-1 border-t">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleView(voucher)}
+                      data-testid={`button-view-${voucher.id}`}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    {canEdit(voucher) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(voucher)}
+                        data-testid={`button-edit-${voucher.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {canDelete() && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(voucher)}
+                        data-testid={`button-delete-${voucher.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1449,20 +1527,21 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* View Voucher Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Voucher Details</DialogTitle>
             <DialogDescription>View voucher information</DialogDescription>
           </DialogHeader>
           {selectedVoucher && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
                   <p className="font-medium">
@@ -1536,26 +1615,26 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   if (!sourceEntry) return null;
 
                   return (
-                    <div className="p-4 bg-muted/50 rounded-md mb-4">
-                      <div className="flex justify-between items-center">
+                    <div className="p-3 md:p-4 bg-muted/50 rounded-md mb-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                         <div>
                           <p className="text-sm text-muted-foreground mb-1">
                             {selectedVoucher.voucherType === "Payment"
                               ? "Paid From"
                               : "Received In"}
                           </p>
-                          <div className="font-medium text-lg">
+                          <div className="font-medium text-base md:text-lg">
                             {sourceEntry.accountName}
                           </div>
                           <div className="text-sm font-mono mt-2">
                             Balance: {formatAmount(cashAccountBalance)}
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="sm:text-right">
                           <p className="text-sm text-muted-foreground mb-1">
                             Total Amount
                           </p>
-                          <div className="text-2xl font-bold font-mono">
+                          <div className="text-xl md:text-2xl font-bold font-mono">
                             {formatAmount(totalAmount)}
                           </div>
                         </div>
@@ -1600,7 +1679,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {/* Cash Account Summary */}
                         {cashEntry && (
                           <div className="p-3 bg-muted/50 rounded-md mb-4">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                               <div>
                                 <div className="font-medium">
                                   {cashEntry.accountName}
@@ -1737,7 +1816,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {/* Purchase Order Info - Show supplier name and container tracking number */}
                         {purchaseOrderData && (
                           <div className="p-3 bg-muted/50 rounded-md space-y-2">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                               <div>
                                 <div className="font-medium">
                                   {purchaseOrderData.supplierName}
@@ -1746,7 +1825,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   Container: {purchaseOrderData.containerNumber}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 {!isPOSUser && purchaseOrderData.itemsTotal && (
                                   <div className="font-mono font-bold">
                                     {formatAmount(
@@ -2346,7 +2425,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
           }
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Voucher</DialogTitle>
             <DialogDescription>
@@ -2359,7 +2438,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 onSubmit={editForm.handleSubmit(handleSaveEdit)}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">
                       Voucher Number
@@ -2388,7 +2467,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={editForm.control}
                     name="voucherType"
@@ -2613,7 +2692,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         </FormItem>
                       ) : (
                         <>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={editForm.control}
                               name={`entries.${index}.debitAmount`}
@@ -2713,7 +2792,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             </span>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4 text-sm font-mono">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-mono">
                             <div className="text-right">
                               <span className="text-muted-foreground mr-2">
                                 Total Debits:

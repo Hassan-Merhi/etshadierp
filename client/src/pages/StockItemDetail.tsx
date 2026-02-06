@@ -86,7 +86,7 @@ export default function StockItemDetail() {
 
   if (!itemId || (stockItems.length > 0 && !selectedItem)) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <Button
           variant="ghost"
           onClick={handleBack}
@@ -106,7 +106,7 @@ export default function StockItemDetail() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -115,13 +115,14 @@ export default function StockItemDetail() {
           className="gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Stock Query
+          <span className="hidden sm:inline">Back to Stock Query</span>
+          <span className="sm:hidden">Back</span>
         </Button>
       </div>
 
       <div>
-        <h1 className="text-3xl font-bold">{selectedItem?.name || "Loading..."}</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl sm:text-3xl font-bold">{selectedItem?.name || "Loading..."}</h1>
+        <p className="text-sm text-muted-foreground">
           Purchase history, sales history, and current inventory locations
         </p>
       </div>
@@ -145,7 +146,7 @@ export default function StockItemDetail() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Purchases Section */}
           <Card className="flex flex-col">
             <CardHeader className="pb-3">
@@ -157,24 +158,37 @@ export default function StockItemDetail() {
             <CardContent className="flex-1 overflow-hidden">
               {itemDetails.purchases.length > 0 ? (
                 <div className="h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background">
-                      <TableRow>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itemDetails.purchases.map((purchase, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="text-sm">{purchase.supplierName || "-"}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(purchase.rate))}</TableCell>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.purchases.map((purchase, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-sm">{purchase.supplierName || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(purchase.rate))}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-2">
+                    {itemDetails.purchases.map((purchase, idx) => (
+                      <div key={idx} className="p-2 rounded-md border text-sm">
+                        <div className="font-medium">{purchase.supplierName || "-"}</div>
+                        <div className="flex justify-between mt-1 text-muted-foreground">
+                          <span>Qty: {formatSmartNumber(purchase.quantity)}</span>
+                          <span>Rate: {formatAmount(parseFloat(purchase.rate))}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -195,31 +209,52 @@ export default function StockItemDetail() {
             <CardContent className="flex-1 overflow-hidden">
               {itemDetails.sales.length > 0 ? (
                 <div className="h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itemDetails.sales.map((sale, idx) => (
-                        <TableRow 
-                          key={idx}
-                          onClick={() => handleSaleClick(sale.saleDate, sale.voucherId)}
-                          className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
-                          data-testid={`row-sale-${idx}`}
-                        >
-                          <TableCell className="text-sm">{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
-                          <TableCell className="text-sm">{sale.locationName || "-"}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatSmartNumber(sale.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(sale.sellingPrice))}</TableCell>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.sales.map((sale, idx) => (
+                          <TableRow 
+                            key={idx}
+                            onClick={() => handleSaleClick(sale.saleDate, sale.voucherId)}
+                            className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
+                            data-testid={`row-sale-${idx}`}
+                          >
+                            <TableCell className="text-sm">{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
+                            <TableCell className="text-sm">{sale.locationName || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{formatSmartNumber(sale.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(sale.sellingPrice))}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-2">
+                    {itemDetails.sales.map((sale, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSaleClick(sale.saleDate, sale.voucherId)}
+                        className={`p-2 rounded-md border text-sm ${sale.voucherId ? "cursor-pointer hover-elevate" : ""}`}
+                        data-testid={`row-sale-${idx}`}
+                      >
+                        <div className="flex justify-between">
+                          <span className="font-medium">{formatDisplayDate(new Date(sale.saleDate))}</span>
+                          <span className="text-muted-foreground">{sale.locationName || "-"}</span>
+                        </div>
+                        <div className="flex justify-between mt-1 text-muted-foreground">
+                          <span>Qty: {formatSmartNumber(sale.quantity)}</span>
+                          <span>Rate: {formatAmount(parseFloat(sale.sellingPrice))}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -240,32 +275,55 @@ export default function StockItemDetail() {
             <CardContent className="flex-1 overflow-hidden">
               {itemDetails.inventoryLocations.length > 0 ? (
                 <div className="h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background">
-                      <TableRow>
-                        <TableHead>Location</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Avg Rate</TableHead>
-                        <TableHead className="text-right">Total Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itemDetails.inventoryLocations.map((loc) => (
-                        <TableRow key={loc.locationId}>
-                          <TableCell className="text-sm">{loc.locationName}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatSmartNumber(loc.quantity)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatAmount(parseFloat(loc.averageRate))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {formatAmount(parseFloat(loc.totalValue))}
-                          </TableCell>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Location</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Avg Rate</TableHead>
+                          <TableHead className="text-right">Total Value</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.inventoryLocations.map((loc) => (
+                          <TableRow key={loc.locationId}>
+                            <TableCell className="text-sm">{loc.locationName}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatSmartNumber(loc.quantity)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatAmount(parseFloat(loc.averageRate))}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatAmount(parseFloat(loc.totalValue))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-2">
+                    {itemDetails.inventoryLocations.map((loc) => (
+                      <div key={loc.locationId} className="p-3 rounded-md border text-sm">
+                        <div className="font-medium">{loc.locationName}</div>
+                        <div className="grid grid-cols-3 gap-2 mt-2 text-muted-foreground">
+                          <div>
+                            <div className="text-xs">Qty</div>
+                            <div className="font-mono">{formatSmartNumber(loc.quantity)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs">Avg Rate</div>
+                            <div className="font-mono">{formatAmount(parseFloat(loc.averageRate))}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs">Value</div>
+                            <div className="font-mono font-medium">{formatAmount(parseFloat(loc.totalValue))}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center text-muted-foreground">

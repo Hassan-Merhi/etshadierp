@@ -501,12 +501,12 @@ export default function POSDaybook() {
 
       {/* Transaction Details Dialog */}
       <Dialog open={!!selectedVoucher} onOpenChange={() => setSelectedVoucher(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">
               Transaction Details - {selectedVoucher?.voucherNumber}
             </DialogTitle>
-            <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-2 text-sm text-muted-foreground">
               <span>{selectedVoucher && `${formatDisplayDate(new Date(selectedVoucher.createdAt))} at ${format(new Date(selectedVoucher.createdAt), "hh:mm a")}`}</span>
               <span>•</span>
               <span>{selectedVoucher?.locationName || `Location ${selectedVoucher?.locationId}`}</span>

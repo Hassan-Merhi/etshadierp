@@ -108,7 +108,7 @@ export default function NetProfitDetails() {
   const isProfit = netProfit >= 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link href="/settings">
@@ -199,7 +199,7 @@ export default function NetProfitDetails() {
           <CardDescription>How Net Position is calculated</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-3 text-lg flex-wrap">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 text-base sm:text-lg flex-wrap">
             <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg">
               <span className="font-semibold text-green-700 dark:text-green-300">
                 What We Have

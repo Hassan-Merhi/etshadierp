@@ -922,7 +922,7 @@ export default function Analytics() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
@@ -933,7 +933,7 @@ export default function Analytics() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -1301,10 +1301,10 @@ export default function Analytics() {
         {/* Sales Analytics Tab */}
         <TabsContent value="sales" className="space-y-4">
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-medium">Sales by Location</h3>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1327,6 +1327,8 @@ export default function Analytics() {
                 No sales data available
               </p>
             ) : (
+              <>
+              <div className="hidden md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1359,6 +1361,24 @@ export default function Analytics() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
+              <div className="md:hidden space-y-3">
+                {salesData.map((location) => (
+                  <Card key={location.locationId} className="hover-elevate cursor-pointer" onClick={() => setSelectedLocationForDetails(location.locationId)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{location.locationName}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-sm">
+                        <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground">{formatAmount(location.totalSales)}</span></span>
+                        <span className="text-muted-foreground">Txns: <span className="text-foreground">{location.totalTransactions}</span></span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              </>
             )}
           </Card>
 
@@ -1367,7 +1387,7 @@ export default function Analytics() {
             open={selectedLocationForDetails !== null} 
             onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
           >
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw] md:w-auto max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   Sales Details - {salesData.find(l => l.locationId === selectedLocationForDetails)?.locationName}
@@ -1376,7 +1396,7 @@ export default function Analytics() {
 
               <div className="space-y-4">
                 <Select value={detailsPeriod} onValueChange={setDetailsPeriod}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1399,6 +1419,7 @@ export default function Analytics() {
                   </p>
                 ) : (
                   <>
+                    <div className="hidden md:block">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1431,6 +1452,23 @@ export default function Analytics() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
+                    <div className="md:hidden space-y-3">
+                      {transactions.map((transaction) => (
+                        <Card key={transaction.id}>
+                          <CardContent className="p-3 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono text-sm">{transaction.voucherNumber}</span>
+                              <span className="text-sm text-muted-foreground">{new Date(transaction.voucherDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>
+                              <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
 
                     <div className="border-t pt-4">
                       <div className="flex justify-between text-sm">
@@ -1474,7 +1512,7 @@ export default function Analytics() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div>
                 <Label htmlFor="container-start-date">Start Date</Label>
                 <DatePickerInput
@@ -1528,7 +1566,7 @@ export default function Analytics() {
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
             ) : containerData ? (
               <div className="space-y-4">
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1575,6 +1613,52 @@ export default function Analytics() {
                       </TableRow>
                     </TableBody>
                   </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {containerData.containers.map((container) => (
+                    <Card key={container.id}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-medium">{container.containerNumber}</span>
+                          <span className="text-sm text-muted-foreground">{container.status}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{container.supplierName} - {container.importDate}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                          <div>
+                            <span className="text-muted-foreground block">Items</span>
+                            <span className="font-mono">{formatAmount(parseFloat(container.itemsTotal))}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">Charges</span>
+                            <span className="font-mono">{formatAmount(parseFloat(container.chargesTotal))}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-muted-foreground block">Total</span>
+                            <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-4">
+                      <div className="font-bold text-sm mb-2">TOTALS</div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground block">Items</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalItemsTotal)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block">Charges</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalChargesTotal)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-muted-foreground block">Grand Total</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalGrandTotal)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             ) : (

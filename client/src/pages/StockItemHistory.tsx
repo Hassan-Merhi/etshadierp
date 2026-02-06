@@ -106,7 +106,7 @@ export default function StockItemHistory() {
   
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-3 sm:p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -114,25 +114,25 @@ export default function StockItemHistory() {
   }
   
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/stock-items")} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            <h1 className="text-lg sm:text-2xl font-bold" data-testid="text-page-title">
               Stock Item Monthly Summary
             </h1>
             {data?.stockItem && (
-              <p className="text-muted-foreground" data-testid="text-item-name">
+              <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code})
               </p>
             )}
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           <PeriodFilter
             value={periodFilter}
             onChange={setPeriodFilter}
@@ -141,7 +141,7 @@ export default function StockItemHistory() {
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]" data-testid="select-year">
+              <SelectTrigger className="w-[100px] sm:w-[120px]" data-testid="select-year">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -159,7 +159,7 @@ export default function StockItemHistory() {
           <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -234,6 +234,63 @@ export default function StockItemHistory() {
               </TableBody>
             </Table>
           </div>
+
+          <div className="md:hidden space-y-2">
+            {data?.monthlyData.map((month) => {
+              const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
+              return (
+                <div
+                  key={month.month}
+                  className={`p-3 rounded-md border text-sm ${hasData ? "cursor-pointer hover-elevate" : "opacity-50"}`}
+                  onClick={() => hasData && handleMonthClick(month.month)}
+                  data-testid={`row-month-${month.month}`}
+                >
+                  <div className="font-medium text-base mb-2">{month.monthName}</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <div className="text-muted-foreground">In</div>
+                      <div className="font-mono">{month.inwardQty > 0 ? formatNumber(month.inwardQty, 0) : "-"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Out</div>
+                      <div className="font-mono">{month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : "-"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Closing</div>
+                      <div className="font-mono font-medium">{month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "-"}</div>
+                    </div>
+                  </div>
+                  {hasData && (
+                    <div className="grid grid-cols-3 gap-2 text-xs mt-1">
+                      <div className="font-mono text-muted-foreground">{month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}</div>
+                      <div className="font-mono text-muted-foreground">{month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}</div>
+                      <div className="font-mono text-muted-foreground">{month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {data && (
+              <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
+                <div className="mb-2">Grand Total</div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground font-normal">In</div>
+                    <div className="font-mono">{formatNumber(data.grandTotal.inwardQty, 0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">Out</div>
+                    <div className="font-mono">{formatNumber(data.grandTotal.outwardQty, 0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">Closing</div>
+                    <div className="font-mono">{formatNumber(data.grandTotal.closingQty, 0)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
       
@@ -242,7 +299,7 @@ export default function StockItemHistory() {
           <CardTitle className="text-lg">Monthly Activity Chart</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className="h-[250px] sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
