@@ -335,6 +335,7 @@ export default function BarcodeManager() {
             <p className="text-muted-foreground">No pending barcodes. Import from Excel or add manually.</p>
           </div>
         ) : (
+          <>
           <div className="hidden md:block">
           <Table>
             <TableHeader>
@@ -424,6 +425,7 @@ export default function BarcodeManager() {
               </Card>
             ))}
           </div>
+          </>
         )}
       </Card>
 
