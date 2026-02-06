@@ -2171,6 +2171,8 @@ export class DbStorage implements IStorage {
     const lastItemIndex = itemsArray.length - 1;
 
     // Add inventory to destination location with weighted average cost
+    // Wrapped in a DB transaction for atomicity
+    const offload = await db.transaction(async (tx) => {
     for (let i = 0; i < itemsArray.length; i++) {
       const [stockItemId, data] = itemsArray[i];
       const isLastItem = i === lastItemIndex;
@@ -2215,7 +2217,7 @@ export class DbStorage implements IStorage {
       }
       
       // Check if inventory exists
-      const [existing] = await db
+      const [existing] = await tx
         .select()
         .from(schema.inventory)
         .where(and(
@@ -2266,7 +2268,7 @@ export class DbStorage implements IStorage {
           throw new Error(`Calculated weighted average rate is infinite for stock item ${stockItemId}. existingQty=${existingQty}, existingRate=${existingRate}, newQty=${newQty}, newRate=${newRate}`);
         }
 
-        await db
+        await tx
           .update(schema.inventory)
           .set({
             quantity: newQty.toString(),
@@ -2277,13 +2279,13 @@ export class DbStorage implements IStorage {
           .where(eq(schema.inventory.id, existing.id));
       } else {
         // Create new inventory record
-        const [location] = await db
+        const [location] = await tx
           .select()
           .from(schema.locations)
           .where(eq(schema.locations.id, locationId));
 
         // Use offloadValue which includes rounding adjustment for last item
-        await db.insert(schema.inventory).values({
+        await tx.insert(schema.inventory).values({
           companyId: location.companyId,
           locationId,
           stockItemId,
@@ -2298,7 +2300,7 @@ export class DbStorage implements IStorage {
     // Update container status to OFFLOADED
     // When status changes from OTW to OFFLOADED, the container is no longer counted in Stock OTW
     // The import cycle balance uses container.status to filter which containers to include
-    await this.updateContainer(containerId, { status: "OFFLOADED" });
+    await tx.update(schema.containers).set({ status: "OFFLOADED" }).where(eq(schema.containers.id, containerId));
 
     // Get location details for voucher entries (container already fetched at top)
     const location = await this.getLocationById(locationId);
@@ -2649,7 +2651,7 @@ export class DbStorage implements IStorage {
     }
 
     // Create offload record with all calculated values
-    const [offload] = await db.insert(schema.containerOffloads).values({
+    const [offloadRecord] = await tx.insert(schema.containerOffloads).values({
       containerId,
       locationId,
       duties,
@@ -2664,14 +2666,17 @@ export class DbStorage implements IStorage {
 
     // Store offload items for exact reversal (prevents discrepancies from weighted average changes)
     for (const item of offloadItemsToStore) {
-      await db.insert(schema.containerOffloadItems).values({
-        offloadId: offload.id,
+      await tx.insert(schema.containerOffloadItems).values({
+        offloadId: offloadRecord.id,
         stockItemId: item.stockItemId,
         quantity: item.quantity.toFixed(3),
         rate: item.rate.toFixed(2),
         totalValue: item.totalValue.toFixed(2),
       });
     }
+
+    return offloadRecord;
+    });
 
     return offload;
   }
