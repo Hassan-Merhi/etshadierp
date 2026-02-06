@@ -1504,6 +1504,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                                 setActiveRow(rowIndex);
                                 setSearchTerm(row.itemName);
                                 setHighlightedIndex(0);
+                              } else if ((col.key === "quantity" || col.key === "rate") && row.itemName?.trim() && !row.stockItemId) {
+                                toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+                                setTimeout(() => {
+                                  setSelectedCell({ row: rowIndex, col: 0 });
+                                  focusCell(rowIndex, 0);
+                                  setActiveRow(rowIndex);
+                                  setSearchTerm(row.itemName);
+                                  setHighlightedIndex(0);
+                                }, 0);
+                                return;
                               }
                             }}
                             onBlur={() => {
