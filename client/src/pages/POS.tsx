@@ -580,15 +580,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setNotes(draft.notes || "");
 
       // Populate rows with draft items
-      const draftRows = draft.items.map((item: any, index: number) => ({
-        id: String(index + 1),
-        itemName: item.stockItemName,
-        stockItemCode: item.stockItemCode || "",
-        stockItemId: item.stockItemId,
-        quantity: parseFloat(item.quantity),
-        rate: parseFloat(item.rate),
-        amount: parseFloat(item.amount),
-      }));
+      const draftRows = draft.items.map((item: any, index: number) => {
+        const rate = parseFloat(item.rate);
+        return {
+          id: String(index + 1),
+          itemName: item.stockItemName,
+          stockItemCode: item.stockItemCode || "",
+          stockItemId: item.stockItemId,
+          quantity: parseFloat(item.quantity),
+          rate: rate,
+          rateUSD: rate,
+          amount: parseFloat(item.amount),
+        };
+      });
 
       // Add blank row at end
       draftRows.push({
@@ -596,6 +600,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         itemName: "",
         quantity: 0,
         rate: 0,
+        rateUSD: 0,
         amount: 0,
       });
 
