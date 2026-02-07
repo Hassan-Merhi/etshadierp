@@ -1,0 +1,288 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { FileText, Search, Pencil, Check, Trash2, X, Filter } from "lucide-react";
+import { format } from "date-fns";
+
+export default function OptionalVouchers() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [search, setSearch] = useState("");
+  const [finalizeVoucherId, setFinalizeVoucherId] = useState<number | null>(null);
+  const [deleteVoucherId, setDeleteVoucherId] = useState<number | null>(null);
+
+  const { data: vouchers = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/vouchers/optional", { type: typeFilter, startDate, endDate, search }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (typeFilter && typeFilter !== "all") params.set("type", typeFilter);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (search) params.set("search", search);
+      const response = await fetch(`/api/vouchers/optional?${params}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch optional vouchers');
+      return response.json();
+    },
+  });
+
+  const finalizeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/vouchers/${id}/finalize`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers/optional"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({ title: "Voucher Finalized", description: "The voucher has been posted successfully." });
+      setFinalizeVoucherId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/vouchers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers/optional"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({ title: "Voucher Deleted", description: "The voucher has been deleted." });
+      setDeleteVoucherId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const clearFilters = () => {
+    setTypeFilter("all");
+    setStartDate("");
+    setEndDate("");
+    setSearch("");
+  };
+
+  const hasFilters = typeFilter !== "all" || startDate || endDate || search;
+
+  const voucherTypes = ["Sales", "Payment", "Receipt", "Journal", "Stock Transfer", "Purchase", "Contra", "Credit Note", "Debit Note"];
+
+  const getTypeBadgeVariant = (type: string) => {
+    switch (type) {
+      case "Sales": return "default";
+      case "Payment": return "secondary";
+      case "Receipt": return "outline";
+      default: return "secondary";
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2" data-testid="text-optional-vouchers-title">
+            <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+            Optional Vouchers
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">Draft/unposted vouchers that can be edited or finalized</p>
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+            <X className="h-4 w-4 mr-1" />
+            Clear Filters
+          </Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger data-testid="select-voucher-type">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {voucherTypes.map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search voucher #, notes..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-vouchers"
+              />
+            </div>
+
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              placeholder="Start Date"
+              data-testid="input-start-date"
+            />
+
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              placeholder="End Date"
+              data-testid="input-end-date"
+            />
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : vouchers.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-optional-vouchers">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">No optional vouchers found</p>
+              <p className="text-sm mt-1">All vouchers are finalized, or try adjusting your filters.</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-muted-foreground mb-2" data-testid="text-voucher-count">
+                {vouchers.length} optional voucher(s)
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Voucher #</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="hidden sm:table-cell">Location</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vouchers.map((v: any) => (
+                      <TableRow key={v.id} data-testid={`row-voucher-${v.id}`}>
+                        <TableCell className="whitespace-nowrap">
+                          {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{v.voucherNumber}</TableCell>
+                        <TableCell>
+                          <Badge variant={getTypeBadgeVariant(v.voucherType)}>{v.voucherType}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-muted-foreground">
+                          {v.locationName || "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => navigate(`/vouchers/${v.id}/edit`)}
+                              data-testid={`button-edit-voucher-${v.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setFinalizeVoucherId(v.id)}
+                              data-testid={`button-finalize-voucher-${v.id}`}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteVoucherId(v.id)}
+                              data-testid={`button-delete-voucher-${v.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={finalizeVoucherId !== null} onOpenChange={(open) => !open && setFinalizeVoucherId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize Voucher</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to finalize this voucher? Once posted, it will be included in all financial calculations and reports. This cannot be undone easily.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-finalize">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => finalizeVoucherId && finalizeMutation.mutate(finalizeVoucherId)}
+              disabled={finalizeMutation.isPending}
+              data-testid="button-confirm-finalize"
+            >
+              {finalizeMutation.isPending ? "Finalizing..." : "Finalize"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteVoucherId !== null} onOpenChange={(open) => !open && setDeleteVoucherId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Voucher</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this optional voucher? This action will remove it from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteVoucherId && deleteMutation.mutate(deleteVoucherId)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

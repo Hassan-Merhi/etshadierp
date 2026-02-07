@@ -91,6 +91,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [itemSearchTerm, setItemSearchTerm] = useState("");
   const [asOfDate, setAsOfDate] = useState<string>("");
+  const [showNegativeStock, setShowNegativeStock] = useState(false);
+  const [negativeSearchTerm, setNegativeSearchTerm] = useState("");
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -176,6 +178,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       return response.json();
     },
     enabled: !!selectedLocationLocal,
+  });
+
+  const { data: negativeStockData = [], isLoading: negativeStockLoading } = useQuery<any[]>({
+    queryKey: ["/api/inventory/negative", { search: negativeSearchTerm }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (negativeSearchTerm) params.set("search", negativeSearchTerm);
+      const response = await fetch(`/api/inventory/negative?${params}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch negative stock');
+      return response.json();
+    },
+    enabled: showNegativeStock,
   });
 
   // Filter out items with 0 quantity
@@ -680,6 +694,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   };
 
+  const handleExportNegativeStock = () => {
+    if (negativeStockData.length === 0) return;
+    const wb = utils.book_new();
+    const wsData = negativeStockData.map(item => ({
+      "Location": item.locationName,
+      "Item Code": item.code,
+      "Item Name": item.name,
+      "Qty": parseFloat(item.quantity),
+      "Group": item.groupName || "Uncategorized",
+    }));
+    const ws = utils.json_to_sheet(wsData);
+    utils.book_append_sheet(wb, ws, "Negative Stock");
+    writeFile(wb, "negative_stock_all_locations.xlsx");
+  };
+
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6 w-full min-w-0">
       <PageHeader 
@@ -687,6 +716,24 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         subtitle="Manage inventory across all locations"
       >
         <div className="flex items-center gap-2 flex-wrap">
+          {!posUser && (
+            <Button
+              variant={showNegativeStock ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setShowNegativeStock(!showNegativeStock);
+                if (showNegativeStock) {
+                  setNegativeSearchTerm("");
+                }
+              }}
+              data-testid="button-negative-stock"
+              className="gap-1"
+            >
+              <AlertCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Negative Stock</span>
+              <span className="sm:hidden">-ve Stock</span>
+            </Button>
+          )}
           <Label className="text-sm text-muted-foreground">As of Date:</Label>
           <DatePickerInput
             value={asOfDate}
@@ -706,6 +753,97 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           )}
         </div>
       </PageHeader>
+      {showNegativeStock && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg sm:text-xl" data-testid="text-negative-stock-title">Negative Stock (All Locations)</CardTitle>
+                <CardDescription>Items with negative inventory across all locations</CardDescription>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportNegativeStock}
+                  disabled={negativeStockData.length === 0}
+                  data-testid="button-export-negative-stock"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowNegativeStock(false); setNegativeSearchTerm(""); }}
+                  data-testid="button-close-negative-stock"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Close
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by code, name, or location..."
+                value={negativeSearchTerm}
+                onChange={(e) => setNegativeSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-negative-stock"
+              />
+            </div>
+
+            {negativeStockLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : negativeStockData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-negative-stock">
+                No negative stock found across any location.
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-muted-foreground mb-2" data-testid="text-negative-stock-count">
+                  Found {negativeStockData.length} item(s) with negative stock
+                </div>
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="hidden sm:table-cell">Group</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {negativeStockData.map((item: any, idx: number) => (
+                        <TableRow key={`${item.locationId}-${item.stockItemId}`} data-testid={`row-negative-stock-${idx}`}>
+                          <TableCell className="font-medium">{item.locationName}</TableCell>
+                          <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell className="text-right text-destructive font-mono">
+                            {parseFloat(item.quantity).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">{item.groupName || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {!showNegativeStock && (
+      <>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
         {!selectedLocationLocal && <span>Select Location</span>}
@@ -1749,6 +1887,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             )}
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Archive Stock Group Confirmation Dialog - placed at root level */}
