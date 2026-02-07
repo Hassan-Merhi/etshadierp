@@ -33,17 +33,19 @@ export default function OptionalVouchers() {
   const [finalizeVoucherId, setFinalizeVoucherId] = useState<number | null>(null);
   const [deleteVoucherId, setDeleteVoucherId] = useState<number | null>(null);
 
+  const queryParams = new URLSearchParams();
+  if (typeFilter && typeFilter !== "all") queryParams.set("type", typeFilter);
+  if (startDate) queryParams.set("startDate", startDate);
+  if (endDate) queryParams.set("endDate", endDate);
+  if (search) queryParams.set("search", search);
+  const queryString = queryParams.toString();
+  const queryUrl = `/api/vouchers/optional${queryString ? `?${queryString}` : ""}`;
+
   const { data: vouchers = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/vouchers/optional", { type: typeFilter, startDate, endDate, search }],
+    queryKey: ["/api/vouchers/optional", typeFilter, startDate, endDate, search],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (typeFilter && typeFilter !== "all") params.set("type", typeFilter);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      if (search) params.set("search", search);
-      const response = await fetch(`/api/vouchers/optional?${params}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch optional vouchers');
-      return response.json();
+      const res = await apiRequest("GET", queryUrl);
+      return res.json();
     },
   });
 
