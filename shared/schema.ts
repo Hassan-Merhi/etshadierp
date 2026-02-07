@@ -1806,6 +1806,7 @@ export const FEATURE_KEYS = [
   "location_summary",
   "sales_report",
   "settings",
+  "optional_vouchers",
 ] as const;
 
 export type FeatureKey = typeof FEATURE_KEYS[number];
@@ -1832,6 +1833,7 @@ export const FEATURE_ROUTES: Record<FeatureKey, string> = {
   location_summary: "/location-summary",
   sales_report: "/sales-report",
   settings: "/settings",
+  optional_vouchers: "/optional-vouchers",
 };
 
 // Map routes to feature keys (reverse lookup)

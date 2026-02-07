@@ -118,6 +118,7 @@ const menuGroups: MenuGroup[] = [
     icon: Receipt,
     items: [
       { title: "Vouchers", url: "/vouchers", icon: Receipt },
+      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
       { title: "Transfer Order", url: "/stock-transfer-order", icon: ArrowLeftRight },
     ],
   },

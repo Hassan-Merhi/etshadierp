@@ -78,6 +78,7 @@ import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
+import OptionalVouchers from "@/pages/OptionalVouchers";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -156,6 +157,7 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/location-summary" component={LocationSummary} />
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
+      <Route path="/optional-vouchers" component={OptionalVouchers} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
       <Route path="/stock-items/:stockItemId/monthly-summary">{() => <LocationMonthlySummary />}</Route>
