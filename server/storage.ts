@@ -1975,50 +1975,48 @@ export class DbStorage implements IStorage {
   }
 
   async updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void> {
-    // Get the location's companyId
-    const [location] = await db
-      .select()
-      .from(schema.locations)
-      .where(eq(schema.locations.id, locationId));
-    
-    if (!location) {
-      throw new Error("Location not found");
-    }
+    await db.transaction(async (tx) => {
+      // Get the location's companyId
+      const [location] = await tx
+        .select()
+        .from(schema.locations)
+        .where(eq(schema.locations.id, locationId));
+      
+      if (!location) {
+        throw new Error("Location not found");
+      }
 
-    // Check if inventory record exists
-    const [existing] = await db
-      .select()
-      .from(schema.inventory)
-      .where(and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId)
-      ));
+      // Check if inventory record exists (with row lock)
+      const existingRows = await (tx as any).execute(
+        sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId} FOR UPDATE`
+      );
+      const existing = existingRows.rows?.[0] || existingRows[0];
 
-
-    const numericQuantity = parseFloat(quantity);
-    if (existing) {
-      // Update existing record
-      await db
-        .update(schema.inventory)
-        .set({
+      const numericQuantity = parseFloat(quantity);
+      if (existing) {
+        // Update existing record
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity,
+            averageRate,
+            totalValue,
+            lastUpdated: new Date(),
+          })
+          .where(eq(schema.inventory.id, existing.id));
+      } else {
+        // Create new record
+        await tx.insert(schema.inventory).values({
+          companyId: location.companyId,
+          locationId,
+          stockItemId,
           quantity,
           averageRate,
           totalValue,
           lastUpdated: new Date(),
-        })
-        .where(eq(schema.inventory.id, existing.id));
-    } else {
-      // Create new record
-      await db.insert(schema.inventory).values({
-        companyId: location.companyId,
-        locationId,
-        stockItemId,
-        quantity,
-        averageRate,
-        totalValue,
-        lastUpdated: new Date(),
-      });
-    }
+        });
+      }
+    });
   }
 
   async updateCostPricesByBarcode(locationId: number, companyId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }> {
@@ -2034,30 +2032,29 @@ export class DbStorage implements IStorage {
           continue;
         }
 
-        // Find inventory record
-        const [inventory] = await db
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, locationId),
-            eq(schema.inventory.stockItemId, stockItem.id)
-          ));
+        await db.transaction(async (tx) => {
+          // Find inventory record (with row lock)
+          const inventoryRows = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${stockItem.id} FOR UPDATE`
+          );
+          const inventory = inventoryRows.rows?.[0] || inventoryRows[0];
 
-        if (inventory) {
-          // Update existing inventory record (including those with 0 quantity from POS sales)
-          const newTotalValue = (parseFloat(inventory.quantity) * update.costPrice).toFixed(2);
-          await db
-            .update(schema.inventory)
-            .set({
-              averageRate: update.costPrice.toFixed(2),
-              totalValue: newTotalValue,
-              lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, inventory.id));
-          updated++;
-        } else {
-          errors.push(`Item not found in inventory for barcode: ${update.barcode}`);
-        }
+          if (inventory) {
+            // Update existing inventory record (including those with 0 quantity from POS sales)
+            const newTotalValue = (parseFloat(inventory.quantity) * update.costPrice).toFixed(2);
+            await tx
+              .update(schema.inventory)
+              .set({
+                averageRate: update.costPrice.toFixed(2),
+                totalValue: newTotalValue,
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, inventory.id));
+            updated++;
+          } else {
+            errors.push(`Item not found in inventory for barcode: ${update.barcode}`);
+          }
+        });
       } catch (err: any) {
         errors.push(`Error processing ${update.barcode}: ${err.message}`);
       }
@@ -2216,20 +2213,17 @@ export class DbStorage implements IStorage {
         throw new Error(`Calculated rate is infinite for stock item ${stockItemId}. averageRate=${averageOriginalRate}, additionalCost=${additionalCostPerBale}`);
       }
       
-      // Check if inventory exists
-      const [existing] = await tx
-        .select()
-        .from(schema.inventory)
-        .where(and(
-          eq(schema.inventory.locationId, locationId),
-          eq(schema.inventory.stockItemId, stockItemId)
-        ));
+      // Check if inventory exists (with row lock)
+      const existingRows = await (tx as any).execute(
+        sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId} FOR UPDATE`
+      );
+      const existing = existingRows.rows?.[0] || existingRows[0];
 
       if (existing) {
         // Add to existing inventory with weighted average rate
         const existingQty = parseFloat(existing.quantity);
-        const existingRate = parseFloat(existing.averageRate);
-        const existingValue = parseFloat(existing.totalValue || "0");
+        const existingRate = parseFloat(existing.average_rate);
+        const existingValue = parseFloat(existing.total_value || "0");
         
         // Negative inventory is VALID when sales happen before container offload
         // We must ADD to it (not replace) so: -2 + 15 = 13 (correct)
@@ -3169,19 +3163,16 @@ export class DbStorage implements IStorage {
           const quantity = parseFloat(saleItem.quantity);
           const costPrice = parseFloat(saleItem.costPrice);
 
-          // Get current inventory
-          const [currentInventory] = await tx
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, voucher.locationId),
-              eq(schema.inventory.stockItemId, saleItem.stockItemId)
-            ));
+          // Get current inventory (with row lock)
+          const currentInventoryRows = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${voucher.locationId} AND stock_item_id = ${saleItem.stockItemId} FOR UPDATE`
+          );
+          const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
 
           if (currentInventory) {
             // Add back the quantity
             const newQuantity = parseFloat(currentInventory.quantity) + quantity;
-            const currentTotalValue = parseFloat(currentInventory.totalValue);
+            const currentTotalValue = parseFloat(currentInventory.total_value);
             const newTotalValue = currentTotalValue + (quantity * costPrice);
             const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
@@ -3232,18 +3223,15 @@ export class DbStorage implements IStorage {
             const sourceLocationId = transferVoucher.sourceLocationId;
             const destinationLocationId = transferVoucher.destinationLocationId;
 
-            // Add back to source location
-            const [sourceInventory] = await tx
-              .select()
-              .from(schema.inventory)
-              .where(and(
-                eq(schema.inventory.locationId, sourceLocationId),
-                eq(schema.inventory.stockItemId, item.stockItemId)
-              ));
+            // Add back to source location (with row lock)
+            const sourceInventoryRows = await (tx as any).execute(
+              sql`SELECT * FROM inventory WHERE location_id = ${sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+            );
+            const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
 
             if (sourceInventory) {
               const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
-              const newTotalValue = parseFloat(sourceInventory.totalValue) + (quantity * rate);
+              const newTotalValue = parseFloat(sourceInventory.total_value) + (quantity * rate);
               const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
               await tx
@@ -3265,18 +3253,15 @@ export class DbStorage implements IStorage {
               });
             }
 
-            // Subtract from destination location
-            const [destInventory] = await tx
-              .select()
-              .from(schema.inventory)
-              .where(and(
-                eq(schema.inventory.locationId, destinationLocationId),
-                eq(schema.inventory.stockItemId, item.stockItemId)
-              ));
+            // Subtract from destination location (with row lock)
+            const destInventoryRows = await (tx as any).execute(
+              sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+            );
+            const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
 
             if (destInventory) {
               const newQuantity = parseFloat(destInventory.quantity) - quantity;
-              const newTotalValue = parseFloat(destInventory.totalValue) - (quantity * rate);
+              const newTotalValue = parseFloat(destInventory.total_value) - (quantity * rate);
               const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
               await tx
@@ -3324,17 +3309,14 @@ export class DbStorage implements IStorage {
               (adjustmentType === "Mixed" && rawQuantity < 0);
             const reversedQuantity = isConsumption ? quantity : -quantity;
 
-            const [currentInventory] = await tx
-              .select()
-              .from(schema.inventory)
-              .where(and(
-                eq(schema.inventory.locationId, adjustmentVoucher.locationId),
-                eq(schema.inventory.stockItemId, item.stockItemId)
-              ));
+            const currentInventoryRows = await (tx as any).execute(
+              sql`SELECT * FROM inventory WHERE location_id = ${adjustmentVoucher.locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+            );
+            const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
 
             if (currentInventory) {
               const currentQty = parseFloat(currentInventory.quantity);
-              const currentRate = parseFloat(currentInventory.averageRate);
+              const currentRate = parseFloat(currentInventory.average_rate);
               const newQuantity = currentQty + reversedQuantity;
               
               let newTotalValue: number;
@@ -3764,20 +3746,17 @@ export class DbStorage implements IStorage {
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
-          // Get current inventory at THIS ITEM's source location
-          const [sourceInventory] = await tx
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, item.sourceLocationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
+          // Get current inventory at THIS ITEM's source location (with row lock)
+          const sourceInventoryRows = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${item.sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+          );
+          const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
 
           if (sourceInventory) {
             // Decrease quantity at this item's source location
             const currentQty = parseFloat(sourceInventory.quantity);
-            const currentValue = parseFloat(sourceInventory.totalValue);
-            const currentRate = parseFloat(sourceInventory.averageRate);
+            const currentValue = parseFloat(sourceInventory.total_value);
+            const currentRate = parseFloat(sourceInventory.average_rate);
             
             const newQty = currentQty - quantity;
             const newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -3804,20 +3783,17 @@ export class DbStorage implements IStorage {
               .where(eq(schema.inventory.id, sourceInventory.id));
           }
 
-          // Get current inventory at destination location
-          const [destInventory] = await tx
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, destinationLocationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
+          // Get current inventory at destination location (with row lock)
+          const destInventoryRows = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+          );
+          const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
 
           if (destInventory) {
             // Increase quantity at destination location using weighted average
             // Use existingQty * existingRate (not totalValue) to avoid data corruption issues
             const currentQty = parseFloat(destInventory.quantity);
-            const currentRate = parseFloat(destInventory.averageRate || "0");
+            const currentRate = parseFloat(destInventory.average_rate || "0");
             
             const newQty = currentQty + quantity;
             // Weighted average: (existing value + new value) / total quantity
@@ -3980,20 +3956,17 @@ export class DbStorage implements IStorage {
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
-          // Get current inventory at location
-          const [currentInventory] = await tx
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, locationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
+          // Get current inventory at location (with row lock)
+          const currentInventoryRows = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+          );
+          const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
 
           if (currentInventory) {
             // Adjust quantity at location
             const currentQty = parseFloat(currentInventory.quantity);
-            const currentValue = parseFloat(currentInventory.totalValue);
-            const currentRate = parseFloat(currentInventory.averageRate);
+            const currentValue = parseFloat(currentInventory.total_value);
+            const currentRate = parseFloat(currentInventory.average_rate);
             
             let newQty: number;
             let newValue: number;
@@ -4233,19 +4206,16 @@ export class DbStorage implements IStorage {
         // Use the item's sourceLocationId if available, otherwise fall back to transfer's sourceLocationId
         const sourceLocationId = oldItem.sourceLocationId || existingTransfer.sourceLocationId;
 
-        const [sourceInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, sourceLocationId),
-            eq(schema.inventory.stockItemId, oldItem.stockItemId)
-          ));
+        const sourceInventoryRows = await (tx as any).execute(
+          sql`SELECT * FROM inventory WHERE location_id = ${sourceLocationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
+        );
+        const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
 
         if (sourceInventory) {
           // Add back to source (reverse the subtraction)
           // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
           const currentQty = parseFloat(sourceInventory.quantity);
-          const currentRate = parseFloat(sourceInventory.averageRate || "0");
+          const currentRate = parseFloat(sourceInventory.average_rate || "0");
           
           const newQty = currentQty + quantity;
           const newRate = newQty > 0 
@@ -4283,19 +4253,16 @@ export class DbStorage implements IStorage {
         }
 
         // REVERSE: Subtract from destination location (we previously added)
-        const [destInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, existingTransfer.destinationLocationId),
-            eq(schema.inventory.stockItemId, oldItem.stockItemId)
-          ));
+        const destInventoryRows = await (tx as any).execute(
+          sql`SELECT * FROM inventory WHERE location_id = ${existingTransfer.destinationLocationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
+        );
+        const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
 
         if (destInventory) {
           // Subtract from destination (reverse the addition)
           const currentQty = parseFloat(destInventory.quantity);
-          const currentValue = parseFloat(destInventory.totalValue);
-          const currentRate = parseFloat(destInventory.averageRate);
+          const currentValue = parseFloat(destInventory.total_value);
+          const currentRate = parseFloat(destInventory.average_rate);
           
           const newQty = currentQty - quantity;
           const newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -4356,20 +4323,17 @@ export class DbStorage implements IStorage {
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
-          // Get current inventory at THIS ITEM's source location
-          const [sourceInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, item.sourceLocationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
+          // Get current inventory at THIS ITEM's source location (with row lock)
+          const sourceInventoryRows2 = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${item.sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+          );
+          const sourceInventory = sourceInventoryRows2.rows?.[0] || sourceInventoryRows2[0];
 
         if (sourceInventory) {
           // Decrease quantity at this item's source location
           const currentQty = parseFloat(sourceInventory.quantity);
-          const currentValue = parseFloat(sourceInventory.totalValue);
-          const currentRate = parseFloat(sourceInventory.averageRate);
+          const currentValue = parseFloat(sourceInventory.total_value);
+          const currentRate = parseFloat(sourceInventory.average_rate);
           
           const newQty = currentQty - quantity;
           const newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -4387,20 +4351,17 @@ export class DbStorage implements IStorage {
           throw new Error(`Insufficient inventory at source location ${item.sourceLocationId} for stock item ${item.stockItemId}`);
         }
 
-        // Get current inventory at destination location
-        const [destInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, destinationLocationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
+        // Get current inventory at destination location (with row lock)
+        const destInventoryRows2 = await (tx as any).execute(
+          sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+        );
+        const destInventory = destInventoryRows2.rows?.[0] || destInventoryRows2[0];
 
         if (destInventory) {
           // Increase quantity at destination location using weighted average
           // Use existingQty * existingRate (not totalValue) to avoid data corruption issues
           const currentQty = parseFloat(destInventory.quantity);
-          const currentRate = parseFloat(destInventory.averageRate || "0");
+          const currentRate = parseFloat(destInventory.average_rate || "0");
           
           const newQty = currentQty + quantity;
           // Weighted average: (existing value + new value) / total quantity
@@ -4510,18 +4471,15 @@ export class DbStorage implements IStorage {
 
         console.log('[storage.updateStockAdjustment] Reversing item:', oldItem.stockItemId, 'qty:', quantity, 'type:', oldAdjustmentType);
 
-        // Get current inventory at location
-        const [currentInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, existingAdjustment.locationId),
-            eq(schema.inventory.stockItemId, oldItem.stockItemId)
-          ));
+        // Get current inventory at location (with row lock)
+        const currentInventoryRows = await (tx as any).execute(
+          sql`SELECT * FROM inventory WHERE location_id = ${existingAdjustment.locationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
+        );
+        const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
 
         if (currentInventory) {
           const currentQty = parseFloat(currentInventory.quantity);
-          const currentRate = parseFloat(currentInventory.averageRate || "0");
+          const currentRate = parseFloat(currentInventory.average_rate || "0");
           
           let newQty: number;
           let newValue: number;
@@ -4719,19 +4677,16 @@ export class DbStorage implements IStorage {
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
-          // Get current inventory at location
-          const [currentInventory] = await tx
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, locationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
+          // Get current inventory at location (with row lock)
+          const currentInventoryRows2 = await (tx as any).execute(
+            sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
+          );
+          const currentInventory = currentInventoryRows2.rows?.[0] || currentInventoryRows2[0];
 
           if (currentInventory) {
             // Adjust quantity at location
             const currentQty = parseFloat(currentInventory.quantity);
-            const currentRate = parseFloat(currentInventory.averageRate || "0");
+            const currentRate = parseFloat(currentInventory.average_rate || "0");
             
             let newQty: number;
             let newValue: number;
