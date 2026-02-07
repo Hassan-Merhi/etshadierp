@@ -112,9 +112,9 @@ export default function VoucherDetail() {
       <div
         className={`${
           voucherTypeColors[data?.voucherType || ""] || "bg-primary"
-        } text-white p-4`}
+        } text-white p-3 sm:p-4`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -129,7 +129,7 @@ export default function VoucherDetail() {
               <p className="text-sm opacity-80">
                 Accounting Voucher Alteration (Secondary)
               </p>
-              <h1 className="text-xl font-bold flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2 flex-wrap">
                 <Badge
                   variant="outline"
                   className="bg-white/20 text-white border-white/40"
@@ -150,7 +150,7 @@ export default function VoucherDetail() {
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-3 sm:p-4 space-y-6">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-32 w-full" />
@@ -160,8 +160,8 @@ export default function VoucherDetail() {
           <>
             {/* Voucher Info */}
             <Card>
-              <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <CardContent className="p-3 sm:p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {data.supplierInvoiceNo && (
                     <div className="flex items-center gap-2">
                       <Hash className="h-4 w-4 text-muted-foreground" />
@@ -226,7 +226,7 @@ export default function VoucherDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
@@ -292,7 +292,7 @@ export default function VoucherDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">

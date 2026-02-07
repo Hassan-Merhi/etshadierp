@@ -129,7 +129,7 @@ export default function EditSupplier() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
+          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
             Edit Supplier
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -148,7 +148,7 @@ export default function EditSupplier() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="code"
@@ -226,7 +226,7 @@ export default function EditSupplier() {
                   control={form.control}
                   name="address"
                   render={({ field }) => (
-                    <FormItem className="col-span-2">
+                    <FormItem className="col-span-1 sm:col-span-2">
                       <FormLabel>Address</FormLabel>
                       <FormControl>
                         <Input 
@@ -316,7 +316,7 @@ export default function EditSupplier() {
                 />
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4">
                 <Button 
                   type="button" 
                   variant="outline" 

@@ -108,7 +108,7 @@ export default function ClosingStockSummary() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button
@@ -120,7 +120,7 @@ export default function ClosingStockSummary() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               <Package className="h-6 w-6" />
               Closing Stock Summary
             </h1>
@@ -201,13 +201,13 @@ export default function ClosingStockSummary() {
 
       <Card className="overflow-hidden">
         <div className="bg-primary text-primary-foreground">
-          <div className="grid grid-cols-4 p-3 font-semibold text-sm">
+          <div className="grid grid-cols-4 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
             <div className="col-span-1">Particulars</div>
             <div className="col-span-3 text-center border-l border-primary-foreground/30">
               Closing Balance
             </div>
           </div>
-          <div className="grid grid-cols-4 px-3 pb-2 text-xs">
+          <div className="grid grid-cols-4 px-2 sm:px-3 pb-2 text-xs">
             <div></div>
             <div className="text-right">Quantity</div>
             <div className="text-right">Rate</div>
@@ -227,13 +227,13 @@ export default function ClosingStockSummary() {
               {data.stockGroups.map((group) => (
                 <div
                   key={group.id}
-                  className="grid grid-cols-4 p-3 cursor-pointer hover-elevate"
+                  className="grid grid-cols-4 p-2 sm:p-3 cursor-pointer hover-elevate"
                   onClick={() => handleGroupClick(group.id, group.name)}
                   data-testid={`row-stock-group-${group.id}`}
                 >
-                  <div className="font-medium flex items-center gap-1">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    {group.name}
+                  <div className="font-medium flex items-center gap-1 truncate text-xs sm:text-sm">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{group.name}</span>
                   </div>
                   <div className="text-right font-mono text-sm">
                     {formatQty(group.closing.quantity)}
@@ -256,8 +256,8 @@ export default function ClosingStockSummary() {
 
         {data?.grandTotal && (
           <div className="bg-muted/50 border-t-2 border-primary">
-            <div className="grid grid-cols-4 p-3 font-bold">
-              <div>Grand Total</div>
+            <div className="grid grid-cols-4 p-2 sm:p-3 font-bold">
+              <div className="text-xs sm:text-sm">Grand Total</div>
               <div className="text-right font-mono">
                 {formatNumber(data.grandTotal.quantity)} BL
               </div>

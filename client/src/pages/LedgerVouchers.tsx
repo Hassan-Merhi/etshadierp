@@ -131,7 +131,7 @@ export default function LedgerVouchers() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -144,7 +144,7 @@ export default function LedgerVouchers() {
             </Button>
             <div>
               <p className="text-sm opacity-80">Ledger Vouchers</p>
-              <h1 className="text-xl font-bold" data-testid="text-account-name">
+              <h1 className="text-lg sm:text-xl font-bold" data-testid="text-account-name">
                 {data?.account?.name || "Loading..."}
               </h1>
             </div>
@@ -159,7 +159,7 @@ export default function LedgerVouchers() {
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-3 sm:p-4 space-y-6">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-[400px] w-full" />
@@ -188,16 +188,16 @@ export default function LedgerVouchers() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="w-24">Date</TableHead>
                         <TableHead>Particulars</TableHead>
-                        <TableHead className="w-32">Vch Type</TableHead>
+                        <TableHead className="w-32 hidden sm:table-cell">Vch Type</TableHead>
                         <TableHead className="text-right w-32">Debit</TableHead>
                         <TableHead className="text-right w-32">Credit</TableHead>
-                        <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-8 hidden sm:table-cell"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -224,7 +224,7 @@ export default function LedgerVouchers() {
                               <TableCell className="font-medium">
                                 {voucher.particulars}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="hidden sm:table-cell">
                                 <Badge
                                   variant="secondary"
                                   className={`text-xs ${
@@ -244,7 +244,7 @@ export default function LedgerVouchers() {
                                   ? formatAmount(voucher.credit)
                                   : ""}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="hidden sm:table-cell">
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </TableCell>
                             </TableRow>
@@ -252,14 +252,15 @@ export default function LedgerVouchers() {
 
                           {/* Totals Row */}
                           <TableRow className="bg-primary/10 font-bold border-t-2">
-                            <TableCell colSpan={3}></TableCell>
+                            <TableCell colSpan={2}></TableCell>
+                            <TableCell className="hidden sm:table-cell"></TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(data.totals.debit)}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(data.totals.credit)}
                             </TableCell>
-                            <TableCell></TableCell>
+                            <TableCell className="hidden sm:table-cell"></TableCell>
                           </TableRow>
                         </>
                       )}
@@ -270,7 +271,7 @@ export default function LedgerVouchers() {
             </Card>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Opening Balance</p>

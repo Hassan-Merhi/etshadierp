@@ -84,7 +84,7 @@ export default function BalanceSheet() {
     const total = calculateTotal(accountList);
 
     return (
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -118,7 +118,7 @@ export default function BalanceSheet() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Balance Sheet</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold">Balance Sheet</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Financial position showing assets, liabilities, and equity
         </p>

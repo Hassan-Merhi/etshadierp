@@ -577,7 +577,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-stock-transfer">Stock Transfer</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-stock-transfer">Stock Transfer</h1>
           <p className="text-muted-foreground">
             {isPOS ? `Transfer stock from your location to another` : `Transfer stock between locations`}
           </p>
@@ -590,7 +590,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         </Link>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>New Transfer</CardTitle>
@@ -654,7 +654,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                   {inventoryLoading && <Skeleton className="h-4 w-24" />}
                 </div>
                 
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -756,7 +756,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         </Card>
 
         {activeSourceLocation && (
-          <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+          <Card className="w-full lg:w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
             <div className="p-4 border-b">
               <h3 className="text-sm font-semibold mb-3">Search Items</h3>
               <div className="relative">

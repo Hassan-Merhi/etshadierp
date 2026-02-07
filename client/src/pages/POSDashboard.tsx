@@ -232,7 +232,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">POS Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold">POS Dashboard</h1>
           <p className="text-muted-foreground">
             {location?.name || "Loading..."} - {posUser.username}
           </p>
@@ -426,15 +426,16 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <CardDescription>Your last 10 shifts at this location</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <TableHead className="hidden sm:table-cell">Duration</TableHead>
                   <TableHead className="text-right">Opening</TableHead>
                   <TableHead className="text-right">Closing</TableHead>
                   <TableHead className="text-right">Sales</TableHead>
-                  <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Variance</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -446,7 +447,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                       <TableCell>
                         {format(new Date(shift.openedAt), "MMM dd, yyyy")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {shift.closedAt ? (
                           <>
                             {format(new Date(shift.openedAt), "hh:mm a")} - {format(new Date(shift.closedAt), "hh:mm a")}
@@ -465,7 +466,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         {shift.salesTotal ? formatAmount(parseFloat(shift.salesTotal)) : "-"}
                         {shift.salesCount ? ` (${shift.salesCount})` : ""}
                       </TableCell>
-                      <TableCell className={`text-right font-mono ${variance !== 0 ? "text-destructive" : "text-green-600"}`}>
+                      <TableCell className={`hidden sm:table-cell text-right font-mono ${variance !== 0 ? "text-destructive" : "text-green-600"}`}>
                         {shift.variance ? formatAmount(variance) : "-"}
                       </TableCell>
                       <TableCell>
@@ -485,6 +486,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

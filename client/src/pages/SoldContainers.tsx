@@ -62,9 +62,9 @@ export default function SoldContainers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Sold Containers</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold">Sold Containers</h1>
           <p className="text-sm text-muted-foreground mt-1">
             View all containers that have been sold to customers
           </p>
@@ -97,7 +97,7 @@ export default function SoldContainers() {
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -105,7 +105,7 @@ export default function SoldContainers() {
                   <TableHead>Customer</TableHead>
                   <TableHead>Sale Date</TableHead>
                   <TableHead className="text-right">Container Cost</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Commission</TableHead>
                   <TableHead className="text-right">Total Amount</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -125,7 +125,7 @@ export default function SoldContainers() {
                     <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
                       ${formatNumber(parseFloat(sale.containerCost))}
                     </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-commission-${sale.saleId}`}>
+                    <TableCell className="text-right font-mono hidden sm:table-cell" data-testid={`text-commission-${sale.saleId}`}>
                       ${formatNumber(parseFloat(sale.commission))}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${sale.saleId}`}>

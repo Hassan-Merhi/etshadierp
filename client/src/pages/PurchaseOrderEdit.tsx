@@ -308,21 +308,21 @@ export default function PurchaseOrderEdit() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="p-3 sm:p-6 space-y-6">
+      <div className="flex items-center gap-2 sm:gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate("/daybook")} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Edit Purchase Order</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Edit Purchase Order</h1>
           <p className="text-muted-foreground">
             {po.supplierName} ({po.supplierCode}) | Container: {po.containerNumber}
           </p>
         </div>
       </div>
 
-      <div className="flex gap-4 relative" ref={containerRef}>
-      <Card className={`flex-1 transition-all ${showItemSidebar ? 'mr-[340px]' : ''}`}>
+      <div className="flex flex-col sm:flex-row gap-4 relative" ref={containerRef}>
+      <Card className={`flex-1 transition-all ${showItemSidebar ? 'sm:mr-[340px]' : ''}`}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>PO Details</span>
@@ -332,7 +332,7 @@ export default function PurchaseOrderEdit() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="poNumber">PO Number</Label>
               <Input
@@ -379,7 +379,7 @@ export default function PurchaseOrderEdit() {
               </Button>
             </div>
             
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -524,7 +524,7 @@ export default function PurchaseOrderEdit() {
 
           <div className="space-y-4">
             <Label>Freight & Other Charges</Label>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="freight">Freight</Label>
                 <Input
@@ -610,7 +610,7 @@ export default function PurchaseOrderEdit() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end gap-2">
+        <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2">
           <Button variant="outline" onClick={() => navigate("/daybook")} data-testid="button-cancel">
             Cancel
           </Button>
@@ -628,7 +628,7 @@ export default function PurchaseOrderEdit() {
       {/* Search Items Sidebar */}
       {showItemSidebar && (
         <Card 
-          className="w-80 flex-shrink-0 absolute right-0 z-10" 
+          className="w-full sm:w-80 flex-shrink-0 sm:absolute sm:right-0 z-10" 
           style={{ top: `${sidebarTop}px` }}
           ref={sidebarRef}
         >
