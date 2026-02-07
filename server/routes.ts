@@ -31795,6 +31795,144 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/inventory/negative", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { search, locationId, stockGroupId } = req.query;
+
+      const conditions = [
+        eq(inventory.companyId, companyId),
+        sql`CAST(${inventory.quantity} AS numeric) < 0`,
+      ];
+
+      if (locationId) {
+        conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
+      }
+
+      const results = await db
+        .select({
+          inventoryId: inventory.id,
+          locationId: inventory.locationId,
+          locationName: locations.name,
+          stockItemId: inventory.stockItemId,
+          code: stockItems.code,
+          name: stockItems.name,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+          groupName: stockGroups.name,
+          groupId: stockItems.stockGroupId,
+        })
+        .from(inventory)
+        .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .where(and(...conditions))
+        .orderBy(locations.name, stockItems.code);
+
+      let filtered = results;
+
+      if (stockGroupId) {
+        const gid = parseInt(stockGroupId as string);
+        filtered = filtered.filter(r => r.groupId === gid);
+      }
+
+      if (search) {
+        const s = (search as string).toLowerCase();
+        filtered = filtered.filter(r =>
+          r.code.toLowerCase().includes(s) ||
+          r.name.toLowerCase().includes(s) ||
+          r.locationName.toLowerCase().includes(s)
+        );
+      }
+
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Negative inventory error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/vouchers/optional", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { type, locationId, startDate, endDate, search } = req.query;
+
+      const conditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, true),
+        isNull(vouchers.deletedAt),
+      ];
+
+      if (type) {
+        conditions.push(eq(vouchers.voucherType, type as string));
+      }
+      if (locationId) {
+        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+      }
+      if (startDate) {
+        conditions.push(sql`${vouchers.voucherDate} >= ${startDate as string}`);
+      }
+      if (endDate) {
+        conditions.push(sql`${vouchers.voucherDate} <= ${endDate as string}`);
+      }
+
+      const results = await db
+        .select()
+        .from(vouchers)
+        .where(and(...conditions))
+        .orderBy(sql`${vouchers.voucherDate} DESC`);
+
+      let filtered = results;
+      if (search) {
+        const s = (search as string).toLowerCase();
+        filtered = filtered.filter(r =>
+          r.voucherNumber.toLowerCase().includes(s) ||
+          (r.description || "").toLowerCase().includes(s) ||
+          (r.locationName || "").toLowerCase().includes(s)
+        );
+      }
+
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Optional vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const voucherId = parseInt(req.params.id);
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
+
+      const [voucher] = await db
+        .select()
+        .from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
+
+      if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      if (!voucher.optional) return res.status(400).json({ message: "Voucher is already finalized" });
+
+      const [updated] = await db
+        .update(vouchers)
+        .set({ optional: false })
+        .where(eq(vouchers.id, voucherId))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Finalize voucher error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
