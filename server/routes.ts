@@ -4077,26 +4077,6 @@ if (asOfDate) {
           return res.status(400).json({ message: "No valid withdrawal amounts provided" });
         }
 
-        // Verify all employees have sufficient balance
-        for (const withdrawal of validWithdrawals) {
-          const [employee] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, withdrawal.employeeId));
-
-          if (!employee) continue;
-          if (employee.companyId !== req.session.currentCompanyId) continue;
-
-          const balance = parseFloat(employee.currentBalance);
-          const withdrawAmount = parseFloat(withdrawal.amount);
-
-          if (balance < withdrawAmount) {
-            return res.status(400).json({
-              message: `${employee.firstName} ${employee.lastName} has insufficient balance. Balance: ${balance}, Requested: ${withdrawAmount}`,
-            });
-          }
-        }
-
         // Calculate total amount
         const totalAmount = validWithdrawals.reduce(
           (sum: number, w: any) => sum + parseFloat(w.amount),
@@ -4400,13 +4380,6 @@ if (asOfDate) {
         }
 
         const currentBalance = parseFloat(employee.currentBalance);
-        if (withdrawalAmount > currentBalance) {
-          return res
-            .status(400)
-            .json({
-              message: `Insufficient balance. Current balance: ${currentBalance.toFixed(2)}`,
-            });
-        }
 
         // Create voucher
         const voucherNumber = `SAL-WD-${Date.now()}`;
