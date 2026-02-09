@@ -598,8 +598,17 @@ export default function Analytics() {
   };
 
   const groupAccountsByParent = (accountList: Account[]) => {
-    const parentAccounts = accountList.filter(acc => !acc.parentId);
-    const childAccounts = accountList.filter(acc => acc.parentId);
+    const accountIdsInList = new Set(accountList.map(acc => acc.accountId));
+    const parentAccounts: Account[] = [];
+    const childAccounts: Account[] = [];
+
+    accountList.forEach(acc => {
+      if (!acc.parentId || !accountIdsInList.has(acc.parentId)) {
+        parentAccounts.push(acc);
+      } else {
+        childAccounts.push(acc);
+      }
+    });
     
     const accountMap = new Map<number, Account[]>();
     childAccounts.forEach(child => {
