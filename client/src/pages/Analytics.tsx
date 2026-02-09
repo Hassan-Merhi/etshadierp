@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,7 +23,11 @@ import {
   ChevronRight,
   ChevronDown,
   Download,
-  RefreshCw
+  RefreshCw,
+  BarChart3,
+  ShoppingCart,
+  Container as ContainerIcon,
+  type LucideIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
@@ -325,8 +328,40 @@ export default function Analytics() {
   const [plStartDate, setPlStartDate] = useState("");
   const [plEndDate, setPlEndDate] = useState("");
   
-  // Tab state for controlled navigation
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeSection, setActiveSection] = useState("overview");
+
+  const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
+    {
+      label: "Financial Summary",
+      items: [
+        { key: "overview", label: "Overview", icon: BarChart3 },
+        { key: "reports", label: "Net Profit (P&L)", icon: DollarSign },
+      ],
+    },
+    {
+      label: "Account Balances",
+      items: [
+        { key: "assets", label: "Assets", icon: Package },
+        { key: "liabilities", label: "Liabilities", icon: FileText },
+        { key: "cash", label: "Cash", icon: Wallet },
+      ],
+    },
+    {
+      label: "Expenses",
+      items: [
+        { key: "expenses", label: "All Expenses", icon: TrendingDown },
+        { key: "direct-expenses", label: "Direct Expenses", icon: DollarSign },
+        { key: "indirect-expenses", label: "Indirect Expenses", icon: FileText },
+      ],
+    },
+    {
+      label: "Sales & Containers",
+      items: [
+        { key: "sales", label: "Sales Analytics", icon: ShoppingCart },
+        { key: "containers", label: "Container Report", icon: ContainerIcon },
+      ],
+    },
+  ];
   
   // Clear cached items when location filter changes
   const handleOpeningStockLocationChange = (newLocationId: string) => {
@@ -915,33 +950,49 @@ export default function Analytics() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Comprehensive financial analysis and reporting
-          </p>
+    <div className="flex h-full">
+      <nav className="w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-analytics">
+        {sidebarGroups.map((group) => (
+          <div key={group.label}>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeSection === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setActiveSection(item.key)}
+                    className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm transition-colors ${isActive ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover-elevate"}`}
+                    data-testid={`tab-${item.key}`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Analytics</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Comprehensive financial analysis and reporting
+            </p>
+          </div>
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="analytics-period-filter"
+          />
         </div>
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="analytics-period-filter"
-        />
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
-          <TabsTrigger value="containers">Containers</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
+        {activeSection === "overview" && (
+        <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1041,149 +1092,137 @@ export default function Analytics() {
               </Card>
             </div>
           )}
-        </TabsContent>
+        </div>
+        )}
 
-        {/* Profit & Loss Tab */}
-        <TabsContent value="profit-loss" className="space-y-4">
+        {activeSection === "assets" && (
           <Card>
             <CardContent className="p-6">
-              <Tabs defaultValue="assets" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="assets">Assets</TabsTrigger>
-                  <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
-                  <TabsTrigger value="cash">Cash</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="assets" className="mt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
-                      Asset Accounts
-                    </h4>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="text-xl font-bold font-mono">
-                        {formatSmartCurrency(calculateTotal(assetAccounts))}
-                      </p>
-                    </div>
-                  </div>
-                  {accountsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-14 w-full" />
-                      ))}
-                    </div>
-                  ) : assetAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No asset accounts found
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Account Name</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {renderHierarchicalAccounts(assetAccounts)}
-                      </TableBody>
-                    </Table>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="liabilities" className="mt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-red-500" />
-                      Liability Accounts
-                    </h4>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="text-xl font-bold font-mono">
-                        {formatSmartCurrency(calculateTotal(liabilityAccounts))}
-                      </p>
-                    </div>
-                  </div>
-                  {accountsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-14 w-full" />
-                      ))}
-                    </div>
-                  ) : liabilityAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No liability accounts found
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Account Name</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {renderHierarchicalAccounts(liabilityAccounts)}
-                      </TableBody>
-                    </Table>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="cash" className="mt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Wallet className="h-5 w-5 text-green-500" />
-                      Cash Accounts
-                    </h4>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total Cash</p>
-                      <p className="text-xl font-bold font-mono">
-                        {formatSmartCurrency(calculateTotal(cashAccounts))}
-                      </p>
-                    </div>
-                  </div>
-                  {accountsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-14 w-full" />
-                      ))}
-                    </div>
-                  ) : cashAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No cash accounts found
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Account Name</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                          <TableHead className="text-right">Side</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {renderHierarchicalAccounts(cashAccounts, true)}
-                      </TableBody>
-                    </Table>
-                  )}
-                </TabsContent>
-              </Tabs>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  Asset Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(assetAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : assetAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No asset accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(assetAccounts)}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        {/* Accounts Tab */}
-        <TabsContent value="accounts" className="space-y-4">
-          <Tabs defaultValue="expenses">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="expenses">Expenses</TabsTrigger>
-              <TabsTrigger value="direct-expenses">Direct Expenses</TabsTrigger>
-              <TabsTrigger value="indirect-expenses">Indirect Expenses</TabsTrigger>
-            </TabsList>
+        {activeSection === "liabilities" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-500" />
+                  Liability Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : liabilityAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No liability accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(liabilityAccounts)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-            {/* Expenses */}
-            <TabsContent value="expenses" className="space-y-4">
+        {activeSection === "cash" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-green-500" />
+                  Cash Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total Cash</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(cashAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : cashAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No cash accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Side</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(cashAccounts, true)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "expenses" && (
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium flex items-center gap-2">
@@ -1221,10 +1260,9 @@ export default function Analytics() {
                   </Table>
                 )}
               </Card>
-            </TabsContent>
+        )}
 
-            {/* Direct Expenses */}
-            <TabsContent value="direct-expenses" className="space-y-4">
+        {activeSection === "direct-expenses" && (
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium flex items-center gap-2">
@@ -1262,10 +1300,9 @@ export default function Analytics() {
                   </Table>
                 )}
               </Card>
-            </TabsContent>
+        )}
 
-            {/* Indirect Expenses */}
-            <TabsContent value="indirect-expenses" className="space-y-4">
+        {activeSection === "indirect-expenses" && (
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium flex items-center gap-2">
@@ -1303,12 +1340,9 @@ export default function Analytics() {
                   </Table>
                 )}
               </Card>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
+        )}
 
-        {/* Sales Analytics Tab */}
-        <TabsContent value="sales" className="space-y-4">
+        {activeSection === "sales" && (<>
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-medium">Sales by Location</h3>
@@ -1502,10 +1536,9 @@ export default function Analytics() {
               </div>
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        </>)}
 
-        {/* Containers Tab */}
-        <TabsContent value="containers" className="space-y-4">
+        {activeSection === "containers" && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
@@ -1676,10 +1709,10 @@ export default function Analytics() {
               </div>
             )}
           </Card>
-        </TabsContent>
+        )}
 
-        {/* Reports Tab */}
-        <TabsContent value="reports" className="space-y-4">
+        {activeSection === "reports" && (
+        <div className="space-y-4">
           {/* Net Profit Report - Tally Prime style */}
           <Card className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -1948,7 +1981,7 @@ export default function Analytics() {
                     {/* Sales Accounts */}
                     <div 
                       className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                      onClick={() => setActiveTab("sales")}
+                      onClick={() => setActiveSection("sales")}
                       data-testid="row-sales-accounts"
                     >
                       <span className="flex items-center gap-2">
@@ -2054,8 +2087,9 @@ export default function Analytics() {
               </div>
             )}
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+        )}
+      </div>
     </div>
   );
 }
