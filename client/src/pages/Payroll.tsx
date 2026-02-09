@@ -1448,7 +1448,6 @@ export default function Payroll() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleWithdrawal(employee)}
-                                disabled={balance <= 0}
                                 data-testid={`button-withdraw-${employee.id}`}
                               >
                                 <TrendingDown className="h-4 w-4 mr-1" />
