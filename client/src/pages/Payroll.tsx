@@ -1536,7 +1536,7 @@ export default function Payroll() {
                             <Button size="sm" variant="outline" onClick={() => handleBonus(employee)} data-testid={`button-bonus-mobile-${employee.id}`}>
                               <DollarSign className="h-4 w-4 mr-1" /> Bonus
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} disabled={balance <= 0} data-testid={`button-withdraw-mobile-${employee.id}`}>
+                            <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-mobile-${employee.id}`}>
                               <TrendingDown className="h-4 w-4 mr-1" /> Withdraw
                             </Button>
                             <ConfirmationDialog
