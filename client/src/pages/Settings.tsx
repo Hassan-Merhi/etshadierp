@@ -52,7 +52,7 @@
   import { Checkbox } from "@/components/ui/checkbox";
   import { Badge } from "@/components/ui/badge";
   import { Switch } from "@/components/ui/switch";
-  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+  
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2181,58 +2181,72 @@ function BulkRenameTab() {
   
     const isPOSRole = selectedRole?.startsWith("POS");
   
+    const [activeSection, setActiveSection] = useState("companies");
+
+    const sidebarGroups = [
+      {
+        label: "General",
+        items: [
+          { key: "companies", label: "Companies", icon: Building2 },
+          { key: "preferences", label: "Preferences", icon: Settings2 },
+          { key: "fiscal", label: "Fiscal Period", icon: CalendarRange },
+          { key: "exchange-rates", label: "Exchange Rates", icon: TrendingUp },
+        ],
+      },
+      {
+        label: "Users & Access",
+        items: [
+          { key: "users", label: "Users", icon: Users },
+          { key: "role-permissions", label: "Permissions", icon: Shield },
+          { key: "active-users", label: "Active Users", icon: Eye },
+        ],
+      },
+      {
+        label: "Tools",
+        items: [
+          { key: "data-tools", label: "Data Tools", icon: Database },
+          { key: "bulk-rename", label: "Bulk Rename", icon: Package },
+          { key: "edit-log", label: "Edit Log", icon: History },
+        ],
+      },
+      {
+        label: "System",
+        items: [
+          { key: "system", label: "System Tools", icon: Wrench },
+        ],
+      },
+    ];
+
     return (
-      <div className="p-6">
-        <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList data-testid="tabs-settings">
-            <TabsTrigger value="companies" data-testid="tab-companies">
-              <Building2 className="h-4 w-4 mr-2" />
-              Companies
-            </TabsTrigger>
-            <TabsTrigger value="users" data-testid="tab-users">
-              <Users className="h-4 w-4 mr-2" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="fiscal" data-testid="tab-fiscal">
-              <CalendarRange className="h-4 w-4 mr-2" />
-              Fiscal Period
-            </TabsTrigger>
-            <TabsTrigger value="preferences" data-testid="tab-preferences">
-              <Settings2 className="h-4 w-4 mr-2" />
-              Preferences
-            </TabsTrigger>
-            <TabsTrigger value="system" data-testid="tab-system">
-              <Wrench className="h-4 w-4 mr-2" />
-              System
-            </TabsTrigger>
-            <TabsTrigger value="active-users" data-testid="tab-active-users">
-              <Eye className="h-4 w-4 mr-2" />
-              Active Users
-            </TabsTrigger>
-            <TabsTrigger value="role-permissions" data-testid="tab-role-permissions">
-              <Shield className="h-4 w-4 mr-2" />
-              Role Permissions
-            </TabsTrigger>
-            <TabsTrigger value="edit-log" data-testid="tab-edit-log">
-              <History className="h-4 w-4 mr-2" />
-              Edit Log
-            </TabsTrigger>
-            <TabsTrigger value="data-tools" data-testid="tab-data-tools">
-              <Database className="h-4 w-4 mr-2" />
-              Data Tools
-            </TabsTrigger>
-            <TabsTrigger value="exchange-rates" data-testid="tab-exchange-rates">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Exchange Rates
-            </TabsTrigger>
-            <TabsTrigger value="bulk-rename" data-testid="tab-bulk-rename">
-              <Package className="h-4 w-4 mr-1" />
-              Bulk Rename
-            </TabsTrigger>
-          </TabsList>
-  
-          {/* Companies Tab */}
-          <TabsContent value="companies" className="space-y-4">
+      <div className="flex h-full">
+        <nav className="w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-settings">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setActiveSection(item.key)}
+                      className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm transition-colors ${isActive ? "bg-background font-medium shadow-sm" : "text-muted-foreground hover-elevate"}`}
+                      data-testid={`tab-${item.key}`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="flex-1 overflow-y-auto p-6">
+
+          {activeSection === "companies" && (
             <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2506,7 +2520,7 @@ function BulkRenameTab() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-          </TabsContent>
+          )}
 
           {/* User Delete Confirmation Dialog */}
           <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
@@ -2603,7 +2617,7 @@ function BulkRenameTab() {
           </Dialog>
   
           {/* Users Tab */}
-          <TabsContent value="users" className="space-y-4">
+          {activeSection === "users" && (
             <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2916,19 +2930,19 @@ function BulkRenameTab() {
             )}
           </Card>
         </div>
-          </TabsContent>
+          )}
   
   
           {/* Fiscal Period Tab */}
-          <TabsContent value="fiscal" className="space-y-4">
+          {activeSection === "fiscal" && (
             <FiscalPeriodTab 
               currentCompanyId={selectedCompany?.id} 
               userRole={currentUser?.role} 
             />
-          </TabsContent>
+          )}
   
           {/* Preferences Tab */}
-          <TabsContent value="preferences" className="space-y-4">
+          {activeSection === "preferences" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5" />
@@ -2987,7 +3001,7 @@ function BulkRenameTab() {
                 </div>
               </Card>
             </div>
-          </TabsContent>
+          )}
 
           {/* Change Password Dialog */}
           <Dialog open={isChangePasswordOpen} onOpenChange={(open) => {
@@ -3078,7 +3092,7 @@ function BulkRenameTab() {
           </Dialog>
   
           {/* System Tab */}
-          <TabsContent value="system" className="space-y-4">
+          {activeSection === "system" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
@@ -3940,15 +3954,15 @@ function BulkRenameTab() {
                 <NetPositionAdjustmentCard />
               </div>
             </div>
-          </TabsContent>
+          )}
 
           {/* Active Users Tab */}
-          <TabsContent value="active-users" className="space-y-4">
+          {activeSection === "active-users" && (
             <ActiveUsersSection />
-          </TabsContent>
+          )}
 
           {/* Role Permissions Tab */}
-          <TabsContent value="role-permissions" className="space-y-4">
+          {activeSection === "role-permissions" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
@@ -4014,9 +4028,9 @@ function BulkRenameTab() {
                 </Card>
               )}
             </div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="edit-log" className="space-y-4">
+          {activeSection === "edit-log" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <History className="h-5 w-5" />
@@ -4038,18 +4052,18 @@ function BulkRenameTab() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="data-tools" className="space-y-4">
+          {activeSection === "data-tools" && (
             <DataToolsTab />
-          </TabsContent>
-          <TabsContent value="exchange-rates" className="space-y-4">
+          )}
+          {activeSection === "exchange-rates" && (
             <ExchangeRateSettings />
-          </TabsContent>
-          <TabsContent value="bulk-rename" className="space-y-4">
+          )}
+          {activeSection === "bulk-rename" && (
             <BulkRenameTab />
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
 
         {/* Initialize Accounting Balances Dialog */}
         <AlertDialog open={isInitBalancesDialogOpen} onOpenChange={setIsInitBalancesDialogOpen}>
