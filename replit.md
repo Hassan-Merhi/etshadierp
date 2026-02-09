@@ -14,6 +14,8 @@ Preferred communication style: Simple, everyday language.
 
 The frontend uses React with TypeScript and Vite, implementing the shadcn/ui design system (New York style) built on Radix UI primitives and styled with Tailwind CSS. It prioritizes clarity and efficiency for data-intensive interfaces, using Inter and JetBrains Mono fonts, and supports light/dark themes.
 
+**Vertical Sidebar Navigation Pattern**: All major pages (Settings, Analytics, AccountingCreate, Vouchers, FactoryProduction, Payroll, Containers, BalanceSheet) use a consistent vertical sidebar navigation pattern instead of horizontal tabs. The pattern uses: `w-56` sidebar width, uppercase group labels (`text-xs font-semibold text-muted-foreground uppercase tracking-wider`), active state styling (`bg-background shadow-sm font-medium`), and `useState` + conditional rendering (not Tabs components). Each sidebar item has an icon from lucide-react. The layout uses `flex gap-6` with the content area as `flex-1 min-w-0`.
+
 ### Technical Implementations
 
 -   **Frontend**: React, TypeScript, Vite, TanStack Query for server state, React hooks/context for local UI state, `react-hook-form` with Zod for forms, and `wouter` for routing.
