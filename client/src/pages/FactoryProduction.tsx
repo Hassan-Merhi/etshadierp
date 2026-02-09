@@ -1,6 +1,5 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Factory, Package, Boxes, Layers, Tags, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Bales = lazy(() => import("./Bales"));
@@ -17,8 +16,38 @@ function LoadingFallback() {
   );
 }
 
+type SectionKey = "bales" | "mix-batches" | "production-bales" | "bale-products";
+
+interface SidebarItem {
+  key: SectionKey;
+  label: string;
+  icon: LucideIcon;
+}
+
+interface SidebarGroup {
+  label: string;
+  items: SidebarItem[];
+}
+
 export default function FactoryProduction() {
-  const [activeTab, setActiveTab] = useState("bales");
+  const [activeSection, setActiveSection] = useState<SectionKey>("bales");
+
+  const sidebarGroups: SidebarGroup[] = [
+    {
+      label: "Raw Materials",
+      items: [
+        { key: "bales", label: "Factory Bales", icon: Package },
+        { key: "mix-batches", label: "Mix Batches", icon: Boxes },
+      ],
+    },
+    {
+      label: "Production",
+      items: [
+        { key: "production-bales", label: "Production Bales", icon: Layers },
+        { key: "bale-products", label: "Bale Products", icon: Tags },
+      ],
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -32,50 +61,47 @@ export default function FactoryProduction() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="bales" data-testid="tab-factory-bales">
-            <Package className="h-4 w-4 mr-2" />
-            Factory Bales
-          </TabsTrigger>
-          <TabsTrigger value="mix-batches" data-testid="tab-mix-batches">
-            <Boxes className="h-4 w-4 mr-2" />
-            Mix Batches
-          </TabsTrigger>
-          <TabsTrigger value="production-bales" data-testid="tab-production-bales">
-            <Layers className="h-4 w-4 mr-2" />
-            Production Bales
-          </TabsTrigger>
-          <TabsTrigger value="bale-products" data-testid="tab-bale-products">
-            <Tags className="h-4 w-4 mr-2" />
-            Bale Products
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex gap-6">
+        <nav className="w-56 shrink-0 space-y-4">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setActiveSection(item.key)}
+                      data-testid={`tab-factory-${item.key}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-        <TabsContent value="bales" className="mt-4">
+        <div className="flex-1 min-w-0">
           <Suspense fallback={<LoadingFallback />}>
-            <Bales />
+            {activeSection === "bales" && <Bales />}
+            {activeSection === "mix-batches" && <MixBatches />}
+            {activeSection === "production-bales" && <ProductionBales />}
+            {activeSection === "bale-products" && <BaleProducts />}
           </Suspense>
-        </TabsContent>
-
-        <TabsContent value="mix-batches" className="mt-4">
-          <Suspense fallback={<LoadingFallback />}>
-            <MixBatches />
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="production-bales" className="mt-4">
-          <Suspense fallback={<LoadingFallback />}>
-            <ProductionBales />
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="bale-products" className="mt-4">
-          <Suspense fallback={<LoadingFallback />}>
-            <BaleProducts />
-          </Suspense>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

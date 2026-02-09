@@ -30,12 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import type { LucideIcon } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -82,7 +77,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2 } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -547,7 +542,26 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
-  
+
+  const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
+    {
+      label: "Financial",
+      items: [
+        { key: "payment", label: "Payment", icon: ArrowDownCircle },
+        { key: "receipt", label: "Receipt", icon: ArrowUpCircle },
+        { key: "journal", label: "Journal", icon: BookOpen },
+      ],
+    },
+    {
+      label: "Inventory & Adjustments",
+      items: [
+        { key: "transfer", label: "Stock Transfer", icon: ArrowLeftRight },
+        { key: "adjustment", label: "Adjustment", icon: SlidersHorizontal },
+        { key: "creditnote", label: "Credit Note", icon: FileText },
+      ],
+    },
+  ];
+
   // Parse URL parameters for edit mode (use window.location.search since wouter doesn't include query params)
   const searchParams = new URLSearchParams(window.location.search);
   const editParam = searchParams.get('edit');
@@ -3530,32 +3544,43 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote")}>
+      <div className="flex gap-6">
         {!isPOS && (
-          <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="payment" className="text-xs sm:text-sm" data-testid="tab-payment">
-              Payment
-            </TabsTrigger>
-            <TabsTrigger value="receipt" className="text-xs sm:text-sm" data-testid="tab-receipt">
-              Receipt
-            </TabsTrigger>
-            <TabsTrigger value="journal" className="text-xs sm:text-sm" data-testid="tab-journal">
-              Journal
-            </TabsTrigger>
-            <TabsTrigger value="transfer" className="text-xs sm:text-sm" data-testid="tab-transfer">
-              Transfer
-            </TabsTrigger>
-            <TabsTrigger value="adjustment" className="text-xs sm:text-sm" data-testid="tab-adjustment">
-              Prod/Cons
-            </TabsTrigger>
-            <TabsTrigger value="creditnote" className="text-xs sm:text-sm" data-testid="tab-creditnote">
-              Cr/Dr Note
-            </TabsTrigger>
-          </TabsList>
+          <nav className="w-56 shrink-0 space-y-4">
+            {sidebarGroups.map((group) => (
+              <div key={group.label}>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                  {group.label}
+                </h3>
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => setActiveTab(item.key as typeof activeTab)}
+                        data-testid={`tab-${item.key}`}
+                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                          isActive
+                            ? "bg-background shadow-sm font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
         )}
 
-        {!isPOS && (
-          <TabsContent value="payment" className="space-y-4">
+        <div className="flex-1 min-w-0">
+        {!isPOS && activeTab === "payment" && (
+          <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
@@ -3598,11 +3623,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
             />
-          </TabsContent>
+          </div>
         )}
 
-        {!isPOS && (
-          <TabsContent value="receipt" className="space-y-4">
+        {!isPOS && activeTab === "receipt" && (
+          <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
@@ -3645,12 +3670,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               onAutoCreateAccount={handleAutoCreateAccount}
               isAutoCreating={isAutoCreating}
             />
-          </TabsContent>
+          </div>
         )}
 
         {/* Journal Voucher Tab */}
-        {!isPOS && (
-          <TabsContent value="journal" className="space-y-4">
+        {!isPOS && activeTab === "journal" && (
+          <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
@@ -4245,10 +4270,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </Card>
               )}
             </div>
-          </TabsContent>
+          </div>
         )}
 
-        <TabsContent value="transfer" className="space-y-4">
+        {(isPOS || activeTab === "transfer") && (
+          <div className="space-y-4">
           <Form {...stockTransferForm}>
             <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit, (errors) => {
               console.error("Stock Transfer Form Validation Errors:", errors);
@@ -5095,10 +5121,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </div>
             </form>
           </Form>
-        </TabsContent>
+          </div>
+        )}
 
-        {!isPOS && (
-          <TabsContent value="adjustment" className="space-y-4">
+        {!isPOS && activeTab === "adjustment" && (
+          <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Production / Consumption Voucher</CardTitle>
@@ -5649,16 +5676,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </Form>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
         )}
 
-        {!isPOS && (
-          <TabsContent value="creditnote" className="space-y-4">
+        {!isPOS && activeTab === "creditnote" && (
+          <div className="space-y-4">
             <CreditNoteTab allAccounts={allAccounts} editVoucherId={activeTab === "creditnote" ? editVoucherId : null} />
-          </TabsContent>
+          </div>
         )}
 
-      </Tabs>
+        </div>
+      </div>
 
       {/* Voucher Edit Dialog */}
       <VoucherEditDialog

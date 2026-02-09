@@ -1,9 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign } from "lucide-react";
+import { DollarSign, Landmark, CreditCard, PiggyBank, type LucideIcon } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -20,17 +20,29 @@ interface Account {
   active: boolean;
 }
 
+type SectionKey = "assets" | "liabilities" | "equity";
+
+interface SidebarItem {
+  key: SectionKey;
+  label: string;
+  icon: LucideIcon;
+}
+
+interface SidebarGroup {
+  label: string;
+  items: SidebarItem[];
+}
+
 export default function BalanceSheet() {
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
+  const [activeSection, setActiveSection] = useState<SectionKey>("assets");
 
   const { data: accounts = [], isLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
-  // Filter accounts by type
-  // Include Fixed Asset type and Ledger accounts with accountType=Asset
   const assetAccounts = accounts.filter(
     (acc) =>
       acc.type === "fixedAsset" ||
@@ -38,19 +50,16 @@ export default function BalanceSheet() {
       acc.type === "bank"
   );
 
-  // Include Supplier type and Ledger accounts with accountType=Liability
   const liabilityAccounts = accounts.filter(
     (acc) =>
       acc.type === "supplier" ||
       (acc.type === "ledger" && acc.accountType === "Liability")
   );
 
-  // Ledger accounts with accountType=Equity
   const equityAccounts = accounts.filter(
     (acc) => acc.type === "ledger" && acc.accountType === "Equity"
   );
 
-  // Calculate totals
   const calculateTotal = (accountList: Account[]) => {
     return accountList.reduce((sum, acc) => {
       const amount = acc.balanceSide === "Cr" ? -acc.balance : acc.balance;
@@ -61,6 +70,17 @@ export default function BalanceSheet() {
   const totalAssets = calculateTotal(assetAccounts);
   const totalLiabilities = calculateTotal(liabilityAccounts);
   const totalEquity = calculateTotal(equityAccounts);
+
+  const sidebarGroups: SidebarGroup[] = [
+    {
+      label: "Balance Sheet",
+      items: [
+        { key: "assets", label: "Assets", icon: Landmark },
+        { key: "liabilities", label: "Liabilities", icon: CreditCard },
+        { key: "equity", label: "Equity", icon: PiggyBank },
+      ],
+    },
+  ];
 
   const renderAccountTable = (accountList: Account[], showTotal: boolean = true) => {
     if (isLoading) {
@@ -115,6 +135,14 @@ export default function BalanceSheet() {
     );
   };
 
+  const getActiveAccounts = () => {
+    switch (activeSection) {
+      case "assets": return assetAccounts;
+      case "liabilities": return liabilityAccounts;
+      case "equity": return equityAccounts;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -126,7 +154,7 @@ export default function BalanceSheet() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -138,7 +166,7 @@ export default function BalanceSheet() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Liabilities</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -150,7 +178,7 @@ export default function BalanceSheet() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Equity</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -162,32 +190,46 @@ export default function BalanceSheet() {
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <Tabs defaultValue="assets" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="assets" data-testid="tab-assets">
-                Assets
-              </TabsTrigger>
-              <TabsTrigger value="liabilities" data-testid="tab-liabilities">
-                Liabilities
-              </TabsTrigger>
-              <TabsTrigger value="equity" data-testid="tab-equity">
-                Equity
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="assets" className="mt-6">
-              {renderAccountTable(assetAccounts)}
-            </TabsContent>
-            <TabsContent value="liabilities" className="mt-6">
-              {renderAccountTable(liabilityAccounts)}
-            </TabsContent>
-            <TabsContent value="equity" className="mt-6">
-              {renderAccountTable(equityAccounts)}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      <div className="flex gap-6">
+        <nav className="w-56 shrink-0 space-y-4">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setActiveSection(item.key)}
+                      data-testid={`tab-${item.key}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="flex-1 min-w-0">
+          <Card>
+            <CardContent className="p-6">
+              {renderAccountTable(getActiveAccounts())}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

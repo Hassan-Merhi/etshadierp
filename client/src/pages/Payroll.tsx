@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import {
@@ -67,7 +66,8 @@ import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -1271,20 +1271,49 @@ export default function Payroll() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Payroll</h1>
 
-      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid grid-cols-3 w-full sm:w-[600px]">
-          <TabsTrigger value="employees" data-testid="tab-employees">
-            Employees ({employeeStaff.length})
-          </TabsTrigger>
-          <TabsTrigger value="workers" data-testid="tab-workers">
-            Workers ({workerStaff.length})
-          </TabsTrigger>
-          <TabsTrigger value="advances" data-testid="tab-advances">
-            Salary Advances ({salaryAdvances?.length || 0})
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex gap-6">
+        <nav className="w-56 shrink-0 space-y-4">
+          {[
+            {
+              label: "Payroll",
+              items: [
+                { key: "employees", label: "Employees", icon: Users as LucideIcon },
+                { key: "workers", label: "Workers", icon: HardHat as LucideIcon },
+                { key: "advances", label: "Advances", icon: Banknote as LucideIcon },
+              ],
+            },
+          ].map((group) => (
+            <div key={group.label}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = selectedTab === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setSelectedTab(item.key)}
+                      data-testid={`tab-${item.key}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-        <TabsContent value="employees">
+        <div className="flex-1 min-w-0">
+        {selectedTab === "employees" && (
           <Card className="p-6">
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
@@ -1561,9 +1590,10 @@ export default function Payroll() {
               )}
             </div>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="workers">
+        {selectedTab === "workers" && (
+          <>
           {/* Worker Payment Summary */}
           <Card className="p-6 mb-4">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
@@ -2107,9 +2137,11 @@ export default function Payroll() {
               })()}
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        </>
+        )}
 
-        <TabsContent value="advances">
+        {selectedTab === "advances" && (
+          <>
           {(() => {
             // Filter advances to show only workers
             const workerAdvancesList = salaryAdvances?.filter(adv => 
@@ -2376,8 +2408,10 @@ export default function Payroll() {
               </>
             );
           })()}
-        </TabsContent>
-      </Tabs>
+        </>
+        )}
+        </div>
+      </div>
 
       {/* Employee Deposit Dialog */}
       <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>

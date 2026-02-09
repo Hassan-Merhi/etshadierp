@@ -44,7 +44,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { LucideIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -79,6 +79,18 @@ interface TrackingEdit {
 
 export default function Containers() {
   const [activeTab, setActiveTab] = useState("active");
+
+  const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
+    {
+      label: "Containers",
+      items: [
+        { key: "active", label: "Active Containers", icon: Package },
+        { key: "otw", label: "In Transit (OTW)", icon: Truck },
+        { key: "sold", label: "Sold Containers", icon: HandCoins },
+      ],
+    },
+  ];
+
   const [searchTerm, setSearchTerm] = useState("");
   const [soldSearchTerm, setSoldSearchTerm] = useState("");
   const [otwSearchTerm, setOtwSearchTerm] = useState("");
@@ -781,32 +793,41 @@ export default function Containers() {
         )}
       </PageHeader>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="active" data-testid="tab-active-containers">
-            <Package className="h-4 w-4 mr-2" />
-            Active Containers
-            <Badge variant="secondary" className="ml-2">
-              {allContainers.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="otw" data-testid="tab-otw-tracking">
-            <Truck className="h-4 w-4 mr-2" />
-            OTW Tracking
-            <Badge variant="secondary" className="ml-2">
-              {otwContainers.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="sold" data-testid="tab-sold-containers">
-            <HandCoins className="h-4 w-4 mr-2" />
-            Sold Containers
-            <Badge variant="secondary" className="ml-2">
-              {soldContainers.length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex gap-6">
+        <nav className="w-56 shrink-0 space-y-4">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setActiveTab(item.key)}
+                      data-testid={`tab-${item.key === "active" ? "active-containers" : item.key === "otw" ? "otw-tracking" : "sold-containers"}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-        <TabsContent value="active" className="space-y-4 mt-4">
+        <div className="flex-1 min-w-0">
+          {activeTab === "active" && (
+          <div className="space-y-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1062,9 +1083,11 @@ export default function Containers() {
               </Card>
             </>
           )}
-        </TabsContent>
+          </div>
+          )}
 
-        <TabsContent value="otw" className="space-y-4 mt-4">
+          {activeTab === "otw" && (
+          <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1582,9 +1605,11 @@ export default function Containers() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
+          </div>
+          )}
 
-        <TabsContent value="sold" className="space-y-4 mt-4">
+          {activeTab === "sold" && (
+          <div className="space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1717,8 +1742,10 @@ export default function Containers() {
               </div>
             </Card>
           )}
-        </TabsContent>
-      </Tabs>
+          </div>
+          )}
+        </div>
+      </div>
 
       <AddContainerDialog
         open={addDialogOpen}

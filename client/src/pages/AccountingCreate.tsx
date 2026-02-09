@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
@@ -33,7 +32,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus } from "lucide-react";
+import { Plus, MapPin, BookOpen, Users, Truck, FolderTree, Package, type LucideIcon } from "lucide-react";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -264,47 +263,84 @@ function EntityFormWrapper({
   }
 }
 
+interface SidebarItem {
+  key: EntityType;
+  label: string;
+  icon: LucideIcon;
+}
+
+interface SidebarGroup {
+  label: string;
+  items: SidebarItem[];
+}
+
 export default function AccountingCreate() {
   const [selectedEntity, setSelectedEntity] = useState<EntityType>("location");
   const config = entityConfig[selectedEntity];
+
+  const sidebarGroups: SidebarGroup[] = [
+    {
+      label: "Accounts",
+      items: [
+        { key: "location", label: "Location", icon: MapPin },
+        { key: "ledger", label: "Ledger", icon: BookOpen },
+        { key: "employee", label: "Employee", icon: Users },
+        { key: "supplier", label: "Supplier", icon: Truck },
+      ],
+    },
+    {
+      label: "Inventory",
+      items: [
+        { key: "stockGroup", label: "Stock Group", icon: FolderTree },
+        { key: "stockItem", label: "Stock Item", icon: Package },
+      ],
+    },
+  ];
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Create Master Data</h1>
 
-      <Tabs
-        value={selectedEntity}
-        onValueChange={(v) => setSelectedEntity(v as EntityType)}
-      >
-        <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-          <TabsTrigger value="location" data-testid="tab-location">
-            Location
-          </TabsTrigger>
-          <TabsTrigger value="ledger" data-testid="tab-ledger">
-            Ledger
-          </TabsTrigger>
-          <TabsTrigger value="employee" data-testid="tab-employee">
-            Employee
-          </TabsTrigger>
-          <TabsTrigger value="supplier" data-testid="tab-supplier">
-            Supplier
-          </TabsTrigger>
-          <TabsTrigger value="stockGroup" data-testid="tab-stock-group">
-            Stock Group
-          </TabsTrigger>
-          <TabsTrigger value="stockItem" data-testid="tab-stock-item">
-            Stock Item
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex gap-6">
+        <nav className="w-56 shrink-0 space-y-4">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                {group.label}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = selectedEntity === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setSelectedEntity(item.key)}
+                      data-testid={`tab-${item.key === "stockGroup" ? "stock-group" : item.key === "stockItem" ? "stock-item" : item.key}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                        isActive
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-        <TabsContent value={selectedEntity}>
+        <div className="flex-1 min-w-0">
           <EntityFormWrapper
             key={selectedEntity}
             entityType={selectedEntity}
             config={config}
           />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
