@@ -265,20 +265,46 @@ export default function StockItems() {
   const allFilteredSelected = filteredStockItems.length > 0 && 
     filteredStockItems.every(item => selectedIds.includes(item.id));
 
-  const exportToExcel = () => {
-    const data = stockItems.map(item => ({
-      Code: item.code,
-      Name: item.name,
-      Barcode: item.barcode || "",
-      UOM: item.uom,
-      "Stock Group": getStockGroupName(item.stockGroupId),
-      "Selling Price": formatAmount(item.sellingPrice),
-      Active: item.active ? "Yes" : "No",
-    }));
-    const worksheet = utils.json_to_sheet(data);
-    const workbook = utils.book_new();
-    utils.book_append_sheet(workbook, worksheet, "Stock Items");
-    writeFile(workbook, "stock-items.xlsx");
+  const exportToExcel = async () => {
+    try {
+      const res = await fetch("/api/stock-item-location-prices/all", { credentials: "include" });
+      const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = res.ok ? await res.json() : [];
+
+      const priceMap = new Map<number, Map<string, string>>();
+      for (const lp of locationPrices) {
+        if (!priceMap.has(lp.stockItemId)) priceMap.set(lp.stockItemId, new Map());
+        priceMap.get(lp.stockItemId)!.set(lp.locationName, lp.sellingPrice);
+      }
+
+      const sortedLocations = locations.map(l => l.name).sort();
+
+      const data = stockItems.map(item => {
+        const row: Record<string, string> = {
+          Code: item.code,
+          Name: item.name,
+          Barcode: item.barcode || "",
+          UOM: item.uom,
+          "Stock Group": getStockGroupName(item.stockGroupId),
+          "Default Selling Price": formatAmount(item.sellingPrice),
+        };
+        for (const loc of sortedLocations) {
+          const price = priceMap.get(item.id)?.get(loc);
+          row[`Price - ${loc}`] = price ? formatAmount(price) : "";
+        }
+        row["Active"] = item.active ? "Yes" : "No";
+        return row;
+      });
+      const worksheet = utils.json_to_sheet(data);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Stock Items");
+      writeFile(workbook, "stock-items.xlsx");
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Could not export stock items",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

@@ -6206,6 +6206,20 @@ if (asOfDate) {
       res.status(500).json({ message: error.message });
     }
   });
+  // Get all location prices for the current company (for export)
+  app.get("/api/stock-item-location-prices/all", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const prices = await storage.getAllLocationPrices(companyId);
+      res.json(prices);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
 
   // Get location prices for a stock item
   app.get("/api/stock-items/:id/location-prices", requireAuth, async (req, res) => {

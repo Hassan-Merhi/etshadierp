@@ -183,6 +183,7 @@ export interface IStorage {
 
   // Stock Item Location Prices
   getStockItemLocationPrices(stockItemId: number): Promise<(schema.StockItemLocationPrice & { locationName: string })[]>;
+  getAllLocationPrices(companyId: number): Promise<{ stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[]>;
   upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<void>;
   deleteLocationPrice(id: number): Promise<void>;
 
@@ -1888,6 +1889,19 @@ export class DbStorage implements IStorage {
       .from(schema.stockItemLocationPrices)
       .leftJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
       .where(and(...conditions));
+  }
+
+  async getAllLocationPrices(companyId: number): Promise<{ stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[]> {
+    return await db
+      .select({
+        stockItemId: schema.stockItemLocationPrices.stockItemId,
+        locationId: schema.stockItemLocationPrices.locationId,
+        locationName: schema.locations.name,
+        sellingPrice: schema.stockItemLocationPrices.sellingPrice,
+      })
+      .from(schema.stockItemLocationPrices)
+      .innerJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
+      .where(eq(schema.locations.companyId, companyId)) as any;
   }
 
   async upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<void> {
