@@ -17528,7 +17528,58 @@ if (asOfDate) {
         });
       });
 
-      res.json({ message: "Sales voucher updated successfully" });
+      // Fetch updated data to return for print template
+      const [updatedVoucher] = await db
+        .select()
+        .from(vouchers)
+        .where(eq(vouchers.id, voucherId))
+        .limit(1);
+
+      const updatedSalesItems = await db
+        .select({
+          id: salesItems.id,
+          stockItemId: salesItems.stockItemId,
+          stockItemName: stockItems.name,
+          stockItemCode: stockItems.code,
+          quantity: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          costPrice: salesItems.costPrice,
+          totalSales: salesItems.totalSales,
+          totalCost: salesItems.totalCost,
+          profit: salesItems.profit,
+          rate: salesItems.sellingPrice,
+          rateUSD: salesItems.sellingPrice,
+        })
+        .from(salesItems)
+        .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+        .where(eq(salesItems.voucherId, voucherId));
+
+      const updatedLocation = await storage.getLocationById(targetLocationId);
+
+      let customerAccount = null;
+      if (isCreditSale) {
+        const updatedEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, voucherId));
+        const debitEntry = updatedEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+        if (debitEntry?.ledgerAccountId) {
+          customerAccount = await storage.getLedgerAccountById(debitEntry.ledgerAccountId);
+        }
+      }
+
+      res.json({
+        voucher: updatedVoucher,
+        location: updatedLocation,
+        items: updatedSalesItems,
+        grandTotal: updatedVoucher.totalAmount,
+        voucherNumber: updatedVoucher.voucherNumber,
+        saleDate: updatedVoucher.voucherDate,
+        isCreditSale: !!isCreditSale,
+        customer: customerAccount
+          ? { id: customerAccount.id, code: customerAccount.code, name: customerAccount.name }
+          : null,
+      });
     } catch (error: any) {
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
