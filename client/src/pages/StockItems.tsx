@@ -270,6 +270,13 @@ export default function StockItems() {
       const res = await fetch("/api/stock-item-location-prices/all", { credentials: "include" });
       const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = res.ok ? await res.json() : [];
 
+      const costDubaiRes = await fetch("/api/stock-items/cost-dubai", { credentials: "include" });
+      const costDubaiData: { stockItemId: number; costDubai: string }[] = costDubaiRes.ok ? await costDubaiRes.json() : [];
+      const costDubaiMap = new Map<number, string>();
+      for (const cd of costDubaiData) {
+        costDubaiMap.set(cd.stockItemId, cd.costDubai);
+      }
+
       const priceMap = new Map<number, Map<string, string>>();
       for (const lp of locationPrices) {
         if (!priceMap.has(lp.stockItemId)) priceMap.set(lp.stockItemId, new Map());
@@ -279,6 +286,7 @@ export default function StockItems() {
       const sortedLocations = locations.map(l => l.name).sort();
 
       const data = stockItems.map(item => {
+        const costDubai = costDubaiMap.get(item.id);
         const row: Record<string, string> = {
           Code: item.code,
           Name: item.name,
@@ -286,6 +294,7 @@ export default function StockItems() {
           UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId),
           "Default Selling Price": formatAmount(item.sellingPrice),
+          "Cost Dubai": costDubai ? formatAmount(costDubai) : "",
         };
         for (const loc of sortedLocations) {
           const price = priceMap.get(item.id)?.get(loc);
