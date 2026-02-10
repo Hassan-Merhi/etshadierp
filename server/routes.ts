@@ -6176,6 +6176,30 @@ if (asOfDate) {
     }
   });
 
+  // Get cost dubai from OTW containers for stock items
+  app.get("/api/stock-items/cost-dubai", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const result = await db.execute(sql`
+        SELECT DISTINCT ON (pli.stock_item_id)
+          pli.stock_item_id AS "stockItemId",
+          pli.rate AS "costDubai"
+        FROM po_line_items pli
+        JOIN purchase_orders po ON pli.po_id = po.id
+        JOIN containers c ON po.container_id = c.id
+        WHERE c.status = 'OTW'
+          AND po.company_id = ${companyId}
+        ORDER BY pli.stock_item_id, pli.id DESC
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
@@ -6220,29 +6244,6 @@ if (asOfDate) {
     }
   });
 
-
-  app.get("/api/stock-items/cost-dubai", requireAuth, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-      const result = await db.execute(sql`
-        SELECT DISTINCT ON (pli.stock_item_id)
-          pli.stock_item_id AS "stockItemId",
-          pli.rate AS "costDubai"
-        FROM po_line_items pli
-        JOIN purchase_orders po ON pli.po_id = po.id
-        JOIN containers c ON po.container_id = c.id
-        WHERE c.status = 'OTW'
-          AND po.company_id = ${companyId}
-        ORDER BY pli.stock_item_id, pli.id DESC
-      `);
-      res.json(result.rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
 
   // Get location prices for a stock item
   app.get("/api/stock-items/:id/location-prices", requireAuth, async (req, res) => {
