@@ -6190,8 +6190,7 @@ if (asOfDate) {
         FROM po_line_items pli
         JOIN purchase_orders po ON pli.po_id = po.id
         JOIN containers c ON po.container_id = c.id
-        WHERE c.status = 'OTW'
-          AND po.company_id = ${companyId}
+        WHERE po.company_id = ${companyId}
         ORDER BY pli.stock_item_id, pli.id DESC
       `);
       res.json(result.rows);
