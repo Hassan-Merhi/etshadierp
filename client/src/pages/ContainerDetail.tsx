@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
+import { utils, writeFile } from "@/lib/excelHelper";
 
 interface ContainerDetailData {
   container: any;
@@ -93,19 +94,26 @@ export default function ContainerDetail() {
     try {
       const response = await fetch(`/api/containers/${containerId}/export`);
       const data = await response.json();
-      
-      // Download as JSON
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `container_${data.container.containerNumber}_export.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({ title: "Export successful", description: "Container data downloaded as JSON" });
+
+      const rows: { Code: string; Name: string; Qty: string; Rate: string; Value: string }[] = [];
+      for (const po of data.purchaseOrders || []) {
+        for (const item of po.lineItems || []) {
+          rows.push({
+            Code: item.stockItemCode || "",
+            Name: item.stockItemName || "",
+            Qty: item.quantity || "0",
+            Rate: item.rate || "0",
+            Value: item.lineTotal || "0",
+          });
+        }
+      }
+
+      const worksheet = utils.json_to_sheet(rows);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Container Items");
+      writeFile(workbook, `container_${data.container.containerNumber}.xlsx`);
+
+      toast({ title: "Export successful", description: "Container data downloaded as Excel" });
     } catch (error: any) {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
     }
