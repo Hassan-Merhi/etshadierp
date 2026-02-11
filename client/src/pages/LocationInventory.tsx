@@ -136,27 +136,23 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     contentRef: printRef,
   });
 
-  // Fetch all locations (only for non-POS users, POS users use specific query below)
-  const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
+  // Fetch all locations (only for non-POS users)
+  const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    enabled: !posUser, // Disable for POS users to avoid redundant requests
-    staleTime: 0, // Always fetch fresh data
-    refetchOnMount: true, // Refetch when component mounts
+    enabled: !posUser,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
-  // If POS user, fetch their specific location
-  const { data: posLocation, isLoading: posLocationLoading } = useQuery<Location>({
-    queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
-    enabled: !!posUser?.assignedLocationId,
+  // For POS users, fetch their assigned locations (multi-location support)
+  const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
+    queryKey: posUser ? ["/api/my-locations"] : [],
+    enabled: !!posUser,
   });
 
-  // Auto-select location for POS users (use posLocation directly)
-  useEffect(() => {
-    if (posUser && posLocation) {
-      console.log('[LocationInventory] Setting POS user location:', posLocation);
-      setSelectedLocationLocal(posLocation);
-    }
-  }, [posUser, posLocation]);
+  // Use the appropriate locations list based on user type
+  const locations = posUser ? posAssignedLocations : allLocations;
+  const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
   // Debug: Log when asOfDate changes
   useEffect(() => {
@@ -849,7 +845,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         {!selectedLocationLocal && <span>Select Location</span>}
         {selectedLocationLocal && !selectedGroup && !viewAllItems && (
           <>
-            {!posUser && (
+            {(!posUser || locations.length > 1) && (
               <>
                 <Button
                   variant="ghost"
@@ -867,7 +863,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         )}
         {selectedLocationLocal && viewAllItems && (
           <>
-            {!posUser && (
+            {(!posUser || locations.length > 1) && (
               <>
                 <Button
                   variant="ghost"
@@ -894,7 +890,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         )}
         {selectedLocationLocal && selectedGroup && (
           <>
-            {!posUser && (
+            {(!posUser || locations.length > 1) && (
               <>
                 <Button
                   variant="ghost"
@@ -926,15 +922,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
             <h1 className="text-xl md:text-3xl font-bold">Location Inventory</h1>
-            <Button
-              variant="default"
-              onClick={() => setCreateLocationDialogOpen(true)}
-              data-testid="button-create-location"
-              className="gap-2 w-full sm:w-auto"
-            >
-              <MapPin className="w-4 h-4" />
-              Create Location
-            </Button>
+            {!posUser && (
+              <Button
+                variant="default"
+                onClick={() => setCreateLocationDialogOpen(true)}
+                data-testid="button-create-location"
+                className="gap-2 w-full sm:w-auto"
+              >
+                <MapPin className="w-4 h-4" />
+                Create Location
+              </Button>
+            )}
           </div>
 
           <LocationCreateDialog

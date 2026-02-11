@@ -89,21 +89,34 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
 
-  // For POS users, fetch their assigned location
-  const { data: posLocation, error: locationError, isLoading: locationLoading } = useQuery<Location>({
-    queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
-    enabled: !!posUser?.assignedLocationId,
+  // For POS users, fetch their assigned locations (multi-location support)
+  const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
+    queryKey: posUser ? ["/api/my-locations"] : [],
+    enabled: !!posUser,
     retry: false,
   });
+
+  // POS user selected location state
+  const [posSelectedLocation, setPosSelectedLocation] = useState<Location | null>(null);
+
+  // Auto-select first assigned location for POS users when locations load
+  useEffect(() => {
+    if (posUser && posAssignedLocations.length > 0 && !posSelectedLocation) {
+      setPosSelectedLocation(posAssignedLocations[0]);
+    }
+  }, [posUser, posAssignedLocations, posSelectedLocation]);
+
+  const locationLoading = posUser ? posLocationsLoading : false;
+  const locationError = posUser && !posLocationsLoading && posAssignedLocations.length === 0;
 
   // Fetch all locations for the dropdown (non-POS users only)
   const { data: allLocations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    enabled: !posUser, // Only fetch for non-POS users
+    enabled: !posUser,
   });
 
-  // Use either the selected location (for Admin/Owner/Manager) or POS user's assigned location
-  const activeLocation = posUser ? posLocation : selectedLocation;
+  // Use either the selected location (for Admin/Owner/Manager) or POS user's selected location
+  const activeLocation = posUser ? posSelectedLocation : selectedLocation;
 
   // Fetch inventory for the active location
   const { data: apiInventory = [], isLoading: inventoryLoading, error: inventoryError } = useQuery<APIInventoryItem[]>({
@@ -216,6 +229,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const itemListRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Reset sale state when POS user switches location
+  const prevLocationRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (posUser && posSelectedLocation) {
+      if (prevLocationRef.current !== null && prevLocationRef.current !== posSelectedLocation.id) {
+        setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
+        setSearchTerm("");
+        setActiveRow(null);
+        setCurrentDraftId(null);
+        setNotes("");
+      }
+      prevLocationRef.current = posSelectedLocation.id;
+    }
+  }, [posUser, posSelectedLocation]);
 
   // Auto-set cash account for POS users with assigned cash account
   useEffect(() => {
@@ -737,8 +765,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   }
 
-  // Show error if POS user has no assigned location
-  if (posUser && !posUser.assignedLocationId) {
+  // Show error if POS user has no assigned locations
+  if (posUser && !posLocationsLoading && posAssignedLocations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <div className="flex items-center gap-2 text-destructive">
@@ -1338,9 +1366,32 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           {posUser ? (
-            <div className="px-2 sm:px-3 py-1.5">
-              <span className="text-sm sm:text-base">{activeLocation?.name}</span>
-            </div>
+            posAssignedLocations.length > 1 ? (
+              <Select
+                value={posSelectedLocation?.id.toString() || ""}
+                onValueChange={(value) => {
+                  const location = posAssignedLocations.find(loc => loc.id.toString() === value);
+                  if (location) {
+                    setPosSelectedLocation(location);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-pos-location">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {posAssignedLocations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id.toString()}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="px-2 sm:px-3 py-1.5">
+                <span className="text-sm sm:text-base">{activeLocation?.name}</span>
+              </div>
+            )
           ) : (
             <Select 
               value={activeLocation?.id.toString() || ""} 
