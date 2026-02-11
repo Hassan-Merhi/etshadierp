@@ -89,6 +89,8 @@ import {
   updatePresenceSchema,
   auditLog,
   insertExchangeRateSchema,
+  userLocations,
+  userCompanyRoles,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -1178,6 +1180,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+
+  // User Locations routes - multi-location assignment for POS users
+  app.get(
+    "/api/user-locations/:userId/:companyId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { userId, companyId } = req.params;
+
+        const locations = await db
+          .select()
+          .from(userLocations)
+          .where(
+            and(
+              eq(userLocations.userId, userId),
+              eq(userLocations.companyId, parseInt(companyId))
+            )
+          );
+        res.json(locations);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.put(
+    "/api/user-locations/:userId/:companyId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { userId, companyId } = req.params;
+        const { locationIds } = req.body;
+        const companyIdNum = parseInt(companyId);
+
+        if (!Array.isArray(locationIds)) {
+          return res.status(400).json({ message: "locationIds must be an array" });
+        }
+
+
+
+        await db
+          .delete(userLocations)
+          .where(
+            and(
+              eq(userLocations.userId, userId),
+              eq(userLocations.companyId, companyIdNum)
+            )
+          );
+
+        if (locationIds.length > 0) {
+          await db.insert(userLocations).values(
+            locationIds.map((locId: number) => ({
+              userId,
+              companyId: companyIdNum,
+              locationId: locId,
+            }))
+          );
+
+          await db
+            .update(userCompanyRoles)
+            .set({ assignedLocationId: locationIds[0] })
+            .where(
+              and(
+                eq(userCompanyRoles.userId, userId),
+                eq(userCompanyRoles.companyId, companyIdNum)
+              )
+            );
+        }
+
+        const updated = await db
+          .select()
+          .from(userLocations)
+          .where(
+            and(
+              eq(userLocations.userId, userId),
+              eq(userLocations.companyId, companyIdNum)
+            )
+          );
+
+        res.json(updated);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // Get assigned locations for current user (used by POS)
+  app.get(
+    "/api/my-locations",
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const { locations } = await import("@shared/schema");
+        const userLocs = await db
+          .select({
+            id: locations.id,
+            name: locations.name,
+            code: locations.code,
+            active: locations.active,
+          })
+          .from(userLocations)
+          .innerJoin(locations, eq(userLocations.locationId, locations.id))
+          .where(
+            and(
+              eq(userLocations.userId, req.user.id),
+              eq(userLocations.companyId, companyId)
+            )
+          );
+        res.json(userLocs);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
   // User Preferences routes
   app.get("/api/user-preferences", requireAuth, async (req, res) => {
     try {

@@ -1439,6 +1439,7 @@ function BulkRenameTab() {
     const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
     const [selectedAccountsToZero, setSelectedAccountsToZero] = useState<number[]>([]);
     const [editingRole, setEditingRole] = useState<any>(null);
+    const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
     const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
@@ -1827,16 +1828,22 @@ function BulkRenameTab() {
   
     const createRoleMutation = useMutation({
       mutationFn: async (data: RoleAssignmentData) => {
+        let result;
         if (editingRole) {
           const res = await apiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
-          return await res.json();
+          result = await res.json();
         } else {
           const res = await apiRequest("POST", "/api/user-company-roles", data);
-          return await res.json();
+          result = await res.json();
         }
+        if (data.role?.startsWith("POS") && selectedLocationIds.length > 0) {
+          await apiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
+            locationIds: selectedLocationIds,
+          });
+        }
+        return result;
       },
       onSuccess: () => {
-        // Capture userId before resetting state
         const userId = currentUserId;
         
         toast({
@@ -1847,6 +1854,7 @@ function BulkRenameTab() {
         setIsRoleDialogOpen(false);
         setEditingRole(null);
         setCurrentUserId(null);
+        setSelectedLocationIds([]);
         roleForm.reset({
           userId: "",
           companyId: 0,
@@ -2125,6 +2133,7 @@ function BulkRenameTab() {
     const handleAddRole = (userId: string) => {
       setCurrentUserId(userId);
       setEditingRole(null);
+      setSelectedLocationIds([]);
       roleForm.reset({
         userId,
         companyId: companies[0]?.id || 0,
@@ -2133,7 +2142,7 @@ function BulkRenameTab() {
       setIsRoleDialogOpen(true);
     };
   
-    const handleEditRole = (role: any) => {
+    const handleEditRole = async (role: any) => {
       setCurrentUserId(role.userId);
       setEditingRole(role);
       roleForm.reset({
@@ -2143,6 +2152,17 @@ function BulkRenameTab() {
         assignedLocationId: role.assignedLocationId,
         posStation: role.posStation,
       });
+      if (role.role?.startsWith("POS")) {
+        try {
+          const res = await fetch(`/api/user-locations/${role.userId}/${role.companyId}`);
+          const locs = await res.json();
+          setSelectedLocationIds(locs.map((l: any) => l.locationId));
+        } catch {
+          setSelectedLocationIds(role.assignedLocationId ? [role.assignedLocationId] : []);
+        }
+      } else {
+        setSelectedLocationIds([]);
+      }
       setIsRoleDialogOpen(true);
     };
   
@@ -4662,24 +4682,40 @@ function BulkRenameTab() {
                       name="assignedLocationId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Assigned Location *</FormLabel>
-                          <Select
-                            onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
-                            value={field.value?.toString() || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-location">
-                                <SelectValue placeholder="Select location" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {locations.map((loc: any) => (
-                                <SelectItem key={loc.id} value={loc.id.toString()}>
+                          <FormLabel>Assigned Locations *</FormLabel>
+                          <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="select-locations">
+                            {locations.map((loc: any) => {
+                              const isChecked = (selectedLocationIds || []).includes(loc.id);
+                              return (
+                                <label
+                                  key={loc.id}
+                                  className="flex items-center gap-2 cursor-pointer text-sm"
+                                  data-testid={`checkbox-location-${loc.id}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const newIds = e.target.checked
+                                        ? [...(selectedLocationIds || []), loc.id]
+                                        : (selectedLocationIds || []).filter((id: number) => id !== loc.id);
+                                      setSelectedLocationIds(newIds);
+                                      if (newIds.length > 0) {
+                                        field.onChange(newIds[0]);
+                                      } else {
+                                        field.onChange(undefined);
+                                      }
+                                    }}
+                                    className="rounded"
+                                  />
                                   {loc.name} ({loc.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {(selectedLocationIds || []).length === 0 && (
+                            <p className="text-sm text-destructive">At least one location is required for POS roles</p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}

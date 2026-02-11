@@ -81,6 +81,22 @@ export const insertUserCompanyRoleSchema = createInsertSchema(userCompanyRoles).
 export type InsertUserCompanyRole = z.infer<typeof insertUserCompanyRoleSchema>;
 export type UserCompanyRole = typeof userCompanyRoles.$inferSelect;
 
+export const userLocations = pgTable("user_locations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertUserLocationSchema = createInsertSchema(userLocations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUserLocation = z.infer<typeof insertUserLocationSchema>;
+export type UserLocation = typeof userLocations.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
