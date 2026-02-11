@@ -43,10 +43,6 @@ import { insertMixBatchSchema } from "@shared/schema";
 
 const formSchema = insertMixBatchSchema.omit({
   companyId: true,
-  createdBy: true,
-}).extend({
-  targetCategory: z.string().optional(),
-  targetGrade: z.string().optional(),
 });
 
 interface ContainerSelection {
@@ -85,12 +81,11 @@ export function CreateMixBatchDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       batchCode: "",
-      targetCategory: "",
-      targetGrade: "",
-      totalPlannedWeight: "0",
+      totalWeightKg: "0",
       totalCost: "0",
       costPerKg: "0",
-      status: "PLANNING",
+      status: "ACTIVE",
+      notes: "",
     },
   });
 
@@ -229,7 +224,7 @@ export function CreateMixBatchDialog({
     const totalCost = selections.reduce((sum, s) => sum + s.totalCost, 0);
     const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
 
-    form.setValue("totalPlannedWeight", totalWeight.toFixed(3));
+    form.setValue("totalWeightKg", totalWeight.toFixed(3));
     form.setValue("totalCost", formatNumber(totalCost));
     form.setValue("costPerKg", blendedCostPerKg.toFixed(4));
   };
@@ -298,47 +293,10 @@ export function CreateMixBatchDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="PLANNING">Planning</SelectItem>
-                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
                         <SelectItem value="COMPLETED">Completed</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="targetCategory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Target Category (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., Mixed Clothing"
-                        data-testid="input-target-category"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="targetGrade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Target Grade (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., A, B, C"
-                        data-testid="input-target-grade"
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -453,7 +411,7 @@ export function CreateMixBatchDialog({
               <div>
                 <p className="text-sm text-muted-foreground">Total Weight</p>
                 <p className="text-2xl font-bold font-mono" data-testid="text-total-weight">
-                  {parseFloat(form.watch("totalPlannedWeight") || "0").toLocaleString()} kg
+                  {parseFloat(form.watch("totalWeightKg") || "0").toLocaleString()} kg
                 </p>
               </div>
               <div>

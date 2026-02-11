@@ -433,7 +433,7 @@ export function CreateBaleDialog({
                             key={batch.id}
                             value={batch.id.toString()}
                           >
-                            {batch.batchCode} - {parseFloat(batch.totalPlannedWeight).toLocaleString()} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg
+                            {batch.batchCode} - {parseFloat(batch.totalWeightKg).toLocaleString()} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -26289,7 +26289,7 @@ if (asOfDate) {
       const data = insertMixBatchSchema.parse({ 
         ...batchData, 
         companyId,
-        createdBy: userId 
+
       });
 
       // Create batch and sources atomically
@@ -26515,7 +26515,7 @@ if (asOfDate) {
         await tx
           .update(mixBatches)
           .set({
-            totalActualWeight: sql`COALESCE(${mixBatches.totalActualWeight}, 0) + ${totalWeight}`,
+
             updatedAt: sql`now()`,
           })
           .where(eq(mixBatches.id, mixBatchId));

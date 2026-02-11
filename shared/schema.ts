@@ -1286,12 +1286,10 @@ export const bales = pgTable("bales", {
   datePressed: date("date_pressed").notNull(),
   price: decimal("price", { precision: 12, scale: 2 }),
   currency: varchar("currency", { length: 3 }).default("USD"),
+  customerId: integer("customer_id"),
   soldDate: timestamp("sold_date"),
-  soldVoucherId: integer("sold_voucher_id"),
   status: text("status").notNull().default("AVAILABLE"),
-  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyBarcode: uniqueIndex("bales_company_barcode_unique").on(t.companyId, t.barcode),
 }));
@@ -1299,7 +1297,6 @@ export const bales = pgTable("bales", {
 export const insertBaleSchema = createInsertSchema(bales).omit({
   id: true,
   createdAt: true,
-  updatedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   containerId: z.number().optional(),
@@ -1345,19 +1342,14 @@ export const mixBatches = pgTable("mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   batchCode: varchar("batch_code", { length: 50 }).notNull(),
-  targetCategory: text("target_category"),
-  targetGrade: text("target_grade"),
-  totalPlannedWeight: decimal("total_planned_weight", { precision: 15, scale: 3 }).notNull(),
-  totalActualWeight: decimal("total_actual_weight", { precision: 15, scale: 3 }).default("0"),
-  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull(),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
-  status: text("status").notNull().default("PLANNING"),
-  createdBy: varchar("created_by").notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("ACTIVE"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyBatchCode: uniqueIndex("mix_batches_company_batch_code_unique").on(t.companyId, t.batchCode),
-}));
+});
 
 export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
   id: true,
@@ -1366,13 +1358,10 @@ export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   batchCode: z.string().min(1, "Batch code is required"),
-  targetCategory: z.string().optional(),
-  targetGrade: z.string().optional(),
-  totalPlannedWeight: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total weight must be positive"),
+  totalWeightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total weight must be positive"),
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
-  status: z.enum(["PLANNING", "IN_PROGRESS", "COMPLETED"]).optional(),
-  createdBy: z.string().min(1, "Creator is required"),
+  status: z.enum(["ACTIVE", "COMPLETED"]).optional(),
 });
 
 export type InsertMixBatch = z.infer<typeof insertMixBatchSchema>;

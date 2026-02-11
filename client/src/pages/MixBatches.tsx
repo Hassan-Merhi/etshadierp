@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Package, CheckCircle, Clock, PlayCircle } from "lucide-react";
+import { Plus, Package, CheckCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,9 +39,7 @@ export default function MixBatches() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "PLANNING":
-        return <Clock className="h-4 w-4" />;
-      case "IN_PROGRESS":
+      case "ACTIVE":
         return <PlayCircle className="h-4 w-4" />;
       case "COMPLETED":
         return <CheckCircle className="h-4 w-4" />;
@@ -52,9 +50,7 @@ export default function MixBatches() {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "PLANNING":
-        return "outline";
-      case "IN_PROGRESS":
+      case "ACTIVE":
         return "default";
       case "COMPLETED":
         return "secondary";
@@ -91,8 +87,7 @@ export default function MixBatches() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
-                <SelectItem value="PLANNING">Planning</SelectItem>
-                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
               </SelectContent>
             </Select>
@@ -110,14 +105,11 @@ export default function MixBatches() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Batch Code</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead className="text-right">Planned Weight (kg)</TableHead>
-                  <TableHead className="text-right">Actual Weight (kg)</TableHead>
+                  <TableHead className="text-right">Weight (kg)</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created By</TableHead>
+                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -130,13 +122,8 @@ export default function MixBatches() {
                     <TableCell className="font-medium" data-testid={`text-batch-code-${batch.id}`}>
                       {batch.batchCode}
                     </TableCell>
-                    <TableCell>{batch.targetCategory ?? "—"}</TableCell>
-                    <TableCell>{batch.targetGrade ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {parseFloat(batch.totalPlannedWeight || "0").toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {parseFloat(batch.totalActualWeight || "0").toLocaleString()}
+                      {parseFloat(batch.totalWeightKg || "0").toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       ${parseFloat(batch.totalCost).toLocaleString(undefined, {
@@ -158,7 +145,7 @@ export default function MixBatches() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {batch.createdBy}
+                      {batch.notes ?? "—"}
                     </TableCell>
                   </TableRow>
                 ))}
