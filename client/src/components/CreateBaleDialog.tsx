@@ -273,7 +273,7 @@ export function CreateBaleDialog({
   });
 
   const activeBatches = mixBatches?.filter(
-    (b) => b.status === "IN_PROGRESS" || b.status === "PLANNING"
+    (b) => b.status === "ACTIVE"
   );
 
   const activeProducts = baleProducts?.filter((p) => p.active);
