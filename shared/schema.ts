@@ -1286,7 +1286,7 @@ export const bales = pgTable("bales", {
   datePressed: date("date_pressed").notNull(),
   price: decimal("price", { precision: 12, scale: 2 }),
   currency: varchar("currency", { length: 3 }).default("USD"),
-  soldAt: timestamp("sold_at"),
+  soldDate: timestamp("sold_date"),
   soldVoucherId: integer("sold_voucher_id"),
   status: text("status").notNull().default("AVAILABLE"),
   active: boolean("active").notNull().default(true),

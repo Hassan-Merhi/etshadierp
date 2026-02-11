@@ -227,7 +227,11 @@ export default function Bales() {
   };
 
   const onSubmit = (data: z.infer<typeof insertBaleSchema>) => {
-    createBale.mutate(data);
+    const submitData = {
+      ...data,
+      containerId: String(data.containerId) === "none" ? null : data.containerId,
+    };
+    createBale.mutate(submitData as InsertBale);
   };
 
   const filteredBales = bales.filter(
@@ -537,7 +541,7 @@ export default function Bales() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {containers.map((c: any) => (
                             <SelectItem key={c.id} value={c.id.toString()}>
                               {c.containerNumber}
