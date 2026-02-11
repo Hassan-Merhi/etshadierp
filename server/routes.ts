@@ -26357,6 +26357,128 @@ if (asOfDate) {
     }
   });
 
+  // Production Raw Stock API Routes
+  app.get("/api/production-raw-stock", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { productionRawStock, containers, suppliers } = await import("@shared/schema");
+
+      const rawStockRows = await db
+        .select({
+          id: productionRawStock.id,
+          companyId: productionRawStock.companyId,
+          containerId: productionRawStock.containerId,
+          receivedKg: productionRawStock.receivedKg,
+          usedKg: productionRawStock.usedKg,
+          costPerKg: productionRawStock.costPerKg,
+          offloadedAt: productionRawStock.offloadedAt,
+          containerNumber: containers.containerNumber,
+          supplierId: containers.supplierId,
+          supplierName: suppliers.name,
+        })
+        .from(productionRawStock)
+        .leftJoin(containers, eq(productionRawStock.containerId, containers.id))
+        .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
+        .where(eq(productionRawStock.companyId, companyId))
+        .orderBy(desc(productionRawStock.offloadedAt));
+
+      const result = rawStockRows.map((row) => {
+        const received = parseFloat(row.receivedKg);
+        const used = parseFloat(row.usedKg);
+        const remaining = received - used;
+        const cost = parseFloat(row.costPerKg);
+        return {
+          ...row,
+          remainingKg: remaining.toFixed(3),
+          valueRemaining: (remaining * cost).toFixed(2),
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching production raw stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-raw-stock/offload", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { containerId, receivedKg, costPerKg } = req.body;
+      if (!containerId || !receivedKg || !costPerKg) {
+        return res.status(400).json({ message: "Missing required fields: containerId, receivedKg, costPerKg" });
+      }
+
+      const container = await storage.getContainerById(parseInt(containerId));
+      if (!container || container.companyId !== companyId) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      const { productionRawStock } = await import("@shared/schema");
+
+      const existing = await db
+        .select()
+        .from(productionRawStock)
+        .where(and(eq(productionRawStock.companyId, companyId), eq(productionRawStock.containerId, parseInt(containerId))));
+
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "Container already offloaded to production raw stock" });
+      }
+
+      const [record] = await db
+        .insert(productionRawStock)
+        .values({
+          companyId,
+          containerId: parseInt(containerId),
+          receivedKg: receivedKg.toString(),
+          costPerKg: costPerKg.toString(),
+          usedKg: "0",
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error: any) {
+      console.error("Error offloading container:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/production-raw-stock/available-containers", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { productionRawStock, containers } = await import("@shared/schema");
+
+      const offloadedIds = await db
+        .select({ containerId: productionRawStock.containerId })
+        .from(productionRawStock)
+        .where(eq(productionRawStock.companyId, companyId));
+
+      const offloadedIdList = offloadedIds.map(r => r.containerId);
+
+      const allContainers = await db
+        .select()
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "AVAILABLE")
+          )
+        );
+
+      const available = allContainers.filter(c => !offloadedIdList.includes(c.id));
+      res.json(available);
+    } catch (error: any) {
+      console.error("Error fetching available containers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Mix Batches API Routes
   app.get("/api/mix-batches", requireAuth, async (req, res) => {
     try {
@@ -26402,44 +26524,105 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
-      
-      if (!companyId || !userId) {
-        return res.status(400).json({ message: "No company or user session" });
+      if (!companyId || !userId) return res.status(400).json({ message: "No company or user session" });
+
+      const { sources, name, ...batchData } = req.body;
+
+      if (!sources || !Array.isArray(sources) || sources.length === 0) {
+        return res.status(400).json({ message: "At least one container source is required" });
       }
 
-      const { insertMixBatchSchema } = await import("@shared/schema");
-      const { sources, ...batchData } = req.body;
-      
-      const data = insertMixBatchSchema.parse({ 
-        ...batchData, 
-        companyId,
+      const { mixBatches, mixBatchSources, productionRawStock } = await import("@shared/schema");
 
+      const result = await db.transaction(async (tx) => {
+        // Auto-generate batch code
+        const year = new Date().getFullYear();
+        const existingBatches = await tx
+          .select({ id: mixBatches.id })
+          .from(mixBatches)
+          .where(eq(mixBatches.companyId, companyId));
+        const batchNum = existingBatches.length + 1;
+        const batchCode = batchData.batchCode || `MB-${year}-${String(batchNum).padStart(3, '0')}`;
+
+        // Calculate totals from sources
+        let totalWeightKg = 0;
+        let totalCost = 0;
+        const validatedSources: Array<{ containerId: number; weightKg: number; costPerKg: number; totalCost: number }> = [];
+
+        for (const source of sources) {
+          const cId = parseInt(source.containerId);
+          const wKg = parseFloat(source.weightKg);
+          const cPKg = parseFloat(source.costPerKg);
+
+          if (isNaN(cId) || isNaN(wKg) || isNaN(cPKg) || wKg <= 0) {
+            throw new Error("Invalid source data");
+          }
+
+          // Check production raw stock for this container
+          const [rawStock] = await tx
+            .select()
+            .from(productionRawStock)
+            .where(and(
+              eq(productionRawStock.companyId, companyId),
+              eq(productionRawStock.containerId, cId)
+            ))
+            .for("update");
+
+          if (!rawStock) {
+            throw new Error(`Container ${cId} not found in production raw stock. Offload it first.`);
+          }
+
+          const remaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
+          if (wKg > remaining + 0.001) {
+            throw new Error(`Container ${rawStock.containerId} only has ${remaining.toFixed(3)} kg remaining, requested ${wKg}`);
+          }
+
+          // Deduct from raw stock
+          const newUsed = parseFloat(rawStock.usedKg) + wKg;
+          await tx
+            .update(productionRawStock)
+            .set({ usedKg: newUsed.toFixed(3) })
+            .where(eq(productionRawStock.id, rawStock.id));
+
+          const sCost = wKg * cPKg;
+          totalWeightKg += wKg;
+          totalCost += sCost;
+          validatedSources.push({ containerId: cId, weightKg: wKg, costPerKg: cPKg, totalCost: sCost });
+        }
+
+        const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
+
+        // Create the mix batch
+        const [batch] = await tx
+          .insert(mixBatches)
+          .values({
+            companyId,
+            batchCode,
+            name: name || batchCode,
+            totalWeightKg: totalWeightKg.toFixed(3),
+            usedKg: "0",
+            costPerKg: blendedCostPerKg.toFixed(4),
+            totalCost: totalCost.toFixed(2),
+            notes: batchData.notes || null,
+            status: "ACTIVE",
+          })
+          .returning();
+
+        // Create sources
+        for (const src of validatedSources) {
+          await tx.insert(mixBatchSources).values({
+            mixBatchId: batch.id,
+            containerId: src.containerId,
+            weightKg: src.weightKg.toFixed(3),
+            costPerKg: src.costPerKg.toFixed(4),
+            totalCost: src.totalCost.toFixed(2),
+          });
+        }
+
+        return batch;
       });
 
-      // Create batch and sources atomically
-      const batch = await storage.createMixBatch(data);
-      
-      // If sources provided, create them
-      if (sources && Array.isArray(sources) && sources.length > 0) {
-        const { insertMixBatchSourceSchema } = await import("@shared/schema");
-        
-        for (const source of sources) {
-          const sourceData = insertMixBatchSourceSchema.parse({
-            ...source,
-            mixBatchId: batch.id,
-          });
-          
-          // Verify container belongs to this company
-          const container = await storage.getContainerById(sourceData.containerId);
-          if (!container || container.companyId !== companyId) {
-            throw new Error(`Container ${sourceData.containerId} not found or doesn't belong to this company`);
-          }
-          
-          await storage.addMixBatchSource(sourceData);
-        }
-      }
-      
-      res.json(batch);
+      res.json(result);
     } catch (error: any) {
       console.error("Error creating mix batch:", error);
       res.status(400).json({ message: error.message });
@@ -26578,6 +26761,12 @@ if (asOfDate) {
       }
 
       const totalWeight = weight * numBales;
+      const remainingKg = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
+      if (totalWeight > remainingKg + 0.001) {
+        return res.status(400).json({ 
+          message: `Not enough remaining in mix batch. Available: ${remainingKg.toFixed(3)} kg, Requested: ${totalWeight.toFixed(3)} kg` 
+        });
+      }
       const costPerKg = parseFloat(batch.costPerKg);
       const totalCostPerBale = (weight * costPerKg).toFixed(2);
 
@@ -26634,12 +26823,11 @@ if (asOfDate) {
             .returning();
           createdBales.push(bale);
         }
-
-        // Update mix batch actual weight atomically within transaction
+        const newUsedKg = parseFloat(batch.usedKg || "0") + totalWeight;
         await tx
           .update(mixBatches)
           .set({
-
+            usedKg: newUsedKg.toFixed(3),
             updatedAt: sql`now()`,
           })
           .where(eq(mixBatches.id, mixBatchId));

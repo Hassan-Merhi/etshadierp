@@ -1353,13 +1353,43 @@ export const insertPendingBarcodeSchema = createInsertSchema(pendingBarcodes).om
 export type InsertPendingBarcode = z.infer<typeof insertPendingBarcodeSchema>;
 export type PendingBarcode = typeof pendingBarcodes.$inferSelect;
 
+// Production Raw Stock - tracks container kg offloaded to production
+export const productionRawStock = pgTable("production_raw_stock", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
+  usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
+  offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyContainer: uniqueIndex("production_raw_stock_company_container_unique").on(t.companyId, t.containerId),
+}));
+
+export const insertProductionRawStockSchema = createInsertSchema(productionRawStock).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  containerId: z.number().min(1, "Container is required"),
+  receivedKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Received kg must be positive"),
+  usedKg: z.string().optional(),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+});
+
+export type InsertProductionRawStock = z.infer<typeof insertProductionRawStockSchema>;
+export type ProductionRawStock = typeof productionRawStock.$inferSelect;
+
 // Mix Batches - combines containers into batches for bale production
 export const mixBatches = pgTable("mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   batchCode: varchar("batch_code", { length: 50 }).notNull(),
+  name: text("name"),
   totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull(),
-  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
   totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
   notes: text("notes"),
   status: text("status").notNull().default("ACTIVE"),
@@ -1373,10 +1403,12 @@ export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
   updatedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  batchCode: z.string().min(1, "Batch code is required"),
+  batchCode: z.string().optional(),
+  name: z.string().optional(),
   totalWeightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total weight must be positive"),
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  usedKg: z.string().optional(),
   status: z.enum(["ACTIVE", "COMPLETED"]).optional(),
 });
 
@@ -1416,6 +1448,7 @@ export const baleProducts = pgTable("bale_products", {
   articleCode: varchar("article_code", { length: 50 }),
   name: text("name").notNull(),
   description: text("description"),
+  weightPerBaleKg: decimal("weight_per_bale_kg", { precision: 10, scale: 2 }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1433,6 +1466,7 @@ export const insertBaleProductSchema = createInsertSchema(baleProducts).omit({
   articleCode: z.string().optional(),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional(),
+  weightPerBaleKg: z.string().optional(),
   active: z.boolean().optional(),
 });
 

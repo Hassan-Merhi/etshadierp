@@ -1,8 +1,8 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, Search, type LucideIcon } from "lucide-react";
+import { Factory, Package, Boxes, Layers, Tags, Search, Container, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const Bales = lazy(() => import("./Bales"));
+const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
 const MixBatches = lazy(() => import("./MixBatches"));
 const ProductionBales = lazy(() => import("./ProductionBales"));
 const BaleProducts = lazy(() => import("./BaleProducts"));
@@ -17,7 +17,7 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "bales" | "mix-batches" | "production-bales" | "bale-products" | "barcode-lookup";
+type SectionKey = "raw-stock" | "mix-batches" | "production-bales" | "bale-products" | "barcode-lookup";
 
 interface SidebarItem {
   key: SectionKey;
@@ -31,13 +31,13 @@ interface SidebarGroup {
 }
 
 export default function FactoryProduction() {
-  const [activeSection, setActiveSection] = useState<SectionKey>("bales");
+  const [activeSection, setActiveSection] = useState<SectionKey>("raw-stock");
 
   const sidebarGroups: SidebarGroup[] = [
     {
       label: "Raw Materials",
       items: [
-        { key: "bales", label: "Factory Bales", icon: Package },
+        { key: "raw-stock", label: "Production Raw Stock", icon: Container },
         { key: "mix-batches", label: "Mix Batches", icon: Boxes },
       ],
     },
@@ -102,7 +102,7 @@ export default function FactoryProduction() {
 
         <div className="flex-1 min-w-0">
           <Suspense fallback={<LoadingFallback />}>
-            {activeSection === "bales" && <Bales />}
+            {activeSection === "raw-stock" && <ProductionRawStock />}
             {activeSection === "mix-batches" && <MixBatches />}
             {activeSection === "production-bales" && <ProductionBales />}
             {activeSection === "bale-products" && <BaleProducts />}

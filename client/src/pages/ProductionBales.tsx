@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Barcode, Trash2 } from "lucide-react";
+import { Plus, Minus, Trash2, Printer, Package, Barcode, ScanLine, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -12,273 +22,578 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import { CreateBaleDialog } from "../components/CreateBaleDialog";
-import type { ProductionBale, BaleProduct, Location } from "@shared/schema";
+import type { MixBatch, BaleProduct, Location } from "@shared/schema";
 
-type BaleWithProduct = {
-  bale: ProductionBale;
-  product: BaleProduct | null;
-  location: Location | null;
-};
+interface CartItem {
+  productId: number;
+  product: BaleProduct;
+  qty: number;
+  weightPerBaleKg: number;
+}
+
+function generateFullLabelHtml(label: {
+  referenceNumber: string;
+  articleCode: string;
+  pieces: number;
+  approxWeightKg: string;
+  productName: string;
+}) {
+  return `
+    <div class="label">
+      <div class="label-top">
+        <div class="logo-section">
+          <div class="logo-text">HMD</div>
+          <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+        </div>
+        <div class="info-section">
+          <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${label.pieces}</span></div>
+          <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+          <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+        </div>
+      </div>
+      <div class="barcode-section">
+        <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+        <div class="barcode-number">${label.referenceNumber}</div>
+      </div>
+      <div class="article-barcode-section">
+        <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        <div class="article-name">${label.productName}</div>
+      </div>
+    </div>`;
+}
+
+function generateLabelHtml(labels: Array<{
+  referenceNumber: string;
+  articleCode: string;
+  pieces: number;
+  approxWeightKg: string;
+  productName: string;
+}>, dualLabel: boolean) {
+  let labelsHtml = '';
+  for (const label of labels) {
+    const fullLabel = generateFullLabelHtml(label);
+    if (dualLabel) {
+      labelsHtml += `
+        <div class="page-container">
+          ${fullLabel}
+          <div class="label name-label">
+            <div class="name-label-content">
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+              <div class="name-label-text">${label.productName}</div>
+            </div>
+          </div>
+        </div>`;
+    } else {
+      labelsHtml += `<div class="single-page">${fullLabel}</div>`;
+    }
+  }
+  const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
+  return `<html><head><title>Print Bale Labels</title><style>
+    @page { ${pageSize} margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
+    .page-container { width: 3in; height: 3.94in; page-break-after: always; overflow: hidden; }
+    .page-container:last-child { page-break-after: auto; }
+    .single-page { width: 3in; height: 1.97in; page-break-after: always; overflow: hidden; }
+    .single-page:last-child { page-break-after: auto; }
+    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border-bottom: 1px dashed #ccc; }
+    .name-label { border-bottom: none; justify-content: center; align-items: center; }
+    .name-label-content { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
+    .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
+    .name-label-text { font-size: 18pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
+    .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
+    .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
+    .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
+    .logo-subtitle { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; color: #000; margin-top: 0.5mm; }
+    .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
+    .info-label { font-weight: 900; }
+    .info-value { font-weight: 900; }
+    .barcode-section { text-align: center; margin-top: 1mm; }
+    .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
+    .barcode-number { font-size: 14pt; font-weight: 900; margin-top: 0.5mm; color: #000; letter-spacing: 1px; }
+    .article-barcode-section { text-align: center; margin-top: 1mm; }
+    .barcode-img-small { width: 55mm; height: 8mm; object-fit: contain; }
+    .article-name { font-size: 7pt; font-weight: 700; margin-top: 0.3mm; color: #000; text-transform: uppercase; }
+  </style></head><body>${labelsHtml}</body></html>`;
+}
 
 export default function ProductionBales() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [baleToDelete, setBaleToDelete] = useState<ProductionBale | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [scanInput, setScanInput] = useState("");
+  const [scanError, setScanError] = useState("");
+  const [dualLabel, setDualLabel] = useState(true);
+  const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: bales, isLoading } = useQuery<BaleWithProduct[]>({
-    queryKey: ["/api/production-bales"],
+  const { data: mixBatches, isLoading: batchesLoading } = useQuery<MixBatch[]>({
+    queryKey: ["/api/mix-batches"],
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/production-bales/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      toast({
-        title: "Success",
-        description: "Bale deleted successfully",
-      });
-      setDeleteDialogOpen(false);
-      setBaleToDelete(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+  const { data: baleProducts } = useQuery<BaleProduct[]>({
+    queryKey: ["/api/bale-products"],
   });
 
-  const handleDeleteClick = (bale: ProductionBale) => {
-    setBaleToDelete(bale);
-    setDeleteDialogOpen(true);
+  const { data: locations } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
+  const activeProducts = baleProducts?.filter((p) => p.active);
+  const activeLocations = locations?.filter((l) => l.active);
+
+  const selectedBatch = activeBatches?.find((b) => b.id.toString() === selectedBatchId);
+  const batchRemaining = selectedBatch
+    ? parseFloat(selectedBatch.totalWeightKg) - parseFloat(selectedBatch.usedKg || "0")
+    : 0;
+
+  useEffect(() => {
+    if (scanRef.current) {
+      scanRef.current.focus();
+    }
+  }, [cart]);
+
+  const handleScan = (value: string) => {
+    if (!value.trim()) return;
+    setScanError("");
+
+    const product = activeProducts?.find(
+      (p) =>
+        p.code.toLowerCase() === value.trim().toLowerCase() ||
+        p.articleCode?.toLowerCase() === value.trim().toLowerCase() ||
+        p.name.toLowerCase() === value.trim().toLowerCase()
+    );
+
+    if (!product) {
+      setScanError(`Unknown product: "${value}"`);
+      setScanInput("");
+      return;
+    }
+
+    const defaultWeight = product.weightPerBaleKg ? parseFloat(product.weightPerBaleKg) : 25;
+
+    setCart((prev) => {
+      const existing = prev.find((item) => item.productId === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id
+            ? { ...item, qty: item.qty + 1 }
+            : item
+        );
+      }
+      return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
+    });
+
+    setScanInput("");
   };
 
-  const handleConfirmDelete = () => {
-    if (baleToDelete) {
-      deleteMutation.mutate(baleToDelete.id);
+  const handleScanKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleScan(scanInput);
     }
   };
 
-  const filteredBales = bales?.filter(({ bale }) => {
-    if (statusFilter === "all") return true;
-    return bale.status === statusFilter;
+  const updateQty = (productId: number, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.productId === productId
+            ? { ...item, qty: Math.max(0, item.qty + delta) }
+            : item
+        )
+        .filter((item) => item.qty > 0)
+    );
+  };
+
+  const setQty = (productId: number, qty: number) => {
+    if (qty <= 0) {
+      setCart((prev) => prev.filter((item) => item.productId !== productId));
+    } else {
+      setCart((prev) =>
+        prev.map((item) =>
+          item.productId === productId ? { ...item, qty } : item
+        )
+      );
+    }
+  };
+
+  const updateWeight = (productId: number, weight: number) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.productId === productId ? { ...item, weightPerBaleKg: weight } : item
+      )
+    );
+  };
+
+  const removeItem = (productId: number) => {
+    setCart((prev) => prev.filter((item) => item.productId !== productId));
+  };
+
+  const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+  const totalKgToConsume = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBatchId || !selectedLocationId || cart.length === 0) {
+        throw new Error("Please select a batch, location, and add items to cart");
+      }
+
+      if (totalKgToConsume > batchRemaining + 0.001) {
+        throw new Error(`Not enough remaining in batch. Available: ${formatNumber(batchRemaining)} kg, Needed: ${formatNumber(totalKgToConsume)} kg`);
+      }
+
+      const allBales: any[] = [];
+      const allProducts: BaleProduct[] = [];
+      const allWeights: string[] = [];
+
+      for (const item of cart) {
+        const response = await apiRequest("POST", "/api/production-bales/create-batch", {
+          mixBatchId: parseInt(selectedBatchId),
+          productId: item.productId,
+          locationId: parseInt(selectedLocationId),
+          quantity: item.qty.toString(),
+          weightPerBale: item.weightPerBaleKg.toString(),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || "Failed to create bales");
+        }
+
+        const result = await response.json();
+        allBales.push(...result.bales);
+        for (let i = 0; i < result.bales.length; i++) {
+          allProducts.push(item.product);
+          allWeights.push(item.weightPerBaleKg.toString());
+        }
+      }
+
+      return { bales: allBales, products: allProducts, weights: allWeights };
+    },
+    onSuccess: async ({ bales, products, weights }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
+
+      await printBaleLabels(bales, products, weights);
+
+      toast({
+        title: "Success",
+        description: `Created ${bales.length} bale(s) and sent to printer`,
+      });
+
+      setCart([]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "LABEL_PRINTED":
-        return "outline";
-      case "PRESSED":
-        return "default";
-      case "IN_STOCK":
-        return "secondary";
-      case "RESERVED":
-        return "outline";
-      case "SOLD":
-        return "secondary";
-      default:
-        return "outline";
+  const printBaleLabels = async (bales: any[], products: BaleProduct[], weights: string[]) => {
+    try {
+      const labelData = bales.map((bale: any, idx: number) => ({
+        productionBaleId: bale.id,
+        productId: products[idx].id,
+        articleCode: products[idx].articleCode || products[idx].code,
+        pieces: 1,
+        approxWeightKg: weights[idx],
+      }));
+
+      const labelPrintResponse = await apiRequest("POST", "/api/bale-label-prints", {
+        bales: labelData,
+      });
+
+      if (!labelPrintResponse.ok) {
+        const err = await labelPrintResponse.json();
+        throw new Error(err.message || "Failed to create label print records");
+      }
+
+      const { labelPrints } = await labelPrintResponse.json();
+
+      const labels = labelPrints.map((lp: any, idx: number) => ({
+        referenceNumber: lp.referenceNumber,
+        articleCode: lp.articleCode,
+        pieces: lp.pieces,
+        approxWeightKg: lp.approxWeightKg,
+        productName: products[idx]?.name || "",
+      }));
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast({ title: "Error", description: "Please allow pop-ups to print labels", variant: "destructive" });
+        return;
+      }
+
+      printWindow.document.write(generateLabelHtml(labels, dualLabel));
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 500);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to generate labels", variant: "destructive" });
     }
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Production Bales</h1>
-          <p className="text-muted-foreground mt-1">
-            Create and track bales from mix batches
-          </p>
+          <p className="text-muted-foreground mt-1">Scanner-first bale production from mix batches</p>
         </div>
-        <Button
-          onClick={() => setCreateDialogOpen(true)}
-          data-testid="button-create-bale"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Bales
-        </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Bale List</CardTitle>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48" data-testid="select-status-filter">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Bales</SelectItem>
-                <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-                <SelectItem value="PRESSED">Pressed</SelectItem>
-                <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="RESERVED">Reserved</SelectItem>
-                <SelectItem value="SOLD">Sold</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : filteredBales && filteredBales.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Barcode</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Total Weight (kg)</TableHead>
-                  <TableHead className="text-right">Cost/kg</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBales.map(({ bale, product, location }) => (
-                  <TableRow
-                    key={bale.id}
-                    data-testid={`row-bale-${bale.id}`}
-                  >
-                    <TableCell className="font-mono">
-                      <div className="flex items-center gap-2">
-                        <Barcode className="h-4 w-4 text-muted-foreground" />
-                        {bale.barcodeValue}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {product ? (
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-muted-foreground font-mono">
-                            {product.code}
+      <div className="grid grid-cols-3 gap-4">
+        <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+          <SelectTrigger data-testid="select-mix-batch">
+            <SelectValue placeholder="Select Mix Batch" />
+          </SelectTrigger>
+          <SelectContent>
+            {activeBatches?.map((batch) => {
+              const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
+              return (
+                <SelectItem key={batch.id} value={batch.id.toString()}>
+                  {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+          <SelectTrigger data-testid="select-location">
+            <SelectValue placeholder="Select Location" />
+          </SelectTrigger>
+          <SelectContent>
+            {activeLocations?.map((loc) => (
+              <SelectItem key={loc.id} value={loc.id.toString()}>
+                {loc.code} - {loc.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-3 rounded-md border px-3">
+          <Switch
+            id="dual-label-toggle"
+            checked={dualLabel}
+            onCheckedChange={setDualLabel}
+            data-testid="switch-dual-label"
+          />
+          <Label htmlFor="dual-label-toggle" className="text-sm cursor-pointer">
+            {dualLabel ? "Dual labels" : "Single label"}
+          </Label>
+        </div>
+      </div>
+
+      <div className="flex gap-6">
+        <div className="flex-1 min-w-0 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <ScanLine className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Scan / Add Product</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Input
+                  ref={scanRef}
+                  value={scanInput}
+                  onChange={(e) => {
+                    setScanInput(e.target.value);
+                    setScanError("");
+                  }}
+                  onKeyDown={handleScanKeyDown}
+                  placeholder="Scan barcode or type product code/name..."
+                  autoFocus
+                  data-testid="input-scan"
+                />
+                {scanError && (
+                  <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
+                    <AlertCircle className="h-4 w-4" />
+                    {scanError}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Barcode className="h-8 w-8 mx-auto mb-2" />
+                  <p>Scan a product to add it to the cart</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-center w-40">Qty</TableHead>
+                      <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
+                      <TableHead className="text-right w-32">Total (kg)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cart.map((item) => (
+                      <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
+                        <TableCell>
+                          <div className="font-medium">{item.product.name}</div>
+                          <div className="text-sm text-muted-foreground font-mono">{item.product.code}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQty(item.productId, -1)}
+                              data-testid={`button-qty-minus-${item.productId}`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              value={item.qty}
+                              onChange={(e) => setQty(item.productId, parseInt(e.target.value) || 0)}
+                              className="w-16 text-center"
+                              min="1"
+                              data-testid={`input-qty-${item.productId}`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQty(item.productId, 1)}
+                              data-testid={`button-qty-plus-${item.productId}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="text-muted-foreground">
-                          {bale.category} - {bale.grade}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      {bale.quantity.toLocaleString()} bales
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {parseFloat(bale.weightKg).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${formatNumber(parseFloat(bale.costPerKg))}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${formatNumber(parseFloat(bale.totalCost))}
-                    </TableCell>
-                    <TableCell>
-                      {location ? (
-                        <Badge variant="outline">{location.name}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(bale.status)}>
-                        {bale.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteClick(bale)}
-                        data-testid={`button-delete-${bale.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-12">
-              <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No bales found</h3>
-              <p className="text-muted-foreground mt-2">
-                {statusFilter === "all"
-                  ? "Create your first bale to get started"
-                  : "No bales found with the selected status"}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            value={item.weightPerBaleKg}
+                            onChange={(e) => updateWeight(item.productId, parseFloat(e.target.value) || 0)}
+                            className="w-24 text-right ml-auto"
+                            step="0.01"
+                            data-testid={`input-weight-${item.productId}`}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {formatNumber(item.qty * item.weightPerBaleKg)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.productId)}
+                            data-testid={`button-remove-${item.productId}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      <CreateBaleDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
+        <div className="w-72 shrink-0 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Batch Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {selectedBatch ? (
+                <>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Batch</p>
+                    <p className="font-medium" data-testid="text-batch-name">
+                      {selectedBatch.name || selectedBatch.batchCode}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Remaining</p>
+                    <p className="text-3xl font-bold font-mono" data-testid="text-batch-remaining">
+                      {formatNumber(batchRemaining)}
+                      <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Cost/kg</p>
+                    <p className="text-lg font-mono" data-testid="text-batch-cost">
+                      ${parseFloat(selectedBatch.costPerKg).toFixed(4)}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">Select a batch to see details</p>
+              )}
+            </CardContent>
+          </Card>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Bale Record</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this bale record? This action cannot be undone.
-              {baleToDelete && (
-                <div className="mt-2 font-mono text-sm">
-                  Barcode: {baleToDelete.barcodeValue} ({baleToDelete.quantity} bales)
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Production Total</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Bales</p>
+                <p className="text-2xl font-bold font-mono" data-testid="text-total-qty">{totalQty}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Weight</p>
+                <p className="text-2xl font-bold font-mono" data-testid="text-total-kg">
+                  {formatNumber(totalKgToConsume)}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
+                </p>
+              </div>
+              {selectedBatch && totalKgToConsume > batchRemaining + 0.001 && (
+                <div className="flex items-center gap-2 text-destructive text-sm p-2 rounded-md bg-destructive/10">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Exceeds batch remaining!</span>
                 </div>
               )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </CardContent>
+          </Card>
+
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => createMutation.mutate()}
+            disabled={
+              createMutation.isPending ||
+              cart.length === 0 ||
+              !selectedBatchId ||
+              !selectedLocationId ||
+              totalKgToConsume > batchRemaining + 0.001
+            }
+            data-testid="button-create-print"
+          >
+            {createMutation.isPending ? (
+              "Creating..."
+            ) : (
+              <>
+                <Printer className="h-4 w-4 mr-2" />
+                Create + Print ({totalQty} bales)
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

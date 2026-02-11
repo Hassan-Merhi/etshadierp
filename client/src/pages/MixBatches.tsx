@@ -65,7 +65,7 @@ export default function MixBatches() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mix Batches</h1>
           <p className="text-muted-foreground mt-1">
-            Combine containers into batches for bale production
+            Combine raw stock containers into batches for bale production
           </p>
         </div>
         <Button
@@ -104,51 +104,59 @@ export default function MixBatches() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Batch Code</TableHead>
-                  <TableHead className="text-right">Weight (kg)</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-right">Total (kg)</TableHead>
+                  <TableHead className="text-right">Used (kg)</TableHead>
+                  <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBatches.map((batch) => (
-                  <TableRow
-                    key={batch.id}
-                    className="hover-elevate"
-                    data-testid={`row-batch-${batch.id}`}
-                  >
-                    <TableCell className="font-medium" data-testid={`text-batch-code-${batch.id}`}>
-                      {batch.batchCode}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {parseFloat(batch.totalWeightKg || "0").toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${parseFloat(batch.totalCost).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${formatNumber(parseFloat(batch.costPerKg))}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={getStatusVariant(batch.status)}
-                        className="gap-1"
-                        data-testid={`badge-status-${batch.id}`}
-                      >
-                        {getStatusIcon(batch.status)}
-                        {batch.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {batch.notes ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredBatches.map((batch) => {
+                  const total = parseFloat(batch.totalWeightKg || "0");
+                  const used = parseFloat(batch.usedKg || "0");
+                  const remaining = total - used;
+                  return (
+                    <TableRow
+                      key={batch.id}
+                      className="hover-elevate"
+                      data-testid={`row-batch-${batch.id}`}
+                    >
+                      <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>
+                        {batch.name || batch.batchCode}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {used.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        <Badge variant={remaining <= 0 ? "secondary" : "default"}>
+                          {formatNumber(remaining)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${parseFloat(batch.costPerKg).toFixed(4)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getStatusVariant(batch.status)}
+                          className="gap-1"
+                          data-testid={`badge-status-${batch.id}`}
+                        >
+                          {getStatusIcon(batch.status)}
+                          {batch.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(batch.createdAt).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
