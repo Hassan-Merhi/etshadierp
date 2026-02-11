@@ -48,6 +48,7 @@ export default function BaleProducts() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importError, setImportError] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [condensedView, setCondensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +79,7 @@ export default function BaleProducts() {
       toast({ title: "Success", description: `Imported ${result.count} products` });
       setImportDialogOpen(false);
       setImportPreview([]);
+      setImportFile(null);
     },
     onError: (error: Error) => {
       toast({ title: "Import Error", description: error.message, variant: "destructive" });
@@ -89,6 +91,7 @@ export default function BaleProducts() {
     if (!file) return;
     setImportError("");
     setImportPreview([]);
+    setImportFile(file);
 
     try {
       const XLSX = await import("xlsx");
@@ -100,6 +103,7 @@ export default function BaleProducts() {
 
       if (rows.length === 0) {
         setImportError("Excel file is empty");
+        setImportFile(null);
         return;
       }
 
@@ -131,6 +135,7 @@ export default function BaleProducts() {
       setImportDialogOpen(true);
     } catch (err: any) {
       setImportError(err.message || "Failed to parse Excel file");
+      setImportFile(null);
       toast({ title: "Parse Error", description: err.message, variant: "destructive" });
     }
 
@@ -138,19 +143,11 @@ export default function BaleProducts() {
   };
 
   const handleConfirmImport = () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".xlsx,.xls,.csv";
-      input.onchange = (e) => {
-        const f = (e.target as HTMLInputElement).files?.[0];
-        if (f) importMutation.mutate(f);
-      };
-      input.click();
+    if (!importFile) {
+      toast({ title: "No file", description: "Please select a file first", variant: "destructive" });
       return;
     }
-    importMutation.mutate(file);
+    importMutation.mutate(importFile);
   };
 
   const toggleGroup = (code: string) => {
