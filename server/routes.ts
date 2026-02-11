@@ -26495,7 +26495,7 @@ if (asOfDate) {
             productId,
             locationId,
             baleCode: product.code,
-            barcodeValue: barcode,
+            barcodeValue: product.articleCode || product.code,
             quantity: 1,
             weightKg: weight.toString(),
             costPerKg: batch.costPerKg,
