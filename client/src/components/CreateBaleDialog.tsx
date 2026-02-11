@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Barcode, Printer } from "lucide-react";
+import { Barcode, Printer, ToggleLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { MixBatch, BaleProduct, Location } from "@shared/schema";
@@ -57,35 +59,76 @@ function generateLabelHtml(labels: Array<{
   pieces: number;
   approxWeightKg: string;
   productName: string;
-}>) {
+}>, dualLabel: boolean) {
   let labelsHtml = '';
   for (const label of labels) {
-    labelsHtml += `
-      <div class="label">
-        <div class="label-top">
-          <div class="logo-section">
-            <div class="logo-text">HMD</div>
-            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+    if (dualLabel) {
+      labelsHtml += `
+        <div class="page-container">
+          <div class="label">
+            <div class="label-top">
+              <div class="logo-section">
+                <div class="logo-text">HMD</div>
+                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+              </div>
+              <div class="info-section">
+                <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
+                <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+                <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+              </div>
+            </div>
+            <div class="barcode-section">
+              <div class="barcode-label">REFERENCE</div>
+              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+              <div class="barcode-text">${label.referenceNumber}</div>
+            </div>
+            <div class="barcode-section">
+              <div class="barcode-label">ARTICLE</div>
+              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <div class="barcode-text">${label.productName}</div>
+            </div>
           </div>
-          <div class="info-section">
-            <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
-            <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+          <div class="label label-rotated">
+            <div class="name-label-content">
+              <div class="name-label-title">${label.productName}</div>
+              <div class="name-label-code">${label.articleCode}</div>
+              <div class="barcode-section">
+                <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              </div>
+            </div>
           </div>
         </div>
-        <div class="barcode-section">
-          <div class="barcode-label">REFERENCE</div>
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-          <div class="barcode-text">${label.referenceNumber}</div>
+      `;
+    } else {
+      labelsHtml += `
+        <div class="label">
+          <div class="label-top">
+            <div class="logo-section">
+              <div class="logo-text">HMD</div>
+              <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+            </div>
+            <div class="info-section">
+              <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
+              <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+              <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+            </div>
+          </div>
+          <div class="barcode-section">
+            <div class="barcode-label">REFERENCE</div>
+            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+            <div class="barcode-text">${label.referenceNumber}</div>
+          </div>
+          <div class="barcode-section">
+            <div class="barcode-label">ARTICLE</div>
+            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+            <div class="barcode-text">${label.productName}</div>
+          </div>
         </div>
-        <div class="barcode-section">
-          <div class="barcode-label">ARTICLE</div>
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-          <div class="barcode-text">${label.productName}</div>
-        </div>
-      </div>
-    `;
+      `;
+    }
   }
+
+  const pageHeight = dualLabel ? '100mm' : '50mm';
 
   return `
     <html>
@@ -93,7 +136,7 @@ function generateLabelHtml(labels: Array<{
         <title>Print Bale Labels</title>
         <style>
           @page {
-            size: 76.2mm 50mm;
+            size: 76.2mm ${pageHeight};
             margin: 0;
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -102,18 +145,60 @@ function generateLabelHtml(labels: Array<{
             margin: 0;
             padding: 0;
           }
+          .page-container {
+            width: 76.2mm;
+            height: 100mm;
+            page-break-after: always;
+            overflow: hidden;
+          }
+          .page-container:last-child {
+            page-break-after: auto;
+          }
           .label {
             width: 76.2mm;
             height: 50mm;
             padding: 2mm 3mm;
-            page-break-after: always;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             overflow: hidden;
           }
-          .label:last-child {
+          .label:not(.label-rotated):last-child {
             page-break-after: auto;
+          }
+          .label:not(.label-rotated) {
+            page-break-after: always;
+          }
+          .page-container .label {
+            page-break-after: auto;
+          }
+          .label-rotated {
+            transform: rotate(180deg);
+            justify-content: center;
+            align-items: center;
+          }
+          .name-label-content {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2mm;
+            width: 100%;
+          }
+          .name-label-title {
+            font-size: 14pt;
+            font-weight: 900;
+            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            line-height: 1.2;
+          }
+          .name-label-code {
+            font-size: 10pt;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            color: #333;
           }
           .label-top {
             display: flex;
@@ -189,6 +274,7 @@ export function CreateBaleDialog({
   onOpenChange,
 }: CreateBaleDialogProps) {
   const { toast } = useToast();
+  const [dualLabel, setDualLabel] = useState(true);
 
   const { data: mixBatches } = useQuery<MixBatch[]>({
     queryKey: ["/api/mix-batches"],
@@ -308,7 +394,7 @@ export function CreateBaleDialog({
         return;
       }
 
-      printWindow.document.write(generateLabelHtml(labels));
+      printWindow.document.write(generateLabelHtml(labels, dualLabel));
       printWindow.document.close();
       printWindow.focus();
 
@@ -481,6 +567,21 @@ export function CreateBaleDialog({
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="flex items-center gap-3 rounded-md border p-3">
+                <Switch
+                  id="dual-label-toggle"
+                  checked={dualLabel}
+                  onCheckedChange={setDualLabel}
+                  data-testid="switch-dual-label"
+                />
+                <Label htmlFor="dual-label-toggle" className="flex flex-col gap-0.5 cursor-pointer">
+                  <span className="text-sm font-medium">Print dual labels (full + name)</span>
+                  <span className="text-xs text-muted-foreground">
+                    {dualLabel ? "Prints two labels per bale: full HMD label on top, rotated name label on bottom" : "Prints single full HMD label per bale"}
+                  </span>
+                </Label>
               </div>
 
               <div className="flex justify-end gap-2">
