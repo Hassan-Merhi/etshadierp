@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { db } from "./db";
+import { userLocations } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 // Authentication middleware - checks if user is logged in
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -98,22 +101,42 @@ export function canModifyDate(dateField: string = "voucherDate") {
 }
 
 // Check if POS user can access a specific location
-export function checkPOSLocation(req: Request, res: Response, next: NextFunction) {
+export async function checkPOSLocation(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !req.user.role) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const isPOS = req.user.role.startsWith("POS");
   if (!isPOS) {
-    return next(); // Non-POS users can access all locations
+    return next();
   }
 
-  // POS users can only access their assigned location
   const locationId = parseInt(req.params.locationId || req.body.locationId || req.query.locationId);
   
-  if (locationId && req.user.assignedLocationId !== locationId) {
+  if (!locationId) {
+    return next();
+  }
+
+  const companyId = req.session.currentCompanyId;
+  if (!companyId) {
+    return res.status(403).json({ message: "No company selected" });
+  }
+
+  const assignedLocations = await db
+    .select({ locationId: userLocations.locationId })
+    .from(userLocations)
+    .where(
+      and(
+        eq(userLocations.userId, req.user.id),
+        eq(userLocations.companyId, companyId)
+      )
+    );
+
+  const allowedIds = assignedLocations.map(l => l.locationId);
+
+  if (!allowedIds.includes(locationId)) {
     return res.status(403).json({ 
-      message: "You can only access data for your assigned location" 
+      message: "You can only access data for your assigned locations" 
     });
   }
 
