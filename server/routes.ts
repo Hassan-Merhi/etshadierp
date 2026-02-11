@@ -32127,6 +32127,27 @@ if (asOfDate) {
     }
   });
 
+  app.post("/api/dev/seed", async (req, res) => {
+    if (process.env.NODE_ENV !== "development") {
+      return res.status(403).json({ message: "Dev seed only available in development" });
+    }
+    try {
+      const { runDevSeed } = await import("./seedDev");
+      const summary = await runDevSeed();
+      console.log("\n=== SEED DATA SUMMARY ===");
+      console.log(`Products: ${summary.products}`);
+      console.log(`Bales: ${summary.bales}`);
+      console.log(`Label Prints: ${summary.labelPrints} (${summary.scannedLabels} scanned)`);
+      console.log(`\nSample ARTICLE codes: ${summary.sampleArticleCodes.join(", ")}`);
+      console.log(`Sample REFERENCE numbers: ${summary.sampleReferenceNumbers.join(", ")}`);
+      console.log("========================\n");
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Seed error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
