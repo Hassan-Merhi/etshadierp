@@ -1,11 +1,12 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, type LucideIcon } from "lucide-react";
+import { Factory, Package, Boxes, Layers, Tags, Search, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Bales = lazy(() => import("./Bales"));
 const MixBatches = lazy(() => import("./MixBatches"));
 const ProductionBales = lazy(() => import("./ProductionBales"));
 const BaleProducts = lazy(() => import("./BaleProducts"));
+const BarcodeLookup = lazy(() => import("./BarcodeLookup"));
 
 function LoadingFallback() {
   return (
@@ -16,7 +17,7 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "bales" | "mix-batches" | "production-bales" | "bale-products";
+type SectionKey = "bales" | "mix-batches" | "production-bales" | "bale-products" | "barcode-lookup";
 
 interface SidebarItem {
   key: SectionKey;
@@ -45,6 +46,12 @@ export default function FactoryProduction() {
       items: [
         { key: "production-bales", label: "Production Bales", icon: Layers },
         { key: "bale-products", label: "Bale Products", icon: Tags },
+      ],
+    },
+    {
+      label: "Traceability",
+      items: [
+        { key: "barcode-lookup", label: "Barcode Lookup", icon: Search },
       ],
     },
   ];
@@ -99,6 +106,7 @@ export default function FactoryProduction() {
             {activeSection === "mix-batches" && <MixBatches />}
             {activeSection === "production-bales" && <ProductionBales />}
             {activeSection === "bale-products" && <BaleProducts />}
+            {activeSection === "barcode-lookup" && <BarcodeLookup />}
           </Suspense>
         </div>
       </div>

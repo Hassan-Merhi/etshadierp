@@ -51,6 +51,139 @@ interface CreateBaleDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function generateLabelHtml(labels: Array<{
+  referenceNumber: string;
+  articleCode: string;
+  pieces: number;
+  approxWeightKg: string;
+  productName: string;
+}>) {
+  let labelsHtml = '';
+  for (const label of labels) {
+    labelsHtml += `
+      <div class="label">
+        <div class="label-top">
+          <div class="logo-section">
+            <div class="logo-text">HMD</div>
+            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+          </div>
+          <div class="info-section">
+            <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
+            <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+          </div>
+        </div>
+        <div class="barcode-section">
+          <div class="barcode-label">REFERENCE</div>
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+          <div class="barcode-text">${label.referenceNumber}</div>
+        </div>
+        <div class="barcode-section">
+          <div class="barcode-label">ARTICLE</div>
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <div class="barcode-text">${label.productName}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <html>
+      <head>
+        <title>Print Bale Labels</title>
+        <style>
+          @page {
+            size: 76.2mm 50mm;
+            margin: 0;
+          }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 0;
+          }
+          .label {
+            width: 76.2mm;
+            height: 50mm;
+            padding: 2mm 3mm;
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+          }
+          .label:last-child {
+            page-break-after: auto;
+          }
+          .label-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1mm;
+          }
+          .logo-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .logo-text {
+            font-size: 14pt;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #000;
+            line-height: 1;
+          }
+          .logo-subtitle {
+            font-size: 5pt;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #333;
+            margin-top: 0.5mm;
+          }
+          .info-section {
+            text-align: right;
+            font-size: 6.5pt;
+            line-height: 1.4;
+          }
+          .info-label {
+            font-weight: 700;
+          }
+          .info-value {
+            font-weight: 400;
+          }
+          .barcode-section {
+            text-align: center;
+            margin-bottom: 0.5mm;
+          }
+          .barcode-label {
+            font-size: 5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 0.5mm;
+          }
+          .barcode-img {
+            width: 58mm;
+            height: 10mm;
+            object-fit: contain;
+          }
+          .barcode-text {
+            font-size: 7pt;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            margin-top: 0.3mm;
+            color: #000;
+          }
+        </style>
+      </head>
+      <body>
+        ${labelsHtml}
+      </body>
+    </html>
+  `;
+}
+
 export function CreateBaleDialog({
   open,
   onOpenChange,
@@ -112,20 +245,19 @@ export function CreateBaleDialog({
       }
 
       const result = await response.json();
-      return { bales: result.bales, product };
+      return { bales: result.bales, product, weightPerBale: data.weightPerBale };
     },
-    onSuccess: async ({ bales, product }) => {
+    onSuccess: async ({ bales, product, weightPerBale }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
-      
-      // Auto-print labels with unique barcodes
-      await printBaleLabels(product, bales);
-      
+
+      await printBaleLabels(product, bales, weightPerBale);
+
       toast({
         title: "Success",
         description: `Created ${bales.length} bale(s) and sent to printer`,
       });
-      
+
       handleClose();
     },
     onError: (error: Error) => {
@@ -137,9 +269,35 @@ export function CreateBaleDialog({
     },
   });
 
-  const printBaleLabels = async (product: BaleProduct, bales: any[]) => {
+  const printBaleLabels = async (product: BaleProduct, bales: any[], weightPerBale: string) => {
     try {
-      // Create printable content with multiple labels (one per bale)
+      const articleCode = product.articleCode || product.code;
+
+      const labelPrintResponse = await apiRequest("POST", "/api/bale-label-prints", {
+        bales: bales.map((bale: any) => ({
+          productionBaleId: bale.id,
+          productId: product.id,
+          articleCode,
+          pieces: 1,
+          approxWeightKg: weightPerBale,
+        })),
+      });
+
+      if (!labelPrintResponse.ok) {
+        const err = await labelPrintResponse.json();
+        throw new Error(err.message || "Failed to create label print records");
+      }
+
+      const { labelPrints } = await labelPrintResponse.json();
+
+      const labels = labelPrints.map((lp: any) => ({
+        referenceNumber: lp.referenceNumber,
+        articleCode: lp.articleCode,
+        pieces: lp.pieces,
+        approxWeightKg: lp.approxWeightKg,
+        productName: product.name,
+      }));
+
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast({
@@ -150,83 +308,17 @@ export function CreateBaleDialog({
         return;
       }
 
-      // Generate HTML for all labels with unique barcodes
-      let labelsHtml = '';
-      for (const bale of bales) {
-        // Get barcode image from backend
-        const response = await apiRequest("POST", "/api/generate-barcode", {
-          text: bale.barcodeValue,
-        });
-        
-        if (!response.ok) {
-          throw new Error("Failed to generate barcode");
-        }
-        
-        const { dataUrl } = await response.json();
-
-        labelsHtml += `
-          <div class="label">
-            <div class="barcode">
-              <img src="${dataUrl}" alt="Barcode" />
-            </div>
-            <div class="barcode-text">${bale.barcodeValue}</div>
-          </div>
-        `;
-      }
-
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Print Barcode Labels - ${product.code}</title>
-            <style>
-              @media print {
-                @page { margin: 0; }
-                body { margin: 1cm; }
-              }
-              body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                padding: 20px;
-              }
-              .label {
-                border: 2px solid #000;
-                padding: 20px;
-                margin: 10px;
-                text-align: center;
-                page-break-after: always;
-                width: 8cm;
-              }
-              .barcode {
-                margin: 15px 0;
-              }
-              .barcode-text {
-                font-size: 16px;
-                font-weight: bold;
-                font-family: monospace;
-                margin-top: 10px;
-                color: #000;
-              }
-            </style>
-          </head>
-          <body>
-            ${labelsHtml}
-          </body>
-        </html>
-      `);
-
+      printWindow.document.write(generateLabelHtml(labels));
       printWindow.document.close();
       printWindow.focus();
-      
-      // Auto-print after a short delay
+
       setTimeout(() => {
         printWindow.print();
-      }, 250);
+      }, 500);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to generate barcode",
+        description: error.message || "Failed to generate labels",
         variant: "destructive",
       });
     }
@@ -305,7 +397,7 @@ export function CreateBaleDialog({
                             key={product.id}
                             value={product.id.toString()}
                           >
-                            {product.code} - {product.name}
+                            {product.code} - {product.name} {product.articleCode ? `(${product.articleCode})` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>

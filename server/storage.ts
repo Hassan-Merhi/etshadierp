@@ -341,6 +341,12 @@ export interface IStorage {
   deleteBaleProduct(id: number): Promise<void>;
   bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]>;
 
+  // Bale Label Prints
+  createBaleLabelPrint(data: schema.InsertBaleLabelPrint): Promise<schema.BaleLabelPrint>;
+  getBaleLabelPrintByReference(referenceNumber: string, companyId: number): Promise<schema.BaleLabelPrint | undefined>;
+  getBaleLabelPrintsByArticle(articleCode: string, companyId: number): Promise<schema.BaleLabelPrint[]>;
+  getBaleProductByArticleCode(articleCode: string, companyId: number): Promise<schema.BaleProduct | undefined>;
+
   // Bale Transfers
   getAllBaleTransfers(companyId: number): Promise<schema.BaleTransfer[]>;
   getBaleTransferById(id: number): Promise<schema.BaleTransfer | undefined>;
@@ -5483,6 +5489,54 @@ export class DbStorage implements IStorage {
       .insert(schema.baleProducts)
       .values(products)
       .returning();
+  }
+
+  // Bale Label Prints
+  async createBaleLabelPrint(data: schema.InsertBaleLabelPrint): Promise<schema.BaleLabelPrint> {
+    const [created] = await db
+      .insert(schema.baleLabelPrints)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async getBaleLabelPrintByReference(referenceNumber: string, companyId: number): Promise<schema.BaleLabelPrint | undefined> {
+    const [record] = await db
+      .select()
+      .from(schema.baleLabelPrints)
+      .where(
+        and(
+          eq(schema.baleLabelPrints.referenceNumber, referenceNumber),
+          eq(schema.baleLabelPrints.companyId, companyId)
+        )
+      );
+    return record;
+  }
+
+  async getBaleLabelPrintsByArticle(articleCode: string, companyId: number): Promise<schema.BaleLabelPrint[]> {
+    return await db
+      .select()
+      .from(schema.baleLabelPrints)
+      .where(
+        and(
+          eq(schema.baleLabelPrints.articleCode, articleCode),
+          eq(schema.baleLabelPrints.companyId, companyId)
+        )
+      )
+      .orderBy(desc(schema.baleLabelPrints.printedAt));
+  }
+
+  async getBaleProductByArticleCode(articleCode: string, companyId: number): Promise<schema.BaleProduct | undefined> {
+    const [product] = await db
+      .select()
+      .from(schema.baleProducts)
+      .where(
+        and(
+          eq(schema.baleProducts.articleCode, articleCode),
+          eq(schema.baleProducts.companyId, companyId)
+        )
+      );
+    return product;
   }
 
   // Bale Transfers

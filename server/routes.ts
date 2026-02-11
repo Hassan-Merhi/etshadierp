@@ -25934,7 +25934,14 @@ if (asOfDate) {
       }
 
       const { insertBaleProductSchema } = await import("@shared/schema");
-      const data = insertBaleProductSchema.parse({ ...req.body, companyId });
+      let articleCode = req.body.articleCode || "";
+      if (!articleCode && req.body.itemNumber) {
+        const num = parseInt(String(req.body.itemNumber));
+        if (!isNaN(num) && num >= 1 && num <= 99) {
+          articleCode = `HMD${String(num).padStart(2, '0')}000`;
+        }
+      }
+      const data = insertBaleProductSchema.parse({ ...req.body, companyId, articleCode: articleCode || undefined });
 
       // Check for duplicate code
       const existing = await storage.getBaleProductByCode(data.code, companyId);
@@ -26032,9 +26039,20 @@ if (asOfDate) {
 
       // Map Excel rows to product data - force companyId from authenticated session
       const productsData = rows.map((row: any) => {
+        const itemNumber = row.itemNumber || row.item_number || row.ItemNumber;
+        let articleCode = row.articleCode || row.article_code || row.ArticleCode || "";
+        
+        if (!articleCode && itemNumber) {
+          const num = parseInt(String(itemNumber));
+          if (!isNaN(num) && num >= 1 && num <= 99) {
+            articleCode = `HMD${String(num).padStart(2, '0')}000`;
+          }
+        }
+
         return insertBaleProductSchema.parse({
-          companyId, // Always use authenticated company
+          companyId,
           code: row.code || row.Code || row.product_code || "",
+          articleCode: articleCode || undefined,
           name: row.name || row.Name || row.product_name || "",
           description: row.description || row.Description || "",
           active: row.active === undefined ? true : Boolean(row.active),
@@ -26057,6 +26075,121 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error importing bale products from Excel:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Bale Label Prints - create label print records with unique reference numbers
+  app.post("/api/bale-label-prints", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { bales } = req.body;
+      if (!bales || !Array.isArray(bales) || bales.length === 0) {
+        return res.status(400).json({ message: "No bales provided" });
+      }
+
+      const { referenceSequences, baleLabelPrints } = await import("@shared/schema");
+
+      const labelPrints = await db.transaction(async (tx) => {
+        const results = [];
+        for (const bale of bales) {
+          const [sequence] = await tx
+            .select()
+            .from(referenceSequences)
+            .where(eq(referenceSequences.companyId, companyId))
+            .for('update');
+
+          let refNum: number;
+          if (!sequence) {
+            await tx
+              .insert(referenceSequences)
+              .values({ companyId, nextNumber: 2 });
+            refNum = 1;
+          } else {
+            refNum = sequence.nextNumber;
+            await tx
+              .update(referenceSequences)
+              .set({ nextNumber: sequence.nextNumber + 1 })
+              .where(eq(referenceSequences.id, sequence.id));
+          }
+
+          const referenceNumber = `REF${String(refNum).padStart(7, '0')}`;
+
+          const [labelPrint] = await tx
+            .insert(baleLabelPrints)
+            .values({
+              companyId,
+              productionBaleId: bale.productionBaleId || null,
+              productId: bale.productId || null,
+              articleCode: bale.articleCode,
+              referenceNumber,
+              pieces: bale.pieces || 1,
+              approxWeightKg: String(bale.approxWeightKg),
+              printedByUserId: req.session.userId || null,
+              printedAt: new Date(),
+            })
+            .returning();
+
+          results.push(labelPrint);
+        }
+        return results;
+      });
+
+      res.json({ labelPrints });
+    } catch (error: any) {
+      console.error("Error creating bale label prints:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Lookup by ARTICLE code
+  app.get("/api/lookup/article/:articleCode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const articleCode = decodeURIComponent(req.params.articleCode);
+      const product = await storage.getBaleProductByArticleCode(articleCode, companyId);
+      const labelPrints = await storage.getBaleLabelPrintsByArticle(articleCode, companyId);
+
+      res.json({ product: product || null, labelPrints });
+    } catch (error: any) {
+      console.error("Error looking up article:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Lookup by REFERENCE number
+  app.get("/api/lookup/reference/:referenceNumber", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const labelPrint = await storage.getBaleLabelPrintByReference(referenceNumber, companyId);
+
+      if (!labelPrint) {
+        return res.status(404).json({ message: "Reference number not found" });
+      }
+
+      let product = null;
+      if (labelPrint.productId) {
+        product = await storage.getBaleProductById(labelPrint.productId);
+      } else {
+        product = await storage.getBaleProductByArticleCode(labelPrint.articleCode, companyId);
+      }
+
+      res.json({ labelPrint, product: product || null });
+    } catch (error: any) {
+      console.error("Error looking up reference:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

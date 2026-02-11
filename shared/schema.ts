@@ -1408,6 +1408,7 @@ export const baleProducts = pgTable("bale_products", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
   name: text("name").notNull(),
   description: text("description"),
   active: boolean("active").notNull().default(true),
@@ -1424,6 +1425,7 @@ export const insertBaleProductSchema = createInsertSchema(baleProducts).omit({
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Product code is required"),
+  articleCode: z.string().optional(),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional(),
   active: z.boolean().optional(),
@@ -1978,3 +1980,54 @@ export const insertPosOfflineQueueSchema = createInsertSchema(posOfflineQueue).o
 
 export type InsertPosOfflineQueue = z.infer<typeof insertPosOfflineQueueSchema>;
 export type PosOfflineQueue = typeof posOfflineQueue.$inferSelect;
+
+// Reference Sequences - tracks next reference number per company for label prints
+export const referenceSequences = pgTable("reference_sequences", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id),
+  nextNumber: integer("next_number").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyId: uniqueIndex("reference_sequences_company_unique").on(t.companyId),
+}));
+
+export type ReferenceSequence = typeof referenceSequences.$inferSelect;
+
+// Bale Label Prints - traceability records for every printed label
+export const baleLabelPrints = pgTable("bale_label_prints", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  productionBaleId: integer("production_bale_id"),
+  productId: integer("product_id"),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  referenceNumber: varchar("reference_number", { length: 100 }).notNull(),
+  pieces: integer("pieces").notNull().default(1),
+  approxWeightKg: decimal("approx_weight_kg", { precision: 15, scale: 3 }).notNull(),
+  printedByUserId: varchar("printed_by_user_id"),
+  printedAt: timestamp("printed_at").notNull().defaultNow(),
+  scannedByUserId: varchar("scanned_by_user_id"),
+  scannedAt: timestamp("scanned_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueReference: uniqueIndex("bale_label_prints_reference_unique").on(t.companyId, t.referenceNumber),
+}));
+
+export const insertBaleLabelPrintSchema = createInsertSchema(baleLabelPrints).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  productionBaleId: z.number().optional(),
+  productId: z.number().optional(),
+  articleCode: z.string().min(1, "Article code is required"),
+  referenceNumber: z.string().min(1, "Reference number is required"),
+  pieces: z.number().min(1, "Pieces must be at least 1"),
+  approxWeightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  printedByUserId: z.string().optional(),
+  printedAt: z.date().optional(),
+  scannedByUserId: z.string().optional(),
+  scannedAt: z.date().optional(),
+});
+
+export type InsertBaleLabelPrint = z.infer<typeof insertBaleLabelPrintSchema>;
+export type BaleLabelPrint = typeof baleLabelPrints.$inferSelect;

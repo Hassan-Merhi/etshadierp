@@ -28,6 +28,8 @@ const formSchema = z.object({
   code: z.string().min(1, "Product code is required"),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional(),
+  itemNumber: z.string().optional(),
+  articleCode: z.string().optional(),
 });
 
 interface CreateBaleProductDialogProps {
@@ -47,6 +49,8 @@ export function CreateBaleProductDialog({
       code: "",
       name: "",
       description: "",
+      itemNumber: "",
+      articleCode: "",
     },
   });
 
@@ -128,6 +132,54 @@ export function CreateBaleProductDialog({
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="itemNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., 1, 2, 8"
+                        type="number"
+                        min="1"
+                        max="99"
+                        data-testid="input-item-number"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Auto-generates article code (HMD0X000)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="articleCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Article Code</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="e.g., HMD01000"
+                        className="font-mono"
+                        data-testid="input-article-code"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Or enter directly (overrides item number)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

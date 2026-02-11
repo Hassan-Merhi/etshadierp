@@ -69,6 +69,7 @@ export default function BaleProducts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
+                  <TableHead>Article Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
@@ -83,6 +84,9 @@ export default function BaleProducts() {
                   >
                     <TableCell className="font-mono font-medium">
                       {product.code}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground">
+                      {product.articleCode || "-"}
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="text-muted-foreground">
