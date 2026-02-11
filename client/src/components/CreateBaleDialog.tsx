@@ -53,6 +53,39 @@ interface CreateBaleDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function generateFullLabelHtml(label: {
+  referenceNumber: string;
+  articleCode: string;
+  pieces: number;
+  approxWeightKg: string;
+  productName: string;
+}) {
+  return `
+    <div class="label">
+      <div class="label-top">
+        <div class="logo-section">
+          <div class="logo-text">HMD</div>
+          <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+        </div>
+        <div class="info-section">
+          <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
+          <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+          <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+        </div>
+      </div>
+      <div class="barcode-section">
+        <div class="barcode-label">REFERENCE</div>
+        <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+        <div class="barcode-text">${label.referenceNumber}</div>
+      </div>
+      <div class="barcode-section">
+        <div class="barcode-label">ARTICLE</div>
+        <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        <div class="barcode-text">${label.productName}</div>
+      </div>
+    </div>`;
+}
+
 function generateLabelHtml(labels: Array<{
   referenceNumber: string;
   articleCode: string;
@@ -61,74 +94,29 @@ function generateLabelHtml(labels: Array<{
   productName: string;
 }>, dualLabel: boolean) {
   let labelsHtml = '';
+
   for (const label of labels) {
+    const fullLabel = generateFullLabelHtml(label);
+
     if (dualLabel) {
       labelsHtml += `
         <div class="page-container">
-          <div class="label">
-            <div class="label-top">
-              <div class="logo-section">
-                <div class="logo-text">HMD</div>
-                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-              </div>
-              <div class="info-section">
-                <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
-                <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-                <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
-              </div>
-            </div>
-            <div class="barcode-section">
-              <div class="barcode-label">REFERENCE</div>
-              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-              <div class="barcode-text">${label.referenceNumber}</div>
-            </div>
-            <div class="barcode-section">
-              <div class="barcode-label">ARTICLE</div>
-              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-              <div class="barcode-text">${label.productName}</div>
+          ${fullLabel}
+          <div class="label nameOnly">
+            <div class="name-only-content">
+              <div class="name-only-text">${label.productName}</div>
             </div>
           </div>
-          <div class="label label-rotated">
-            <div class="name-label-content">
-              <div class="name-label-title">${label.productName}</div>
-              <div class="name-label-code">${label.articleCode}</div>
-              <div class="barcode-section">
-                <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+        </div>`;
     } else {
       labelsHtml += `
-        <div class="label">
-          <div class="label-top">
-            <div class="logo-section">
-              <div class="logo-text">HMD</div>
-              <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-            </div>
-            <div class="info-section">
-              <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
-              <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-              <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
-            </div>
-          </div>
-          <div class="barcode-section">
-            <div class="barcode-label">REFERENCE</div>
-            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-            <div class="barcode-text">${label.referenceNumber}</div>
-          </div>
-          <div class="barcode-section">
-            <div class="barcode-label">ARTICLE</div>
-            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="barcode-text">${label.productName}</div>
-          </div>
-        </div>
-      `;
+        <div class="single-page">
+          ${fullLabel}
+        </div>`;
     }
   }
 
-  const pageHeight = dualLabel ? '100mm' : '50mm';
+  const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
 
   return `
     <html>
@@ -136,7 +124,7 @@ function generateLabelHtml(labels: Array<{
         <title>Print Bale Labels</title>
         <style>
           @page {
-            size: 76.2mm ${pageHeight};
+            ${pageSize}
             margin: 0;
           }
           * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -146,59 +134,52 @@ function generateLabelHtml(labels: Array<{
             padding: 0;
           }
           .page-container {
-            width: 76.2mm;
-            height: 100mm;
+            width: 3in;
+            height: 3.94in;
             page-break-after: always;
             overflow: hidden;
           }
           .page-container:last-child {
             page-break-after: auto;
           }
+          .single-page {
+            width: 3in;
+            height: 1.97in;
+            page-break-after: always;
+            overflow: hidden;
+          }
+          .single-page:last-child {
+            page-break-after: auto;
+          }
           .label {
-            width: 76.2mm;
-            height: 50mm;
+            width: 3in;
+            height: 1.97in;
             padding: 2mm 3mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             overflow: hidden;
           }
-          .label:not(.label-rotated):last-child {
-            page-break-after: auto;
-          }
-          .label:not(.label-rotated) {
-            page-break-after: always;
-          }
-          .page-container .label {
-            page-break-after: auto;
-          }
-          .label-rotated {
+          .nameOnly {
             transform: rotate(180deg);
             justify-content: center;
             align-items: center;
           }
-          .name-label-content {
-            text-align: center;
+          .name-only-content {
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2mm;
             width: 100%;
+            height: 100%;
           }
-          .name-label-title {
-            font-size: 14pt;
+          .name-only-text {
+            font-size: 32px;
             font-weight: 900;
             color: #000;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            line-height: 1.2;
-          }
-          .name-label-code {
-            font-size: 10pt;
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
-            color: #333;
+            text-align: center;
+            line-height: 1.15;
+            padding: 2mm;
+            word-break: break-word;
           }
           .label-top {
             display: flex;
@@ -577,9 +558,9 @@ export function CreateBaleDialog({
                   data-testid="switch-dual-label"
                 />
                 <Label htmlFor="dual-label-toggle" className="flex flex-col gap-0.5 cursor-pointer">
-                  <span className="text-sm font-medium">Print dual labels (full + name)</span>
+                  <span className="text-sm font-medium">Print name label too</span>
                   <span className="text-xs text-muted-foreground">
-                    {dualLabel ? "Prints two labels per bale: full HMD label on top, rotated name label on bottom" : "Prints single full HMD label per bale"}
+                    {dualLabel ? "Two stickers per bale: full HMD label + upside-down name label" : "Single full HMD label per bale"}
                   </span>
                 </Label>
               </div>
