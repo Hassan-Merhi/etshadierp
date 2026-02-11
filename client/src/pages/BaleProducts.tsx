@@ -358,7 +358,7 @@ export default function BaleProducts() {
           </Table>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)} data-testid="button-cancel-import">
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportFile(null); setImportPreview([]); }} data-testid="button-cancel-import">
               Cancel
             </Button>
             <Button
