@@ -31,7 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import type { MixBatch } from "@shared/schema";
+import type { FactoryMixBatch } from "@shared/schema";
 
 interface RawStockRow {
   id: number;
@@ -72,12 +72,12 @@ export function CreateMixBatchDialog({
   const [notes, setNotes] = useState("");
 
   const { data: rawStock } = useQuery<RawStockRow[]>({
-    queryKey: ["/api/production-raw-stock"],
+    queryKey: ["/api/factory/raw-stock"],
     enabled: open,
   });
 
-  const { data: existingBatches } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: existingBatches } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
     enabled: open,
   });
 
@@ -114,7 +114,7 @@ export function CreateMixBatchDialog({
           weightKg: s.weightKg.toString(),
         }));
 
-      const response = await fetch("/api/mix-batches", {
+      const response = await fetch("/api/factory/mix-batches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -134,8 +134,8 @@ export function CreateMixBatchDialog({
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       toast({ title: "Success", description: "Mix batch created successfully" });
       handleClose();
     },

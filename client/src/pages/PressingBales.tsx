@@ -19,11 +19,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { BaleProduct } from "@shared/schema";
+import type { FactoryBaleProduct } from "@shared/schema";
 
 interface CartItem {
   productId: number;
-  product: BaleProduct;
+  product: FactoryBaleProduct;
   qty: number;
   weightPerBaleKg: number;
 }
@@ -127,8 +127,8 @@ export default function PressingBales() {
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: baleProducts, isLoading: productsLoading } = useQuery<BaleProduct[]>({
-    queryKey: ["/api/bale-products"],
+  const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
   });
 
   const activeProducts = baleProducts?.filter((p) => p.active);
@@ -219,7 +219,7 @@ export default function PressingBales() {
   const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
   const totalKgToConsume = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
 
-  const printBaleLabels = async (bales: any[], products: BaleProduct[], weights: string[]) => {
+  const printBaleLabels = async (bales: any[], products: FactoryBaleProduct[], weights: string[]) => {
     try {
       const labelData = bales.map((bale: any, idx: number) => ({
         productionBaleId: bale.id,
@@ -270,7 +270,7 @@ export default function PressingBales() {
       }
 
       const allBales: any[] = [];
-      const allProducts: BaleProduct[] = [];
+      const allProducts: FactoryBaleProduct[] = [];
       const allWeights: string[] = [];
 
       for (const item of cart) {
@@ -281,7 +281,7 @@ export default function PressingBales() {
           mode: "pressing",
         };
 
-        const response = await apiRequest("POST", "/api/production-bales/create-batch", payload);
+        const response = await apiRequest("POST", "/api/factory/pressing/create-and-print", payload);
 
         if (!response.ok) {
           const err = await response.json();
@@ -299,9 +299,10 @@ export default function PressingBales() {
       return { bales: allBales, products: allProducts, weights: allWeights };
     },
     onSuccess: async ({ bales, products, weights }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pressing-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/pressing-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
 
       await printBaleLabels(bales, products, weights);
 

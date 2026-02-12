@@ -32,7 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { MixBatch, BaleProduct, Location } from "@shared/schema";
+import type { FactoryMixBatch, FactoryBaleProduct, Location } from "@shared/schema";
 
 const formSchema = z.object({
   mixBatchId: z.string().min(1, "Please select a mix batch"),
@@ -305,13 +305,13 @@ export function CreateBaleDialog({
   const { toast } = useToast();
   const [dualLabel, setDualLabel] = useState(true);
 
-  const { data: mixBatches } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
     enabled: open,
   });
 
-  const { data: baleProducts } = useQuery<BaleProduct[]>({
-    queryKey: ["/api/bale-products"],
+  const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
     enabled: open,
   });
 
@@ -353,7 +353,7 @@ export function CreateBaleDialog({
         weightPerBale: data.weightPerBale,
       };
 
-      const response = await apiRequest("POST", "/api/production-bales/create-batch", baleData);
+      const response = await apiRequest("POST", "/api/factory/bales/create-batch", baleData);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to create bales");
@@ -363,8 +363,8 @@ export function CreateBaleDialog({
       return { bales: result.bales, product, weightPerBale: data.weightPerBale };
     },
     onSuccess: async ({ bales, product, weightPerBale }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
 
       await printBaleLabels(product, bales, weightPerBale);
 
@@ -384,7 +384,7 @@ export function CreateBaleDialog({
     },
   });
 
-  const printBaleLabels = async (product: BaleProduct, bales: any[], weightPerBale: string) => {
+  const printBaleLabels = async (product: FactoryBaleProduct, bales: any[], weightPerBale: string) => {
     try {
       const articleCode = product.articleCode || product.code;
 

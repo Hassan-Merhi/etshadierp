@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { BaleProductCategory } from "@shared/schema";
+import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
   articleCode: z.string().min(1, "Article code is required"),
@@ -52,8 +52,8 @@ export function CreateBaleProductDialog({
 }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
 
-  const { data: categories } = useQuery<BaleProductCategory[]>({
-    queryKey: ["/api/bale-product-categories"],
+  const { data: categories } = useQuery<FactoryCategory[]>({
+    queryKey: ["/api/factory/categories"],
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -78,7 +78,7 @@ export function CreateBaleProductDialog({
         }
       }
       const categoryId = data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : undefined;
-      const response = await apiRequest("POST", "/api/bale-products", {
+      const response = await apiRequest("POST", "/api/factory/bale-products", {
         articleCode,
         name: data.name,
         description: data.description,
@@ -88,7 +88,7 @@ export function CreateBaleProductDialog({
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       toast({
         title: "Success",
         description: "Product created successfully",

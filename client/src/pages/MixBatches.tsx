@@ -23,7 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
 import { formatNumber } from "@/lib/formatNumber";
-import type { MixBatch } from "@shared/schema";
+import type { FactoryMixBatch } from "@shared/schema";
 
 const BatchDetail = lazy(() => import("./BatchDetail"));
 
@@ -32,8 +32,8 @@ export default function MixBatches() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
-  const { data: batches, isLoading } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: batches, isLoading } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
   });
 
   const filteredBatches = batches?.filter((batch) => {

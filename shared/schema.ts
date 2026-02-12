@@ -2125,3 +2125,312 @@ export const insertBaleLabelPrintSchema = createInsertSchema(baleLabelPrints).om
 
 export type InsertBaleLabelPrint = z.infer<typeof insertBaleLabelPrintSchema>;
 export type BaleLabelPrint = typeof baleLabelPrints.$inferSelect;
+
+// ============================================================
+// FACTORY DOMAIN TABLES (isolated from ERP)
+// ============================================================
+
+export const factorySuppliers = pgTable("factory_suppliers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  contactPerson: text("contact_person"),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 200 }),
+  address: text("address"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyName: uniqueIndex("factory_suppliers_company_name_unique").on(t.companyId, t.name),
+}));
+
+export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Supplier name is required"),
+  contactPerson: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertFactorySupplier = z.infer<typeof insertFactorySupplierSchema>;
+export type FactorySupplier = typeof factorySuppliers.$inferSelect;
+
+export const factoryCategories = pgTable("factory_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyName: uniqueIndex("factory_categories_company_name_unique").on(t.companyId, t.name),
+}));
+
+export const insertFactoryCategorySchema = createInsertSchema(factoryCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Category name is required"),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertFactoryCategory = z.infer<typeof insertFactoryCategorySchema>;
+export type FactoryCategory = typeof factoryCategories.$inferSelect;
+
+export const factoryBaleProducts = pgTable("factory_bale_products", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  name: text("name").notNull(),
+  description: text("description"),
+  weightPerBaleKg: decimal("weight_per_bale_kg", { precision: 10, scale: 2 }),
+  categoryId: integer("category_id"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("factory_bale_products_company_code_unique").on(t.companyId, t.code),
+  uniqueCompanyArticleCode: uniqueIndex("factory_bale_products_company_article_code_unique").on(t.companyId, t.articleCode),
+}));
+
+export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  code: z.string().optional(),
+  articleCode: z.string().min(1, "Article code is required"),
+  name: z.string().min(1, "Product name is required"),
+  description: z.string().optional().nullable(),
+  weightPerBaleKg: z.string().optional().nullable(),
+  categoryId: z.number().optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+export type InsertFactoryBaleProduct = z.infer<typeof insertFactoryBaleProductSchema>;
+export type FactoryBaleProduct = typeof factoryBaleProducts.$inferSelect;
+
+export const factoryContainers = pgTable("factory_containers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerNumber: varchar("container_number", { length: 100 }).notNull(),
+  supplierId: integer("supplier_id"),
+  origin: text("origin"),
+  totalKg: decimal("total_kg", { precision: 15, scale: 3 }),
+  ratePerKg: decimal("rate_per_kg", { precision: 20, scale: 4 }),
+  arrivalDate: date("arrival_date"),
+  notes: text("notes"),
+  status: text("status").notNull().default("PENDING"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertFactoryContainerSchema = createInsertSchema(factoryContainers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  containerNumber: z.string().min(1, "Container number is required"),
+  supplierId: z.number().optional().nullable(),
+  origin: z.string().optional().nullable(),
+  totalKg: z.string().optional().nullable(),
+  ratePerKg: z.string().optional().nullable(),
+  arrivalDate: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  status: z.string().optional(),
+});
+
+export type InsertFactoryContainer = z.infer<typeof insertFactoryContainerSchema>;
+export type FactoryContainer = typeof factoryContainers.$inferSelect;
+
+export const factoryRawStock = pgTable("factory_raw_stock", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
+  usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
+  offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyContainer: uniqueIndex("factory_raw_stock_company_container_unique").on(t.companyId, t.containerId),
+}));
+
+export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  containerId: z.number().min(1, "Container is required"),
+  receivedKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Received kg must be positive"),
+  usedKg: z.string().optional(),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+});
+
+export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;
+export type FactoryRawStock = typeof factoryRawStock.$inferSelect;
+
+export const factoryMixBatches = pgTable("factory_mix_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  batchCode: varchar("batch_code", { length: 50 }).notNull(),
+  name: text("name"),
+  totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull(),
+  usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertFactoryMixBatchSchema = createInsertSchema(factoryMixBatches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  batchCode: z.string().optional(),
+  name: z.string().optional(),
+  totalWeightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total weight must be positive"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  usedKg: z.string().optional(),
+  status: z.enum(["ACTIVE", "COMPLETED"]).optional(),
+});
+
+export type InsertFactoryMixBatch = z.infer<typeof insertFactoryMixBatchSchema>;
+export type FactoryMixBatch = typeof factoryMixBatches.$inferSelect;
+
+export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
+  id: serial("id").primaryKey(),
+  mixBatchId: integer("mix_batch_id").notNull(),
+  containerId: integer("container_id"),
+  sourceBatchId: integer("source_batch_id"),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryMixBatchSourceSchema = createInsertSchema(factoryMixBatchSources).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  mixBatchId: z.number().min(1, "Mix batch is required"),
+  containerId: z.number().optional().nullable(),
+  sourceBatchId: z.number().optional().nullable(),
+  weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+});
+
+export type InsertFactoryMixBatchSource = z.infer<typeof insertFactoryMixBatchSourceSchema>;
+export type FactoryMixBatchSource = typeof factoryMixBatchSources.$inferSelect;
+
+export const factoryPressingBatches = pgTable("factory_pressing_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  mixBatchId: integer("mix_batch_id"),
+  productId: integer("product_id"),
+  expectedCount: integer("expected_count").notNull(),
+  status: text("status").notNull().default("PENDING"),
+  notes: text("notes"),
+  createdBy: integer("created_by"),
+  finalizedAt: timestamp("finalized_at"),
+  finalizedLocationId: integer("finalized_location_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryPressingBatchSchema = createInsertSchema(factoryPressingBatches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryPressingBatch = z.infer<typeof insertFactoryPressingBatchSchema>;
+export type FactoryPressingBatch = typeof factoryPressingBatches.$inferSelect;
+
+export const factoryBales = pgTable("factory_bales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  mixBatchId: integer("mix_batch_id"),
+  productId: integer("product_id"),
+  pressingBatchId: integer("pressing_batch_id"),
+  erpLocationId: integer("erp_location_id"),
+  baleCode: varchar("bale_code", { length: 50 }).notNull(),
+  referenceNumber: varchar("reference_number", { length: 100 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  productName: text("product_name"),
+  category: text("category"),
+  grade: text("grade"),
+  quantity: integer("quantity").notNull().default(1),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull().default("0"),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("PENDING_PRESSING"),
+  pressedAt: timestamp("pressed_at"),
+  finalizedAt: timestamp("finalized_at"),
+  finalizedBy: integer("finalized_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyRef: uniqueIndex("factory_bales_company_ref_unique").on(t.companyId, t.referenceNumber),
+  statusIdx: index("factory_bales_status_idx").on(t.status),
+  pressingBatchIdx: index("factory_bales_pressing_batch_idx").on(t.pressingBatchId),
+  mixBatchIdx: index("factory_bales_mix_batch_idx").on(t.mixBatchId),
+  companyIdx: index("factory_bales_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryBaleSchema = createInsertSchema(factoryBales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  mixBatchId: z.number().optional().nullable(),
+  productId: z.number().optional().nullable(),
+  pressingBatchId: z.number().optional().nullable(),
+  erpLocationId: z.number().optional().nullable(),
+  baleCode: z.string().min(1, "Bale code is required"),
+  referenceNumber: z.string().min(1, "Reference number is required"),
+  articleCode: z.string().optional().nullable(),
+  productName: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  grade: z.string().optional().nullable(),
+  weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  costPerKg: z.string().optional(),
+  totalCost: z.string().optional(),
+  status: z.enum(["PENDING_PRESSING", "FINALIZED"]).optional(),
+  pressedAt: z.string().optional().nullable(),
+  finalizedAt: z.string().optional().nullable(),
+  finalizedBy: z.number().optional().nullable(),
+});
+
+export type InsertFactoryBale = z.infer<typeof insertFactoryBaleSchema>;
+export type FactoryBale = typeof factoryBales.$inferSelect;
+
+export const factoryBaleSequences = pgTable("factory_bale_sequences", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  nextNumber: integer("next_number").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyId: uniqueIndex("factory_bale_sequences_company_unique").on(t.companyId),
+}));
+
+export type FactoryBaleSequence = typeof factoryBaleSequences.$inferSelect;

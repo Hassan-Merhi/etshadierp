@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
-import type { MixBatch, MixBatchSource } from "@shared/schema";
+import type { FactoryMixBatch, FactoryMixBatchSource } from "@shared/schema";
 
 interface BatchDetailProps {
   batchId: number;
@@ -22,22 +22,23 @@ interface BatchDetailProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  PENDING_PRESSING: "outline",
   LABEL_PRINTED: "secondary",
   PRESSED: "default",
-  IN_STOCK: "default",
+  FINALIZED: "default",
   RESERVED: "outline",
   SOLD: "destructive",
 };
 
 export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
-  const { data: batch, isLoading: batchLoading } = useQuery<MixBatch>({
-    queryKey: ["/api/mix-batches", batchId],
+  const { data: batch, isLoading: batchLoading } = useQuery<FactoryMixBatch>({
+    queryKey: ["/api/factory/mix-batches", batchId],
   });
 
   const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
-    queryKey: ["/api/production-bales", { mixBatchId: batchId }],
+    queryKey: ["/api/factory/bales", { mixBatchId: batchId }],
     queryFn: async () => {
-      const res = await fetch(`/api/production-bales?mixBatchId=${batchId}`, {
+      const res = await fetch(`/api/factory/bales?mixBatchId=${batchId}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch bales");
@@ -45,10 +46,10 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
     },
   });
 
-  const { data: sources, isLoading: sourcesLoading } = useQuery<MixBatchSource[]>({
-    queryKey: ["/api/mix-batches", batchId, "sources"],
+  const { data: sources, isLoading: sourcesLoading } = useQuery<FactoryMixBatchSource[]>({
+    queryKey: ["/api/factory/mix-batches", batchId, "sources"],
     queryFn: async () => {
-      const res = await fetch(`/api/mix-batches/${batchId}/sources`, {
+      const res = await fetch(`/api/factory/mix-batches/${batchId}/sources`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch sources");

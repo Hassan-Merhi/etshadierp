@@ -63,17 +63,17 @@ export default function ProductionRawStock() {
   const { toast } = useToast();
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
-    queryKey: ["/api/production-raw-stock"],
+    queryKey: ["/api/factory/raw-stock"],
   });
 
   const { data: availableContainers } = useQuery<ContainerOption[]>({
-    queryKey: ["/api/production-raw-stock/available-containers"],
+    queryKey: ["/api/factory/raw-stock/available-containers"],
     enabled: offloadDialogOpen,
   });
 
   const offloadMutation = useMutation({
     mutationFn: async (data: { containerId: string; receivedKg: string; costPerKg: string }) => {
-      const response = await apiRequest("POST", "/api/production-raw-stock/offload", data);
+      const response = await apiRequest("POST", "/api/factory/raw-stock/offload", data);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Failed to offload container");
@@ -81,8 +81,8 @@ export default function ProductionRawStock() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-raw-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-raw-stock/available-containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
       toast({ title: "Success", description: "Container offloaded to production raw stock" });
       handleCloseDialog();
     },

@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
-import type { BaleProduct, BaleProductCategory } from "@shared/schema";
+import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
 
 interface ImportPreviewRow {
   articleCode: string;
@@ -41,7 +41,7 @@ interface GroupedProduct {
   articleCode: string;
   name: string;
   count: number;
-  items: BaleProduct[];
+  items: FactoryBaleProduct[];
 }
 
 export default function BaleProducts() {
@@ -58,12 +58,12 @@ export default function BaleProducts() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery<BaleProduct[]>({
-    queryKey: ["/api/bale-products"],
+  const { data: products, isLoading } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
   });
 
-  const { data: categories } = useQuery<BaleProductCategory[]>({
-    queryKey: ["/api/bale-product-categories"],
+  const { data: categories } = useQuery<FactoryCategory[]>({
+    queryKey: ["/api/factory/categories"],
   });
 
   const categoryMap = new Map<number, string>();
@@ -73,11 +73,11 @@ export default function BaleProducts() {
 
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", "/api/bale-product-categories", { name });
+      const response = await apiRequest("POST", "/api/factory/categories", { name });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
       setNewCategoryName("");
       toast({ title: "Category created" });
     },
@@ -88,12 +88,12 @@ export default function BaleProducts() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      const response = await apiRequest("PATCH", `/api/bale-product-categories/${id}`, { name });
+      const response = await apiRequest("PATCH", `/api/factory/categories/${id}`, { name });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       setEditingCategory(null);
       toast({ title: "Category updated" });
     },
@@ -104,11 +104,11 @@ export default function BaleProducts() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/bale-product-categories/${id}`);
+      const response = await apiRequest("DELETE", `/api/factory/categories/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
@@ -120,7 +120,7 @@ export default function BaleProducts() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("/api/bale-products/import-excel", {
+      const response = await fetch("/api/factory/bale-products/import-excel", {
         method: "POST",
         body: formData,
       });
@@ -131,8 +131,8 @@ export default function BaleProducts() {
       return response.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
       const parts = [];
       if (result.created) parts.push(`${result.created} created`);
       if (result.updated) parts.push(`${result.updated} updated`);

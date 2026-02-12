@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
-import type { MixBatch } from "@shared/schema";
+import type { FactoryMixBatch } from "@shared/schema";
 
 interface RawStockRow {
   id: number;
@@ -52,15 +52,15 @@ function filterBalesByDate(bales: any[], startDate: Date): any[] {
 
 export default function ProductionSummary() {
   const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
-    queryKey: ["/api/production-bales"],
+    queryKey: ["/api/factory/bales"],
   });
 
-  const { data: mixBatches, isLoading: batchesLoading } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: mixBatches, isLoading: batchesLoading } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
   });
 
   const { data: rawStock, isLoading: rawStockLoading } = useQuery<RawStockRow[]>({
-    queryKey: ["/api/production-raw-stock"],
+    queryKey: ["/api/factory/raw-stock"],
   });
 
   const isLoading = balesLoading || batchesLoading || rawStockLoading;

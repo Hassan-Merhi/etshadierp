@@ -113,7 +113,7 @@ export default function BaleTransfers() {
   });
 
   const { data: allBales } = useQuery<BaleRow[]>({
-    queryKey: ["/api/production-bales"],
+    queryKey: ["/api/factory/bales"],
     enabled: dialogOpen,
   });
 
@@ -140,7 +140,7 @@ export default function BaleTransfers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Transfer created successfully" });
       handleCloseDialog();
     },
@@ -156,7 +156,7 @@ export default function BaleTransfers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Transfer completed" });
     },
     onError: (error: any) => {
@@ -170,7 +170,7 @@ export default function BaleTransfers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Transfer deleted" });
       setDeleteConfirm(null);
       if (expandedId !== null) setExpandedId(null);
@@ -182,7 +182,7 @@ export default function BaleTransfers() {
   });
 
   const availableBales = (allBales || []).filter((row) => {
-    if (row.bale.status !== "IN_STOCK") return false;
+    if (row.bale.status !== "FINALIZED") return false;
     if (sourceLocationId && row.bale.locationId != null) {
       return String(row.bale.locationId) === sourceLocationId;
     }
@@ -485,7 +485,7 @@ export default function BaleTransfers() {
               {!sourceLocationId ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">Select a source location to see available bales</p>
               ) : availableBales.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No IN_STOCK bales at this location</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">No finalized bales at this location</p>
               ) : (
                 <div className="border rounded-md max-h-60 overflow-auto">
                   <Table>

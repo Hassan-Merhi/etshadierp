@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, type LucideIcon } from "lucide-react";
+import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, Users, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
@@ -11,6 +11,8 @@ const BalesHistory = lazy(() => import("./BalesHistory"));
 const ProductionSummary = lazy(() => import("./ProductionSummary"));
 const BaleTransfers = lazy(() => import("./BaleTransfers"));
 const PressingBales = lazy(() => import("./PressingBales"));
+const FactorySuppliers = lazy(() => import("./FactorySuppliers"));
+const FactoryContainers = lazy(() => import("./FactoryContainers"));
 
 function LoadingFallback() {
   return (
@@ -21,7 +23,7 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "raw-stock" | "mix-batches" | "pressing-bales" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers";
+type SectionKey = "raw-stock" | "mix-batches" | "pressing-bales" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers" | "factory-suppliers" | "factory-containers";
 
 interface SidebarItem {
   key: SectionKey;
@@ -39,9 +41,17 @@ export default function FactoryProduction() {
 
   const sidebarGroups: SidebarGroup[] = [
     {
+      label: "Master Data",
+      items: [
+        { key: "factory-suppliers", label: "Factory Suppliers", icon: Users },
+        { key: "factory-containers", label: "Factory Containers", icon: Container },
+        { key: "bale-products", label: "Bale Products", icon: Tags },
+      ],
+    },
+    {
       label: "Raw Materials",
       items: [
-        { key: "raw-stock", label: "Production Raw Stock", icon: Container },
+        { key: "raw-stock", label: "Production Raw Stock", icon: Package },
         { key: "mix-batches", label: "Mix Batches", icon: Boxes },
       ],
     },
@@ -51,7 +61,6 @@ export default function FactoryProduction() {
         { key: "pressing-bales", label: "Pressing Bales", icon: ScanLine },
         { key: "production-bales", label: "Finalize / Counting", icon: CheckCircle },
         { key: "bales-history", label: "Bales History", icon: History },
-        { key: "bale-products", label: "Bale Products", icon: Tags },
       ],
     },
     {
@@ -129,6 +138,8 @@ export default function FactoryProduction() {
             {activeSection === "barcode-lookup" && <BarcodeLookup />}
             {activeSection === "production-summary" && <ProductionSummary />}
             {activeSection === "bale-transfers" && <BaleTransfers />}
+            {activeSection === "factory-suppliers" && <FactorySuppliers />}
+            {activeSection === "factory-containers" && <FactoryContainers />}
           </Suspense>
         </div>
       </div>

@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { BaleProduct, Location, MixBatch } from "@shared/schema";
+import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -134,25 +134,25 @@ export default function ProductionBales() {
   const { toast } = useToast();
 
   const { data: pressingBatches, isLoading: batchesLoading } = useQuery<any[]>({
-    queryKey: ["/api/pressing-batches"],
+    queryKey: ["/api/factory/pressing-batches"],
   });
 
-  const { data: baleProducts } = useQuery<BaleProduct[]>({
-    queryKey: ["/api/bale-products"],
+  const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
   });
 
   const { data: locations } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
 
-  const { data: mixBatches } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
   });
 
   const activeLocations = locations?.filter((l) => l.active);
   const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
-  const pendingBatches = pressingBatches?.filter((b: any) => b.batch.status === "PENDING" && b.pendingCount > 0);
+  const pendingBatches = pressingBatches?.filter((b: any) => b.pendingCount > 0);
   const selectedBatchData = pressingBatches?.find((b: any) => b.batch.id.toString() === selectedPressingBatchId);
 
   const selectedMixBatch = activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId);
@@ -181,7 +181,7 @@ export default function ProductionBales() {
     }
 
     try {
-      const response = await apiRequest("GET", `/api/production-bales/lookup/${encodeURIComponent(value.trim())}`);
+      const response = await apiRequest("GET", `/api/factory/bales/lookup/${encodeURIComponent(value.trim())}`);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Bale not found");
@@ -190,7 +190,7 @@ export default function ProductionBales() {
       const result = await response.json();
       const bale = result.bale || result;
 
-      if (bale.status !== "PENDING") {
+      if (bale.status !== "PENDING_PRESSING") {
         setScanError(`Bale is not pending (status: ${bale.status})`);
         setScanInput("");
         return;
@@ -213,7 +213,7 @@ export default function ProductionBales() {
       setScannedBales((prev) => [...prev, {
         ...bale,
         productName: product?.name || bale.baleCode || "",
-        articleCode: product?.articleCode || bale.barcodeValue || "",
+        articleCode: product?.articleCode || bale.referenceNumber || "",
       }]);
     } catch (error: any) {
       setScanError(error.message || "Bale not found");
@@ -254,10 +254,10 @@ export default function ProductionBales() {
         throw new Error("Please select a mix batch for raw material consumption");
       }
 
-      const response = await apiRequest("POST", "/api/production-bales/finalize", {
+      const response = await apiRequest("POST", "/api/factory/finalize", {
         pressingBatchId: parseInt(selectedPressingBatchId),
         scannedBaleIds: scannedBales.map((b: any) => b.id),
-        locationId: parseInt(selectedLocationId),
+        erpLocationId: parseInt(selectedLocationId),
         mixBatchId: parseInt(selectedMixBatchId),
       });
 
@@ -269,15 +269,15 @@ export default function ProductionBales() {
       return await response.json();
     },
     onSuccess: async (result) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pressing-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/pressing-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
 
       const locName = selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "";
 
       const labels = scannedBales.map((bale: any) => ({
-        referenceNumber: bale.barcodeValue || bale.baleCode,
+        referenceNumber: bale.referenceNumber || bale.baleCode,
         articleCode: bale.articleCode || "",
         pieces: 1,
         approxWeightKg: bale.weightKg || "0",
@@ -421,7 +421,7 @@ export default function ProductionBales() {
                     {scannedBales.map((bale: any, idx: number) => (
                       <TableRow key={bale.id} data-testid={`row-scanned-bale-${bale.id}`}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-mono text-sm">{bale.barcodeValue || bale.baleCode}</TableCell>
+                        <TableCell className="font-mono text-sm">{bale.referenceNumber || bale.baleCode}</TableCell>
                         <TableCell>{bale.productName || "-"}</TableCell>
                         <TableCell className="text-right font-mono">
                           {formatNumber(parseFloat(bale.weightKg || "0"))}

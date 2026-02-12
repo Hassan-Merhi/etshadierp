@@ -32,7 +32,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { MixBatch, BaleProduct } from "@shared/schema";
+import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -121,10 +121,10 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: "outline",
+  PENDING_PRESSING: "outline",
   LABEL_PRINTED: "secondary",
   PRESSED: "default",
-  IN_STOCK: "default",
+  FINALIZED: "default",
   RESERVED: "outline",
   SOLD: "destructive",
 };
@@ -139,19 +139,19 @@ export default function BalesHistory() {
   const { toast } = useToast();
 
   const { data: balesData, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/production-bales"],
+    queryKey: ["/api/factory/bales"],
   });
 
-  const { data: mixBatches } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
+    queryKey: ["/api/factory/mix-batches"],
   });
 
   const deleteBale = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/production-bales/${id}`, {});
+      return await apiRequest("DELETE", `/api/factory/bales/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Bale deleted" });
       setDeleteConfirm(null);
     },
@@ -163,10 +163,10 @@ export default function BalesHistory() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return await apiRequest("PATCH", `/api/production-bales/${id}/status`, { status });
+      return await apiRequest("PATCH", `/api/factory/bales/${id}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Status updated" });
     },
     onError: (error: any) => {
@@ -176,10 +176,10 @@ export default function BalesHistory() {
 
   const bulkUpdateStatus = useMutation({
     mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
-      return await apiRequest("PATCH", "/api/production-bales/bulk-status", { ids, status });
+      return await apiRequest("PATCH", "/api/factory/bales/bulk-status", { ids, status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       setSelectedIds(new Set());
       setBulkStatus("");
       toast({ title: "Bulk status updated" });
@@ -294,10 +294,10 @@ export default function BalesHistory() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
                 <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                 <SelectItem value="PRESSED">Pressed</SelectItem>
-                <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                <SelectItem value="FINALIZED">Finalized</SelectItem>
                 <SelectItem value="RESERVED">Reserved</SelectItem>
                 <SelectItem value="SOLD">Sold</SelectItem>
               </SelectContent>
@@ -313,10 +313,10 @@ export default function BalesHistory() {
                   <SelectValue placeholder="Change status to..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
                   <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                   <SelectItem value="PRESSED">Pressed</SelectItem>
-                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                  <SelectItem value="FINALIZED">Finalized</SelectItem>
                   <SelectItem value="RESERVED">Reserved</SelectItem>
                   <SelectItem value="SOLD">Sold</SelectItem>
                 </SelectContent>
@@ -402,10 +402,10 @@ export default function BalesHistory() {
                               </Badge>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="PENDING">Pending</SelectItem>
+                              <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
                               <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                               <SelectItem value="PRESSED">Pressed</SelectItem>
-                              <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                              <SelectItem value="FINALIZED">Finalized</SelectItem>
                               <SelectItem value="RESERVED">Reserved</SelectItem>
                               <SelectItem value="SOLD">Sold</SelectItem>
                             </SelectContent>
