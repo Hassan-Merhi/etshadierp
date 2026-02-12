@@ -62,7 +62,7 @@ function generatePressingLabelHtml(labels: Array<{
           </div>
           <div class="article-barcode-area">
             <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="article-barcode-number">${label.articleCode}</div>
+            <div class="article-barcode-number">${label.productName}</div>
           </div>
         </div>
       </div>`;
