@@ -75,7 +75,7 @@ function generateFullLabelHtml(label: {
             <div class="logo-subtitle">INTERNATIONAL GROUP</div>
           </div>
           <div class="info-section">
-            <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
+            <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
             <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
             <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
           </div>
