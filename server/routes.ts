@@ -26890,11 +26890,16 @@ if (asOfDate) {
 
       const { mixBatchId, productId, locationId, quantity, weightPerBale, mode } = req.body;
 
-      if (!mixBatchId || !productId || !quantity || !weightPerBale) {
+      const isPressing = mode === "pressing";
+
+      if (!productId || !quantity || !weightPerBale) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      const isPressing = mode === "pressing";
+      if (!isPressing && !mixBatchId) {
+        return res.status(400).json({ message: "Mix batch is required for counting mode" });
+      }
+
       if (!isPressing && !locationId) {
         return res.status(400).json({ message: "Location is required for counting mode" });
       }
@@ -26910,12 +26915,6 @@ if (asOfDate) {
         return res.status(400).json({ message: "Weight must be between 1 and 500 kg" });
       }
 
-      // Get mix batch to verify and get cost info
-      const batch = await storage.getMixBatchById(mixBatchId, companyId);
-      if (!batch) {
-        return res.status(404).json({ message: "Mix batch not found" });
-      }
-
       // Get product for bale code
       const { baleProducts } = await import("@shared/schema");
       const [product] = await db.select().from(baleProducts).where(eq(baleProducts.id, productId));
@@ -26923,15 +26922,28 @@ if (asOfDate) {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      const totalWeight = weight * numBales;
-      const remainingKg = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
-      if (totalWeight > remainingKg + 0.001) {
-        return res.status(400).json({ 
-          message: `Not enough remaining in mix batch. Available: ${remainingKg.toFixed(3)} kg, Requested: ${totalWeight.toFixed(3)} kg` 
-        });
+      let batch: any = null;
+      let costPerKg = 0;
+      let totalCostPerBale = "0";
+
+      if (mixBatchId) {
+        batch = await storage.getMixBatchById(mixBatchId, companyId);
+        if (!batch) {
+          return res.status(404).json({ message: "Mix batch not found" });
+        }
+
+        const totalWeight = weight * numBales;
+        const remainingKg = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
+        if (totalWeight > remainingKg + 0.001) {
+          return res.status(400).json({ 
+            message: `Not enough remaining in mix batch. Available: ${remainingKg.toFixed(3)} kg, Requested: ${totalWeight.toFixed(3)} kg` 
+          });
+        }
+        costPerKg = parseFloat(batch.costPerKg);
+        totalCostPerBale = (weight * costPerKg).toFixed(2);
       }
-      const costPerKg = parseFloat(batch.costPerKg);
-      const totalCostPerBale = (weight * costPerKg).toFixed(2);
+
+      const totalWeight = weight * numBales;
 
       // Wrap everything in a transaction for atomicity
       const result = await db.transaction(async (tx) => {
@@ -26944,7 +26956,7 @@ if (asOfDate) {
             .insert(pressingBatches)
             .values({
               companyId,
-              mixBatchId,
+              mixBatchId: mixBatchId || null,
               productId,
               expectedCount: numBales,
               status: "PENDING",
@@ -26983,7 +26995,7 @@ if (asOfDate) {
           // Create bale within transaction
           const baleData = {
             companyId,
-            mixBatchId,
+            mixBatchId: mixBatchId || null,
             productId,
             locationId: isPressing ? null : locationId,
             pressingBatchId,
@@ -26991,8 +27003,8 @@ if (asOfDate) {
             barcodeValue: barcode,
             quantity: 1,
             weightKg: weight.toString(),
-            costPerKg: batch.costPerKg,
-            totalCost: totalCostPerBale,
+            costPerKg: costPerKg > 0 ? costPerKg.toString() : null,
+            totalCost: costPerKg > 0 ? totalCostPerBale : null,
             status: isPressing ? "PENDING" : "IN_STOCK",
             pressedAt: new Date(),
           };
@@ -27003,14 +27015,17 @@ if (asOfDate) {
             .returning();
           createdBales.push(bale);
         }
-        const newUsedKg = parseFloat(batch.usedKg || "0") + totalWeight;
-        await tx
-          .update(mixBatches)
-          .set({
-            usedKg: newUsedKg.toFixed(3),
-            updatedAt: sql`now()`,
-          })
-          .where(eq(mixBatches.id, mixBatchId));
+
+        if (batch && mixBatchId) {
+          const newUsedKg = parseFloat(batch.usedKg || "0") + totalWeight;
+          await tx
+            .update(mixBatches)
+            .set({
+              usedKg: newUsedKg.toFixed(3),
+              updatedAt: sql`now()`,
+            })
+            .where(eq(mixBatches.id, mixBatchId));
+        }
 
         return { bales: createdBales, pressingBatchId };
       });
