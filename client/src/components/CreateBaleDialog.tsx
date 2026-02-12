@@ -62,24 +62,26 @@ function generateFullLabelHtml(label: {
 }) {
   return `
     <div class="label">
-      <div class="label-top">
-        <div class="logo-section">
-          <div class="logo-text">HMD</div>
-          <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+      <div class="label-content">
+        <div class="label-top">
+          <div class="logo-section">
+            <div class="logo-text">HMD</div>
+            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+          </div>
+          <div class="info-section">
+            <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${label.pieces}</span></div>
+            <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+          </div>
         </div>
-        <div class="info-section">
-          <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${label.pieces}</span></div>
-          <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-          <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+        <div class="barcode-section">
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
+          <div class="barcode-number">${label.referenceNumber}</div>
         </div>
-      </div>
-      <div class="barcode-section">
-        <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-        <div class="barcode-number">${label.referenceNumber}</div>
-      </div>
-      <div class="article-barcode-section">
-        <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-        <div class="article-name">${label.productName}</div>
+        <div class="article-barcode-section">
+          <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <div class="article-name">${label.productName}</div>
+        </div>
       </div>
     </div>`;
 }
@@ -102,8 +104,8 @@ function generateLabelHtml(labels: Array<{
           ${fullLabel}
           <div class="label name-label">
             <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-              <div class="name-label-text">${label.productName}</div>
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <div class="name-label-text">${label.articleCode}</div>
             </div>
           </div>
         </div>`;
@@ -159,6 +161,25 @@ function generateLabelHtml(labels: Array<{
             justify-content: space-between;
             overflow: hidden;
             border-bottom: 1px dashed #ccc;
+            position: relative;
+            background-image: url('/hmd-label-bg.jpeg');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+          }
+          .label::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.80);
+          }
+          .label-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
           }
           .name-label {
             border-bottom: none;
@@ -166,6 +187,8 @@ function generateLabelHtml(labels: Array<{
             align-items: center;
           }
           .name-label-content {
+            position: relative;
+            z-index: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
