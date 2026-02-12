@@ -122,6 +122,7 @@ function Router({ user }: { user: any }) {
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
         <Route path="/pos-customers">{() => <POSCustomers />}</Route>
+        <Route path="/pos-import" component={POSImport} />
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
