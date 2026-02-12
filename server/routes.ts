@@ -4920,52 +4920,59 @@ if (asOfDate) {
     }
   });
 
-  // Get all suppliers with their container counts and balances (global, no company filter)
+  // Get suppliers with their container counts and balances, filtered by current company
   // MUST come before /api/suppliers/:id to avoid route matching issues
   app.get("/api/suppliers/stats", requireAuth, async (req, res) => {
     try {
+      const companyId = (req.session as any).currentCompanyId;
       const suppliers = await storage.getAllSuppliers();
 
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
-          // Aggregate container count across ALL companies (no filter)
           const containerCount = await storage.getContainerCountBySupplier(
             supplier.id,
+            companyId || undefined,
           );
 
-          // Calculate balance from voucher entries across ALL companies
-          // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
-          // Balance = Opening Balance + Credits - Debits
-          // Opening balance: Positive = we owe them, Negative = they owe us/we prepaid
           const entries = await storage.getVoucherEntriesBySupplier(
             supplier.id,
+            companyId || undefined,
           );
+
+          let poCount = 0;
+          if (companyId) {
+            const pos = await storage.getPurchaseOrdersBySupplier(supplier.id, companyId);
+            poCount = pos.length;
+          }
+
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
 
-            // Only count if this is a pure credit or pure debit entry
-            // This prevents double-counting if both sides of a transaction have supplierId
             if (credit > 0 && debit === 0) {
-              return sum + credit; // Increase payable
+              return sum + credit;
             } else if (debit > 0 && credit === 0) {
-              return sum - debit; // Decrease payable
+              return sum - debit;
             }
             return sum;
-          }, openingBalance);
+          }, companyId ? 0 : openingBalance);
 
           return {
             ...supplier,
             containerCount,
             balance,
+            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0,
           };
         }),
       );
 
-      // Return all suppliers with their stats
-      res.json(suppliersWithStats);
+      if (companyId) {
+        res.json(suppliersWithStats.filter(s => s.hasActivity));
+      } else {
+        res.json(suppliersWithStats);
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
