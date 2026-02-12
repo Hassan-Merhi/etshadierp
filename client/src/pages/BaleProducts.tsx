@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +147,45 @@ export default function BaleProducts() {
     },
   });
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const templateData = [
+        {
+          articleCode: "HMD01000",
+          name: "Sample Product 1",
+          category: "Category A",
+          description: "Optional description",
+          weightPerBaleKg: "45",
+          active: true,
+        },
+        {
+          articleCode: "HMD02000",
+          name: "Sample Product 2",
+          category: "Category B",
+          description: "",
+          weightPerBaleKg: "50",
+          active: true,
+        },
+      ];
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      ws["!cols"] = [
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 30 },
+        { wch: 18 },
+        { wch: 10 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
+      XLSX.writeFile(wb, "bale_products_template.xlsx");
+      toast({ title: "Template downloaded" });
+    } catch (err: any) {
+      toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,6 +288,14 @@ export default function BaleProducts() {
           >
             <Tags className="h-4 w-4 mr-2" />
             Categories
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadTemplate}
+            data-testid="button-download-template"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Template
           </Button>
           <input
             ref={fileInputRef}
