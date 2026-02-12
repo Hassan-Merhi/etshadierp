@@ -170,7 +170,6 @@ function generateLabelHtml(labels: Array<{
             flex-direction: column;
             justify-content: space-between;
             overflow: hidden;
-            border-bottom: 1px dashed #ccc;
             position: relative;
             background-image: url('/hmd-label-bg.jpeg');
             background-repeat: no-repeat;
@@ -192,7 +191,6 @@ function generateLabelHtml(labels: Array<{
             height: 100%;
           }
           .name-label {
-            border-bottom: none;
             justify-content: center;
             align-items: center;
           }
