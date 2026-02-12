@@ -396,7 +396,7 @@ export default function ProductionBales() {
                     {scannedBales.map((bale: any, idx: number) => (
                       <TableRow key={bale.id} data-testid={`row-scanned-bale-${bale.id}`}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-mono text-sm">{bale.referenceNumber || bale.baleCode}</TableCell>
+                        <TableCell className="font-mono text-sm">{bale.articleCode || bale.referenceNumber || bale.baleCode}</TableCell>
                         <TableCell>{bale.productName || "-"}</TableCell>
                         <TableCell className="text-right font-mono">
                           {formatNumber(parseFloat(bale.weightKg || "0"))}
