@@ -27195,14 +27195,15 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { pressingBatchId, scannedBaleIds, locationId } = req.body;
+      const { pressingBatchId, scannedBaleIds, locationId, mixBatchId } = req.body;
       if (!locationId) return res.status(400).json({ message: "Location is required" });
       if (!pressingBatchId) return res.status(400).json({ message: "Pressing batch ID is required" });
+      if (!mixBatchId) return res.status(400).json({ message: "Mix batch is required for raw material consumption" });
       if (!Array.isArray(scannedBaleIds) || scannedBaleIds.length === 0) {
         return res.status(400).json({ message: "No bale IDs provided" });
       }
 
-      const { productionBales, pressingBatches } = await import("@shared/schema");
+      const { productionBales, pressingBatches, mixBatches } = await import("@shared/schema");
 
       const [batch] = await db
         .select()
@@ -27214,6 +27215,9 @@ if (asOfDate) {
 
       if (!batch) return res.status(404).json({ message: "Pressing batch not found" });
       if (batch.status === "FINALIZED") return res.status(400).json({ message: "This pressing batch has already been finalized" });
+
+      const mixBatch = await storage.getMixBatchById(parseInt(mixBatchId), companyId);
+      if (!mixBatch) return res.status(404).json({ message: "Mix batch not found" });
 
       const pendingBales = await db
         .select()
@@ -27244,25 +27248,58 @@ if (asOfDate) {
         });
       }
 
+      const scannedBaleRecords = pendingBales.filter(b => scannedIds.includes(b.id));
+      const totalWeight = scannedBaleRecords.reduce((sum, b) => sum + parseFloat(b.weightKg || "0"), 0);
+      const mixRemainingKg = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
+      if (totalWeight > mixRemainingKg + 0.001) {
+        return res.status(400).json({
+          message: `Not enough remaining in mix batch. Available: ${mixRemainingKg.toFixed(3)} kg, Required: ${totalWeight.toFixed(3)} kg`,
+        });
+      }
+
+      const costPerKg = parseFloat(mixBatch.costPerKg);
+
       const updated = await db.transaction(async (tx) => {
-        const finalizedBales = await tx
-          .update(productionBales)
+        const finalizedBales: any[] = [];
+        for (const baleId of scannedIds) {
+          const baleRecord = scannedBaleRecords.find(b => b.id === baleId);
+          const baleWeight = parseFloat(baleRecord?.weightKg || "0");
+          const baleTotalCost = (baleWeight * costPerKg).toFixed(2);
+
+          const [updatedBale] = await tx
+            .update(productionBales)
+            .set({
+              locationId: parseInt(locationId),
+              mixBatchId: parseInt(mixBatchId),
+              costPerKg: costPerKg.toString(),
+              totalCost: baleTotalCost,
+              status: "IN_STOCK",
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(productionBales.id, baleId),
+              eq(productionBales.companyId, companyId),
+              eq(productionBales.status, "PENDING")
+            ))
+            .returning();
+
+          if (updatedBale) finalizedBales.push(updatedBale);
+        }
+
+        const newUsedKg = parseFloat(mixBatch.usedKg || "0") + totalWeight;
+        await tx
+          .update(mixBatches)
           .set({
-            locationId: parseInt(locationId),
-            status: "IN_STOCK",
-            updatedAt: new Date(),
+            usedKg: newUsedKg.toFixed(3),
+            updatedAt: sql`now()`,
           })
-          .where(and(
-            inArray(productionBales.id, scannedIds),
-            eq(productionBales.companyId, companyId),
-            eq(productionBales.status, "PENDING")
-          ))
-          .returning();
+          .where(eq(mixBatches.id, parseInt(mixBatchId)));
 
         await tx
           .update(pressingBatches)
           .set({
             status: "FINALIZED",
+            mixBatchId: parseInt(mixBatchId),
             finalizedAt: new Date(),
             finalizedLocationId: parseInt(locationId),
           })

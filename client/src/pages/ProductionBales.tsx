@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { BaleProduct, Location } from "@shared/schema";
+import type { BaleProduct, Location, MixBatch } from "@shared/schema";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -125,6 +125,7 @@ function generateFinalLabelHtml(labels: Array<{
 export default function ProductionBales() {
   const [selectedPressingBatchId, setSelectedPressingBatchId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [selectedMixBatchId, setSelectedMixBatchId] = useState<string>("");
   const [scannedBales, setScannedBales] = useState<any[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
@@ -144,10 +145,20 @@ export default function ProductionBales() {
     queryKey: ["/api/locations"],
   });
 
+  const { data: mixBatches } = useQuery<MixBatch[]>({
+    queryKey: ["/api/mix-batches"],
+  });
+
   const activeLocations = locations?.filter((l) => l.active);
+  const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
   const pendingBatches = pressingBatches?.filter((b: any) => b.batch.status === "PENDING" && b.pendingCount > 0);
   const selectedBatchData = pressingBatches?.find((b: any) => b.batch.id.toString() === selectedPressingBatchId);
+
+  const selectedMixBatch = activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId);
+  const mixBatchRemaining = selectedMixBatch
+    ? parseFloat(selectedMixBatch.totalWeightKg) - parseFloat(selectedMixBatch.usedKg || "0")
+    : 0;
 
   const expectedCount = selectedBatchData?.pendingCount || 0;
   const scannedCount = scannedBales.length;
@@ -229,6 +240,8 @@ export default function ProductionBales() {
 
   const selectedLocationName = activeLocations?.find((l) => l.id.toString() === selectedLocationId);
 
+  const totalScannedWeight = scannedBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
+
   const finalizeMutation = useMutation({
     mutationFn: async () => {
       if (!countsMatch) {
@@ -237,11 +250,15 @@ export default function ProductionBales() {
       if (!selectedLocationId) {
         throw new Error("Please select a warehouse location");
       }
+      if (!selectedMixBatchId) {
+        throw new Error("Please select a mix batch for raw material consumption");
+      }
 
       const response = await apiRequest("POST", "/api/production-bales/finalize", {
         pressingBatchId: parseInt(selectedPressingBatchId),
         scannedBaleIds: scannedBales.map((b: any) => b.id),
         locationId: parseInt(selectedLocationId),
+        mixBatchId: parseInt(selectedMixBatchId),
       });
 
       if (!response.ok) {
@@ -285,6 +302,7 @@ export default function ProductionBales() {
 
       setScannedBales([]);
       setSelectedPressingBatchId("");
+      setSelectedMixBatchId("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -515,18 +533,50 @@ export default function ProductionBales() {
               <CardTitle className="text-lg">Finalize</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger data-testid="select-finalize-location">
-                  <SelectValue placeholder="Select Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeLocations?.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()}>
-                      {loc.code} - {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1.5">Mix Batch (raw material)</p>
+                <Select value={selectedMixBatchId} onValueChange={setSelectedMixBatchId}>
+                  <SelectTrigger data-testid="select-finalize-mix-batch">
+                    <SelectValue placeholder="Select Mix Batch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeMixBatches && activeMixBatches.length > 0 ? (
+                      activeMixBatches.map((batch) => {
+                        const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
+                        return (
+                          <SelectItem key={batch.id} value={batch.id.toString()}>
+                            {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
+                          </SelectItem>
+                        );
+                      })
+                    ) : (
+                      <SelectItem value="none" disabled>No active mix batches</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedMixBatch && (
+                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                    <p>Remaining: <span className="font-medium">{formatNumber(mixBatchRemaining)} kg</span></p>
+                    <p>Will consume: <span className={`font-medium ${totalScannedWeight > mixBatchRemaining + 0.001 ? "text-destructive" : ""}`}>{formatNumber(totalScannedWeight)} kg</span></p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
+                <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                  <SelectTrigger data-testid="select-finalize-location">
+                    <SelectValue placeholder="Select Location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeLocations?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.code} - {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="flex items-center gap-3 rounded-md border px-3 py-2">
                 <Switch
@@ -548,6 +598,7 @@ export default function ProductionBales() {
                   finalizeMutation.isPending ||
                   !countsMatch ||
                   !selectedLocationId ||
+                  !selectedMixBatchId ||
                   scannedBales.length === 0
                 }
                 data-testid="button-confirm-finalize"

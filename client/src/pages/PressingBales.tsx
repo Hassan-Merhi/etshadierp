@@ -8,13 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -26,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { MixBatch, BaleProduct } from "@shared/schema";
+import type { BaleProduct } from "@shared/schema";
 
 interface CartItem {
   productId: number;
@@ -127,7 +120,6 @@ function generateLabelHtml(labels: Array<{
 }
 
 export default function PressingBales() {
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
@@ -135,22 +127,11 @@ export default function PressingBales() {
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: mixBatches, isLoading: batchesLoading } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
-  });
-
-  const { data: baleProducts } = useQuery<BaleProduct[]>({
+  const { data: baleProducts, isLoading: productsLoading } = useQuery<BaleProduct[]>({
     queryKey: ["/api/bale-products"],
   });
 
-  const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
   const activeProducts = baleProducts?.filter((p) => p.active);
-
-  const selectedBatch = activeBatches?.find((b) => b.id.toString() === selectedBatchId);
-  const batchRemaining = selectedBatch
-    ? parseFloat(selectedBatch.totalWeightKg) - parseFloat(selectedBatch.usedKg || "0")
-    : 0;
-  const batchCostPerKg = selectedBatch?.costPerKg ? parseFloat(selectedBatch.costPerKg) : 0;
 
   useEffect(() => {
     if (scanRef.current) {
@@ -284,12 +265,8 @@ export default function PressingBales() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedBatchId || cart.length === 0) {
-        throw new Error("Please select a batch and add items to cart");
-      }
-
-      if (totalKgToConsume > batchRemaining + 0.001) {
-        throw new Error(`Not enough remaining in batch. Available: ${formatNumber(batchRemaining)} kg, Needed: ${formatNumber(totalKgToConsume)} kg`);
+      if (cart.length === 0) {
+        throw new Error("Please add items to cart");
       }
 
       const allBales: any[] = [];
@@ -298,7 +275,6 @@ export default function PressingBales() {
 
       for (const item of cart) {
         const payload: any = {
-          mixBatchId: parseInt(selectedBatchId),
           productId: item.productId,
           quantity: item.qty.toString(),
           weightPerBale: item.weightPerBaleKg.toString(),
@@ -324,8 +300,8 @@ export default function PressingBales() {
     },
     onSuccess: async ({ bales, products, weights }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pressing-batches"] });
 
       await printBaleLabels(bales, products, weights);
 
@@ -341,7 +317,7 @@ export default function PressingBales() {
     },
   });
 
-  if (batchesLoading) {
+  if (productsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-64" data-testid="text-loading" />
@@ -357,30 +333,11 @@ export default function PressingBales() {
         <div className="flex items-center gap-3 flex-wrap">
           <div>
             <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Pressing Bales</h1>
-            <p className="text-muted-foreground mt-1" data-testid="text-page-subtitle">Scanner-only bale pressing - creates PENDING bales for counting</p>
+            <p className="text-muted-foreground mt-1" data-testid="text-page-subtitle">Scan products to create PENDING bales for counting</p>
           </div>
           <Badge variant="secondary" data-testid="text-pressing-badge">PRESSING</Badge>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-          <SelectTrigger data-testid="select-mix-batch">
-            <SelectValue placeholder="Select Mix Batch" />
-          </SelectTrigger>
-          <SelectContent>
-            {activeBatches?.map((batch) => {
-              const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
-              return (
-                <SelectItem key={batch.id} value={batch.id.toString()}>
-                  {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-3 rounded-md border px-3">
+        <div className="flex items-center gap-3 rounded-md border px-3 py-2">
           <Switch
             id="pressing-dual-label-toggle"
             checked={dualLabel}
@@ -516,30 +473,6 @@ export default function PressingBales() {
         </div>
 
         <div className="w-72 space-y-4">
-          {selectedBatch && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Batch Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <div className="text-sm text-muted-foreground">Batch</div>
-                  <div className="font-medium" data-testid="text-batch-name">{selectedBatch.name || selectedBatch.batchCode}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Remaining</div>
-                  <div className="font-medium" data-testid="text-batch-remaining">{formatNumber(batchRemaining)} kg</div>
-                </div>
-                {batchCostPerKg > 0 && (
-                  <div>
-                    <div className="text-sm text-muted-foreground">Cost/kg</div>
-                    <div className="font-medium" data-testid="text-batch-cost-per-kg">${formatNumber(batchCostPerKg)}</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -561,7 +494,7 @@ export default function PressingBales() {
 
           <Button
             className="w-full gap-2"
-            disabled={cart.length === 0 || !selectedBatchId || createMutation.isPending}
+            disabled={cart.length === 0 || createMutation.isPending}
             onClick={() => createMutation.mutate()}
             data-testid="button-create-print"
           >
