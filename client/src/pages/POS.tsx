@@ -115,6 +115,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !posUser,
   });
 
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings"],
+    enabled: !!posUser,
+  });
+  const showPosImport = !posUser || companySettings?.posExcelImportEnabled;
+
   // Use either the selected location (for Admin/Owner/Manager) or POS user's selected location
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
 
@@ -1293,7 +1299,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         subtitle={editVoucherId && editVoucher ? `Voucher #${editVoucher.voucherNumber}` : undefined}
       >
         <div className="flex flex-wrap gap-1 sm:gap-2">
-          {!posUser && !editVoucherId && (
+          {!editVoucherId && showPosImport && (
             <Link href="/pos-import">
               <Button variant="outline" size="sm" className="gap-1 sm:gap-2" data-testid="button-import-sales">
                 <Upload className="h-4 w-4" />

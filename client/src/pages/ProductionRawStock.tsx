@@ -103,15 +103,18 @@ export default function ProductionRawStock() {
       toast({ title: "Missing fields", description: "Please select a container", variant: "destructive" });
       return;
     }
-    if (!receivedKg) {
+    const container = availableContainers?.find((c) => c.id.toString() === selectedContainerId);
+    const finalReceivedKg = receivedKg || container?.totalKg || "";
+    const finalCostPerKg = costPerKg || container?.ratePerKg || "";
+    if (!finalReceivedKg) {
       toast({ title: "Missing weight", description: "This container has no saved Total KG. Please enter the received weight to offload.", variant: "destructive" });
       return;
     }
-    if (!costPerKg) {
+    if (!finalCostPerKg) {
       toast({ title: "Missing cost", description: "This container has no saved Rate per KG. Please enter the cost per kg to offload.", variant: "destructive" });
       return;
     }
-    offloadMutation.mutate({ containerId: selectedContainerId, receivedKg, costPerKg });
+    offloadMutation.mutate({ containerId: selectedContainerId, receivedKg: finalReceivedKg, costPerKg: finalCostPerKg });
   };
 
   const handleCloseDialog = () => {

@@ -166,11 +166,11 @@ export default function ProductionBales() {
     if (!value.trim()) return;
     setScanError("");
 
+    const trimmed = value.trim().toLowerCase();
     const product = activeProducts?.find(
       (p) =>
-        p.code.toLowerCase() === value.trim().toLowerCase() ||
-        p.articleCode?.toLowerCase() === value.trim().toLowerCase() ||
-        p.name.toLowerCase() === value.trim().toLowerCase()
+        p.articleCode?.toLowerCase() === trimmed ||
+        p.code.toLowerCase() === trimmed
     );
 
     if (!product) {
@@ -413,7 +413,7 @@ export default function ProductionBales() {
                     setScanError("");
                   }}
                   onKeyDown={handleScanKeyDown}
-                  placeholder="Scan barcode or type product code/name..."
+                  placeholder="Scan barcode or type article code..."
                   autoFocus
                   data-testid="input-scan"
                 />

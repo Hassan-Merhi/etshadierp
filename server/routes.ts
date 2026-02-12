@@ -26506,14 +26506,24 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { containerId, receivedKg, costPerKg } = req.body;
-      if (!containerId || !receivedKg || !costPerKg) {
-        return res.status(400).json({ message: "Missing required fields: containerId, receivedKg, costPerKg" });
+      const { containerId } = req.body;
+      if (!containerId) {
+        return res.status(400).json({ message: "Missing required field: containerId" });
       }
 
       const container = await storage.getContainerById(parseInt(containerId));
       if (!container || container.companyId !== companyId) {
         return res.status(404).json({ message: "Container not found" });
+      }
+
+      const finalReceivedKg = req.body.receivedKg || container.totalKg || null;
+      const finalCostPerKg = req.body.costPerKg || container.ratePerKg || null;
+
+      if (!finalReceivedKg || parseFloat(finalReceivedKg) <= 0) {
+        return res.status(400).json({ message: "Received weight is required. Container has no saved Total KG - please provide a value." });
+      }
+      if (!finalCostPerKg || parseFloat(finalCostPerKg) <= 0) {
+        return res.status(400).json({ message: "Cost per kg is required. Container has no saved Rate per KG - please provide a value." });
       }
 
       const { productionRawStock } = await import("@shared/schema");
@@ -26532,8 +26542,8 @@ if (asOfDate) {
         .values({
           companyId,
           containerId: parseInt(containerId),
-          receivedKg: receivedKg.toString(),
-          costPerKg: costPerKg.toString(),
+          receivedKg: finalReceivedKg.toString(),
+          costPerKg: finalCostPerKg.toString(),
           usedKg: "0",
         })
         .returning();
