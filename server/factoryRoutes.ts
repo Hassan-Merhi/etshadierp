@@ -12,6 +12,7 @@ import {
   factoryPressingBatches,
   factoryBales,
   factoryBaleSequences,
+  stockItems,
   insertFactorySupplierSchema,
   insertFactoryCategorySchema,
   insertFactoryBaleProductSchema,
@@ -22,6 +23,7 @@ import {
   insertFactoryPressingBatchSchema,
   insertFactoryBaleSchema,
 } from "@shared/schema";
+import { adjustInventory } from "./inventoryHelper";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -1149,7 +1151,59 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           })
           .where(eq(factoryPressingBatches.id, pressingBatchId));
 
-        return updatedBales;
+        const productIds: number[] = [];
+        for (const b of pendingBales) {
+          if (b.productId && !productIds.includes(b.productId)) productIds.push(b.productId);
+        }
+        const factoryProducts = productIds.length > 0
+          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          : [];
+
+        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+
+        const stockItemCache = new Map<string, number>();
+
+        for (const bale of pendingBales) {
+          const factoryProduct = productMap.get(bale.productId as number);
+          if (!factoryProduct) continue;
+
+          const itemCode: string = factoryProduct.articleCode || factoryProduct.code;
+          if (!itemCode) continue;
+
+          let erpStockItemId: number | undefined = stockItemCache.get(itemCode);
+
+          if (!erpStockItemId) {
+            const [existing] = await tx
+              .select({ id: stockItems.id })
+              .from(stockItems)
+              .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+
+            if (existing) {
+              erpStockItemId = existing.id;
+            } else {
+              const [created] = await tx
+                .insert(stockItems)
+                .values({
+                  companyId,
+                  code: itemCode,
+                  name: factoryProduct.name as string,
+                  uom: "BALE",
+                  active: true,
+                })
+                .returning({ id: stockItems.id });
+              erpStockItemId = created.id;
+            }
+            stockItemCache.set(itemCode, erpStockItemId!);
+          }
+
+          const weight = parseFloat(bale.weightKg);
+          const baleCostPerKg = parseFloat(bale.costPerKg || "0");
+          const baleRate = weight * baleCostPerKg;
+
+          await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
+        }
+
+        return { updated: updatedBales.length, bales: updatedBales };
       });
 
       res.json(result);

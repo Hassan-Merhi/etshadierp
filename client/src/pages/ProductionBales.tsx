@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -34,37 +32,6 @@ function formatLabelNum(val: string | number): string {
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
 
-function generateFullLabelHtml(label: {
-  referenceNumber: string;
-  articleCode: string;
-  pieces: number;
-  approxWeightKg: string;
-  productName: string;
-  locationName?: string;
-}) {
-  return `
-    <div class="label">
-      <div class="label-content">
-        <div class="label-top">
-          <div class="logo-section">
-            <div class="logo-text">HMD</div>
-            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-          </div>
-          <div class="info-section">
-            <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
-            <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-            ${label.locationName ? `<div class="info-row"><span class="info-label">LOCATION:</span> <span class="info-value">${label.locationName}</span></div>` : ''}
-          </div>
-        </div>
-        <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-          <div class="product-name-text">${label.productName}</div>
-        </div>
-      </div>
-    </div>`;
-}
-
 function generateFinalLabelHtml(labels: Array<{
   referenceNumber: string;
   articleCode: string;
@@ -72,54 +39,57 @@ function generateFinalLabelHtml(labels: Array<{
   approxWeightKg: string;
   productName: string;
   locationName?: string;
-}>, dualLabel: boolean) {
+}>) {
   let labelsHtml = '';
   for (const label of labels) {
-    const fullLabel = generateFullLabelHtml(label);
-    if (dualLabel) {
-      labelsHtml += `
-        <div class="page-container">
-          ${fullLabel}
-          <div class="label name-label">
-            <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-              <div class="name-label-text">${label.productName}</div>
+    labelsHtml += `
+      <div class="page-container">
+        <div class="code-label">
+          <div class="label-top">
+            <div class="logo-section">
+              <div class="logo-text">HMD</div>
+              <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+            </div>
+            <div class="info-section">
+              <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
+              <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
+              <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
             </div>
           </div>
-        </div>`;
-    } else {
-      labelsHtml += `<div class="single-page">${fullLabel}</div>`;
-    }
+          <div class="barcode-area">
+            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+            <div class="barcode-number">${label.referenceNumber}</div>
+            <div class="product-short">${label.productName}</div>
+          </div>
+        </div>
+        <div class="name-label">
+          <div class="name-label-text">${label.productName}</div>
+        </div>
+      </div>`;
   }
-  const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
   return `<html><head><title>Final Labels</title><style>
-    @page { ${pageSize} margin: 0; }
+    @page { size: 76mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .page-container { width: 3in; height: 3.94in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
+    .page-container { width: 76mm; height: 100mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .page-container:last-child { page-break-after: auto; }
-    .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
-    .single-page:last-child { page-break-after: auto; }
-    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background-image: url('/hmd-label-bg.jpeg'); background-repeat: no-repeat; background-position: center; background-size: contain; }
-    .label::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.80); }
-    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-    .name-label { justify-content: center; align-items: center; }
-    .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
-    .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
-    .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
-    .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
+    .code-label { width: 76mm; height: 50mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
-    .logo-subtitle { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; color: #000; margin-top: 0.5mm; }
-    .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
-    .info-label { font-weight: 900; }
-    .info-value { font-weight: 900; }
-    .barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
-    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .logo-text { font-size: 18pt; font-weight: 900; letter-spacing: 2px; color: #000; line-height: 1; }
+    .logo-subtitle { font-size: 5pt; font-weight: 700; letter-spacing: 1px; color: #000; margin-top: 0.5mm; }
+    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
+    .info-key { font-weight: 900; }
+    .info-val { font-weight: 900; }
+    .barcode-area { text-align: center; margin-top: auto; }
+    .barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
+    .barcode-number { font-size: 9pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .product-short { font-size: 8pt; font-weight: 900; text-transform: uppercase; margin-top: 0.5mm; color: #000; white-space: nowrap; }
+    .name-label { width: 76mm; height: 50mm; display: flex; align-items: center; justify-content: center; background: #fff; }
+    .name-label-text { font-size: 36pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
-  </style></head><body><div class="print-note">FINAL STOCK LABEL - For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } }
+  </style></head><body><div class="print-note">FINAL LABELS - disable "Headers and Footers" in print settings for cleanest output.</div>${labelsHtml}</body></html>`;
 }
 
 export default function ProductionBales() {
@@ -129,7 +99,6 @@ export default function ProductionBales() {
   const [scannedBales, setScannedBales] = useState<any[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
-  const [dualLabel, setDualLabel] = useState(true);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -287,7 +256,7 @@ export default function ProductionBales() {
 
       const printWindow = window.open("", "_blank");
       if (printWindow) {
-        printWindow.document.write(generateFinalLabelHtml(labels, dualLabel));
+        printWindow.document.write(generateFinalLabelHtml(labels));
         printWindow.document.close();
         printWindow.focus();
         setTimeout(() => printWindow.print(), 500);
@@ -295,9 +264,10 @@ export default function ProductionBales() {
         toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
       }
 
+      const count = result.updated || result.length || scannedBales.length;
       toast({
         title: "Finalized",
-        description: `${result.updated} bale(s) moved to stock and labels printed`,
+        description: `${count} bale(s) moved to stock and labels printed`,
       });
 
       setScannedBales([]);
@@ -576,18 +546,6 @@ export default function ProductionBales() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-                <Switch
-                  id="final-dual-label-toggle"
-                  checked={dualLabel}
-                  onCheckedChange={setDualLabel}
-                  data-testid="switch-final-dual-label"
-                />
-                <Label htmlFor="final-dual-label-toggle" className="text-sm cursor-pointer">
-                  {dualLabel ? "Dual labels" : "Single label"}
-                </Label>
               </div>
 
               <Button
