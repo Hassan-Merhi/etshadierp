@@ -94,15 +94,21 @@ export default function ProductionRawStock() {
   const handleContainerSelect = (id: string) => {
     setSelectedContainerId(id);
     const container = availableContainers?.find((c) => c.id.toString() === id);
-    if (container) {
-      if (container.totalKg) setReceivedKg(container.totalKg);
-      if (container.ratePerKg) setCostPerKg(container.ratePerKg);
-    }
+    setReceivedKg(container?.totalKg || "");
+    setCostPerKg(container?.ratePerKg || "");
   };
 
   const handleOffload = () => {
-    if (!selectedContainerId || !receivedKg || !costPerKg) {
-      toast({ title: "Missing fields", description: "Please fill all fields", variant: "destructive" });
+    if (!selectedContainerId) {
+      toast({ title: "Missing fields", description: "Please select a container", variant: "destructive" });
+      return;
+    }
+    if (!receivedKg) {
+      toast({ title: "Missing weight", description: "This container has no saved Total KG. Please enter the received weight to offload.", variant: "destructive" });
+      return;
+    }
+    if (!costPerKg) {
+      toast({ title: "Missing cost", description: "This container has no saved Rate per KG. Please enter the cost per kg to offload.", variant: "destructive" });
       return;
     }
     offloadMutation.mutate({ containerId: selectedContainerId, receivedKg, costPerKg });
@@ -271,7 +277,7 @@ export default function ProductionRawStock() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label>Received Weight (kg)</Label>
               <Input
                 type="number"
@@ -281,9 +287,10 @@ export default function ProductionRawStock() {
                 step="0.001"
                 data-testid="input-received-kg"
               />
+              <p className="text-xs text-muted-foreground">Auto-filled from container. Edit only if actual differs.</p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label>Cost per kg ($)</Label>
               <Input
                 type="number"
@@ -293,6 +300,7 @@ export default function ProductionRawStock() {
                 step="0.0001"
                 data-testid="input-cost-per-kg"
               />
+              <p className="text-xs text-muted-foreground">Auto-filled from container. Edit only if actual differs.</p>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -301,7 +309,7 @@ export default function ProductionRawStock() {
               </Button>
               <Button
                 onClick={handleOffload}
-                disabled={offloadMutation.isPending || !selectedContainerId || !receivedKg || !costPerKg}
+                disabled={offloadMutation.isPending || !selectedContainerId}
                 data-testid="button-confirm-offload"
               >
                 {offloadMutation.isPending ? "Offloading..." : "Offload to Production"}
