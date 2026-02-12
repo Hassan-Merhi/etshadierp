@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, type LucideIcon } from "lucide-react";
+import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
@@ -8,6 +8,8 @@ const ProductionBales = lazy(() => import("./ProductionBales"));
 const BaleProducts = lazy(() => import("./BaleProducts"));
 const BarcodeLookup = lazy(() => import("./BarcodeLookup"));
 const BalesHistory = lazy(() => import("./BalesHistory"));
+const ProductionSummary = lazy(() => import("./ProductionSummary"));
+const BaleTransfers = lazy(() => import("./BaleTransfers"));
 
 function LoadingFallback() {
   return (
@@ -18,7 +20,7 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "raw-stock" | "mix-batches" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup";
+type SectionKey = "raw-stock" | "mix-batches" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers";
 
 interface SidebarItem {
   key: SectionKey;
@@ -48,6 +50,18 @@ export default function FactoryProduction() {
         { key: "production-bales", label: "Production Bales", icon: Layers },
         { key: "bales-history", label: "Bales History", icon: History },
         { key: "bale-products", label: "Bale Products", icon: Tags },
+      ],
+    },
+    {
+      label: "Logistics",
+      items: [
+        { key: "bale-transfers", label: "Bale Transfers", icon: ArrowRightLeft },
+      ],
+    },
+    {
+      label: "Analytics",
+      items: [
+        { key: "production-summary", label: "Production Summary", icon: BarChart3 },
       ],
     },
     {
@@ -110,6 +124,8 @@ export default function FactoryProduction() {
             {activeSection === "bales-history" && <BalesHistory />}
             {activeSection === "bale-products" && <BaleProducts />}
             {activeSection === "barcode-lookup" && <BarcodeLookup />}
+            {activeSection === "production-summary" && <ProductionSummary />}
+            {activeSection === "bale-transfers" && <BaleTransfers />}
           </Suspense>
         </div>
       </div>
