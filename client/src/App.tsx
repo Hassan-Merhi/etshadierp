@@ -16,7 +16,7 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload } from "lucide-react";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -99,7 +99,7 @@ declare global {
   }
 }
 
-function Router({ user }: { user: any }) {
+function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: boolean }) {
   const isPOS = user?.role?.startsWith("POS");
   const [_location, navigate] = useLocation();
   
@@ -122,7 +122,7 @@ function Router({ user }: { user: any }) {
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
         <Route path="/pos-customers">{() => <POSCustomers />}</Route>
-        <Route path="/pos-import" component={POSImport} />
+        <Route path="/pos-import">{() => posImportEnabled ? <POSImport /> : <Redirect to="/" />}</Route>
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
@@ -251,6 +251,14 @@ function AuthenticatedApp() {
     }
   }, [isLoading, error, user, setLocation]);
 
+  const isPOS = user?.role?.startsWith("POS") ?? false;
+
+  const { data: posCompanySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings"],
+    enabled: isPOS,
+  });
+  const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
+
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
@@ -273,7 +281,6 @@ function AuthenticatedApp() {
     return null; // Will redirect to login
   }
 
-  const isPOS = user.role.startsWith("POS");
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -303,6 +310,7 @@ function AuthenticatedApp() {
     const isOnPOS = currentLocation === "/";
     const isOnInventory = currentLocation === "/location-inventory";
     const isOnDaybook = currentLocation === "/pos-daybook";
+    const isOnImport = currentLocation === "/pos-import";
     
     return (
       <>
@@ -378,11 +386,23 @@ function AuthenticatedApp() {
                 <span className="hidden sm:inline">Customers</span>
               </Button>
             )}
+            {posImportEnabled && (
+              <Button
+                variant={isOnImport ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setLocation("/pos-import")}
+                data-testid="button-pos-import-tab"
+                className="shrink-0"
+              >
+                <Upload className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Import</span>
+              </Button>
+            )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">
           <div className="w-full">
-            <Router user={user} />
+            <Router user={user} posImportEnabled={posImportEnabled} />
           </div>
         </main>
       </div>
