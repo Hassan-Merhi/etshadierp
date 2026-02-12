@@ -59,7 +59,6 @@ function generateFinalLabelHtml(labels: Array<{
           <div class="barcode-area">
             <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
             <div class="barcode-number">${label.referenceNumber}</div>
-            <div class="product-short">${label.productName}</div>
           </div>
           <div class="article-barcode-area">
             <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
