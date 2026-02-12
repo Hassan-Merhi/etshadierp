@@ -35,6 +35,12 @@ interface CartItem {
   weightPerBaleKg: number;
 }
 
+function formatLabelNum(val: string | number): string {
+  const n = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(n)) return String(val);
+  return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
+}
+
 function generateFullLabelHtml(label: {
   referenceNumber: string;
   articleCode: string;
@@ -51,9 +57,9 @@ function generateFullLabelHtml(label: {
             <div class="logo-subtitle">INTERNATIONAL GROUP</div>
           </div>
           <div class="info-section">
-            <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${label.pieces}</span></div>
+            <div class="info-row"><span class="info-label">PEICES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
             <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.approxWeightKg} KGS</span></div>
+            <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
           </div>
         </div>
         <div class="barcode-section">
@@ -85,7 +91,7 @@ function generateLabelHtml(labels: Array<{
           <div class="label name-label">
             <div class="name-label-content">
               <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-              <div class="name-label-text">${label.articleCode}</div>
+              <div class="name-label-text">${label.productName}</div>
             </div>
           </div>
         </div>`;
@@ -94,13 +100,13 @@ function generateLabelHtml(labels: Array<{
     }
   }
   const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
-  return `<html><head><title>Print Bale Labels</title><style>
+  return `<html><head><title></title><style>
     @page { ${pageSize} margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .page-container { width: 3in; height: 3.94in; page-break-after: always; overflow: hidden; }
+    .page-container { width: 3in; height: 3.94in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .page-container:last-child { page-break-after: auto; }
-    .single-page { width: 3in; height: 1.97in; page-break-after: always; overflow: hidden; }
+    .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border-bottom: 1px dashed #ccc; position: relative; background-image: url('/hmd-label-bg.jpeg'); background-repeat: no-repeat; background-position: center; background-size: contain; }
     .label::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.80); }
@@ -122,7 +128,9 @@ function generateLabelHtml(labels: Array<{
     .article-barcode-section { text-align: center; margin-top: 1mm; }
     .barcode-img-small { width: 55mm; height: 8mm; object-fit: contain; }
     .article-name { font-size: 7pt; font-weight: 700; margin-top: 0.3mm; color: #000; text-transform: uppercase; }
-  </style></head><body>${labelsHtml}</body></html>`;
+    .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
+    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
+  </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
 }
 
 export default function ProductionBales() {
