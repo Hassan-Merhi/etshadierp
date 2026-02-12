@@ -1557,7 +1557,7 @@ export const insertProductionBaleSchema = createInsertSchema(productionBales).om
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
   warehouseLocation: z.string().optional(),
-  status: z.enum(["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"]).optional(),
+  status: z.enum(["PENDING", "LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"]).optional(),
   pressedAt: z.string().optional(),
 });
 

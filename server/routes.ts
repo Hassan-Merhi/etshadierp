@@ -26888,10 +26888,15 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { mixBatchId, productId, locationId, quantity, weightPerBale } = req.body;
+      const { mixBatchId, productId, locationId, quantity, weightPerBale, mode } = req.body;
 
-      if (!mixBatchId || !productId || !locationId || !quantity || !weightPerBale) {
+      if (!mixBatchId || !productId || !quantity || !weightPerBale) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const isPressing = mode === "pressing";
+      if (!isPressing && !locationId) {
+        return res.status(400).json({ message: "Location is required for counting mode" });
       }
 
       const numBales = parseInt(quantity);
@@ -26964,14 +26969,14 @@ if (asOfDate) {
             companyId,
             mixBatchId,
             productId,
-            locationId,
+            locationId: isPressing ? null : locationId,
             baleCode: product.code,
             barcodeValue: product.articleCode || product.code,
             quantity: 1,
             weightKg: weight.toString(),
             costPerKg: batch.costPerKg,
             totalCost: totalCostPerBale,
-            status: "IN_STOCK" as const,
+            status: isPressing ? "PENDING" : "IN_STOCK",
             pressedAt: new Date(),
           };
           
@@ -26996,6 +27001,105 @@ if (asOfDate) {
       res.json({ bales, success: true, count: bales.length });
     } catch (error: any) {
       console.error("Error creating production bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/production-bales/pending", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { productionBales, baleProducts, mixBatches } = await import("@shared/schema");
+
+      const pending = await db
+        .select({
+          bale: productionBales,
+          product: baleProducts,
+          mixBatch: mixBatches,
+        })
+        .from(productionBales)
+        .leftJoin(baleProducts, eq(productionBales.productId, baleProducts.id))
+        .leftJoin(mixBatches, eq(productionBales.mixBatchId, mixBatches.id))
+        .where(and(
+          eq(productionBales.companyId, companyId),
+          eq(productionBales.status, "PENDING")
+        ))
+        .orderBy(desc(productionBales.createdAt));
+
+      res.json(pending);
+    } catch (error: any) {
+      console.error("Error fetching pending bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/production-bales/lookup/:barcode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const barcode = req.params.barcode.trim();
+      const { productionBales, baleProducts, mixBatches } = await import("@shared/schema");
+
+      const results = await db
+        .select({
+          bale: productionBales,
+          product: baleProducts,
+          mixBatch: mixBatches,
+        })
+        .from(productionBales)
+        .leftJoin(baleProducts, eq(productionBales.productId, baleProducts.id))
+        .leftJoin(mixBatches, eq(productionBales.mixBatchId, mixBatches.id))
+        .where(and(
+          eq(productionBales.companyId, companyId),
+          or(
+            eq(productionBales.barcodeValue, barcode),
+            eq(productionBales.baleCode, barcode)
+          )
+        ));
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      res.json(results[0]);
+    } catch (error: any) {
+      console.error("Error looking up bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-bales/finalize", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { baleIds, locationId } = req.body;
+      if (!locationId) return res.status(400).json({ message: "Location is required" });
+      if (!Array.isArray(baleIds) || baleIds.length === 0) {
+        return res.status(400).json({ message: "No bale IDs provided" });
+      }
+
+      const { productionBales } = await import("@shared/schema");
+
+      const updated = await db
+        .update(productionBales)
+        .set({
+          locationId: parseInt(locationId),
+          status: "IN_STOCK",
+          updatedAt: new Date(),
+        })
+        .where(and(
+          inArray(productionBales.id, baleIds.map((id: any) => parseInt(id))),
+          eq(productionBales.companyId, companyId),
+          eq(productionBales.status, "PENDING")
+        ))
+        .returning();
+
+      res.json({ updated: updated.length, bales: updated });
+    } catch (error: any) {
+      console.error("Error finalizing bales:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -27172,7 +27276,7 @@ if (asOfDate) {
 
       const id = parseInt(req.params.id);
       const { status } = req.body;
-      const validStatuses = ["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
+      const validStatuses = ["PENDING", "LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
@@ -27206,7 +27310,7 @@ if (asOfDate) {
       }
 
       const { ids, status } = req.body;
-      const validStatuses = ["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
+      const validStatuses = ["PENDING", "LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }

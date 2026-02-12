@@ -81,12 +81,8 @@ function generateFullLabelHtml(label: {
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-          <div class="barcode-number">${label.referenceNumber}</div>
-        </div>
-        <div class="article-barcode-section">
-          <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-          <div class="article-name">${label.productName}</div>
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
     </div>`;
@@ -210,13 +206,17 @@ function generateLabelHtml(labels: Array<{
             object-fit: contain;
           }
           .name-label-text {
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: 900;
             color: #000;
             text-align: center;
             line-height: 1.15;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            max-width: 100%;
+            display: block;
           }
           .label-top {
             display: flex;
@@ -276,30 +276,17 @@ function generateLabelHtml(labels: Array<{
             height: 14mm;
             object-fit: contain;
           }
-          .barcode-number {
-            font-size: 14pt;
+          .product-name-text {
+            font-size: 10pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
             margin-top: 0.5mm;
             color: #000;
-            letter-spacing: 1px;
-          }
-          .article-barcode-section {
-            text-align: center;
-            margin-top: 1mm;
-          }
-          .barcode-img-small {
-            width: 55mm;
-            height: 8mm;
-            object-fit: contain;
-          }
-          .article-name {
-            font-size: 7pt;
-            font-weight: 700;
-            font-family: Arial, Helvetica, sans-serif;
-            margin-top: 0.3mm;
-            color: #000;
             text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
           }
         </style>
       </head>

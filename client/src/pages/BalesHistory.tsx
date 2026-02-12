@@ -58,21 +58,17 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
         <div class="label-top">
           <div class="logo-section">
             <div class="logo-text">HMD</div>
-            <div class="logo-subtitle">TEXTILES</div>
+            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
           </div>
           <div class="info-section">
-            <div><span class="info-label">PCS:</span> <span class="info-value">${label.pieces}</span></div>
-            <div><span class="info-label">KG:</span> <span class="info-value">${label.weightKg}</span></div>
-            <div><span class="info-label">DATE:</span> <span class="info-value">${label.date}</span></div>
+            <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
+            <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+            <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.weightKg} KGS</span></div>
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.baleCode)}" alt="Bale Barcode" />
-          <div class="barcode-number">${label.baleCode}</div>
-        </div>
-        <div class="article-barcode-section">
-          <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-          <div class="article-name">${label.articleCode}</div>
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
     </div>`;
@@ -108,7 +104,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
-    .name-label-text { font-size: 18pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
+    .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
@@ -118,16 +114,14 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .info-value { font-weight: 900; }
     .barcode-section { text-align: center; margin-top: 1mm; }
     .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
-    .barcode-number { font-size: 14pt; font-weight: 900; margin-top: 0.5mm; color: #000; letter-spacing: 1px; }
-    .article-barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img-small { width: 55mm; height: 8mm; object-fit: contain; }
-    .article-name { font-size: 7pt; font-weight: 700; margin-top: 0.3mm; color: #000; text-transform: uppercase; }
+    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
   </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  PENDING: "outline",
   LABEL_PRINTED: "secondary",
   PRESSED: "default",
   IN_STOCK: "default",
@@ -300,6 +294,7 @@ export default function BalesHistory() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                 <SelectItem value="PRESSED">Pressed</SelectItem>
                 <SelectItem value="IN_STOCK">In Stock</SelectItem>
@@ -318,6 +313,7 @@ export default function BalesHistory() {
                   <SelectValue placeholder="Change status to..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="PENDING">Pending</SelectItem>
                   <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                   <SelectItem value="PRESSED">Pressed</SelectItem>
                   <SelectItem value="IN_STOCK">In Stock</SelectItem>
@@ -406,6 +402,7 @@ export default function BalesHistory() {
                               </Badge>
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="PENDING">Pending</SelectItem>
                               <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                               <SelectItem value="PRESSED">Pressed</SelectItem>
                               <SelectItem value="IN_STOCK">In Stock</SelectItem>

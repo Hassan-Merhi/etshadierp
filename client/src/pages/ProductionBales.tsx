@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Minus, Trash2, Printer, Package, Barcode, ScanLine, AlertCircle } from "lucide-react";
+import { Plus, Minus, Trash2, Printer, Package, Barcode, ScanLine, AlertCircle, Search, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,8 @@ interface CartItem {
   weightPerBaleKg: number;
 }
 
+type ProductionMode = "pressing" | "counting";
+
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
   if (isNaN(n)) return String(val);
@@ -63,12 +65,8 @@ function generateFullLabelHtml(label: {
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Reference Barcode" />
-          <div class="barcode-number">${label.referenceNumber}</div>
-        </div>
-        <div class="article-barcode-section">
-          <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-          <div class="article-name">${label.productName}</div>
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
     </div>`;
@@ -114,7 +112,7 @@ function generateLabelHtml(labels: Array<{
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
-    .name-label-text { font-size: 18pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
+    .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
@@ -124,16 +122,14 @@ function generateLabelHtml(labels: Array<{
     .info-value { font-weight: 900; }
     .barcode-section { text-align: center; margin-top: 1mm; }
     .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
-    .barcode-number { font-size: 14pt; font-weight: 900; margin-top: 0.5mm; color: #000; letter-spacing: 1px; }
-    .article-barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img-small { width: 55mm; height: 8mm; object-fit: contain; }
-    .article-name { font-size: 7pt; font-weight: 700; margin-top: 0.3mm; color: #000; text-transform: uppercase; }
+    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
   </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
 }
 
 export default function ProductionBales() {
+  const [mode, setMode] = useState<ProductionMode>("pressing");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -142,6 +138,12 @@ export default function ProductionBales() {
   const [dualLabel, setDualLabel] = useState(true);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const [countingScanInput, setCountingScanInput] = useState("");
+  const [countingScanError, setCountingScanError] = useState("");
+  const [countingLocationId, setCountingLocationId] = useState<string>("");
+  const [foundBales, setFoundBales] = useState<any[]>([]);
+  const countingScanRef = useRef<HTMLInputElement>(null);
 
   const { data: mixBatches, isLoading: batchesLoading } = useQuery<MixBatch[]>({
     queryKey: ["/api/mix-batches"],
@@ -155,6 +157,11 @@ export default function ProductionBales() {
     queryKey: ["/api/locations"],
   });
 
+  const { data: pendingBales, isLoading: pendingLoading } = useQuery<any[]>({
+    queryKey: ["/api/production-bales/pending"],
+    enabled: mode === "counting",
+  });
+
   const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
   const activeProducts = baleProducts?.filter((p) => p.active);
   const activeLocations = locations?.filter((l) => l.active);
@@ -165,10 +172,13 @@ export default function ProductionBales() {
     : 0;
 
   useEffect(() => {
-    if (scanRef.current) {
+    if (mode === "pressing" && scanRef.current) {
       scanRef.current.focus();
     }
-  }, [cart]);
+    if (mode === "counting" && countingScanRef.current) {
+      countingScanRef.current.focus();
+    }
+  }, [cart, mode]);
 
   const handleScan = (value: string) => {
     if (!value.trim()) return;
@@ -252,8 +262,12 @@ export default function ProductionBales() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedBatchId || !selectedLocationId || cart.length === 0) {
-        throw new Error("Please select a batch, location, and add items to cart");
+      if (!selectedBatchId || cart.length === 0) {
+        throw new Error("Please select a batch and add items to cart");
+      }
+
+      if (mode !== "pressing" && !selectedLocationId) {
+        throw new Error("Please select a location");
       }
 
       if (totalKgToConsume > batchRemaining + 0.001) {
@@ -265,13 +279,20 @@ export default function ProductionBales() {
       const allWeights: string[] = [];
 
       for (const item of cart) {
-        const response = await apiRequest("POST", "/api/production-bales/create-batch", {
+        const payload: any = {
           mixBatchId: parseInt(selectedBatchId),
           productId: item.productId,
-          locationId: parseInt(selectedLocationId),
           quantity: item.qty.toString(),
           weightPerBale: item.weightPerBaleKg.toString(),
-        });
+        };
+
+        if (mode === "pressing") {
+          payload.mode = "pressing";
+        } else {
+          payload.locationId = parseInt(selectedLocationId);
+        }
+
+        const response = await apiRequest("POST", "/api/production-bales/create-batch", payload);
 
         if (!response.ok) {
           const err = await response.json();
@@ -291,6 +312,7 @@ export default function ProductionBales() {
     onSuccess: async ({ bales, products, weights }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
 
       await printBaleLabels(bales, products, weights);
 
@@ -350,262 +372,536 @@ export default function ProductionBales() {
     }
   };
 
+  const handleCountingScan = async (value: string) => {
+    if (!value.trim()) return;
+    setCountingScanError("");
+
+    try {
+      const response = await apiRequest("GET", `/api/production-bales/lookup/${encodeURIComponent(value.trim())}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Bale not found");
+      }
+      const result = await response.json();
+      const balesArr = Array.isArray(result) ? result : result.bales ? result.bales : [result];
+
+      const newBales = balesArr.filter(
+        (b: any) => !foundBales.some((fb: any) => fb.id === b.id)
+      );
+
+      if (newBales.length === 0) {
+        setCountingScanError("Bale already added to list");
+      } else {
+        setFoundBales((prev) => [...prev, ...newBales]);
+      }
+    } catch (error: any) {
+      setCountingScanError(error.message || "Bale not found");
+    }
+
+    setCountingScanInput("");
+  };
+
+  const handleCountingScanKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCountingScan(countingScanInput);
+    }
+  };
+
+  const removeFoundBale = (baleId: number) => {
+    setFoundBales((prev) => prev.filter((b: any) => b.id !== baleId));
+  };
+
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      if (foundBales.length === 0) {
+        throw new Error("No bales to finalize");
+      }
+      if (!countingLocationId) {
+        throw new Error("Please select a location");
+      }
+
+      const response = await apiRequest("POST", "/api/production-bales/finalize", {
+        baleIds: foundBales.map((b: any) => b.id),
+        locationId: parseInt(countingLocationId),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to finalize bales");
+      }
+
+      return await response.json();
+    },
+    onSuccess: async (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
+
+      const balesForPrint = result.bales || foundBales;
+      const products: BaleProduct[] = [];
+      const weights: string[] = [];
+
+      for (const bale of balesForPrint) {
+        const product = baleProducts?.find((p) => p.id === bale.productId);
+        products.push(product || { id: bale.productId, name: bale.productName || "", code: bale.articleCode || "", articleCode: bale.articleCode || "" } as BaleProduct);
+        weights.push(bale.approxWeightKg || bale.weightPerBaleKg || "0");
+      }
+
+      await printBaleLabels(balesForPrint, products, weights);
+
+      toast({
+        title: "Success",
+        description: `Finalized ${foundBales.length} bale(s) and sent to printer`,
+      });
+
+      setFoundBales([]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Production Bales</h1>
           <p className="text-muted-foreground mt-1">Scanner-first bale production from mix batches</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-          <SelectTrigger data-testid="select-mix-batch">
-            <SelectValue placeholder="Select Mix Batch" />
-          </SelectTrigger>
-          <SelectContent>
-            {activeBatches?.map((batch) => {
-              const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
-              return (
-                <SelectItem key={batch.id} value={batch.id.toString()}>
-                  {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-          <SelectTrigger data-testid="select-location">
-            <SelectValue placeholder="Select Location" />
-          </SelectTrigger>
-          <SelectContent>
-            {activeLocations?.map((loc) => (
-              <SelectItem key={loc.id} value={loc.id.toString()}>
-                {loc.code} - {loc.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-3 rounded-md border px-3">
-          <Switch
-            id="dual-label-toggle"
-            checked={dualLabel}
-            onCheckedChange={setDualLabel}
-            data-testid="switch-dual-label"
-          />
-          <Label htmlFor="dual-label-toggle" className="text-sm cursor-pointer">
-            {dualLabel ? "Dual labels" : "Single label"}
-          </Label>
-        </div>
-      </div>
-
-      <div className="flex gap-6">
-        <div className="flex-1 min-w-0 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <ScanLine className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg">Scan / Add Product</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Input
-                  ref={scanRef}
-                  value={scanInput}
-                  onChange={(e) => {
-                    setScanInput(e.target.value);
-                    setScanError("");
-                  }}
-                  onKeyDown={handleScanKeyDown}
-                  placeholder="Scan barcode or type article code..."
-                  autoFocus
-                  data-testid="input-scan"
-                />
-                {scanError && (
-                  <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
-                    <AlertCircle className="h-4 w-4" />
-                    {scanError}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cart.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Barcode className="h-8 w-8 mx-auto mb-2" />
-                  <p>Scan a product to add it to the cart</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-center w-40">Qty</TableHead>
-                      <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
-                      <TableHead className="text-right w-32">Total (kg)</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cart.map((item) => (
-                      <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
-                        <TableCell>
-                          <div className="font-medium">{item.product.name}</div>
-                          <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => updateQty(item.productId, -1)}
-                              data-testid={`button-qty-minus-${item.productId}`}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              value={item.qty}
-                              onChange={(e) => setQty(item.productId, parseInt(e.target.value) || 0)}
-                              className="w-16 text-center"
-                              min="1"
-                              data-testid={`input-qty-${item.productId}`}
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => updateQty(item.productId, 1)}
-                              data-testid={`button-qty-plus-${item.productId}`}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            value={item.weightPerBaleKg}
-                            onChange={(e) => updateWeight(item.productId, parseFloat(e.target.value) || 0)}
-                            className="w-24 text-right ml-auto"
-                            step="0.01"
-                            data-testid={`input-weight-${item.productId}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatNumber(item.qty * item.weightPerBaleKg)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeItem(item.productId)}
-                            data-testid={`button-remove-${item.productId}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="w-72 shrink-0 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Batch Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedBatch ? (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Batch</p>
-                    <p className="font-medium" data-testid="text-batch-name">
-                      {selectedBatch.name || selectedBatch.batchCode}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Remaining</p>
-                    <p className="text-3xl font-bold font-mono" data-testid="text-batch-remaining">
-                      {formatNumber(batchRemaining)}
-                      <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Cost/kg</p>
-                    <p className="text-lg font-mono" data-testid="text-batch-cost">
-                      ${parseFloat(selectedBatch.costPerKg).toFixed(4)}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <p className="text-muted-foreground text-sm">Select a batch to see details</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Production Total</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Bales</p>
-                <p className="text-2xl font-bold font-mono" data-testid="text-total-qty">{totalQty}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Weight</p>
-                <p className="text-2xl font-bold font-mono" data-testid="text-total-kg">
-                  {formatNumber(totalKgToConsume)}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
-                </p>
-              </div>
-              {selectedBatch && totalKgToConsume > batchRemaining + 0.001 && (
-                <div className="flex items-center gap-2 text-destructive text-sm p-2 rounded-md bg-destructive/10">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Exceeds batch remaining!</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+        <div className="flex items-center gap-2" data-testid="mode-toggle">
           <Button
-            className="w-full"
-            size="lg"
-            onClick={() => createMutation.mutate()}
-            disabled={
-              createMutation.isPending ||
-              cart.length === 0 ||
-              !selectedBatchId ||
-              !selectedLocationId ||
-              totalKgToConsume > batchRemaining + 0.001
-            }
-            data-testid="button-create-print"
+            variant={mode === "pressing" ? "default" : "outline"}
+            onClick={() => setMode("pressing")}
+            data-testid="button-mode-pressing"
           >
-            {createMutation.isPending ? (
-              "Creating..."
-            ) : (
-              <>
-                <Printer className="h-4 w-4 mr-2" />
-                Create + Print ({totalQty} bales)
-              </>
-            )}
+            Pressing (Pending)
+          </Button>
+          <Button
+            variant={mode === "counting" ? "default" : "outline"}
+            onClick={() => setMode("counting")}
+            data-testid="button-mode-counting"
+          >
+            Counting (Enter Location)
           </Button>
         </div>
       </div>
+
+      {mode === "pressing" && (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+              <SelectTrigger data-testid="select-mix-batch">
+                <SelectValue placeholder="Select Mix Batch" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeBatches?.map((batch) => {
+                  const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
+                  return (
+                    <SelectItem key={batch.id} value={batch.id.toString()}>
+                      {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-3 rounded-md border px-3">
+              <Switch
+                id="dual-label-toggle"
+                checked={dualLabel}
+                onCheckedChange={setDualLabel}
+                data-testid="switch-dual-label"
+              />
+              <Label htmlFor="dual-label-toggle" className="text-sm cursor-pointer">
+                {dualLabel ? "Dual labels" : "Single label"}
+              </Label>
+            </div>
+          </div>
+
+          <div className="flex gap-6">
+            <div className="flex-1 min-w-0 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <ScanLine className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="text-lg">Scan / Add Product</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Input
+                      ref={scanRef}
+                      value={scanInput}
+                      onChange={(e) => {
+                        setScanInput(e.target.value);
+                        setScanError("");
+                      }}
+                      onKeyDown={handleScanKeyDown}
+                      placeholder="Scan barcode or type article code..."
+                      autoFocus
+                      data-testid="input-scan"
+                    />
+                    {scanError && (
+                      <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
+                        <AlertCircle className="h-4 w-4" />
+                        {scanError}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {cart.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Barcode className="h-8 w-8 mx-auto mb-2" />
+                      <p>Scan a product to add it to the cart</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center w-40">Qty</TableHead>
+                          <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
+                          <TableHead className="text-right w-32">Total (kg)</TableHead>
+                          <TableHead className="w-12"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cart.map((item) => (
+                          <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
+                            <TableCell>
+                              <div className="font-medium">{item.product.name}</div>
+                              <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => updateQty(item.productId, -1)}
+                                  data-testid={`button-qty-minus-${item.productId}`}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <Input
+                                  type="number"
+                                  value={item.qty}
+                                  onChange={(e) => setQty(item.productId, parseInt(e.target.value) || 0)}
+                                  className="w-16 text-center"
+                                  min="1"
+                                  data-testid={`input-qty-${item.productId}`}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => updateQty(item.productId, 1)}
+                                  data-testid={`button-qty-plus-${item.productId}`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                value={item.weightPerBaleKg}
+                                onChange={(e) => updateWeight(item.productId, parseFloat(e.target.value) || 0)}
+                                className="w-24 text-right ml-auto"
+                                step="0.01"
+                                data-testid={`input-weight-${item.productId}`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              {formatNumber(item.qty * item.weightPerBaleKg)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeItem(item.productId)}
+                                data-testid={`button-remove-${item.productId}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="w-72 shrink-0 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Batch Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedBatch ? (
+                    <>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Batch</p>
+                        <p className="font-medium" data-testid="text-batch-name">
+                          {selectedBatch.name || selectedBatch.batchCode}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Remaining</p>
+                        <p className="text-3xl font-bold font-mono" data-testid="text-batch-remaining">
+                          {formatNumber(batchRemaining)}
+                          <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Cost/kg</p>
+                        <p className="text-lg font-mono" data-testid="text-batch-cost">
+                          ${parseFloat(selectedBatch.costPerKg).toFixed(4)}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Select a batch to see details</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Production Total</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Bales</p>
+                    <p className="text-2xl font-bold font-mono" data-testid="text-total-qty">{totalQty}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Weight</p>
+                    <p className="text-2xl font-bold font-mono" data-testid="text-total-kg">
+                      {formatNumber(totalKgToConsume)}
+                      <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
+                    </p>
+                  </div>
+                  {selectedBatch && totalKgToConsume > batchRemaining + 0.001 && (
+                    <div className="flex items-center gap-2 text-destructive text-sm p-2 rounded-md bg-destructive/10">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Exceeds batch remaining!</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => createMutation.mutate()}
+                disabled={
+                  createMutation.isPending ||
+                  cart.length === 0 ||
+                  !selectedBatchId ||
+                  totalKgToConsume > batchRemaining + 0.001
+                }
+                data-testid="button-create-print"
+              >
+                {createMutation.isPending ? (
+                  "Creating..."
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Create + Print ({totalQty} bales)
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {mode === "counting" && (
+        <div className="flex gap-6">
+          <div className="flex-1 min-w-0 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg">Scan Pending Bale Barcode</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Input
+                    ref={countingScanRef}
+                    value={countingScanInput}
+                    onChange={(e) => {
+                      setCountingScanInput(e.target.value);
+                      setCountingScanError("");
+                    }}
+                    onKeyDown={handleCountingScanKeyDown}
+                    placeholder="Scan bale barcode to look up..."
+                    autoFocus
+                    data-testid="input-counting-scan"
+                  />
+                  {countingScanError && (
+                    <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-counting-scan-error">
+                      <AlertCircle className="h-4 w-4" />
+                      {countingScanError}
+                    </div>
+                  )}
+
+                  <Select value={countingLocationId} onValueChange={setCountingLocationId}>
+                    <SelectTrigger data-testid="select-counting-location">
+                      <SelectValue placeholder="Select Location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeLocations?.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id.toString()}>
+                          {loc.code} - {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {foundBales.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">
+                    Scanned Bales ({foundBales.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                        <TableHead className="w-12"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {foundBales.map((bale: any) => (
+                        <TableRow key={bale.id} data-testid={`row-found-bale-${bale.id}`}>
+                          <TableCell className="font-mono">{bale.referenceNumber || bale.barcode || "-"}</TableCell>
+                          <TableCell>{bale.productName || bale.articleCode || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {bale.approxWeightKg || bale.weightPerBaleKg || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="text-xs">
+                              {bale.status || "PENDING"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeFoundBale(bale.id)}
+                              data-testid={`button-remove-found-${bale.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex items-center gap-3 rounded-md border px-3 py-2">
+                      <Switch
+                        id="counting-dual-label-toggle"
+                        checked={dualLabel}
+                        onCheckedChange={setDualLabel}
+                        data-testid="switch-counting-dual-label"
+                      />
+                      <Label htmlFor="counting-dual-label-toggle" className="text-sm cursor-pointer">
+                        {dualLabel ? "Dual labels" : "Single label"}
+                      </Label>
+                    </div>
+                    <Button
+                      className="flex-1"
+                      size="lg"
+                      onClick={() => finalizeMutation.mutate()}
+                      disabled={
+                        finalizeMutation.isPending ||
+                        foundBales.length === 0 ||
+                        !countingLocationId
+                      }
+                      data-testid="button-finalize-print"
+                    >
+                      {finalizeMutation.isPending ? (
+                        "Finalizing..."
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Finalize + Print ({foundBales.length} bales)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">All Pending Bales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pendingLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : !pendingBales || pendingBales.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-8 w-8 mx-auto mb-2" />
+                    <p>No pending bales</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead className="text-right">Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingBales.map((bale: any) => (
+                        <TableRow key={bale.id} data-testid={`row-pending-bale-${bale.id}`}>
+                          <TableCell className="font-mono text-sm">{bale.referenceNumber || bale.barcode || "-"}</TableCell>
+                          <TableCell>{bale.productName || bale.articleCode || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {bale.approxWeightKg || bale.weightPerBaleKg || "-"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {bale.createdAt ? new Date(bale.createdAt).toLocaleDateString() : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
