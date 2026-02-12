@@ -26,6 +26,7 @@ import {
   Calculator,
   Store,
   TrendingUp,
+  Upload,
 } from "lucide-react";
 import {
   Sidebar,
@@ -101,6 +102,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Dashboard", url: "/pos-dashboard", icon: LayoutDashboard },
       { title: "POS", url: "/pos", icon: ShoppingCart },
       { title: "POS Daybook", url: "/pos-daybook", icon: Book },
+      { title: "POS Import", url: "/pos-import", icon: Upload },
     ],
   },
   {
@@ -149,6 +151,16 @@ export function AppSidebar({ user }: { user?: any }) {
     enabled: !!user,
   });
 
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
   const allowedFeatures = new Set<string>();
   myPermissions.forEach((p: any) => {
     if (p.enabled) {
@@ -161,7 +173,6 @@ export function AppSidebar({ user }: { user?: any }) {
     const isAdmin = user?.role === "Admin";
     const featureKey = ROUTE_TO_FEATURE[item.url];
 
-    // Hide Factory Production for ERP companies (only show for factory companies)
     if (item.url === "/factory-production") {
       const isFactoryCompany = selectedCompany?.companyType === "factory";
       if (!isFactoryCompany) return false;
@@ -175,7 +186,11 @@ export function AppSidebar({ user }: { user?: any }) {
     }
 
     if (isPOSUser) {
-      return ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"].includes(item.url);
+      const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"];
+      if (companySettings?.posExcelImportEnabled) {
+        posRoutes.push("/pos-import");
+      }
+      return posRoutes.includes(item.url);
     }
 
     if (item.url === "/settings") return false;

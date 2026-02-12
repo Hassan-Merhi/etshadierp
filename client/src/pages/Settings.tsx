@@ -56,7 +56,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1168,6 +1168,82 @@ function EditLogTable({ companyId }: { companyId?: number }) {
 }
 
 
+function PosSettingsTab() {
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/company-settings", {
+        companyId: selectedCompany?.id,
+        posExcelImportEnabled: enabled,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-settings", selectedCompany?.id] });
+      toast({ title: "Updated", description: "POS Excel Import setting has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  if (!selectedCompany) {
+    return (
+      <Card className="p-6">
+        <p className="text-muted-foreground">Select a company to configure POS settings.</p>
+      </Card>
+    );
+  }
+
+  const isEnabled = companySettings?.posExcelImportEnabled ?? false;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ShoppingCart className="h-5 w-5" />
+        <h2 className="text-lg font-semibold" data-testid="text-pos-settings-title">POS Settings</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">Configure features available to POS users for {selectedCompany.name}.</p>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-500/10 rounded-lg">
+              <Upload className="h-6 w-6 text-green-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold" data-testid="text-pos-excel-import-title">POS Excel Import</h3>
+              <p className="text-sm text-muted-foreground">
+                Allow POS users to import sales from Excel files. When enabled, a "POS Import" option appears in their sidebar.
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+            disabled={toggleMutation.isPending}
+            data-testid="switch-pos-excel-import"
+          />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+
 function BulkRenameTab() {
   const { toast } = useToast();
   const [findText, setFindText] = useState("");
@@ -2227,6 +2303,12 @@ function BulkRenameTab() {
           { key: "data-tools", label: "Data Tools", icon: Database },
           { key: "bulk-rename", label: "Bulk Rename", icon: Package },
           { key: "edit-log", label: "Edit Log", icon: History },
+        ],
+      },
+      {
+        label: "POS",
+        items: [
+          { key: "pos-settings", label: "POS Settings", icon: ShoppingCart },
         ],
       },
       {
@@ -4082,6 +4164,9 @@ function BulkRenameTab() {
           )}
           {activeSection === "bulk-rename" && (
             <BulkRenameTab />
+          )}
+          {activeSection === "pos-settings" && (
+            <PosSettingsTab />
           )}
         </div>
 

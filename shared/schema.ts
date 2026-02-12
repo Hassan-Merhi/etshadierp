@@ -1269,6 +1269,7 @@ export const companySettings = pgTable("company_settings", {
   invoiceFooter: text("invoice_footer"),
   parentCreditAccountId: integer("parent_credit_account_id"),
   netPositionAdjustment: decimal("net_position_adjustment", { precision: 15, scale: 2 }).default("0"),
+  posExcelImportEnabled: boolean("pos_excel_import_enabled").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1284,6 +1285,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   invoiceFooter: z.string().optional(),
   parentCreditAccountId: z.number().optional(),
   netPositionAdjustment: z.string().optional(),
+  posExcelImportEnabled: z.boolean().optional(),
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
