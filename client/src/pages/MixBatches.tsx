@@ -4,6 +4,7 @@ import { Plus, Package, CheckCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -65,7 +66,7 @@ export default function MixBatches() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mix Batches</h1>
           <p className="text-muted-foreground mt-1">
-            Combine raw stock containers into batches for bale production
+            Combine raw stock containers and existing batches for bale production
           </p>
         </div>
         <Button
@@ -106,8 +107,7 @@ export default function MixBatches() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Used (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
+                  <TableHead>Usage</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -118,6 +118,7 @@ export default function MixBatches() {
                   const total = parseFloat(batch.totalWeightKg || "0");
                   const used = parseFloat(batch.usedKg || "0");
                   const remaining = total - used;
+                  const usagePercent = total > 0 ? Math.min((used / total) * 100, 100) : 0;
                   return (
                     <TableRow
                       key={batch.id}
@@ -128,15 +129,19 @@ export default function MixBatches() {
                         {batch.name || batch.batchCode}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {total.toLocaleString()}
+                        {formatNumber(total)}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {used.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        <Badge variant={remaining <= 0 ? "secondary" : "default"}>
-                          {formatNumber(remaining)}
-                        </Badge>
+                      <TableCell className="min-w-[200px]">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Used: <span className="font-mono font-medium text-foreground">{formatNumber(used)}</span> kg</span>
+                            <span>Left: <span className="font-mono font-medium text-foreground">{formatNumber(remaining)}</span> kg</span>
+                          </div>
+                          <Progress value={usagePercent} className="h-2" />
+                          <div className="text-xs text-muted-foreground text-right">
+                            {usagePercent.toFixed(0)}% used
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${parseFloat(batch.costPerKg).toFixed(4)}

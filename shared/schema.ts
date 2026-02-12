@@ -1417,11 +1417,12 @@ export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
 export type InsertMixBatch = z.infer<typeof insertMixBatchSchema>;
 export type MixBatch = typeof mixBatches.$inferSelect;
 
-// Mix Batch Sources - tracks which containers contribute to a mix batch
+// Mix Batch Sources - tracks which containers or existing batches contribute to a mix batch
 export const mixBatchSources = pgTable("mix_batch_sources", {
   id: serial("id").primaryKey(),
   mixBatchId: integer("mix_batch_id").notNull(),
-  containerId: integer("container_id").notNull(),
+  containerId: integer("container_id"),
+  sourceBatchId: integer("source_batch_id"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
@@ -1433,7 +1434,8 @@ export const insertMixBatchSourceSchema = createInsertSchema(mixBatchSources).om
   createdAt: true,
 }).extend({
   mixBatchId: z.number().min(1, "Mix batch is required"),
-  containerId: z.number().min(1, "Container is required"),
+  containerId: z.number().optional().nullable(),
+  sourceBatchId: z.number().optional().nullable(),
   weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),

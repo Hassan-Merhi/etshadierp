@@ -26624,16 +26624,18 @@ if (asOfDate) {
       const userId = req.session.userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user session" });
 
-      const { sources, name, ...batchData } = req.body;
+      const { sources, batchSources, name, ...batchData } = req.body;
 
-      if (!sources || !Array.isArray(sources) || sources.length === 0) {
-        return res.status(400).json({ message: "At least one container source is required" });
+      const hasSources = (sources && Array.isArray(sources) && sources.length > 0);
+      const hasBatchSources = (batchSources && Array.isArray(batchSources) && batchSources.length > 0);
+
+      if (!hasSources && !hasBatchSources) {
+        return res.status(400).json({ message: "At least one container or batch source is required" });
       }
 
       const { mixBatches, mixBatchSources, productionRawStock } = await import("@shared/schema");
 
       const result = await db.transaction(async (tx) => {
-        // Auto-generate batch code
         const year = new Date().getFullYear();
         const existingBatches = await tx
           .select({ id: mixBatches.id })
@@ -26642,55 +26644,103 @@ if (asOfDate) {
         const batchNum = existingBatches.length + 1;
         const batchCode = batchData.batchCode || `MB-${year}-${String(batchNum).padStart(3, '0')}`;
 
-        // Calculate totals from sources
         let totalWeightKg = 0;
         let totalCost = 0;
-        const validatedSources: Array<{ containerId: number; weightKg: number; costPerKg: number; totalCost: number }> = [];
+        const validatedSources: Array<{ containerId?: number; sourceBatchId?: number; weightKg: number; costPerKg: number; totalCost: number }> = [];
 
-        for (const source of sources) {
-          const cId = parseInt(source.containerId);
-          const wKg = parseFloat(source.weightKg);
-          const cPKg = parseFloat(source.costPerKg);
+        // Process container sources
+        if (hasSources) {
+          for (const source of sources) {
+            const cId = parseInt(source.containerId);
+            const wKg = parseFloat(source.weightKg);
+            const cPKg = parseFloat(source.costPerKg);
 
-          if (isNaN(cId) || isNaN(wKg) || isNaN(cPKg) || wKg <= 0) {
-            throw new Error("Invalid source data");
+            if (isNaN(cId) || isNaN(wKg) || isNaN(cPKg) || wKg <= 0) {
+              throw new Error("Invalid container source data");
+            }
+
+            const [rawStock] = await tx
+              .select()
+              .from(productionRawStock)
+              .where(and(
+                eq(productionRawStock.companyId, companyId),
+                eq(productionRawStock.containerId, cId)
+              ))
+              .for("update");
+
+            if (!rawStock) {
+              throw new Error(`Container ${cId} not found in production raw stock. Offload it first.`);
+            }
+
+            const remaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
+            if (wKg > remaining + 0.001) {
+              throw new Error(`Container ${rawStock.containerId} only has ${remaining.toFixed(3)} kg remaining, requested ${wKg}`);
+            }
+
+            const newUsed = parseFloat(rawStock.usedKg) + wKg;
+            await tx
+              .update(productionRawStock)
+              .set({ usedKg: newUsed.toFixed(3) })
+              .where(eq(productionRawStock.id, rawStock.id));
+
+            const sCost = wKg * cPKg;
+            totalWeightKg += wKg;
+            totalCost += sCost;
+            validatedSources.push({ containerId: cId, weightKg: wKg, costPerKg: cPKg, totalCost: sCost });
           }
+        }
 
-          // Check production raw stock for this container
-          const [rawStock] = await tx
-            .select()
-            .from(productionRawStock)
-            .where(and(
-              eq(productionRawStock.companyId, companyId),
-              eq(productionRawStock.containerId, cId)
-            ))
-            .for("update");
+        // Process existing batch sources
+        if (hasBatchSources) {
+          for (const bSrc of batchSources) {
+            const srcBatchId = parseInt(bSrc.sourceBatchId);
+            const wKg = parseFloat(bSrc.weightKg);
 
-          if (!rawStock) {
-            throw new Error(`Container ${cId} not found in production raw stock. Offload it first.`);
+            if (isNaN(srcBatchId) || isNaN(wKg) || wKg <= 0) {
+              throw new Error("Invalid batch source data");
+            }
+
+            const [srcBatch] = await tx
+              .select()
+              .from(mixBatches)
+              .where(and(
+                eq(mixBatches.id, srcBatchId),
+                eq(mixBatches.companyId, companyId)
+              ))
+              .for("update");
+
+            if (!srcBatch) {
+              throw new Error(`Source batch ${srcBatchId} not found`);
+            }
+
+            const srcTotal = parseFloat(srcBatch.totalWeightKg);
+            const srcUsed = parseFloat(srcBatch.usedKg);
+            const srcRemaining = srcTotal - srcUsed;
+
+            if (wKg > srcRemaining + 0.001) {
+              throw new Error(`Batch ${srcBatch.batchCode} only has ${srcRemaining.toFixed(3)} kg remaining, requested ${wKg}`);
+            }
+
+            // Deduct from source batch's usedKg
+            const newUsed = srcUsed + wKg;
+            await tx
+              .update(mixBatches)
+              .set({
+                usedKg: newUsed.toFixed(3),
+                status: (newUsed >= srcTotal - 0.001) ? "COMPLETED" : srcBatch.status,
+              })
+              .where(eq(mixBatches.id, srcBatchId));
+
+            const srcCostPerKg = parseFloat(srcBatch.costPerKg);
+            const sCost = wKg * srcCostPerKg;
+            totalWeightKg += wKg;
+            totalCost += sCost;
+            validatedSources.push({ sourceBatchId: srcBatchId, weightKg: wKg, costPerKg: srcCostPerKg, totalCost: sCost });
           }
-
-          const remaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
-          if (wKg > remaining + 0.001) {
-            throw new Error(`Container ${rawStock.containerId} only has ${remaining.toFixed(3)} kg remaining, requested ${wKg}`);
-          }
-
-          // Deduct from raw stock
-          const newUsed = parseFloat(rawStock.usedKg) + wKg;
-          await tx
-            .update(productionRawStock)
-            .set({ usedKg: newUsed.toFixed(3) })
-            .where(eq(productionRawStock.id, rawStock.id));
-
-          const sCost = wKg * cPKg;
-          totalWeightKg += wKg;
-          totalCost += sCost;
-          validatedSources.push({ containerId: cId, weightKg: wKg, costPerKg: cPKg, totalCost: sCost });
         }
 
         const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
 
-        // Create the mix batch
         const [batch] = await tx
           .insert(mixBatches)
           .values({
@@ -26706,11 +26756,11 @@ if (asOfDate) {
           })
           .returning();
 
-        // Create sources
         for (const src of validatedSources) {
           await tx.insert(mixBatchSources).values({
             mixBatchId: batch.id,
-            containerId: src.containerId,
+            containerId: src.containerId || null,
+            sourceBatchId: src.sourceBatchId || null,
             weightKg: src.weightKg.toFixed(3),
             costPerKg: src.costPerKg.toFixed(4),
             totalCost: src.totalCost.toFixed(2),
