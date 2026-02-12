@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Printer, Trash2, Search, Package, Filter, Download } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -139,6 +140,8 @@ export default function BalesHistory() {
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
   const { toast } = useToast();
 
   const { data: balesData, isLoading } = useQuery<any[]>({
@@ -163,6 +166,53 @@ export default function BalesHistory() {
       setDeleteConfirm(null);
     },
   });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return await apiRequest("PATCH", `/api/production-bales/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      toast({ title: "Status updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error updating status", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const bulkUpdateStatus = useMutation({
+    mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
+      return await apiRequest("PATCH", "/api/production-bales/bulk-status", { ids, status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      setSelectedIds(new Set());
+      setBulkStatus("");
+      toast({ title: "Bulk status updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error updating status", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (filteredItems: any[]) => {
+    const filteredIds = filteredItems.map((r: any) => r.bale.id);
+    const allSelected = filteredIds.every((id: number) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredIds));
+    }
+  };
 
   const handleReprint = (baleRow: any) => {
     const html = generateReprintHtml(baleRow.bale, baleRow.product, true);
@@ -259,6 +309,41 @@ export default function BalesHistory() {
             </Select>
           </div>
 
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-md bg-muted">
+              <CheckSquare className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{selectedIds.size} selected</span>
+              <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                <SelectTrigger className="w-[180px]" data-testid="select-bulk-status">
+                  <SelectValue placeholder="Change status to..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
+                  <SelectItem value="PRESSED">Pressed</SelectItem>
+                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                  <SelectItem value="RESERVED">Reserved</SelectItem>
+                  <SelectItem value="SOLD">Sold</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!bulkStatus || bulkUpdateStatus.isPending}
+                onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status: bulkStatus })}
+                data-testid="button-bulk-update"
+              >
+                {bulkUpdateStatus.isPending ? "Updating..." : "Apply"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setSelectedIds(new Set()); setBulkStatus(""); }}
+                data-testid="button-clear-selection"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
+
           {filtered.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -270,6 +355,13 @@ export default function BalesHistory() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={filtered.length > 0 && filtered.every((r: any) => selectedIds.has(r.bale.id))}
+                        onCheckedChange={() => toggleSelectAll(filtered)}
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
                     <TableHead>Bale Code</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Article</TableHead>
@@ -289,6 +381,13 @@ export default function BalesHistory() {
                     const batch = row.mixBatch;
                     return (
                       <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(bale.id)}
+                            onCheckedChange={() => toggleSelect(bale.id)}
+                            data-testid={`checkbox-bale-${bale.id}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{bale.baleCode}</TableCell>
                         <TableCell>{product?.name || "-"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
@@ -297,9 +396,23 @@ export default function BalesHistory() {
                         <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
                         <TableCell className="text-right font-mono text-muted-foreground">{formatLabelNum(bale.costPerKg)}</TableCell>
                         <TableCell>
-                          <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} data-testid={`badge-status-${bale.id}`}>
-                            {bale.status.replace(/_/g, " ")}
-                          </Badge>
+                          <Select
+                            value={bale.status}
+                            onValueChange={(val) => updateStatus.mutate({ id: bale.id, status: val })}
+                          >
+                            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-status-${bale.id}`}>
+                              <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} className="text-xs">
+                                {bale.status.replace(/_/g, " ")}
+                              </Badge>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
+                              <SelectItem value="PRESSED">Pressed</SelectItem>
+                              <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                              <SelectItem value="RESERVED">Reserved</SelectItem>
+                              <SelectItem value="SOLD">Sold</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {new Date(bale.createdAt).toLocaleDateString()}

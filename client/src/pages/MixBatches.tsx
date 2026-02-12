@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Package, CheckCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,12 @@ import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
 import { formatNumber } from "@/lib/formatNumber";
 import type { MixBatch } from "@shared/schema";
 
+const BatchDetail = lazy(() => import("./BatchDetail"));
+
 export default function MixBatches() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
   const { data: batches, isLoading } = useQuery<MixBatch[]>({
     queryKey: ["/api/mix-batches"],
@@ -59,6 +62,14 @@ export default function MixBatches() {
         return "outline";
     }
   };
+
+  if (selectedBatchId !== null) {
+    return (
+      <Suspense fallback={<div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>}>
+        <BatchDetail batchId={selectedBatchId} onBack={() => setSelectedBatchId(null)} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -122,7 +133,8 @@ export default function MixBatches() {
                   return (
                     <TableRow
                       key={batch.id}
-                      className="hover-elevate"
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => setSelectedBatchId(batch.id)}
                       data-testid={`row-batch-${batch.id}`}
                     >
                       <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>

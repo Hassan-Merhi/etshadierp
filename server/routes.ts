@@ -27163,6 +27163,77 @@ if (asOfDate) {
     }
   });
 
+  app.patch("/api/production-bales/:id/status", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      const validStatuses = ["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+      }
+
+      const { productionBales } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq, and } = await import("drizzle-orm");
+
+      const [updated] = await db
+        .update(productionBales)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(productionBales.id, id), eq(productionBales.companyId, companyId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating bale status:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/production-bales/bulk-status", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { ids, status } = req.body;
+      const validStatuses = ["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+      }
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "No bale IDs provided" });
+      }
+
+      const { productionBales } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq, and, inArray } = await import("drizzle-orm");
+
+      const updated = await db
+        .update(productionBales)
+        .set({ status, updatedAt: new Date() })
+        .where(and(
+          inArray(productionBales.id, ids.map((id: any) => parseInt(id))),
+          eq(productionBales.companyId, companyId)
+        ))
+        .returning();
+
+      res.json({ updated: updated.length });
+    } catch (error: any) {
+      console.error("Error bulk updating bale status:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/production-bales/import-excel", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -27298,20 +27369,33 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const transfers = await storage.getAllBaleTransfers(companyId);
+
+      const { baleTransfers, baleTransferItems } = await import("@shared/schema");
+
+      const transfers = await db
+        .select({
+          id: baleTransfers.id,
+          companyId: baleTransfers.companyId,
+          sourceLocationId: baleTransfers.sourceLocationId,
+          destinationLocationId: baleTransfers.destinationLocationId,
+          transferDate: baleTransfers.transferDate,
+          notes: baleTransfers.notes,
+          createdBy: baleTransfers.createdBy,
+          updatedBy: baleTransfers.updatedBy,
+          status: baleTransfers.status,
+          createdAt: baleTransfers.createdAt,
+          updatedAt: baleTransfers.updatedAt,
+          sourceLocationName: sql<string>`(SELECT name FROM locations WHERE id = ${baleTransfers.sourceLocationId})`,
+          destinationLocationName: sql<string>`(SELECT name FROM locations WHERE id = ${baleTransfers.destinationLocationId})`,
+          itemCount: sql<number>`(SELECT COUNT(*) FROM bale_transfer_items WHERE transfer_id = ${baleTransfers.id})::int`,
+        })
+        .from(baleTransfers)
+        .where(eq(baleTransfers.companyId, companyId))
+        .orderBy(desc(baleTransfers.createdAt));
+
       res.json(transfers);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get("/api/bale-transfers/:id", requireAuth, async (req, res) => {
-    try {
-      const transfer = await storage.getBaleTransferById(parseInt(req.params.id));
-      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
-      const items = await storage.getBaleTransferItems(transfer.id);
-      res.json({ ...transfer, items });
-    } catch (error: any) {
+      console.error("Error fetching bale transfers:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -27320,32 +27404,190 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      
-      const { sourceLocationId, destinationLocationId, transferDate, notes, items } = req.body;
-      
-      const transfer = await storage.createBaleTransfer({
-        companyId,
-        sourceLocationId,
-        destinationLocationId,
-        transferDate,
-        notes,
-        createdBy: req.session.userId!,
-        status: "PENDING"
-      });
 
-      for (const item of items) {
-        await storage.createBaleTransferItem({
-          transferId: transfer.id,
-          productionBaleId: item.productionBaleId,
-          quantity: item.quantity,
-          weightKg: item.weightKg.toString(),
-          costPerKg: item.costPerKg.toString(),
-          totalCost: item.totalCost.toString()
-        });
+      const { sourceLocationId, destinationLocationId, transferDate, notes, items } = req.body;
+
+      if (!sourceLocationId || !destinationLocationId || !transferDate || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Missing required fields: sourceLocationId, destinationLocationId, transferDate, and items array" });
       }
 
-      res.json({ success: true, transferId: transfer.id });
+      const { baleTransfers, baleTransferItems, productionBales } = await import("@shared/schema");
+      const createdBy = req.session.username || "system";
+
+      const result = await db.transaction(async (tx) => {
+        const [transfer] = await tx
+          .insert(baleTransfers)
+          .values({
+            companyId,
+            sourceLocationId,
+            destinationLocationId,
+            transferDate,
+            notes: notes || null,
+            createdBy,
+            status: "PENDING",
+          })
+          .returning();
+
+        for (const item of items) {
+          await tx.insert(baleTransferItems).values({
+            transferId: transfer.id,
+            productionBaleId: item.productionBaleId,
+            quantity: item.quantity || 1,
+            weightKg: item.weightKg.toString(),
+            costPerKg: item.costPerKg.toString(),
+            totalCost: item.totalCost.toString(),
+          });
+
+          await tx
+            .update(productionBales)
+            .set({
+              locationId: destinationLocationId,
+              status: "IN_STOCK",
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productionBales.id, item.productionBaleId));
+        }
+
+        return transfer;
+      });
+
+      res.json({ success: true, transferId: result.id, transfer: result });
     } catch (error: any) {
+      console.error("Error creating bale transfer:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bale-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.id);
+      if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
+
+      const { baleTransfers, baleTransferItems, productionBales, baleProducts } = await import("@shared/schema");
+
+      const [transfer] = await db
+        .select({
+          id: baleTransfers.id,
+          companyId: baleTransfers.companyId,
+          sourceLocationId: baleTransfers.sourceLocationId,
+          destinationLocationId: baleTransfers.destinationLocationId,
+          transferDate: baleTransfers.transferDate,
+          notes: baleTransfers.notes,
+          createdBy: baleTransfers.createdBy,
+          updatedBy: baleTransfers.updatedBy,
+          status: baleTransfers.status,
+          createdAt: baleTransfers.createdAt,
+          updatedAt: baleTransfers.updatedAt,
+          sourceLocationName: sql<string>`(SELECT name FROM locations WHERE id = ${baleTransfers.sourceLocationId})`,
+          destinationLocationName: sql<string>`(SELECT name FROM locations WHERE id = ${baleTransfers.destinationLocationId})`,
+        })
+        .from(baleTransfers)
+        .where(eq(baleTransfers.id, transferId));
+
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
+      const items = await db
+        .select({
+          id: baleTransferItems.id,
+          transferId: baleTransferItems.transferId,
+          productionBaleId: baleTransferItems.productionBaleId,
+          quantity: baleTransferItems.quantity,
+          weightKg: baleTransferItems.weightKg,
+          costPerKg: baleTransferItems.costPerKg,
+          totalCost: baleTransferItems.totalCost,
+          createdAt: baleTransferItems.createdAt,
+          baleCode: productionBales.baleCode,
+          barcodeValue: productionBales.barcodeValue,
+          baleCategory: productionBales.category,
+          baleGrade: productionBales.grade,
+          baleStatus: productionBales.status,
+          productName: baleProducts.name,
+          productCode: baleProducts.code,
+        })
+        .from(baleTransferItems)
+        .leftJoin(productionBales, eq(baleTransferItems.productionBaleId, productionBales.id))
+        .leftJoin(baleProducts, eq(productionBales.productId, baleProducts.id))
+        .where(eq(baleTransferItems.transferId, transferId));
+
+      res.json({ ...transfer, items });
+    } catch (error: any) {
+      console.error("Error fetching bale transfer:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/bale-transfers/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.id);
+      if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
+
+      const { baleTransfers } = await import("@shared/schema");
+
+      const [transfer] = await db
+        .select()
+        .from(baleTransfers)
+        .where(eq(baleTransfers.id, transferId));
+
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
+      const [updated] = await db
+        .update(baleTransfers)
+        .set({
+          status: "COMPLETED",
+          updatedBy: req.session.username || "system",
+          updatedAt: sql`now()`,
+        })
+        .where(eq(baleTransfers.id, transferId))
+        .returning();
+
+      res.json({ success: true, transfer: updated });
+    } catch (error: any) {
+      console.error("Error completing bale transfer:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/bale-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.id);
+      if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
+
+      const { baleTransfers, baleTransferItems, productionBales } = await import("@shared/schema");
+
+      const [transfer] = await db
+        .select()
+        .from(baleTransfers)
+        .where(eq(baleTransfers.id, transferId));
+
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
+      if (transfer.status !== "PENDING") {
+        return res.status(400).json({ message: "Only PENDING transfers can be deleted" });
+      }
+
+      await db.transaction(async (tx) => {
+        const items = await tx
+          .select()
+          .from(baleTransferItems)
+          .where(eq(baleTransferItems.transferId, transferId));
+
+        for (const item of items) {
+          await tx
+            .update(productionBales)
+            .set({
+              locationId: transfer.sourceLocationId,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(productionBales.id, item.productionBaleId));
+        }
+
+        await tx.delete(baleTransferItems).where(eq(baleTransferItems.transferId, transferId));
+        await tx.delete(baleTransfers).where(eq(baleTransfers.id, transferId));
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting bale transfer:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -27358,7 +27600,7 @@ if (asOfDate) {
       await storage.updateBaleTransfer(transferId, {
         status,
         notes,
-        updatedBy: req.session.userId!
+        updatedBy: req.session.username || "system"
       });
 
       if (items) {
