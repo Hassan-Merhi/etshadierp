@@ -60,16 +60,20 @@ function generatePressingLabelHtml(labels: Array<{
             <div class="barcode-number">${label.referenceNumber}</div>
             <div class="product-short">${label.productName}</div>
           </div>
+          <div class="article-barcode-area">
+            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+            <div class="article-barcode-number">${label.articleCode}</div>
+          </div>
         </div>
       </div>`;
   }
   return `<html><head><title>Pressing Labels</title><style>
-    @page { size: 76mm 50mm; margin: 0; }
+    @page { size: 76mm 62mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .label-page { width: 76mm; height: 50mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
+    .label-page { width: 76mm; height: 62mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .label-page:last-child { page-break-after: auto; }
-    .code-label { width: 76mm; height: 50mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-text { font-size: 18pt; font-weight: 900; letter-spacing: 2px; color: #000; line-height: 1; }
@@ -78,9 +82,12 @@ function generatePressingLabelHtml(labels: Array<{
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
-    .barcode-number { font-size: 9pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .product-short { font-size: 8pt; font-weight: 900; text-transform: uppercase; margin-top: 0.5mm; color: #000; white-space: nowrap; }
+    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
+    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .product-short { font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-top: 0.3mm; color: #000; white-space: nowrap; }
+    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
+    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
   </style></head><body><div class="print-note">Pressing labels - disable "Headers and Footers" in print settings for cleanest output.</div>${labelsHtml}</body></html>`;

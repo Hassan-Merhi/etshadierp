@@ -61,6 +61,10 @@ function generateFinalLabelHtml(labels: Array<{
             <div class="barcode-number">${label.referenceNumber}</div>
             <div class="product-short">${label.productName}</div>
           </div>
+          <div class="article-barcode-area">
+            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+            <div class="article-barcode-number">${label.articleCode}</div>
+          </div>
         </div>
         <div class="name-label">
           <div class="name-label-text">${label.productName}</div>
@@ -68,12 +72,12 @@ function generateFinalLabelHtml(labels: Array<{
       </div>`;
   }
   return `<html><head><title>Final Labels</title><style>
-    @page { size: 76mm 100mm; margin: 0; }
+    @page { size: 76mm 105mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .page-container { width: 76mm; height: 100mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
+    .page-container { width: 76mm; height: 105mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .page-container:last-child { page-break-after: auto; }
-    .code-label { width: 76mm; height: 50mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .code-label { width: 76mm; height: 55mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-text { font-size: 18pt; font-weight: 900; letter-spacing: 2px; color: #000; line-height: 1; }
@@ -82,10 +86,13 @@ function generateFinalLabelHtml(labels: Array<{
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
-    .barcode-number { font-size: 9pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .product-short { font-size: 8pt; font-weight: 900; text-transform: uppercase; margin-top: 0.5mm; color: #000; white-space: nowrap; }
-    .name-label { width: 76mm; height: 50mm; display: flex; align-items: center; justify-content: center; background: #fff; }
+    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
+    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .product-short { font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-top: 0.3mm; color: #000; white-space: nowrap; }
+    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
+    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
+    .name-label { width: 76mm; height: 50mm; display: flex; align-items: center; justify-content: center; background: #fff; border-top: 0.3mm solid #ddd; }
     .name-label-text { font-size: 36pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
@@ -122,7 +129,7 @@ export default function ProductionBales() {
   const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
   const pendingBatches = pressingBatches?.filter((b: any) => b.pendingCount > 0);
-  const selectedBatchData = pressingBatches?.find((b: any) => b.batch.id.toString() === selectedPressingBatchId);
+  const selectedBatchData = pressingBatches?.find((b: any) => b.id?.toString() === selectedPressingBatchId);
 
   const selectedMixBatch = activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId);
   const mixBatchRemaining = selectedMixBatch
@@ -316,9 +323,8 @@ export default function ProductionBales() {
                       <SelectItem value="loading" disabled>Loading...</SelectItem>
                     ) : pendingBatches && pendingBatches.length > 0 ? (
                       pendingBatches.map((b: any) => (
-                        <SelectItem key={b.batch.id} value={b.batch.id.toString()}>
-                          Batch #{b.batch.id} - {b.product?.name || "Unknown"} ({b.pendingCount} pending)
-                          {b.mixBatch ? ` - Mix: ${b.mixBatch.name || b.mixBatch.batchCode}` : ""}
+                        <SelectItem key={b.id} value={b.id.toString()}>
+                          Batch #{b.id} - {b.productName || "Unknown"} ({b.pendingCount} pending)
                         </SelectItem>
                       ))
                     ) : (
@@ -477,21 +483,13 @@ export default function ProductionBales() {
                 <div>
                   <p className="text-sm text-muted-foreground">Product</p>
                   <p className="font-medium" data-testid="text-batch-product">
-                    {selectedBatchData.product?.name || "Unknown"}
+                    {selectedBatchData.productName || "Unknown"}
                   </p>
                 </div>
-                {selectedBatchData.mixBatch && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Mix Batch</p>
-                    <p className="font-medium" data-testid="text-batch-mix">
-                      {selectedBatchData.mixBatch.name || selectedBatchData.mixBatch.batchCode}
-                    </p>
-                  </div>
-                )}
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
                   <p className="text-sm" data-testid="text-batch-created">
-                    {new Date(selectedBatchData.batch.createdAt).toLocaleString()}
+                    {new Date(selectedBatchData.createdAt).toLocaleString()}
                   </p>
                 </div>
               </CardContent>
