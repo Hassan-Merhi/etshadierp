@@ -26934,9 +26934,25 @@ if (asOfDate) {
       const totalCostPerBale = (weight * costPerKg).toFixed(2);
 
       // Wrap everything in a transaction for atomicity
-      const bales = await db.transaction(async (tx) => {
+      const result = await db.transaction(async (tx) => {
         const createdBales = [];
-        const { baleSequences, productionBales, mixBatches } = await import("@shared/schema");
+        const { baleSequences, productionBales, mixBatches, pressingBatches } = await import("@shared/schema");
+
+        let pressingBatchId: number | null = null;
+        if (isPressing) {
+          const [pb] = await tx
+            .insert(pressingBatches)
+            .values({
+              companyId,
+              mixBatchId,
+              productId,
+              expectedCount: numBales,
+              status: "PENDING",
+              createdBy: (req.session as any).userId || null,
+            })
+            .returning();
+          pressingBatchId = pb.id;
+        }
         
         // Create bales with unique barcodes (all within transaction)
         for (let i = 0; i < numBales; i++) {
@@ -26970,8 +26986,9 @@ if (asOfDate) {
             mixBatchId,
             productId,
             locationId: isPressing ? null : locationId,
+            pressingBatchId,
             baleCode: product.code,
-            barcodeValue: product.articleCode || product.code,
+            barcodeValue: barcode,
             quantity: 1,
             weightKg: weight.toString(),
             costPerKg: batch.costPerKg,
@@ -26995,10 +27012,10 @@ if (asOfDate) {
           })
           .where(eq(mixBatches.id, mixBatchId));
 
-        return createdBales;
+        return { bales: createdBales, pressingBatchId };
       });
 
-      res.json({ bales, success: true, count: bales.length });
+      res.json({ bales: result.bales, success: true, count: result.bales.length, pressingBatchId: result.pressingBatchId });
     } catch (error: any) {
       console.error("Error creating production bales:", error);
       res.status(500).json({ message: error.message });
@@ -27070,34 +27087,176 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/pressing-batches", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { pressingBatches, baleProducts, mixBatches, productionBales } = await import("@shared/schema");
+
+      const batches = await db
+        .select({
+          batch: pressingBatches,
+          product: baleProducts,
+          mixBatch: mixBatches,
+        })
+        .from(pressingBatches)
+        .leftJoin(baleProducts, eq(pressingBatches.productId, baleProducts.id))
+        .leftJoin(mixBatches, eq(pressingBatches.mixBatchId, mixBatches.id))
+        .where(eq(pressingBatches.companyId, companyId))
+        .orderBy(desc(pressingBatches.createdAt));
+
+      const batchesWithBales = await Promise.all(
+        batches.map(async (b) => {
+          const bales = await db
+            .select()
+            .from(productionBales)
+            .where(and(
+              eq(productionBales.pressingBatchId, b.batch.id),
+              eq(productionBales.companyId, companyId)
+            ));
+          return {
+            ...b,
+            bales,
+            pendingCount: bales.filter(bl => bl.status === "PENDING").length,
+            finalizedCount: bales.filter(bl => bl.status !== "PENDING").length,
+          };
+        })
+      );
+
+      res.json(batchesWithBales);
+    } catch (error: any) {
+      console.error("Error fetching pressing batches:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/pressing-batches/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const batchId = parseInt(req.params.id);
+      const { pressingBatches, baleProducts, mixBatches, productionBales } = await import("@shared/schema");
+
+      const [batchRow] = await db
+        .select({
+          batch: pressingBatches,
+          product: baleProducts,
+          mixBatch: mixBatches,
+        })
+        .from(pressingBatches)
+        .leftJoin(baleProducts, eq(pressingBatches.productId, baleProducts.id))
+        .leftJoin(mixBatches, eq(pressingBatches.mixBatchId, mixBatches.id))
+        .where(and(
+          eq(pressingBatches.id, batchId),
+          eq(pressingBatches.companyId, companyId)
+        ));
+
+      if (!batchRow) return res.status(404).json({ message: "Pressing batch not found" });
+
+      const bales = await db
+        .select()
+        .from(productionBales)
+        .where(and(
+          eq(productionBales.pressingBatchId, batchId),
+          eq(productionBales.companyId, companyId)
+        ));
+
+      res.json({
+        ...batchRow,
+        bales,
+        pendingCount: bales.filter(b => b.status === "PENDING").length,
+        finalizedCount: bales.filter(b => b.status !== "PENDING").length,
+      });
+    } catch (error: any) {
+      console.error("Error fetching pressing batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/production-bales/finalize", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { baleIds, locationId } = req.body;
+      const { pressingBatchId, scannedBaleIds, locationId } = req.body;
       if (!locationId) return res.status(400).json({ message: "Location is required" });
-      if (!Array.isArray(baleIds) || baleIds.length === 0) {
+      if (!pressingBatchId) return res.status(400).json({ message: "Pressing batch ID is required" });
+      if (!Array.isArray(scannedBaleIds) || scannedBaleIds.length === 0) {
         return res.status(400).json({ message: "No bale IDs provided" });
       }
 
-      const { productionBales } = await import("@shared/schema");
+      const { productionBales, pressingBatches } = await import("@shared/schema");
 
-      const updated = await db
-        .update(productionBales)
-        .set({
-          locationId: parseInt(locationId),
-          status: "IN_STOCK",
-          updatedAt: new Date(),
-        })
+      const [batch] = await db
+        .select()
+        .from(pressingBatches)
         .where(and(
-          inArray(productionBales.id, baleIds.map((id: any) => parseInt(id))),
+          eq(pressingBatches.id, parseInt(pressingBatchId)),
+          eq(pressingBatches.companyId, companyId)
+        ));
+
+      if (!batch) return res.status(404).json({ message: "Pressing batch not found" });
+      if (batch.status === "FINALIZED") return res.status(400).json({ message: "This pressing batch has already been finalized" });
+
+      const pendingBales = await db
+        .select()
+        .from(productionBales)
+        .where(and(
+          eq(productionBales.pressingBatchId, batch.id),
           eq(productionBales.companyId, companyId),
           eq(productionBales.status, "PENDING")
-        ))
-        .returning();
+        ));
 
-      res.json({ updated: updated.length, bales: updated });
+      const expectedCount = pendingBales.length;
+      const scannedIds = scannedBaleIds.map((id: any) => parseInt(id));
+
+      if (scannedIds.length !== expectedCount) {
+        return res.status(400).json({
+          message: `Count mismatch: expected ${expectedCount}, scanned ${scannedIds.length}`,
+          expected: expectedCount,
+          scanned: scannedIds.length,
+        });
+      }
+
+      const pendingBaleIds = new Set(pendingBales.map(b => b.id));
+      const invalidIds = scannedIds.filter((id: number) => !pendingBaleIds.has(id));
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          message: `Some scanned bales do not belong to this pressing batch or are not pending`,
+          invalidIds,
+        });
+      }
+
+      const updated = await db.transaction(async (tx) => {
+        const finalizedBales = await tx
+          .update(productionBales)
+          .set({
+            locationId: parseInt(locationId),
+            status: "IN_STOCK",
+            updatedAt: new Date(),
+          })
+          .where(and(
+            inArray(productionBales.id, scannedIds),
+            eq(productionBales.companyId, companyId),
+            eq(productionBales.status, "PENDING")
+          ))
+          .returning();
+
+        await tx
+          .update(pressingBatches)
+          .set({
+            status: "FINALIZED",
+            finalizedAt: new Date(),
+            finalizedLocationId: parseInt(locationId),
+          })
+          .where(eq(pressingBatches.id, batch.id));
+
+        return finalizedBales;
+      });
+
+      res.json({ updated: updated.length, bales: updated, pressingBatchId: batch.id });
     } catch (error: any) {
       console.error("Error finalizing bales:", error);
       res.status(500).json({ message: error.message });

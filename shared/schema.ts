@@ -1517,6 +1517,28 @@ export const baleSequences = pgTable("bale_sequences", {
 
 export type BaleSequence = typeof baleSequences.$inferSelect;
 
+// Pressing Batches - groups bales created during pressing for count validation
+export const pressingBatches = pgTable("pressing_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  mixBatchId: integer("mix_batch_id"),
+  productId: integer("product_id"),
+  expectedCount: integer("expected_count").notNull(),
+  status: text("status").notNull().default("PENDING"),
+  createdBy: integer("created_by"),
+  finalizedAt: timestamp("finalized_at"),
+  finalizedLocationId: integer("finalized_location_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPressingBatchSchema = createInsertSchema(pressingBatches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPressingBatch = z.infer<typeof insertPressingBatchSchema>;
+export type PressingBatch = typeof pressingBatches.$inferSelect;
+
 // Production Bales - extends the concept with mix batch tracking
 export const productionBales = pgTable("production_bales", {
   id: serial("id").primaryKey(),
@@ -1524,6 +1546,7 @@ export const productionBales = pgTable("production_bales", {
   mixBatchId: integer("mix_batch_id"),
   productId: integer("product_id"),
   locationId: integer("location_id"),
+  pressingBatchId: integer("pressing_batch_id"),
   baleCode: varchar("bale_code", { length: 50 }).notNull(),
   barcodeValue: varchar("barcode_value", { length: 100 }).notNull(),
   category: text("category"),

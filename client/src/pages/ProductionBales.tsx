@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Minus, Trash2, Printer, Package, Barcode, ScanLine, AlertCircle, Search, CheckCircle } from "lucide-react";
+import { CheckCircle, Trash2, Printer, Package, ScanLine, AlertCircle, Search, XCircle, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,16 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { MixBatch, BaleProduct, Location } from "@shared/schema";
-
-interface CartItem {
-  productId: number;
-  product: BaleProduct;
-  qty: number;
-  weightPerBaleKg: number;
-}
-
-type ProductionMode = "pressing" | "counting";
+import type { BaleProduct, Location } from "@shared/schema";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -44,11 +35,12 @@ function formatLabelNum(val: string | number): string {
 }
 
 function generateFullLabelHtml(label: {
-  referenceNumber: string;
+  barcodeValue: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
   productName: string;
+  locationName?: string;
 }) {
   return `
     <div class="label">
@@ -62,22 +54,24 @@ function generateFullLabelHtml(label: {
             <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
             <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
             <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+            ${label.locationName ? `<div class="info-row"><span class="info-label">LOCATION:</span> <span class="info-value">${label.locationName}</span></div>` : ''}
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
     </div>`;
 }
 
-function generateLabelHtml(labels: Array<{
-  referenceNumber: string;
+function generateFinalLabelHtml(labels: Array<{
+  barcodeValue: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
   productName: string;
+  locationName?: string;
 }>, dualLabel: boolean) {
   let labelsHtml = '';
   for (const label of labels) {
@@ -88,7 +82,7 @@ function generateLabelHtml(labels: Array<{
           ${fullLabel}
           <div class="label name-label">
             <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
               <div class="name-label-text">${label.productName}</div>
             </div>
           </div>
@@ -98,7 +92,7 @@ function generateLabelHtml(labels: Array<{
     }
   }
   const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
-  return `<html><head><title></title><style>
+  return `<html><head><title>Final Labels</title><style>
     @page { ${pageSize} margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
@@ -125,28 +119,21 @@ function generateLabelHtml(labels: Array<{
     .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
-  </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">FINAL STOCK LABEL - For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
 }
 
 export default function ProductionBales() {
-  const [mode, setMode] = useState<ProductionMode>("pressing");
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+  const [selectedPressingBatchId, setSelectedPressingBatchId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [scannedBales, setScannedBales] = useState<any[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
   const [dualLabel, setDualLabel] = useState(true);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const [countingScanInput, setCountingScanInput] = useState("");
-  const [countingScanError, setCountingScanError] = useState("");
-  const [countingLocationId, setCountingLocationId] = useState<string>("");
-  const [foundBales, setFoundBales] = useState<any[]>([]);
-  const countingScanRef = useRef<HTMLInputElement>(null);
-
-  const { data: mixBatches, isLoading: batchesLoading } = useQuery<MixBatch[]>({
-    queryKey: ["/api/mix-batches"],
+  const { data: pressingBatches, isLoading: batchesLoading } = useQuery<any[]>({
+    queryKey: ["/api/pressing-batches"],
   });
 
   const { data: baleProducts } = useQuery<BaleProduct[]>({
@@ -157,59 +144,69 @@ export default function ProductionBales() {
     queryKey: ["/api/locations"],
   });
 
-  const { data: pendingBales, isLoading: pendingLoading } = useQuery<any[]>({
-    queryKey: ["/api/production-bales/pending"],
-    enabled: mode === "counting",
-  });
-
-  const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
-  const activeProducts = baleProducts?.filter((p) => p.active);
   const activeLocations = locations?.filter((l) => l.active);
 
-  const selectedBatch = activeBatches?.find((b) => b.id.toString() === selectedBatchId);
-  const batchRemaining = selectedBatch
-    ? parseFloat(selectedBatch.totalWeightKg) - parseFloat(selectedBatch.usedKg || "0")
-    : 0;
+  const pendingBatches = pressingBatches?.filter((b: any) => b.batch.status === "PENDING" && b.pendingCount > 0);
+  const selectedBatchData = pressingBatches?.find((b: any) => b.batch.id.toString() === selectedPressingBatchId);
+
+  const expectedCount = selectedBatchData?.pendingCount || 0;
+  const scannedCount = scannedBales.length;
+  const countsMatch = scannedCount === expectedCount && expectedCount > 0;
 
   useEffect(() => {
-    if (mode === "pressing" && scanRef.current) {
+    if (scanRef.current) {
       scanRef.current.focus();
     }
-    if (mode === "counting" && countingScanRef.current) {
-      countingScanRef.current.focus();
-    }
-  }, [cart, mode]);
+  }, [scannedBales]);
 
-  const handleScan = (value: string) => {
+  const handleScan = async (value: string) => {
     if (!value.trim()) return;
     setScanError("");
 
-    const trimmed = value.trim().toLowerCase();
-    const product = activeProducts?.find(
-      (p) =>
-        p.articleCode?.toLowerCase() === trimmed ||
-        p.code.toLowerCase() === trimmed
-    );
-
-    if (!product) {
-      setScanError(`Unknown product: "${value}"`);
+    if (!selectedPressingBatchId) {
+      setScanError("Please select a pressing batch first");
       setScanInput("");
       return;
     }
 
-    const defaultWeight = product.weightPerBaleKg ? parseFloat(product.weightPerBaleKg) : 25;
-
-    setCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id
-            ? { ...item, qty: item.qty + 1 }
-            : item
-        );
+    try {
+      const response = await apiRequest("GET", `/api/production-bales/lookup/${encodeURIComponent(value.trim())}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Bale not found");
       }
-      return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
-    });
+
+      const result = await response.json();
+      const bale = result.bale || result;
+
+      if (bale.status !== "PENDING") {
+        setScanError(`Bale is not pending (status: ${bale.status})`);
+        setScanInput("");
+        return;
+      }
+
+      if (bale.pressingBatchId?.toString() !== selectedPressingBatchId) {
+        setScanError("This bale does not belong to the selected pressing batch");
+        setScanInput("");
+        return;
+      }
+
+      if (scannedBales.some((b: any) => b.id === bale.id)) {
+        setScanError("Bale already scanned");
+        setScanInput("");
+        return;
+      }
+
+      const product = result.product || baleProducts?.find((p) => p.id === bale.productId);
+
+      setScannedBales((prev) => [...prev, {
+        ...bale,
+        productName: product?.name || bale.baleCode || "",
+        articleCode: product?.articleCode || bale.barcodeValue || "",
+      }]);
+    } catch (error: any) {
+      setScanError(error.message || "Bale not found");
+    }
 
     setScanInput("");
   };
@@ -221,209 +218,30 @@ export default function ProductionBales() {
     }
   };
 
-  const updateQty = (productId: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.productId === productId
-            ? { ...item, qty: Math.max(0, item.qty + delta) }
-            : item
-        )
-        .filter((item) => item.qty > 0)
-    );
+  const removeScannedBale = (baleId: number) => {
+    setScannedBales((prev) => prev.filter((b: any) => b.id !== baleId));
   };
 
-  const setQty = (productId: number, qty: number) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((item) => item.productId !== productId));
-    } else {
-      setCart((prev) =>
-        prev.map((item) =>
-          item.productId === productId ? { ...item, qty } : item
-        )
-      );
-    }
+  const clearScanned = () => {
+    setScannedBales([]);
+    setScanError("");
   };
 
-  const updateWeight = (productId: number, weight: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.productId === productId ? { ...item, weightPerBaleKg: weight } : item
-      )
-    );
-  };
-
-  const removeItem = (productId: number) => {
-    setCart((prev) => prev.filter((item) => item.productId !== productId));
-  };
-
-  const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-  const totalKgToConsume = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedBatchId || cart.length === 0) {
-        throw new Error("Please select a batch and add items to cart");
-      }
-
-      if (mode !== "pressing" && !selectedLocationId) {
-        throw new Error("Please select a location");
-      }
-
-      if (totalKgToConsume > batchRemaining + 0.001) {
-        throw new Error(`Not enough remaining in batch. Available: ${formatNumber(batchRemaining)} kg, Needed: ${formatNumber(totalKgToConsume)} kg`);
-      }
-
-      const allBales: any[] = [];
-      const allProducts: BaleProduct[] = [];
-      const allWeights: string[] = [];
-
-      for (const item of cart) {
-        const payload: any = {
-          mixBatchId: parseInt(selectedBatchId),
-          productId: item.productId,
-          quantity: item.qty.toString(),
-          weightPerBale: item.weightPerBaleKg.toString(),
-        };
-
-        if (mode === "pressing") {
-          payload.mode = "pressing";
-        } else {
-          payload.locationId = parseInt(selectedLocationId);
-        }
-
-        const response = await apiRequest("POST", "/api/production-bales/create-batch", payload);
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || "Failed to create bales");
-        }
-
-        const result = await response.json();
-        allBales.push(...result.bales);
-        for (let i = 0; i < result.bales.length; i++) {
-          allProducts.push(item.product);
-          allWeights.push(item.weightPerBaleKg.toString());
-        }
-      }
-
-      return { bales: allBales, products: allProducts, weights: allWeights };
-    },
-    onSuccess: async ({ bales, products, weights }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
-
-      await printBaleLabels(bales, products, weights);
-
-      toast({
-        title: "Success",
-        description: `Created ${bales.length} bale(s) and sent to printer`,
-      });
-
-      setCart([]);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const printBaleLabels = async (bales: any[], products: BaleProduct[], weights: string[]) => {
-    try {
-      const labelData = bales.map((bale: any, idx: number) => ({
-        productionBaleId: bale.id,
-        productId: products[idx].id,
-        articleCode: products[idx].articleCode || products[idx].code,
-        pieces: 1,
-        approxWeightKg: weights[idx],
-      }));
-
-      const labelPrintResponse = await apiRequest("POST", "/api/bale-label-prints", {
-        bales: labelData,
-      });
-
-      if (!labelPrintResponse.ok) {
-        const err = await labelPrintResponse.json();
-        throw new Error(err.message || "Failed to create label print records");
-      }
-
-      const { labelPrints } = await labelPrintResponse.json();
-
-      const labels = labelPrints.map((lp: any, idx: number) => ({
-        referenceNumber: lp.referenceNumber,
-        articleCode: lp.articleCode,
-        pieces: lp.pieces,
-        approxWeightKg: lp.approxWeightKg,
-        productName: products[idx]?.name || "",
-      }));
-
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        toast({ title: "Error", description: "Please allow pop-ups to print labels", variant: "destructive" });
-        return;
-      }
-
-      printWindow.document.write(generateLabelHtml(labels, dualLabel));
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 500);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to generate labels", variant: "destructive" });
-    }
-  };
-
-  const handleCountingScan = async (value: string) => {
-    if (!value.trim()) return;
-    setCountingScanError("");
-
-    try {
-      const response = await apiRequest("GET", `/api/production-bales/lookup/${encodeURIComponent(value.trim())}`);
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Bale not found");
-      }
-      const result = await response.json();
-      const balesArr = Array.isArray(result) ? result : result.bales ? result.bales : [result];
-
-      const newBales = balesArr.filter(
-        (b: any) => !foundBales.some((fb: any) => fb.id === b.id)
-      );
-
-      if (newBales.length === 0) {
-        setCountingScanError("Bale already added to list");
-      } else {
-        setFoundBales((prev) => [...prev, ...newBales]);
-      }
-    } catch (error: any) {
-      setCountingScanError(error.message || "Bale not found");
-    }
-
-    setCountingScanInput("");
-  };
-
-  const handleCountingScanKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleCountingScan(countingScanInput);
-    }
-  };
-
-  const removeFoundBale = (baleId: number) => {
-    setFoundBales((prev) => prev.filter((b: any) => b.id !== baleId));
-  };
+  const selectedLocationName = activeLocations?.find((l) => l.id.toString() === selectedLocationId);
 
   const finalizeMutation = useMutation({
     mutationFn: async () => {
-      if (foundBales.length === 0) {
-        throw new Error("No bales to finalize");
+      if (!countsMatch) {
+        throw new Error(`Count mismatch: expected ${expectedCount}, scanned ${scannedCount}`);
       }
-      if (!countingLocationId) {
-        throw new Error("Please select a location");
+      if (!selectedLocationId) {
+        throw new Error("Please select a warehouse location");
       }
 
       const response = await apiRequest("POST", "/api/production-bales/finalize", {
-        baleIds: foundBales.map((b: any) => b.id),
-        locationId: parseInt(countingLocationId),
+        pressingBatchId: parseInt(selectedPressingBatchId),
+        scannedBaleIds: scannedBales.map((b: any) => b.id),
+        locationId: parseInt(selectedLocationId),
       });
 
       if (!response.ok) {
@@ -436,26 +254,37 @@ export default function ProductionBales() {
     onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pressing-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
 
-      const balesForPrint = result.bales || foundBales;
-      const products: BaleProduct[] = [];
-      const weights: string[] = [];
+      const locName = selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "";
 
-      for (const bale of balesForPrint) {
-        const product = baleProducts?.find((p) => p.id === bale.productId);
-        products.push(product || { id: bale.productId, name: bale.productName || "", code: bale.articleCode || "", articleCode: bale.articleCode || "" } as BaleProduct);
-        weights.push(bale.approxWeightKg || bale.weightPerBaleKg || "0");
+      const labels = scannedBales.map((bale: any) => ({
+        barcodeValue: bale.barcodeValue || bale.baleCode,
+        articleCode: bale.articleCode || "",
+        pieces: 1,
+        approxWeightKg: bale.weightKg || "0",
+        productName: bale.productName || "",
+        locationName: locName,
+      }));
+
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(generateFinalLabelHtml(labels, dualLabel));
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+      } else {
+        toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
       }
 
-      await printBaleLabels(balesForPrint, products, weights);
-
       toast({
-        title: "Success",
-        description: `Finalized ${foundBales.length} bale(s) and sent to printer`,
+        title: "Finalized",
+        description: `${result.updated} bale(s) moved to stock and labels printed`,
       });
 
-      setFoundBales([]);
+      setScannedBales([]);
+      setSelectedPressingBatchId("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -466,442 +295,282 @@ export default function ProductionBales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Production Bales</h1>
-          <p className="text-muted-foreground mt-1">Scanner-first bale production from mix batches</p>
+          <h1 className="text-3xl font-bold tracking-tight">Finalize / Counting</h1>
+          <p className="text-muted-foreground mt-1">Scan pending bales, verify counts, assign to warehouse</p>
         </div>
-        <div className="flex items-center gap-2" data-testid="mode-toggle">
-          <Button
-            variant={mode === "pressing" ? "default" : "outline"}
-            onClick={() => setMode("pressing")}
-            data-testid="button-mode-pressing"
-          >
-            Pressing (Pending)
-          </Button>
-          <Button
-            variant={mode === "counting" ? "default" : "outline"}
-            onClick={() => setMode("counting")}
-            data-testid="button-mode-counting"
-          >
-            Counting (Enter Location)
-          </Button>
-        </div>
+        <Badge variant="outline" className="text-sm" data-testid="badge-finalize-mode">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          FINALIZE MODE
+        </Badge>
       </div>
 
-      {mode === "pressing" && (
-        <>
-          <div className="grid grid-cols-2 gap-4">
-            <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-              <SelectTrigger data-testid="select-mix-batch">
-                <SelectValue placeholder="Select Mix Batch" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeBatches?.map((batch) => {
-                  const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
-                  return (
-                    <SelectItem key={batch.id} value={batch.id.toString()}>
-                      {batch.name || batch.batchCode} ({formatNumber(remaining)} kg remaining)
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-
-            <div className="flex items-center gap-3 rounded-md border px-3">
-              <Switch
-                id="dual-label-toggle"
-                checked={dualLabel}
-                onCheckedChange={setDualLabel}
-                data-testid="switch-dual-label"
-              />
-              <Label htmlFor="dual-label-toggle" className="text-sm cursor-pointer">
-                {dualLabel ? "Dual labels" : "Single label"}
-              </Label>
-            </div>
-          </div>
-
-          <div className="flex gap-6">
-            <div className="flex-1 min-w-0 space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <ScanLine className="h-5 w-5 text-muted-foreground" />
-                    <CardTitle className="text-lg">Scan / Add Product</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Input
-                      ref={scanRef}
-                      value={scanInput}
-                      onChange={(e) => {
-                        setScanInput(e.target.value);
-                        setScanError("");
-                      }}
-                      onKeyDown={handleScanKeyDown}
-                      placeholder="Scan barcode or type article code..."
-                      autoFocus
-                      data-testid="input-scan"
-                    />
-                    {scanError && (
-                      <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
-                        <AlertCircle className="h-4 w-4" />
-                        {scanError}
-                      </div>
+      <div className="flex gap-6">
+        <div className="flex-1 min-w-0 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Select Pressing Batch</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Select value={selectedPressingBatchId} onValueChange={(val) => {
+                  setSelectedPressingBatchId(val);
+                  setScannedBales([]);
+                  setScanError("");
+                }}>
+                  <SelectTrigger data-testid="select-pressing-batch">
+                    <SelectValue placeholder="Select a pending pressing batch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {batchesLoading ? (
+                      <SelectItem value="loading" disabled>Loading...</SelectItem>
+                    ) : pendingBatches && pendingBatches.length > 0 ? (
+                      pendingBatches.map((b: any) => (
+                        <SelectItem key={b.batch.id} value={b.batch.id.toString()}>
+                          Batch #{b.batch.id} - {b.product?.name || "Unknown"} ({b.pendingCount} pending)
+                          {b.mixBatch ? ` - Mix: ${b.mixBatch.name || b.mixBatch.batchCode}` : ""}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>No pending batches</SelectItem>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {cart.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Barcode className="h-8 w-8 mx-auto mb-2" />
-                      <p>Scan a product to add it to the cart</p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead className="text-center w-40">Qty</TableHead>
-                          <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
-                          <TableHead className="text-right w-32">Total (kg)</TableHead>
-                          <TableHead className="w-12"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {cart.map((item) => (
-                          <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
-                            <TableCell>
-                              <div className="font-medium">{item.product.name}</div>
-                              <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => updateQty(item.productId, -1)}
-                                  data-testid={`button-qty-minus-${item.productId}`}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  value={item.qty}
-                                  onChange={(e) => setQty(item.productId, parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center"
-                                  min="1"
-                                  data-testid={`input-qty-${item.productId}`}
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => updateQty(item.productId, 1)}
-                                  data-testid={`button-qty-plus-${item.productId}`}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                value={item.weightPerBaleKg}
-                                onChange={(e) => updateWeight(item.productId, parseFloat(e.target.value) || 0)}
-                                className="w-24 text-right ml-auto"
-                                step="0.01"
-                                data-testid={`input-weight-${item.productId}`}
-                              />
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-medium">
-                              {formatNumber(item.qty * item.weightPerBaleKg)}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeItem(item.productId)}
-                                data-testid={`button-remove-${item.productId}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="w-72 shrink-0 space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Batch Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedBatch ? (
-                    <>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Batch</p>
-                        <p className="font-medium" data-testid="text-batch-name">
-                          {selectedBatch.name || selectedBatch.batchCode}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Remaining</p>
-                        <p className="text-3xl font-bold font-mono" data-testid="text-batch-remaining">
-                          {formatNumber(batchRemaining)}
-                          <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Cost/kg</p>
-                        <p className="text-lg font-mono" data-testid="text-batch-cost">
-                          ${parseFloat(selectedBatch.costPerKg).toFixed(4)}
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">Select a batch to see details</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Production Total</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Bales</p>
-                    <p className="text-2xl font-bold font-mono" data-testid="text-total-qty">{totalQty}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Weight</p>
-                    <p className="text-2xl font-bold font-mono" data-testid="text-total-kg">
-                      {formatNumber(totalKgToConsume)}
-                      <span className="text-sm font-normal text-muted-foreground ml-1">kg</span>
-                    </p>
-                  </div>
-                  {selectedBatch && totalKgToConsume > batchRemaining + 0.001 && (
-                    <div className="flex items-center gap-2 text-destructive text-sm p-2 rounded-md bg-destructive/10">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>Exceeds batch remaining!</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => createMutation.mutate()}
-                disabled={
-                  createMutation.isPending ||
-                  cart.length === 0 ||
-                  !selectedBatchId ||
-                  totalKgToConsume > batchRemaining + 0.001
-                }
-                data-testid="button-create-print"
-              >
-                {createMutation.isPending ? (
-                  "Creating..."
-                ) : (
-                  <>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Create + Print ({totalQty} bales)
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {mode === "counting" && (
-        <div className="flex gap-6">
-          <div className="flex-1 min-w-0 space-y-4">
+          {selectedPressingBatchId && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
-                  <Search className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-lg">Scan Pending Bale Barcode</CardTitle>
+                  <ScanLine className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg">Scan Bales</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <Input
-                    ref={countingScanRef}
-                    value={countingScanInput}
+                    ref={scanRef}
+                    value={scanInput}
                     onChange={(e) => {
-                      setCountingScanInput(e.target.value);
-                      setCountingScanError("");
+                      setScanInput(e.target.value);
+                      setScanError("");
                     }}
-                    onKeyDown={handleCountingScanKeyDown}
-                    placeholder="Scan bale barcode to look up..."
+                    onKeyDown={handleScanKeyDown}
+                    placeholder="Scan bale barcode..."
                     autoFocus
-                    data-testid="input-counting-scan"
+                    data-testid="input-finalize-scan"
                   />
-                  {countingScanError && (
-                    <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-counting-scan-error">
+                  {scanError && (
+                    <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
                       <AlertCircle className="h-4 w-4" />
-                      {countingScanError}
+                      {scanError}
                     </div>
                   )}
-
-                  <Select value={countingLocationId} onValueChange={setCountingLocationId}>
-                    <SelectTrigger data-testid="select-counting-location">
-                      <SelectValue placeholder="Select Location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeLocations?.map((loc) => (
-                        <SelectItem key={loc.id} value={loc.id.toString()}>
-                          {loc.code} - {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </CardContent>
             </Card>
+          )}
 
-            {foundBales.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">
-                    Scanned Bales ({foundBales.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {foundBales.map((bale: any) => (
-                        <TableRow key={bale.id} data-testid={`row-found-bale-${bale.id}`}>
-                          <TableCell className="font-mono">{bale.referenceNumber || bale.barcode || "-"}</TableCell>
-                          <TableCell>{bale.productName || bale.articleCode || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {bale.approxWeightKg || bale.weightPerBaleKg || "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="secondary" className="text-xs">
-                              {bale.status || "PENDING"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeFoundBale(bale.id)}
-                              data-testid={`button-remove-found-${bale.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-                      <Switch
-                        id="counting-dual-label-toggle"
-                        checked={dualLabel}
-                        onCheckedChange={setDualLabel}
-                        data-testid="switch-counting-dual-label"
-                      />
-                      <Label htmlFor="counting-dual-label-toggle" className="text-sm cursor-pointer">
-                        {dualLabel ? "Dual labels" : "Single label"}
-                      </Label>
-                    </div>
-                    <Button
-                      className="flex-1"
-                      size="lg"
-                      onClick={() => finalizeMutation.mutate()}
-                      disabled={
-                        finalizeMutation.isPending ||
-                        foundBales.length === 0 ||
-                        !countingLocationId
-                      }
-                      data-testid="button-finalize-print"
-                    >
-                      {finalizeMutation.isPending ? (
-                        "Finalizing..."
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Finalize + Print ({foundBales.length} bales)
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
+          {scannedBales.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">All Pending Bales</CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-lg">
+                    Scanned Bales ({scannedCount} / {expectedCount})
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={clearScanned} data-testid="button-clear-scanned">
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Clear All
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                {pendingLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                  </div>
-                ) : !pendingBales || pendingBales.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="h-8 w-8 mx-auto mb-2" />
-                    <p>No pending bales</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-right">Created</TableHead>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Barcode</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Weight (kg)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scannedBales.map((bale: any, idx: number) => (
+                      <TableRow key={bale.id} data-testid={`row-scanned-bale-${bale.id}`}>
+                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="font-mono text-sm">{bale.barcodeValue || bale.baleCode}</TableCell>
+                        <TableCell>{bale.productName || "-"}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(parseFloat(bale.weightKg || "0"))}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeScannedBale(bale.id)}
+                            data-testid={`button-remove-scanned-${bale.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingBales.map((bale: any) => (
-                        <TableRow key={bale.id} data-testid={`row-pending-bale-${bale.id}`}>
-                          <TableCell className="font-mono text-sm">{bale.referenceNumber || bale.barcode || "-"}</TableCell>
-                          <TableCell>{bale.productName || bale.articleCode || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {bale.approxWeightKg || bale.weightPerBaleKg || "-"}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {bale.createdAt ? new Date(bale.createdAt).toLocaleDateString() : "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {!selectedPressingBatchId && !batchesLoading && (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-lg font-medium">Select a pressing batch to begin counting</p>
+                  <p className="text-sm mt-1">Pending batches from the pressing floor will appear in the dropdown above</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      )}
+
+        <div className="w-72 shrink-0 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Count Validation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Expected</p>
+                <p className="text-3xl font-bold font-mono" data-testid="text-expected-count">
+                  {expectedCount}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Scanned</p>
+                <p className={`text-3xl font-bold font-mono ${countsMatch ? "text-green-600" : scannedCount > 0 ? "text-amber-500" : ""}`} data-testid="text-scanned-count">
+                  {scannedCount}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Remaining</p>
+                <p className="text-xl font-bold font-mono" data-testid="text-remaining-count">
+                  {Math.max(0, expectedCount - scannedCount)}
+                </p>
+              </div>
+
+              {countsMatch && (
+                <div className="flex items-center gap-2 text-green-600 text-sm p-2 rounded-md bg-green-50 dark:bg-green-950/20" data-testid="text-count-match">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Counts match! Ready to confirm.</span>
+                </div>
+              )}
+
+              {scannedCount > 0 && scannedCount > expectedCount && (
+                <div className="flex items-center gap-2 text-destructive text-sm p-2 rounded-md bg-destructive/10" data-testid="text-count-mismatch">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Too many scanned! Expected {expectedCount}.</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {selectedPressingBatchId && selectedBatchData && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Batch Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">Product</p>
+                  <p className="font-medium" data-testid="text-batch-product">
+                    {selectedBatchData.product?.name || "Unknown"}
+                  </p>
+                </div>
+                {selectedBatchData.mixBatch && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Mix Batch</p>
+                    <p className="font-medium" data-testid="text-batch-mix">
+                      {selectedBatchData.mixBatch.name || selectedBatchData.mixBatch.batchCode}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-muted-foreground">Created</p>
+                  <p className="text-sm" data-testid="text-batch-created">
+                    {new Date(selectedBatchData.batch.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Finalize</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                <SelectTrigger data-testid="select-finalize-location">
+                  <SelectValue placeholder="Select Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeLocations?.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id.toString()}>
+                      {loc.code} - {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-3 rounded-md border px-3 py-2">
+                <Switch
+                  id="final-dual-label-toggle"
+                  checked={dualLabel}
+                  onCheckedChange={setDualLabel}
+                  data-testid="switch-final-dual-label"
+                />
+                <Label htmlFor="final-dual-label-toggle" className="text-sm cursor-pointer">
+                  {dualLabel ? "Dual labels" : "Single label"}
+                </Label>
+              </div>
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => finalizeMutation.mutate()}
+                disabled={
+                  finalizeMutation.isPending ||
+                  !countsMatch ||
+                  !selectedLocationId ||
+                  scannedBales.length === 0
+                }
+                data-testid="button-confirm-finalize"
+              >
+                {finalizeMutation.isPending ? (
+                  "Finalizing..."
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm + Print Final Labels
+                  </>
+                )}
+              </Button>
+
+              {!countsMatch && scannedCount > 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Scan all {expectedCount} bales to enable confirm
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

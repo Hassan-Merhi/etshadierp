@@ -60,7 +60,7 @@ function formatLabelNum(val: string | number): string {
 }
 
 function generateFullLabelHtml(label: {
-  referenceNumber: string;
+  barcodeValue: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
@@ -81,7 +81,7 @@ function generateFullLabelHtml(label: {
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
@@ -89,7 +89,7 @@ function generateFullLabelHtml(label: {
 }
 
 function generateLabelHtml(labels: Array<{
-  referenceNumber: string;
+  barcodeValue: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
@@ -106,7 +106,7 @@ function generateLabelHtml(labels: Array<{
           ${fullLabel}
           <div class="label name-label">
             <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
               <div class="name-label-text">${label.productName}</div>
             </div>
           </div>
@@ -405,8 +405,8 @@ export function CreateBaleDialog({
 
       const { labelPrints } = await labelPrintResponse.json();
 
-      const labels = labelPrints.map((lp: any) => ({
-        referenceNumber: lp.referenceNumber,
+      const labels = labelPrints.map((lp: any, idx: number) => ({
+        barcodeValue: bales[idx]?.barcodeValue || lp.referenceNumber,
         articleCode: lp.articleCode,
         pieces: lp.pieces,
         approxWeightKg: lp.approxWeightKg,
