@@ -35,7 +35,7 @@ function formatLabelNum(val: string | number): string {
 }
 
 function generateFullLabelHtml(label: {
-  barcodeValue: string;
+  referenceNumber: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
@@ -58,7 +58,7 @@ function generateFullLabelHtml(label: {
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
@@ -66,7 +66,7 @@ function generateFullLabelHtml(label: {
 }
 
 function generateFinalLabelHtml(labels: Array<{
-  barcodeValue: string;
+  referenceNumber: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
@@ -82,7 +82,7 @@ function generateFinalLabelHtml(labels: Array<{
           ${fullLabel}
           <div class="label name-label">
             <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
               <div class="name-label-text">${label.productName}</div>
             </div>
           </div>
@@ -260,7 +260,7 @@ export default function ProductionBales() {
       const locName = selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "";
 
       const labels = scannedBales.map((bale: any) => ({
-        barcodeValue: bale.barcodeValue || bale.baleCode,
+        referenceNumber: bale.barcodeValue || bale.baleCode,
         articleCode: bale.articleCode || "",
         pieces: 1,
         approxWeightKg: bale.weightKg || "0",

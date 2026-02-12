@@ -43,7 +43,6 @@ function formatLabelNum(val: string | number): string {
 function generateReprintHtml(bale: any, product: any, dualLabel: boolean): string {
   const label = {
     baleCode: bale.baleCode,
-    barcodeValue: bale.barcodeValue || bale.baleCode,
     articleCode: product?.articleCode || bale.category || "",
     productName: product?.name || bale.category || "",
     weightKg: formatLabelNum(bale.weightKg),
@@ -68,7 +67,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
           </div>
         </div>
         <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
+          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
@@ -81,7 +80,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
         ${fullLabel}
         <div class="label name-label">
           <div class="name-label-content">
-            <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.barcodeValue)}" alt="Bale Barcode" />
+            <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
             <div class="name-label-text">${label.productName}</div>
           </div>
         </div>
