@@ -5769,10 +5769,12 @@ export class DbStorage implements IStorage {
         bale: schema.productionBales,
         product: schema.baleProducts,
         location: schema.locations,
+        mixBatch: schema.mixBatches,
       })
       .from(schema.productionBales)
       .leftJoin(schema.baleProducts, eq(schema.productionBales.productId, schema.baleProducts.id))
       .leftJoin(schema.locations, eq(schema.productionBales.locationId, schema.locations.id))
+      .leftJoin(schema.mixBatches, eq(schema.productionBales.mixBatchId, schema.mixBatches.id))
       .where(and(...conditions))
       .orderBy(desc(schema.productionBales.createdAt));
   }
