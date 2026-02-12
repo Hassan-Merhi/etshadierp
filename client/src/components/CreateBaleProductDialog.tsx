@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,15 +21,24 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { BaleProductCategory } from "@shared/schema";
 
 const formSchema = z.object({
-  code: z.string().min(1, "Product code is required"),
+  articleCode: z.string().min(1, "Article code is required"),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional(),
   itemNumber: z.string().optional(),
-  articleCode: z.string().optional(),
+  categoryId: z.string().optional(),
+  weightPerBaleKg: z.string().optional(),
 });
 
 interface CreateBaleProductDialogProps {
@@ -43,20 +52,39 @@ export function CreateBaleProductDialog({
 }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
 
+  const { data: categories } = useQuery<BaleProductCategory[]>({
+    queryKey: ["/api/bale-product-categories"],
+  });
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      code: "",
+      articleCode: "",
       name: "",
       description: "",
       itemNumber: "",
-      articleCode: "",
+      categoryId: "",
+      weightPerBaleKg: "",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const response = await apiRequest("POST", "/api/bale-products", data);
+      let articleCode = data.articleCode;
+      if (!articleCode && data.itemNumber) {
+        const num = parseInt(data.itemNumber);
+        if (!isNaN(num) && num >= 1 && num <= 99) {
+          articleCode = `HMD${String(num).padStart(2, "0")}000`;
+        }
+      }
+      const categoryId = data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : undefined;
+      const response = await apiRequest("POST", "/api/bale-products", {
+        articleCode,
+        name: data.name,
+        description: data.description,
+        categoryId: categoryId || undefined,
+        weightPerBaleKg: data.weightPerBaleKg || undefined,
+      });
       return await response.json();
     },
     onSuccess: () => {
@@ -95,16 +123,16 @@ export function CreateBaleProductDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="code"
+              name="articleCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Code *</FormLabel>
+                  <FormLabel>Article Code *</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="e.g., TSM-A, PANTS-B"
+                      placeholder="e.g., HMD01000"
                       className="font-mono"
-                      data-testid="input-code"
+                      data-testid="input-article-code"
                     />
                   </FormControl>
                   <FormDescription>
@@ -136,23 +164,25 @@ export function CreateBaleProductDialog({
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="itemNumber"
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Item Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., 1, 2, 8"
-                        type="number"
-                        min="1"
-                        max="99"
-                        data-testid="input-item-number"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Auto-generates article code (HMD0X000)
-                    </FormDescription>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Uncategorized</SelectItem>
+                        {categories?.filter(c => c.isActive).map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -160,21 +190,19 @@ export function CreateBaleProductDialog({
 
               <FormField
                 control={form.control}
-                name="articleCode"
+                name="weightPerBaleKg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Article Code</FormLabel>
+                    <FormLabel>Weight/Bale (kg)</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="e.g., HMD01000"
-                        className="font-mono"
-                        data-testid="input-article-code"
+                        placeholder="e.g., 45"
+                        type="number"
+                        step="0.01"
+                        data-testid="input-weight"
                       />
                     </FormControl>
-                    <FormDescription>
-                      Or enter directly (overrides item number)
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

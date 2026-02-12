@@ -1442,6 +1442,31 @@ export const insertMixBatchSourceSchema = createInsertSchema(mixBatchSources).om
 export type InsertMixBatchSource = z.infer<typeof insertMixBatchSourceSchema>;
 export type MixBatchSource = typeof mixBatchSources.$inferSelect;
 
+// Bale Product Categories
+export const baleProductCategories = pgTable("bale_product_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyName: uniqueIndex("bale_product_categories_company_name_unique").on(t.companyId, t.name),
+}));
+
+export const insertBaleProductCategorySchema = createInsertSchema(baleProductCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Category name is required"),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertBaleProductCategory = z.infer<typeof insertBaleProductCategorySchema>;
+export type BaleProductCategory = typeof baleProductCategories.$inferSelect;
+
 // Bale Products - master list of product types with codes
 export const baleProducts = pgTable("bale_products", {
   id: serial("id").primaryKey(),
@@ -1451,11 +1476,13 @@ export const baleProducts = pgTable("bale_products", {
   name: text("name").notNull(),
   description: text("description"),
   weightPerBaleKg: decimal("weight_per_bale_kg", { precision: 10, scale: 2 }),
+  categoryId: integer("category_id"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("bale_products_company_code_unique").on(t.companyId, t.code),
+  uniqueCompanyArticleCode: uniqueIndex("bale_products_company_article_code_unique").on(t.companyId, t.articleCode),
 }));
 
 export const insertBaleProductSchema = createInsertSchema(baleProducts).omit({
@@ -1464,11 +1491,12 @@ export const insertBaleProductSchema = createInsertSchema(baleProducts).omit({
   updatedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Product code is required"),
-  articleCode: z.string().optional(),
+  code: z.string().optional(),
+  articleCode: z.string().min(1, "Article code is required"),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional(),
   weightPerBaleKg: z.string().optional(),
+  categoryId: z.number().optional().nullable(),
   active: z.boolean().optional(),
 });
 

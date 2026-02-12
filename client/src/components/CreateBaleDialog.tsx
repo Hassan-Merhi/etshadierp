@@ -503,7 +503,7 @@ export function CreateBaleDialog({
                             key={product.id}
                             value={product.id.toString()}
                           >
-                            {product.code} - {product.name} {product.articleCode ? `(${product.articleCode})` : ''}
+                            {product.articleCode || product.code} - {product.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

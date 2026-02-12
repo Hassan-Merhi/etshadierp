@@ -332,6 +332,14 @@ export interface IStorage {
   deletePendingBarcode(id: number): Promise<void>;
   bulkCreatePendingBarcodes(barcodes: schema.InsertPendingBarcode[]): Promise<schema.PendingBarcode[]>;
   markBarcodesAsPrinted(ids: number[]): Promise<void>;
+  // Bale Product Categories
+  getAllBaleProductCategories(companyId: number): Promise<schema.BaleProductCategory[]>;
+  getBaleProductCategoryById(id: number): Promise<schema.BaleProductCategory | undefined>;
+  getBaleProductCategoryByName(name: string, companyId: number): Promise<schema.BaleProductCategory | undefined>;
+  createBaleProductCategory(category: schema.InsertBaleProductCategory): Promise<schema.BaleProductCategory>;
+  updateBaleProductCategory(id: number, updates: Partial<schema.InsertBaleProductCategory>): Promise<schema.BaleProductCategory>;
+  deleteBaleProductCategory(id: number): Promise<void>;
+
   // Bale Products
   getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]>;
   getBaleProductById(id: number): Promise<schema.BaleProduct | undefined>;
@@ -5417,6 +5425,58 @@ export class DbStorage implements IStorage {
       .set({ printed: true })
       .where(inArray(schema.pendingBarcodes.id, ids));
   }
+  async getAllBaleProductCategories(companyId: number): Promise<schema.BaleProductCategory[]> {
+    return await db
+      .select()
+      .from(schema.baleProductCategories)
+      .where(eq(schema.baleProductCategories.companyId, companyId))
+      .orderBy(schema.baleProductCategories.name);
+  }
+
+  async getBaleProductCategoryById(id: number): Promise<schema.BaleProductCategory | undefined> {
+    const [cat] = await db
+      .select()
+      .from(schema.baleProductCategories)
+      .where(eq(schema.baleProductCategories.id, id));
+    return cat;
+  }
+
+  async getBaleProductCategoryByName(name: string, companyId: number): Promise<schema.BaleProductCategory | undefined> {
+    const [cat] = await db
+      .select()
+      .from(schema.baleProductCategories)
+      .where(
+        and(
+          eq(schema.baleProductCategories.name, name),
+          eq(schema.baleProductCategories.companyId, companyId)
+        )
+      );
+    return cat;
+  }
+
+  async createBaleProductCategory(category: schema.InsertBaleProductCategory): Promise<schema.BaleProductCategory> {
+    const [created] = await db
+      .insert(schema.baleProductCategories)
+      .values(category)
+      .returning();
+    return created;
+  }
+
+  async updateBaleProductCategory(id: number, updates: Partial<schema.InsertBaleProductCategory>): Promise<schema.BaleProductCategory> {
+    const [updated] = await db
+      .update(schema.baleProductCategories)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.baleProductCategories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBaleProductCategory(id: number): Promise<void> {
+    await db
+      .delete(schema.baleProductCategories)
+      .where(eq(schema.baleProductCategories.id, id));
+  }
+
   async getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]> {
     return await db
       .select()
@@ -5447,9 +5507,13 @@ export class DbStorage implements IStorage {
   }
 
   async createBaleProduct(product: schema.InsertBaleProduct): Promise<schema.BaleProduct> {
+    const valuesWithCode = {
+      ...product,
+      code: product.code || product.articleCode || `AUTO-${Date.now()}`,
+    };
     const [created] = await db
       .insert(schema.baleProducts)
-      .values(product)
+      .values(valuesWithCode)
       .returning();
     return created;
   }
@@ -5472,14 +5536,17 @@ export class DbStorage implements IStorage {
   async bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]> {
     if (products.length === 0) return [];
     
-    // Validate all products have the same companyId
     const companyIds = new Set(products.map(p => p.companyId));
     if (companyIds.size > 1) {
       throw new Error("All products must belong to the same company");
     }
     
-    // Check for duplicate codes within the batch
-    const codes = products.map(p => p.code);
+    const withCodes = products.map(p => ({
+      ...p,
+      code: p.code || p.articleCode || `AUTO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    }));
+    
+    const codes = withCodes.map(p => p.code);
     const duplicates = codes.filter((code, index) => codes.indexOf(code) !== index);
     if (duplicates.length > 0) {
       throw new Error(`Duplicate product codes in import: ${duplicates.join(", ")}`);
@@ -5487,7 +5554,7 @@ export class DbStorage implements IStorage {
     
     return await db
       .insert(schema.baleProducts)
-      .values(products)
+      .values(withCodes)
       .returning();
   }
 

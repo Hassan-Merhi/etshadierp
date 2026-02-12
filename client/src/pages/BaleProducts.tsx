@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, ChevronDown, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { Plus, Package, Upload, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,25 +19,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
-import type { BaleProduct } from "@shared/schema";
+import type { BaleProduct, BaleProductCategory } from "@shared/schema";
 
 interface ImportPreviewRow {
-  code: string;
-  articleCode?: string;
+  articleCode: string;
   name: string;
+  category?: string;
   description?: string;
   weightPerBaleKg?: string;
   active?: boolean;
 }
 
 interface GroupedProduct {
-  code: string;
+  articleCode: string;
   name: string;
   count: number;
   items: BaleProduct[];
@@ -51,6 +52,9 @@ export default function BaleProducts() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [condensedView, setCondensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showCategories, setShowCategories] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -58,7 +62,59 @@ export default function BaleProducts() {
     queryKey: ["/api/bale-products"],
   });
 
+  const { data: categories } = useQuery<BaleProductCategory[]>({
+    queryKey: ["/api/bale-product-categories"],
+  });
+
+  const categoryMap = new Map<number, string>();
+  categories?.forEach((c) => categoryMap.set(c.id, c.name));
+
   const activeProducts = products?.filter((p) => p.active);
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await apiRequest("POST", "/api/bale-product-categories", { name });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      setNewCategoryName("");
+      toast({ title: "Category created" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const response = await apiRequest("PATCH", `/api/bale-product-categories/${id}`, { name });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bale-products"] });
+      setEditingCategory(null);
+      toast({ title: "Category updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/bale-product-categories/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      toast({ title: "Category deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -76,7 +132,12 @@ export default function BaleProducts() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-products"] });
-      toast({ title: "Success", description: `Imported ${result.count} products` });
+      queryClient.invalidateQueries({ queryKey: ["/api/bale-product-categories"] });
+      const parts = [];
+      if (result.created) parts.push(`${result.created} created`);
+      if (result.updated) parts.push(`${result.updated} updated`);
+      if (result.categoriesCreated) parts.push(`${result.categoriesCreated} categories auto-created`);
+      toast({ title: "Import Complete", description: parts.join(", ") || `${result.count} products processed` });
       setImportDialogOpen(false);
       setImportPreview([]);
       setImportFile(null);
@@ -117,21 +178,21 @@ export default function BaleProducts() {
           }
         }
         return {
-          code: row.code || row.Code || row.product_code || "",
-          articleCode: articleCode || undefined,
+          articleCode: articleCode || "",
           name: row.name || row.Name || row.product_name || "",
+          category: (row.category || row.Category || row.category_name || "").toString().trim(),
           description: row.description || row.Description || "",
           weightPerBaleKg: row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || undefined,
           active: row.active === undefined ? true : Boolean(row.active),
         };
       });
 
-      const missing = preview.filter((r) => !r.code || !r.name);
+      const missing = preview.filter((r) => !r.articleCode || !r.name);
       if (missing.length > 0) {
-        setImportError(`${missing.length} row(s) missing required code or name`);
+        setImportError(`${missing.length} row(s) missing required Article Code or Name`);
       }
 
-      setImportPreview(preview.filter((r) => r.code && r.name));
+      setImportPreview(preview.filter((r) => r.articleCode && r.name));
       setImportDialogOpen(true);
     } catch (err: any) {
       setImportError(err.message || "Failed to parse Excel file");
@@ -150,11 +211,11 @@ export default function BaleProducts() {
     importMutation.mutate(importFile);
   };
 
-  const toggleGroup = (code: string) => {
+  const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -163,24 +224,32 @@ export default function BaleProducts() {
     if (!activeProducts) return [];
     const groups: Record<string, GroupedProduct> = {};
     for (const p of activeProducts) {
-      const key = p.code;
+      const key = p.articleCode || p.code;
       if (!groups[key]) {
-        groups[key] = { code: p.code, name: p.name, count: 0, items: [] };
+        groups[key] = { articleCode: key, name: p.name, count: 0, items: [] };
       }
       groups[key].count++;
       groups[key].items.push(p);
     }
-    return Object.values(groups).sort((a, b) => a.code.localeCompare(b.code));
+    return Object.values(groups).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
   })();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bale Products</h1>
           <p className="text-muted-foreground mt-1">Manage product types for bale production</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => setShowCategories(!showCategories)}
+            data-testid="button-manage-categories"
+          >
+            <Tags className="h-4 w-4 mr-2" />
+            Categories
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -204,9 +273,110 @@ export default function BaleProducts() {
         </div>
       </div>
 
+      {showCategories && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tags className="h-5 w-5" />
+              Product Categories
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="New category name..."
+                data-testid="input-new-category"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCategoryName.trim()) {
+                    createCategoryMutation.mutate(newCategoryName.trim());
+                  }
+                }}
+              />
+              <Button
+                onClick={() => {
+                  if (newCategoryName.trim()) createCategoryMutation.mutate(newCategoryName.trim());
+                }}
+                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                data-testid="button-add-category"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add
+              </Button>
+            </div>
+            {categories && categories.length > 0 ? (
+              <div className="space-y-2">
+                {categories.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between gap-2 p-2 rounded-md border">
+                    {editingCategory?.id === cat.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          value={editingCategory.name}
+                          onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                          data-testid={`input-edit-category-${cat.id}`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && editingCategory.name.trim()) {
+                              updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() });
+                            }
+                            if (e.key === "Escape") setEditingCategory(null);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() })}
+                          disabled={!editingCategory.name.trim()}
+                          data-testid={`button-save-category-${cat.id}`}
+                        >
+                          Save
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setEditingCategory(null)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium" data-testid={`text-category-${cat.id}`}>{cat.name}</span>
+                          {!cat.isActive && <Badge variant="outline">Inactive</Badge>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingCategory({ id: cat.id, name: cat.name })}
+                            data-testid={`button-edit-category-${cat.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              if (confirm(`Delete category "${cat.name}"?`)) {
+                                deleteCategoryMutation.mutate(cat.id);
+                              }
+                            }}
+                            data-testid={`button-delete-category-${cat.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No categories yet. Create one above.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle>Product List</CardTitle>
             <div className="flex items-center gap-2">
               <List className="h-4 w-4 text-muted-foreground" />
@@ -233,8 +403,9 @@ export default function BaleProducts() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
-                    <TableHead>Code</TableHead>
+                    <TableHead>Article Code</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead className="text-right">Count</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -242,25 +413,28 @@ export default function BaleProducts() {
                   {groupedProducts.map((group) => (
                     <>
                       <TableRow
-                        key={group.code}
+                        key={group.articleCode}
                         className="cursor-pointer hover-elevate"
-                        onClick={() => toggleGroup(group.code)}
-                        data-testid={`row-group-${group.code}`}
+                        onClick={() => toggleGroup(group.articleCode)}
+                        data-testid={`row-group-${group.articleCode}`}
                       >
                         <TableCell>
-                          {expandedGroups.has(group.code) ? (
+                          {expandedGroups.has(group.articleCode) ? (
                             <ChevronDown className="h-4 w-4" />
                           ) : (
                             <ChevronRight className="h-4 w-4" />
                           )}
                         </TableCell>
-                        <TableCell className="font-mono font-medium">{group.code}</TableCell>
+                        <TableCell className="font-mono font-medium">{group.articleCode}</TableCell>
                         <TableCell className="font-medium">{group.name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Badge variant="secondary">{group.count}</Badge>
                         </TableCell>
                       </TableRow>
-                      {expandedGroups.has(group.code) &&
+                      {expandedGroups.has(group.articleCode) &&
                         group.items.map((product) => (
                           <TableRow key={product.id} className="bg-muted/30" data-testid={`row-product-${product.id}`}>
                             <TableCell></TableCell>
@@ -268,6 +442,9 @@ export default function BaleProducts() {
                               {product.articleCode || "-"}
                             </TableCell>
                             <TableCell className="text-sm">{product.name}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {product.categoryId ? categoryMap.get(product.categoryId) || "-" : "-"}
+                            </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {product.weightPerBaleKg ? `${product.weightPerBaleKg} kg` : "-"}
                             </TableCell>
@@ -284,30 +461,28 @@ export default function BaleProducts() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
                   <TableHead>Article Code</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {activeProducts.map((product) => (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                    <TableCell className="font-mono font-medium">{product.code}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground">{product.articleCode || "-"}</TableCell>
+                    <TableCell className="font-mono font-medium">{product.articleCode || "-"}</TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
+                    </TableCell>
                     <TableCell className="text-right font-mono">{product.weightPerBaleKg || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{product.description || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={product.active ? "secondary" : "outline"}>
                         {product.active ? "Active" : "Inactive"}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(product.createdAt).toLocaleDateString()}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -326,7 +501,7 @@ export default function BaleProducts() {
           <DialogHeader>
             <DialogTitle>Import Preview</DialogTitle>
             <DialogDescription>
-              Review the {importPreview.length} product(s) to import. Click confirm to proceed.
+              Review the {importPreview.length} product(s) to import. Existing products (by Article Code) will be updated.
             </DialogDescription>
           </DialogHeader>
 
@@ -337,9 +512,9 @@ export default function BaleProducts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Code</TableHead>
                 <TableHead>Article Code</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Weight/Bale</TableHead>
                 <TableHead>Description</TableHead>
               </TableRow>
@@ -347,9 +522,9 @@ export default function BaleProducts() {
             <TableBody>
               {importPreview.map((row, idx) => (
                 <TableRow key={idx}>
-                  <TableCell className="font-mono">{row.code}</TableCell>
-                  <TableCell className="font-mono text-muted-foreground">{row.articleCode || "-"}</TableCell>
+                  <TableCell className="font-mono font-medium">{row.articleCode}</TableCell>
                   <TableCell>{row.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.category || "Uncategorized"}</TableCell>
                   <TableCell>{row.weightPerBaleKg || "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{row.description || "-"}</TableCell>
                 </TableRow>

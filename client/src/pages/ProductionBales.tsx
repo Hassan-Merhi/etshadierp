@@ -453,7 +453,7 @@ export default function ProductionBales() {
                       <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
                         <TableCell>
                           <div className="font-medium">{item.product.name}</div>
-                          <div className="text-sm text-muted-foreground font-mono">{item.product.code}</div>
+                          <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">

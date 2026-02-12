@@ -169,12 +169,8 @@ export default function BarcodeLookup() {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Product Code</p>
-                    <p className="font-medium" data-testid="text-product-code">{articleResult.product.code}</p>
-                  </div>
-                  <div>
                     <p className="text-sm text-muted-foreground">Article Code</p>
-                    <p className="font-medium" data-testid="text-article-code">{articleResult.product.articleCode || "Not assigned"}</p>
+                    <p className="font-medium" data-testid="text-article-code">{articleResult.product.articleCode || articleResult.product.code}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Product Name</p>
@@ -317,12 +313,8 @@ export default function BarcodeLookup() {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Product Code</p>
-                    <p className="font-medium">{referenceResult.product.code}</p>
-                  </div>
-                  <div>
                     <p className="text-sm text-muted-foreground">Article Code</p>
-                    <p className="font-medium">{referenceResult.product.articleCode || "Not assigned"}</p>
+                    <p className="font-medium">{referenceResult.product.articleCode || referenceResult.product.code}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Product Name</p>
