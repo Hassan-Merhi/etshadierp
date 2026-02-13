@@ -2201,6 +2201,7 @@ export const factoryBaleProducts = pgTable("factory_bale_products", {
   description: text("description"),
   weightPerBaleKg: decimal("weight_per_bale_kg", { precision: 10, scale: 2 }),
   categoryId: integer("category_id"),
+  sellingPrice: decimal("selling_price", { precision: 20, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2220,6 +2221,7 @@ export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProd
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional().nullable(),
   weightPerBaleKg: z.string().optional().nullable(),
+  sellingPrice: z.string().optional().nullable(),
   categoryId: z.number().optional().nullable(),
   active: z.boolean().optional(),
 });
@@ -2423,7 +2425,7 @@ export const insertFactoryBaleSchema = createInsertSchema(factoryBales).omit({
   weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
   costPerKg: z.string().optional(),
   totalCost: z.string().optional(),
-  status: z.enum(["PENDING_PRESSING", "FINALIZED"]).optional(),
+  status: z.enum(["PENDING_PRESSING", "FINALIZED", "SOLD"]).optional(),
   pressedAt: z.string().optional().nullable(),
   finalizedAt: z.string().optional().nullable(),
   finalizedBy: z.number().optional().nullable(),
@@ -2458,3 +2460,152 @@ export const factoryContainerCommissions = pgTable("factory_container_commission
 }));
 
 export type FactoryContainerCommission = typeof factoryContainerCommissions.$inferSelect;
+
+export const customerProformas = pgTable("customer_proformas", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  customerCompanyIdx: index("customer_proformas_customer_company_idx").on(t.customerId, t.companyId),
+}));
+
+export const insertCustomerProformaSchema = createInsertSchema(customerProformas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  customerId: z.number().min(1, "Customer is required"),
+  name: z.string().min(1, "Proforma name is required"),
+  isActive: z.boolean().optional(),
+});
+
+export type InsertCustomerProforma = z.infer<typeof insertCustomerProformaSchema>;
+export type CustomerProforma = typeof customerProformas.$inferSelect;
+
+export const customerProformaLines = pgTable("customer_proforma_lines", {
+  id: serial("id").primaryKey(),
+  proformaId: integer("proforma_id").notNull(),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  productName: text("product_name").notNull(),
+  pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  proformaIdx: index("customer_proforma_lines_proforma_idx").on(t.proformaId),
+  uniqueProformaArticle: uniqueIndex("customer_proforma_lines_proforma_article_unique").on(t.proformaId, t.articleCode),
+}));
+
+export const insertCustomerProformaLineSchema = createInsertSchema(customerProformaLines).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  proformaId: z.number().min(1, "Proforma is required"),
+  articleCode: z.string().min(1, "Article code is required"),
+  productName: z.string().min(1, "Product name is required"),
+  pricePerBale: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Price must be non-negative"),
+});
+
+export type InsertCustomerProformaLine = z.infer<typeof insertCustomerProformaLineSchema>;
+export type CustomerProformaLine = typeof customerProformaLines.$inferSelect;
+
+export const customerOrders = pgTable("customer_orders", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 50 }),
+  orderDate: date("order_date").notNull(),
+  proformaIdUsed: integer("proforma_id_used"),
+  status: text("status").notNull().default("DRAFT"),
+  subtotalBales: decimal("subtotal_bales", { precision: 20, scale: 2 }).notNull().default("0"),
+  freightAmount: decimal("freight_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  otherChargesTotal: decimal("other_charges_total", { precision: 20, scale: 2 }).notNull().default("0"),
+  grandTotal: decimal("grand_total", { precision: 20, scale: 2 }).notNull().default("0"),
+  totalQtyBales: integer("total_qty_bales").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("customer_orders_company_idx").on(t.companyId),
+  customerIdx: index("customer_orders_customer_idx").on(t.customerId),
+  statusIdx: index("customer_orders_status_idx").on(t.status),
+  invoiceIdx: uniqueIndex("customer_orders_invoice_unique").on(t.companyId, t.invoiceNumber),
+}));
+
+export const insertCustomerOrderSchema = createInsertSchema(customerOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  customerId: z.number().min(1, "Customer is required"),
+  orderDate: z.string().min(1, "Order date is required"),
+  proformaIdUsed: z.number().optional().nullable(),
+  status: z.enum(["DRAFT", "FINALIZED", "CANCELLED"]).optional(),
+  subtotalBales: z.string().optional(),
+  freightAmount: z.string().optional(),
+  otherChargesTotal: z.string().optional(),
+  grandTotal: z.string().optional(),
+  totalQtyBales: z.number().optional(),
+  invoiceNumber: z.string().optional().nullable(),
+});
+
+export type InsertCustomerOrder = z.infer<typeof insertCustomerOrderSchema>;
+export type CustomerOrder = typeof customerOrders.$inferSelect;
+
+export const customerOrderLines = pgTable("customer_order_lines", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  articleCode: varchar("article_code", { length: 50 }).notNull(),
+  baleName: text("bale_name").notNull(),
+  qty: integer("qty").notNull().default(1),
+  weightPerBale: decimal("weight_per_bale", { precision: 15, scale: 3 }).notNull(),
+  totalWeight: decimal("total_weight", { precision: 15, scale: 3 }).notNull(),
+  pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 20, scale: 2 }).notNull(),
+}, (t) => ({
+  orderIdx: index("customer_order_lines_order_idx").on(t.orderId),
+}));
+
+export type CustomerOrderLine = typeof customerOrderLines.$inferSelect;
+
+export const customerOrderBales = pgTable("customer_order_bales", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  baleReference: varchar("bale_reference", { length: 100 }).notNull(),
+  locationId: integer("location_id").notNull(),
+  weight: decimal("weight", { precision: 15, scale: 3 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  baleName: text("bale_name"),
+  priceUsed: decimal("price_used", { precision: 20, scale: 2 }).notNull(),
+}, (t) => ({
+  orderIdx: index("customer_order_bales_order_idx").on(t.orderId),
+  baleIdx: index("customer_order_bales_bale_idx").on(t.baleId),
+}));
+
+export type CustomerOrderBale = typeof customerOrderBales.$inferSelect;
+
+export const customerOrderCharges = pgTable("customer_order_charges", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  name: text("name").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  chargeType: text("charge_type").notNull().default("OTHER"),
+}, (t) => ({
+  orderIdx: index("customer_order_charges_order_idx").on(t.orderId),
+}));
+
+export type CustomerOrderCharge = typeof customerOrderCharges.$inferSelect;
+
+export const customerInvoiceSequences = pgTable("customer_invoice_sequences", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  nextNumber: integer("next_number").notNull().default(1),
+}, (t) => ({
+  uniqueCompanyId: uniqueIndex("customer_invoice_sequences_company_unique").on(t.companyId),
+}));
+
+export type CustomerInvoiceSequence = typeof customerInvoiceSequences.$inferSelect;

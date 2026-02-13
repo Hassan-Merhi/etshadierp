@@ -24,6 +24,9 @@ import {
   Database,
   Settings,
   Upload,
+  ShoppingCart,
+  Receipt,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -90,6 +93,15 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Pressing", url: "/factory/pressing", icon: ScanLine },
       { title: "Finalize / Counting", url: "/factory/finalize", icon: CheckCircle },
       { title: "Bales History", url: "/factory/bales-history", icon: History },
+    ],
+  },
+  {
+    title: "Sales",
+    icon: ShoppingCart,
+    items: [
+      { title: "New Invoice", url: "/factory/sales/new", icon: Receipt },
+      { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
+      { title: "Proformas", url: "/factory/sales/proformas", icon: FileText },
     ],
   },
   {

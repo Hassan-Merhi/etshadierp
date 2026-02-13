@@ -89,6 +89,10 @@ import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
 import FactoryImport from "@/pages/FactoryImport";
+import CustomerProformas from "@/pages/CustomerProformas";
+import CustomerInvoiceCreate from "@/pages/CustomerInvoiceCreate";
+import CustomerInvoices from "@/pages/CustomerInvoices";
+import CustomerInvoiceDetail from "@/pages/CustomerInvoiceDetail";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -484,6 +488,10 @@ function AuthenticatedApp() {
                     <Route path="/factory/payroll" component={Payroll} />
                     <Route path="/factory/analytics" component={Analytics} />
                     <Route path="/factory/production-summary" component={ProductionSummary} />
+                    <Route path="/factory/sales/new" component={CustomerInvoiceCreate} />
+                    <Route path="/factory/sales/invoices/:id" component={CustomerInvoiceDetail} />
+                    <Route path="/factory/sales/invoices" component={CustomerInvoices} />
+                    <Route path="/factory/sales/proformas" component={CustomerProformas} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />

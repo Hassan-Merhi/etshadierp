@@ -25,6 +25,20 @@ import {
   insertFactoryMixBatchSourceSchema,
   insertFactoryPressingBatchSchema,
   insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  companies,
+  locations,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -1948,6 +1962,785 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.send(csv);
     } catch (error: any) {
       console.error("Error generating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // HELPER: Recalculate order totals
+  // ───────────────────────────────────────────────
+  async function recalculateOrderTotals(dbConn: any, orderId: number) {
+    const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+
+    await dbConn.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+
+    const grouped: Record<string, { articleCode: string; baleName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
+    for (const b of bales) {
+      const key = b.articleCode || 'UNKNOWN';
+      if (!grouped[key]) {
+        grouped[key] = { articleCode: key, baleName: b.baleName || key, qty: 0, totalWeight: 0, totalPrice: 0 };
+      }
+      grouped[key].qty += 1;
+      grouped[key].totalWeight += parseFloat(b.weight);
+      grouped[key].totalPrice += parseFloat(b.priceUsed);
+    }
+
+    for (const line of Object.values(grouped)) {
+      await dbConn.insert(customerOrderLines).values({
+        orderId,
+        articleCode: line.articleCode,
+        baleName: line.baleName,
+        qty: line.qty,
+        weightPerBale: String(line.qty > 0 ? line.totalWeight / line.qty : 0),
+        totalWeight: String(line.totalWeight),
+        pricePerBale: String(line.qty > 0 ? line.totalPrice / line.qty : 0),
+        totalPrice: String(line.totalPrice),
+      });
+    }
+
+    const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+    const freightAmount = charges.filter((c: any) => c.chargeType === 'FREIGHT').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    const otherChargesTotal = charges.filter((c: any) => c.chargeType === 'OTHER').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    const subtotalBales = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed), 0);
+    const grandTotal = subtotalBales + freightAmount + otherChargesTotal;
+
+    await dbConn.update(customerOrders).set({
+      subtotalBales: String(subtotalBales),
+      freightAmount: String(freightAmount),
+      otherChargesTotal: String(otherChargesTotal),
+      grandTotal: String(grandTotal),
+      totalQtyBales: bales.length,
+      updatedAt: new Date(),
+    }).where(eq(customerOrders.id, orderId));
+  }
+
+  // ───────────────────────────────────────────────
+  // CUSTOMER PROFORMAS CRUD
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const customerId = req.query.customerId ? parseInt(req.query.customerId) : null;
+      if (!customerId) return res.status(400).json({ message: "customerId is required" });
+
+      const proformas = await db
+        .select()
+        .from(customerProformas)
+        .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, customerId)))
+        .orderBy(desc(customerProformas.createdAt));
+
+      const proformaIds = proformas.map((p: any) => p.id);
+      let lines: any[] = [];
+      if (proformaIds.length > 0) {
+        lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+      }
+
+      const result = proformas.map((p: any) => ({
+        ...p,
+        lines: lines.filter((l: any) => l.proformaId === p.id),
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching customer proformas:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertCustomerProformaSchema.parse({ ...req.body, companyId });
+
+      if (parsed.isActive) {
+        await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
+          .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, parsed.customerId)));
+      }
+
+      const [proforma] = await db.insert(customerProformas).values(parsed).returning();
+      res.json(proforma);
+    } catch (error: any) {
+      console.error("Error creating customer proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [existing] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Proforma not found" });
+
+      if (req.body.isActive === true) {
+        await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
+          .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, existing.customerId)));
+      }
+
+      const [updated] = await db.update(customerProformas)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating customer proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      await db.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+      const [deleted] = await db.delete(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
+        .returning();
+
+      if (!deleted) return res.status(404).json({ message: "Proforma not found" });
+      res.json({ message: "Proforma deleted" });
+    } catch (error: any) {
+      console.error("Error deleting customer proforma:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proforma-lines", requireAuth, async (req: any, res: any) => {
+    try {
+      const parsed = insertCustomerProformaLineSchema.parse(req.body);
+
+      const [existingLine] = await db.select().from(customerProformaLines)
+        .where(and(eq(customerProformaLines.proformaId, parsed.proformaId), eq(customerProformaLines.articleCode, parsed.articleCode)));
+      if (existingLine) return res.status(400).json({ message: "Article code already exists in this proforma" });
+
+      const [line] = await db.insert(customerProformaLines).values(parsed).returning();
+      res.json(line);
+    } catch (error: any) {
+      console.error("Error creating proforma line:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData: any = {};
+      if (req.body.productName !== undefined) updateData.productName = req.body.productName;
+      if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
+
+      const [updated] = await db.update(customerProformaLines).set(updateData)
+        .where(eq(customerProformaLines.id, id)).returning();
+
+      if (!updated) return res.status(404).json({ message: "Proforma line not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating proforma line:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(customerProformaLines).where(eq(customerProformaLines.id, id)).returning();
+      if (!deleted) return res.status(404).json({ message: "Proforma line not found" });
+      res.json({ message: "Proforma line deleted" });
+    } catch (error: any) {
+      console.error("Error deleting proforma line:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // CUSTOMER ORDERS CRUD + FINALIZE
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const conditions: any[] = [eq(customerOrders.companyId, companyId)];
+      if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseInt(req.query.customerId)));
+      if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
+
+      const orders = await db
+        .select({
+          id: customerOrders.id,
+          companyId: customerOrders.companyId,
+          customerId: customerOrders.customerId,
+          invoiceNumber: customerOrders.invoiceNumber,
+          orderDate: customerOrders.orderDate,
+          proformaIdUsed: customerOrders.proformaIdUsed,
+          status: customerOrders.status,
+          subtotalBales: customerOrders.subtotalBales,
+          freightAmount: customerOrders.freightAmount,
+          otherChargesTotal: customerOrders.otherChargesTotal,
+          grandTotal: customerOrders.grandTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          createdAt: customerOrders.createdAt,
+          updatedAt: customerOrders.updatedAt,
+          customerName: customers.legalName,
+        })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(...conditions))
+        .orderBy(desc(customerOrders.createdAt));
+
+      res.json(orders);
+    } catch (error: any) {
+      console.error("Error fetching customer orders:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [order] = await db
+        .select({
+          id: customerOrders.id,
+          companyId: customerOrders.companyId,
+          customerId: customerOrders.customerId,
+          invoiceNumber: customerOrders.invoiceNumber,
+          orderDate: customerOrders.orderDate,
+          proformaIdUsed: customerOrders.proformaIdUsed,
+          status: customerOrders.status,
+          subtotalBales: customerOrders.subtotalBales,
+          freightAmount: customerOrders.freightAmount,
+          otherChargesTotal: customerOrders.otherChargesTotal,
+          grandTotal: customerOrders.grandTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          createdAt: customerOrders.createdAt,
+          updatedAt: customerOrders.updatedAt,
+          customerName: customers.legalName,
+          customerCode: customers.code,
+        })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
+
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
+      const bales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, id));
+      const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, id));
+
+      res.json({ ...order, lines, bales, charges });
+    } catch (error: any) {
+      console.error("Error fetching customer order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
+      const [order] = await db.insert(customerOrders).values(parsed).returning();
+      res.json(order);
+    } catch (error: any) {
+      console.error("Error creating customer order:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { scanCode, locationId } = req.body;
+      if (!scanCode || !locationId) return res.status(400).json({ message: "scanCode and locationId are required" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "DRAFT") return res.status(400).json({ message: "Can only add bales to DRAFT orders" });
+
+      const [bale] = await db.select().from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.status, "FINALIZED"),
+          eq(factoryBales.erpLocationId, parseInt(locationId)),
+          or(
+            eq(factoryBales.referenceNumber, scanCode),
+            eq(factoryBales.baleCode, scanCode),
+            eq(factoryBales.articleCode, scanCode)
+          )
+        ));
+
+      if (!bale) return res.status(404).json({ message: "Bale not found, not at this location, or not available for sale" });
+
+      const [alreadyAdded] = await db.select().from(customerOrderBales)
+        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, bale.id)));
+      if (alreadyAdded) return res.status(400).json({ message: "Bale already added to this order" });
+
+      let priceUsed = "0";
+      if (order.proformaIdUsed) {
+        const [proformaLine] = await db.select().from(customerProformaLines)
+          .where(and(
+            eq(customerProformaLines.proformaId, order.proformaIdUsed),
+            eq(customerProformaLines.articleCode, bale.articleCode || "")
+          ));
+        if (proformaLine) {
+          priceUsed = proformaLine.pricePerBale;
+        }
+      }
+
+      if (priceUsed === "0" && bale.productId) {
+        const [product] = await db.select().from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.id, bale.productId));
+        if (product && product.sellingPrice) {
+          priceUsed = product.sellingPrice;
+        }
+      }
+
+      await db.insert(customerOrderBales).values({
+        orderId,
+        baleId: bale.id,
+        baleReference: bale.referenceNumber,
+        locationId: parseInt(locationId),
+        weight: bale.weightKg,
+        articleCode: bale.articleCode,
+        baleName: bale.productName || bale.articleCode || bale.baleCode,
+        priceUsed,
+      });
+
+      await recalculateOrderTotals(db, orderId);
+
+      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
+    } catch (error: any) {
+      console.error("Error adding bale to order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const baleId = parseInt(req.params.baleId);
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "DRAFT") return res.status(400).json({ message: "Can only remove bales from DRAFT orders" });
+
+      await db.delete(customerOrderBales)
+        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
+    } catch (error: any) {
+      console.error("Error removing bale from order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { name, amount, chargeType } = req.body;
+      if (!name || !amount) return res.status(400).json({ message: "name and amount are required" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      await db.insert(customerOrderCharges).values({
+        orderId,
+        name,
+        amount: String(amount),
+        chargeType: chargeType || "OTHER",
+      });
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, charges: updatedCharges });
+    } catch (error: any) {
+      console.error("Error adding charge to order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const chargeId = parseInt(req.params.chargeId);
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      await db.delete(customerOrderCharges)
+        .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, charges: updatedCharges });
+    } catch (error: any) {
+      console.error("Error removing charge from order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+
+      const result = await db.transaction(async (tx: any) => {
+        const [order] = await tx.select().from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) throw new Error("Order not found");
+        if (order.status !== "DRAFT") throw new Error("Only DRAFT orders can be finalized");
+
+        const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        if (bales.length === 0) throw new Error("Order has no bales");
+
+        for (const b of bales) {
+          const [factoryBale] = await tx.select().from(factoryBales)
+            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "FINALIZED"), eq(factoryBales.erpLocationId, b.locationId)));
+          if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available at the specified location`);
+        }
+
+        let seqRows = await tx.execute(sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`);
+        let seqRow = seqRows.rows?.[0] || seqRows[0];
+        if (!seqRow) {
+          [seqRow] = await tx.insert(customerInvoiceSequences).values({ companyId, nextNumber: 1 }).returning();
+        }
+        const invoiceNum = seqRow.nextNumber || seqRow.next_number;
+        await tx.update(customerInvoiceSequences).set({ nextNumber: invoiceNum + 1 }).where(eq(customerInvoiceSequences.companyId, companyId));
+        const invoiceNumber = `INV-${String(invoiceNum).padStart(6, '0')}`;
+
+        for (const b of bales) {
+          await tx.update(factoryBales).set({ status: "SOLD", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
+        }
+
+        await recalculateOrderTotals(tx, orderId);
+
+        const [recalcOrder] = await tx.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+        await tx.update(customerOrders).set({
+          invoiceNumber,
+          status: "FINALIZED",
+          updatedAt: new Date(),
+        }).where(eq(customerOrders.id, orderId));
+
+        const grandTotal = parseFloat(recalcOrder.grandTotal || "0");
+        const today = new Date().toISOString().split('T')[0];
+
+        await tx.insert(customerBalances).values({
+          companyId,
+          customerId: order.customerId,
+          transactionDate: today,
+          transactionType: "SALE",
+          debitAmount: String(grandTotal),
+          creditAmount: "0",
+          balance: String(grandTotal),
+          referenceType: "INVOICE",
+          referenceId: order.id,
+          description: `Invoice ${invoiceNumber}`,
+          currency: "USD",
+        });
+
+        const [finalOrder] = await tx
+          .select({
+            id: customerOrders.id,
+            companyId: customerOrders.companyId,
+            customerId: customerOrders.customerId,
+            invoiceNumber: customerOrders.invoiceNumber,
+            orderDate: customerOrders.orderDate,
+            proformaIdUsed: customerOrders.proformaIdUsed,
+            status: customerOrders.status,
+            subtotalBales: customerOrders.subtotalBales,
+            freightAmount: customerOrders.freightAmount,
+            otherChargesTotal: customerOrders.otherChargesTotal,
+            grandTotal: customerOrders.grandTotal,
+            totalQtyBales: customerOrders.totalQtyBales,
+            createdAt: customerOrders.createdAt,
+            updatedAt: customerOrders.updatedAt,
+            customerName: customers.legalName,
+          })
+          .from(customerOrders)
+          .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+          .where(eq(customerOrders.id, orderId));
+
+        const finalLines = await tx.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+        const finalBales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        const finalCharges = await tx.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+        return { ...finalOrder, lines: finalLines, bales: finalBales, charges: finalCharges };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error finalizing order:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/cancel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "DRAFT") return res.status(400).json({ message: "Only DRAFT orders can be cancelled" });
+
+      const [updated] = await db.update(customerOrders)
+        .set({ status: "CANCELLED", updatedAt: new Date() })
+        .where(eq(customerOrders.id, orderId))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error cancelling order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // BALE SCAN LOOKUP
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/bale-lookup", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const code = req.query.code as string;
+      const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : null;
+      if (!code) return res.status(400).json({ message: "code is required" });
+
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        eq(factoryBales.status, "FINALIZED"),
+        or(
+          eq(factoryBales.referenceNumber, code),
+          eq(factoryBales.baleCode, code),
+          eq(factoryBales.articleCode, code)
+        ),
+      ];
+
+      if (locationId) {
+        conditions.push(eq(factoryBales.erpLocationId, locationId));
+      }
+
+      const results = await db.select().from(factoryBales).where(and(...conditions));
+
+      if (results.length === 0) return res.status(404).json({ message: "No available bale found with that code at this location" });
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error looking up bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // INVOICE EXPORT (Excel/CSV)
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [order] = await db
+        .select({
+          id: customerOrders.id,
+          invoiceNumber: customerOrders.invoiceNumber,
+          orderDate: customerOrders.orderDate,
+          status: customerOrders.status,
+          subtotalBales: customerOrders.subtotalBales,
+          freightAmount: customerOrders.freightAmount,
+          otherChargesTotal: customerOrders.otherChargesTotal,
+          grandTotal: customerOrders.grandTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          customerName: customers.legalName,
+          customerCode: customers.code,
+        })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
+
+      let csv = `Company: ${company?.name || ""}\n`;
+      csv += `Invoice: ${order.invoiceNumber || "DRAFT"}\n`;
+      csv += `Customer: ${order.customerName} (${order.customerCode})\n`;
+      csv += `Date: ${order.orderDate}\n\n`;
+      csv += `#,Article Code,Product Name,Qty,Weight/Bale,Total Weight,Price/Bale,Total Price\n`;
+
+      sortedLines.forEach((line, idx) => {
+        csv += `${idx + 1},${line.articleCode},${(line.baleName || "").replace(/,/g, " ")},${line.qty},${line.weightPerBale},${line.totalWeight},${line.pricePerBale},${line.totalPrice}\n`;
+      });
+
+      csv += `\nCharges\n`;
+      csv += `Name,Type,Amount\n`;
+      for (const charge of charges) {
+        csv += `${(charge.name || "").replace(/,/g, " ")},${charge.chargeType},${charge.amount}\n`;
+      }
+
+      csv += `\nSummary\n`;
+      csv += `Subtotal Bales,${order.subtotalBales}\n`;
+      csv += `Freight,${order.freightAmount}\n`;
+      csv += `Other Charges,${order.otherChargesTotal}\n`;
+      csv += `Grand Total,${order.grandTotal}\n`;
+      csv += `Total Qty Bales,${order.totalQtyBales}\n`;
+
+      const filename = `invoice_${order.invoiceNumber || orderId}.csv`;
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Error exporting order to CSV:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // INVOICE EXPORT (PDF as HTML)
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customer-orders/:id/export-pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [order] = await db
+        .select({
+          id: customerOrders.id,
+          invoiceNumber: customerOrders.invoiceNumber,
+          orderDate: customerOrders.orderDate,
+          status: customerOrders.status,
+          subtotalBales: customerOrders.subtotalBales,
+          freightAmount: customerOrders.freightAmount,
+          otherChargesTotal: customerOrders.otherChargesTotal,
+          grandTotal: customerOrders.grandTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          customerName: customers.legalName,
+          customerCode: customers.code,
+        })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
+
+      let linesHtml = "";
+      sortedLines.forEach((line, idx) => {
+        linesHtml += `<tr><td>${idx + 1}</td><td>${line.articleCode}</td><td>${line.baleName || ""}</td><td style="text-align:right">${line.qty}</td><td style="text-align:right">${line.weightPerBale}</td><td style="text-align:right">${line.totalWeight}</td><td style="text-align:right">${line.pricePerBale}</td><td style="text-align:right">${line.totalPrice}</td></tr>`;
+      });
+
+      let chargesHtml = "";
+      for (const charge of charges) {
+        chargesHtml += `<tr><td>${charge.name}</td><td>${charge.chargeType}</td><td style="text-align:right">${charge.amount}</td></tr>`;
+      }
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Invoice ${order.invoiceNumber || "DRAFT"}</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+h1 { margin-bottom: 5px; }
+.header-info { margin-bottom: 20px; }
+.header-info p { margin: 2px 0; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+th { background-color: #f5f5f5; text-align: left; }
+.totals-table { width: 300px; margin-left: auto; }
+.totals-table td:last-child { text-align: right; font-weight: bold; }
+.grand-total { font-size: 16px; font-weight: bold; background: #f0f0f0; }
+@media print { body { margin: 20px; } }
+</style></head><body>
+<h1>${company?.name || ""}</h1>
+<div class="header-info">
+<p><strong>Invoice:</strong> ${order.invoiceNumber || "DRAFT"}</p>
+<p><strong>Customer:</strong> ${order.customerName} (${order.customerCode})</p>
+<p><strong>Date:</strong> ${order.orderDate}</p>
+</div>
+<h3>Order Lines</h3>
+<table>
+<thead><tr><th>#</th><th>Article Code</th><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Weight/Bale</th><th style="text-align:right">Total Weight</th><th style="text-align:right">Price/Bale</th><th style="text-align:right">Total Price</th></tr></thead>
+<tbody>${linesHtml}</tbody>
+</table>
+${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>${chargesHtml}</tbody></table>` : ""}
+<table class="totals-table">
+<tr><td>Subtotal Bales</td><td>${order.subtotalBales}</td></tr>
+<tr><td>Freight</td><td>${order.freightAmount}</td></tr>
+<tr><td>Other Charges</td><td>${order.otherChargesTotal}</td></tr>
+<tr class="grand-total"><td>Grand Total</td><td>${order.grandTotal}</td></tr>
+<tr><td>Total Qty Bales</td><td>${order.totalQtyBales}</td></tr>
+</table>
+</body></html>`;
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (error: any) {
+      console.error("Error exporting order to PDF:", error);
       res.status(500).json({ message: error.message });
     }
   });
