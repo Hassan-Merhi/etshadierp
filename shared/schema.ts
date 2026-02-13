@@ -2241,6 +2241,10 @@ export const factoryContainers = pgTable("factory_containers", {
   actualReceivedKg: decimal("actual_received_kg", { precision: 15, scale: 3 }),
   finalPayableAmount: decimal("final_payable_amount", { precision: 20, scale: 4 }),
   differenceKg: decimal("difference_kg", { precision: 15, scale: 3 }),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
+  ratePerKgUsd: decimal("rate_per_kg_usd", { precision: 20, scale: 4 }),
+  finalPayableAmountUsd: decimal("final_payable_amount_usd", { precision: 20, scale: 4 }),
   arrivalDate: date("arrival_date"),
   notes: text("notes"),
   status: text("status").notNull().default("PENDING"),
@@ -2259,6 +2263,10 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
   origin: z.string().optional().nullable(),
   totalKg: z.string().optional().nullable(),
   ratePerKg: z.string().optional().nullable(),
+  currencyCode: z.string().optional(),
+  fxRateToUsd: z.string().optional(),
+  ratePerKgUsd: z.string().optional().nullable(),
+  finalPayableAmountUsd: z.string().optional().nullable(),
   arrivalDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.string().optional(),
@@ -2274,6 +2282,7 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
   receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
   usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
+  costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 4 }),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2289,6 +2298,7 @@ export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).o
   receivedKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Received kg must be positive"),
   usedKg: z.string().optional(),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  costPerKgUsd: z.string().optional().nullable(),
 });
 
 export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;
@@ -2453,6 +2463,9 @@ export const factoryContainerCommissions = pgTable("factory_container_commission
   commissionType: text("commission_type").notNull().default("PER_KG"),
   commissionRate: decimal("commission_rate", { precision: 20, scale: 4 }).notNull(),
   commissionTotal: decimal("commission_total", { precision: 20, scale: 4 }).notNull(),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
+  commissionTotalUsd: decimal("commission_total_usd", { precision: 20, scale: 4 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   containerIdx: index("factory_container_commissions_container_idx").on(t.containerId),
@@ -2609,3 +2622,67 @@ export const customerInvoiceSequences = pgTable("customer_invoice_sequences", {
 }));
 
 export type CustomerInvoiceSequence = typeof customerInvoiceSequences.$inferSelect;
+
+// ─── Factory FX Rates ───────────────────────────────────
+export const factoryFxRates = pgTable("factory_fx_rates", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull(),
+  rateToUsd: decimal("rate_to_usd", { precision: 20, scale: 8 }).notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyDateIdx: index("factory_fx_rates_company_date_idx").on(t.companyId, t.effectiveDate),
+  companyCurrencyIdx: index("factory_fx_rates_company_currency_idx").on(t.companyId, t.currencyCode),
+}));
+
+export const insertFactoryFxRateSchema = createInsertSchema(factoryFxRates).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  currencyCode: z.string().min(1, "Currency code is required"),
+  rateToUsd: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Rate must be positive"),
+  effectiveDate: z.string().min(1, "Date is required"),
+});
+
+export type InsertFactoryFxRate = z.infer<typeof insertFactoryFxRateSchema>;
+export type FactoryFxRate = typeof factoryFxRates.$inferSelect;
+
+// ─── Factory Daybook Entries ────────────────────────────
+export const factoryDaybookEntries = pgTable("factory_daybook_entries", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  txDate: date("tx_date").notNull(),
+  txType: text("tx_type").notNull(),
+  referenceId: integer("reference_id"),
+  description: text("description").notNull(),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+  amountCurrency: decimal("amount_currency", { precision: 20, scale: 2 }).notNull().default("0"),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
+  amountUsd: decimal("amount_usd", { precision: 20, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by"),
+}, (t) => ({
+  companyDateIdx: index("factory_daybook_company_date_idx").on(t.companyId, t.txDate),
+  txTypeIdx: index("factory_daybook_tx_type_idx").on(t.txType),
+}));
+
+export const insertFactoryDaybookEntrySchema = createInsertSchema(factoryDaybookEntries).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  txDate: z.string().min(1),
+  txType: z.string().min(1),
+  description: z.string().min(1),
+  currencyCode: z.string().optional(),
+  amountCurrency: z.string().optional(),
+  fxRateToUsd: z.string().optional(),
+  amountUsd: z.string().optional(),
+  referenceId: z.number().optional().nullable(),
+  createdBy: z.number().optional().nullable(),
+});
+
+export type InsertFactoryDaybookEntry = z.infer<typeof insertFactoryDaybookEntrySchema>;
+export type FactoryDaybookEntry = typeof factoryDaybookEntries.$inferSelect;

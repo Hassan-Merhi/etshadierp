@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Pencil, Container, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,25 @@ export default function FactoryContainers() {
     notes: "",
     status: "PENDING",
   });
+  const [currency, setCurrency] = useState("USD");
+  const [fxRate, setFxRate] = useState("1");
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (currency === "USD") {
+      setFxRate("1");
+      return;
+    }
+    fetch(`/api/factory/fx-rates/latest/${currency}`)
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error("No rate found");
+      })
+      .then((data) => {
+        if (data?.rate) setFxRate(String(data.rate));
+      })
+      .catch(() => {});
+  }, [currency]);
 
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
     queryKey: ["/api/factory/containers"],
@@ -67,6 +85,8 @@ export default function FactoryContainers() {
       const payload = {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
+        currencyCode: currency,
+        fxRateToUsd: fxRate,
       };
       const res = await apiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -91,6 +111,8 @@ export default function FactoryContainers() {
       const payload = {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
+        currencyCode: currency,
+        fxRateToUsd: fxRate,
       };
       const res = await apiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -139,6 +161,8 @@ export default function FactoryContainers() {
       notes: "",
       status: "PENDING",
     });
+    setCurrency("USD");
+    setFxRate("1");
   };
 
   const openEdit = (c: ContainerWithSupplier) => {
@@ -153,6 +177,8 @@ export default function FactoryContainers() {
       notes: c.notes || "",
       status: c.status,
     });
+    setCurrency((c as any).currencyCode || "USD");
+    setFxRate((c as any).fxRateToUsd || "1");
   };
 
   const handleSubmit = () => {
@@ -211,6 +237,7 @@ export default function FactoryContainers() {
                   <TableHead>Origin</TableHead>
                   <TableHead className="text-right">Total Kg</TableHead>
                   <TableHead className="text-right">Rate/Kg</TableHead>
+                  <TableHead>Currency</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Arrival</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
@@ -227,6 +254,9 @@ export default function FactoryContainers() {
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {c.ratePerKg ? formatNumber(parseFloat(c.ratePerKg)) : "-"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {(c as any).currencyCode || "USD"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
@@ -336,6 +366,39 @@ export default function FactoryContainers() {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={(val) => setCurrency(val)}>
+                  <SelectTrigger data-testid="select-container-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>FX Rate to USD</Label>
+                <Input
+                  type="number"
+                  value={fxRate}
+                  onChange={(e) => setFxRate(e.target.value)}
+                  disabled={currency === "USD"}
+                  placeholder="1"
+                  data-testid="input-container-fx-rate"
+                />
+              </div>
+            </div>
+            {currency !== "USD" && formData.ratePerKg && fxRate && (
+              <div className="text-sm text-muted-foreground">
+                Computed USD Rate/Kg: {formatNumber(parseFloat(formData.ratePerKg) * parseFloat(fxRate))} USD
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Arrival Date</Label>

@@ -31,6 +31,7 @@ import Accounts from "@/pages/Accounts";
 import Suppliers from "@/pages/Suppliers";
 import Vouchers from "@/pages/Vouchers";
 import Daybook from "@/pages/Daybook";
+import FactoryDaybook from "@/pages/FactoryDaybook";
 import Analytics from "@/pages/Analytics";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
@@ -466,7 +467,7 @@ function AuthenticatedApp() {
                 <div className="w-full">
                   <Switch>
                     <Route path="/factory/dashboard" component={Dashboard} />
-                    <Route path="/factory/daybook">{() => <Daybook user={user} />}</Route>
+                    <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />

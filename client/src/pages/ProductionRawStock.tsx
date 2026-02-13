@@ -54,6 +54,8 @@ interface ContainerOption {
   containerNumber: string;
   totalKg: string | null;
   ratePerKg: string | null;
+  currencyCode?: string;
+  fxRateToUsd?: string;
 }
 
 export default function ProductionRawStock() {
@@ -64,6 +66,8 @@ export default function ProductionRawStock() {
   const [commissionPersonName, setCommissionPersonName] = useState("");
   const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
   const [commissionRate, setCommissionRate] = useState("");
+  const [currencyCode, setCurrencyCode] = useState("USD");
+  const [fxRateToUsd, setFxRateToUsd] = useState("1");
   const { toast } = useToast();
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
@@ -93,6 +97,10 @@ export default function ProductionRawStock() {
     ? commRateNum * actualKg
     : commRateNum;
 
+  const fxRate = parseFloat(fxRateToUsd || "1");
+  const rateUsd = currencyCode === "USD" ? rate : rate * fxRate;
+  const totalPayableUsd = actualKg * rateUsd;
+
   const offloadMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/factory/raw-stock/offload", data);
@@ -119,6 +127,8 @@ export default function ProductionRawStock() {
     const container = availableContainers?.find((c) => c.id.toString() === id);
     setActualReceivedKg(container?.totalKg || "");
     setCostPerKg(container?.ratePerKg || "");
+    setCurrencyCode(container?.currencyCode || "USD");
+    setFxRateToUsd(container?.fxRateToUsd || "1");
   };
 
   const handleOffload = () => {
@@ -139,6 +149,8 @@ export default function ProductionRawStock() {
       containerId: selectedContainerId,
       receivedKg: actualReceivedKg,
       costPerKg,
+      currencyCode,
+      fxRateToUsd,
     };
 
     if (commissionPersonName.trim() && commRateNum > 0) {
@@ -160,6 +172,8 @@ export default function ProductionRawStock() {
     setCommissionPersonName("");
     setCommissionType("PER_KG");
     setCommissionRate("");
+    setCurrencyCode("USD");
+    setFxRateToUsd("1");
   };
 
   const totalReceived = rawStock?.reduce((sum, r) => sum + parseFloat(r.receivedKg), 0) || 0;
@@ -368,6 +382,41 @@ export default function ProductionRawStock() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Currency</Label>
+                    <Select value={currencyCode} onValueChange={setCurrencyCode}>
+                      <SelectTrigger data-testid="select-currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="AUD">AUD</SelectItem>
+                        <SelectItem value="LBP">LBP</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                    <Input
+                      type="number"
+                      value={fxRateToUsd}
+                      onChange={(e) => setFxRateToUsd(e.target.value)}
+                      placeholder="1.0"
+                      step="0.0001"
+                      disabled={currencyCode === "USD"}
+                      data-testid="input-fx-rate"
+                    />
+                  </div>
+                </div>
+                {currencyCode !== "USD" && rate > 0 && (
+                  <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
+                    Rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
+                  </div>
+                )}
+
                 {hasWeightDiff && (
                   <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${differenceKg > 0 ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : "text-blue-600 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -453,13 +502,21 @@ export default function ProductionRawStock() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Rate</span>
-                    <span className="font-mono">${rate.toFixed(4)}/kg</span>
+                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{rate.toFixed(4)}/kg</span>
                   </div>
                   <Separator className="my-1" />
                   <div className="flex justify-between font-medium">
                     <span>Total Payable</span>
-                    <span className="font-mono text-base">${formatNumber(totalPayable)}</span>
+                    <span className="font-mono text-base">
+                      {currencyCode !== "USD" ? `${currencyCode} ${formatNumber(totalPayable)}` : `$${formatNumber(totalPayable)}`}
+                    </span>
                   </div>
+                  {currencyCode !== "USD" && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Total Payable (USD)</span>
+                      <span className="font-mono">${formatNumber(totalPayableUsd)}</span>
+                    </div>
+                  )}
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Commission ({commissionPersonName})</span>

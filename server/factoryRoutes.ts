@@ -39,10 +39,43 @@ import {
   insertCustomerProformaSchema,
   insertCustomerProformaLineSchema,
   insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
+
+  async function writeDaybookEntry(dbOrTx: any, opts: {
+    companyId: number;
+    txDate: string;
+    txType: string;
+    referenceId?: number;
+    description: string;
+    currencyCode?: string;
+    amountCurrency?: number;
+    fxRateToUsd?: number;
+    amountUsd?: number;
+    createdBy?: number;
+  }) {
+    const currency = opts.currencyCode || "USD";
+    const fxRate = opts.fxRateToUsd || 1;
+    const amtCurrency = opts.amountCurrency || 0;
+    const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+    await dbOrTx.insert(factoryDaybookEntries).values({
+      companyId: opts.companyId,
+      txDate: opts.txDate,
+      txType: opts.txType,
+      referenceId: opts.referenceId || null,
+      description: opts.description,
+      currencyCode: currency,
+      amountCurrency: String(amtCurrency),
+      fxRateToUsd: String(fxRate),
+      amountUsd: String(amtUsd),
+      createdBy: opts.createdBy || null,
+    });
+  }
 
   // ───────────────────────────────────────────────
   // 1. Factory Suppliers CRUD
@@ -586,7 +619,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactoryContainerSchema.parse({ ...req.body, companyId });
-      const [container] = await db.insert(factoryContainers).values(parsed).returning();
+      const currencyCode = parsed.currencyCode || "USD";
+      const fxRate = parseFloat(parsed.fxRateToUsd || "1");
+      const ratePerKg = parseFloat(parsed.ratePerKg || "0");
+      const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRate;
+      const values = {
+        ...parsed,
+        currencyCode,
+        fxRateToUsd: String(fxRate),
+        ratePerKgUsd: String(ratePerKgUsd),
+      };
+      const [container] = await db.insert(factoryContainers).values(values).returning();
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: container.arrivalDate || today,
+        txType: "CONTAINER_IMPORT",
+        referenceId: container.id,
+        description: `Container imported: ${container.containerNumber}`,
+        currencyCode: container.currencyCode || "USD",
+        amountCurrency: parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0"),
+        fxRateToUsd: parseFloat(container.fxRateToUsd || "1"),
+      });
       res.json(container);
     } catch (error: any) {
       console.error("Error creating factory container:", error);
@@ -650,6 +704,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           receivedKg: factoryRawStock.receivedKg,
           usedKg: factoryRawStock.usedKg,
           costPerKg: factoryRawStock.costPerKg,
+          costPerKgUsd: factoryRawStock.costPerKgUsd,
           offloadedAt: factoryRawStock.offloadedAt,
           createdAt: factoryRawStock.createdAt,
           containerNumber: factoryContainers.containerNumber,
@@ -719,7 +774,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { containerId, receivedKg, costPerKg, commission } = req.body;
+      const { containerId, receivedKg, costPerKg, commission, currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
       const [container] = await db
@@ -736,11 +791,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       if (existing) return res.status(400).json({ message: "This container has already been offloaded" });
 
+      const currencyCode = reqCurrencyCode || container.currencyCode || "USD";
+      const fxRate = parseFloat(reqFxRate || container.fxRateToUsd || "1");
+
       const declaredKg = container.totalKg || "0";
       const actualKg = receivedKg || declaredKg;
       const finalCostPerKg = costPerKg || container.ratePerKg || "0";
       const differenceKg = String(parseFloat(declaredKg) - parseFloat(actualKg));
       const finalPayableAmount = String(parseFloat(actualKg) * parseFloat(finalCostPerKg));
+
+      const costPerKgUsd = currencyCode === "USD" ? parseFloat(finalCostPerKg) : parseFloat(finalCostPerKg) * fxRate;
+      const finalPayableAmountUsd = String(parseFloat(actualKg) * costPerKgUsd);
 
       const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
 
@@ -751,6 +812,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           containerId,
           receivedKg: String(actualKg),
           costPerKg: String(finalCostPerKg),
+          costPerKgUsd: String(costPerKgUsd),
         })
         .returning();
 
@@ -762,6 +824,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           actualReceivedKg: String(actualKg),
           finalPayableAmount,
           differenceKg,
+          currencyCode,
+          fxRateToUsd: String(fxRate),
+          ratePerKgUsd: String(costPerKgUsd),
+          finalPayableAmountUsd,
           updatedAt: new Date(),
         })
         .where(eq(factoryContainers.id, containerId));
@@ -774,6 +840,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           ? commRate * parseFloat(actualKg)
           : commRate;
 
+        const commCurrency = commission.currencyCode || currencyCode;
+        const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
+        const commTotalUsd = commCurrency === "USD" ? commTotal : commTotal * commFxRate;
+
         [commissionRecord] = await db
           .insert(factoryContainerCommissions)
           .values({
@@ -783,8 +853,35 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             commissionType: commType,
             commissionRate: String(commRate),
             commissionTotal: String(commTotal),
+            currencyCode: commCurrency,
+            fxRateToUsd: String(commFxRate),
+            commissionTotalUsd: String(commTotalUsd),
           })
           .returning();
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "OFFLOAD_RAW_STOCK",
+        referenceId: rawStock.id,
+        description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${finalCostPerKg}/kg`,
+        currencyCode,
+        amountCurrency: parseFloat(finalPayableAmount),
+        fxRateToUsd: fxRate,
+      });
+      if (commissionRecord) {
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "COMMISSION",
+          referenceId: commissionRecord.id,
+          description: `Commission for ${commissionRecord.personName} on container ${container.containerNumber}`,
+          currencyCode: commissionRecord.currencyCode || "USD",
+          amountCurrency: parseFloat(commissionRecord.commissionTotal),
+          fxRateToUsd: parseFloat(commissionRecord.fxRateToUsd || "1"),
+        });
       }
 
       res.json({ rawStock, commission: commissionRecord });
@@ -908,7 +1005,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             throw new Error(`Not enough raw stock for container ${containerId}. Available: ${remaining.toFixed(3)} kg`);
           }
 
-          const cost = srcCostPerKg ? parseFloat(srcCostPerKg) : parseFloat(rawStock.costPerKg);
+          const costUsd = srcCostPerKg ? parseFloat(srcCostPerKg) : parseFloat(rawStock.costPerKgUsd || rawStock.costPerKg);
 
           await tx
             .update(factoryRawStock)
@@ -916,8 +1013,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .where(eq(factoryRawStock.id, rawStock.id));
 
           totalWeightKg += weight;
-          totalCost += weight * cost;
-          sourceRecords.push({ containerId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
+          totalCost += weight * costUsd;
+          sourceRecords.push({ containerId, weightKg: String(weight), costPerKg: String(costUsd), totalCost: String(weight * costUsd) });
         }
 
         for (const bSource of batchSources) {
@@ -1090,6 +1187,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return { pressingBatchId: pressingBatch.id, bales };
       });
 
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_PRESSING",
+        referenceId: result.pressingBatchId,
+        description: `Pressing batch created: ${result.bales?.length || 0} bales`,
+      });
+
       res.json(result);
     } catch (error: any) {
       console.error("Error creating pressing batch:", error);
@@ -1177,6 +1283,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
 
         return { pressingBatchId: pressingBatch.id, bales };
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_PRESSING",
+        referenceId: result.pressingBatchId,
+        description: `Multi-product pressing batch: ${result.bales?.length || 0} bales`,
       });
 
       res.json(result);
@@ -1552,6 +1667,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           })),
           isFullyFinalized,
         };
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_FINALIZE",
+        referenceId: pressingBatchId,
+        description: `Finalized ${result.updated} bales into location`,
+        amountCurrency: 0,
       });
 
       res.json(result);
@@ -2013,6 +2138,85 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       updatedAt: new Date(),
     }).where(eq(customerOrders.id, orderId));
   }
+
+  // ───────────────────────────────────────────────
+  // FX Rates CRUD
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { currencyCode } = req.query;
+      const conditions: any[] = [eq(factoryFxRates.companyId, companyId)];
+      if (currencyCode) conditions.push(eq(factoryFxRates.currencyCode, currencyCode as string));
+      const results = await db.select().from(factoryFxRates).where(and(...conditions)).orderBy(desc(factoryFxRates.effectiveDate));
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/fx-rates/latest/:currencyCode", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const [rate] = await db.select().from(factoryFxRates)
+        .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, req.params.currencyCode)))
+        .orderBy(desc(factoryFxRates.effectiveDate))
+        .limit(1);
+      res.json(rate || null);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const parsed = insertFactoryFxRateSchema.parse({ ...req.body, companyId });
+      const [rate] = await db.insert(factoryFxRates).values(parsed).returning();
+      res.json(rate);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/fx-rates/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const [deleted] = await db.delete(factoryFxRates)
+        .where(and(eq(factoryFxRates.id, parseInt(req.params.id)), eq(factoryFxRates.companyId, companyId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Rate not found" });
+      res.json(deleted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // Factory Daybook
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/daybook", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { startDate, endDate, txType, currencyCode } = req.query;
+      const conditions: any[] = [eq(factoryDaybookEntries.companyId, companyId)];
+      if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
+      if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
+      if (currencyCode) conditions.push(eq(factoryDaybookEntries.currencyCode, currencyCode as string));
+      const results = await db.select().from(factoryDaybookEntries).where(and(...conditions)).orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // ───────────────────────────────────────────────
   // CUSTOMER PROFORMAS CRUD
@@ -2518,6 +2722,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return { ...finalOrder, lines: finalLines, bales: finalBales, charges: finalCharges };
       });
 
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "INVOICE",
+        referenceId: result.orderId || orderId,
+        description: `Invoice ${result.invoiceNumber} for customer`,
+        amountCurrency: parseFloat(result.grandTotal || "0"),
+        amountUsd: parseFloat(result.grandTotal || "0"),
+      });
+
       res.json(result);
     } catch (error: any) {
       console.error("Error finalizing order:", error);
@@ -2628,7 +2843,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       csv += `Date: ${order.orderDate}\n\n`;
       csv += `#,Article Code,Product Name,Qty,Weight/Bale,Total Weight,Price/Bale,Total Price\n`;
 
-      sortedLines.forEach((line, idx) => {
+      sortedLines.forEach((line: any, idx: number) => {
         csv += `${idx + 1},${line.articleCode},${(line.baleName || "").replace(/,/g, " ")},${line.qty},${line.weightPerBale},${line.totalWeight},${line.pricePerBale},${line.totalPrice}\n`;
       });
 
@@ -2692,7 +2907,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
 
       let linesHtml = "";
-      sortedLines.forEach((line, idx) => {
+      sortedLines.forEach((line: any, idx: number) => {
         linesHtml += `<tr><td>${idx + 1}</td><td>${line.articleCode}</td><td>${line.baleName || ""}</td><td style="text-align:right">${line.qty}</td><td style="text-align:right">${line.weightPerBale}</td><td style="text-align:right">${line.totalWeight}</td><td style="text-align:right">${line.pricePerBale}</td><td style="text-align:right">${line.totalPrice}</td></tr>`;
       });
 
