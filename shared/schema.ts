@@ -2139,6 +2139,7 @@ export const factorySuppliers = pgTable("factory_suppliers", {
   email: varchar("email", { length: 200 }),
   address: text("address"),
   notes: text("notes"),
+  openingBalance: decimal("opening_balance", { precision: 20, scale: 4 }).notNull().default("0"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2158,6 +2159,7 @@ export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers).
   email: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  openingBalance: z.string().optional(),
   isActive: z.boolean().optional(),
 });
 
