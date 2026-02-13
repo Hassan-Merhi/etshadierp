@@ -1583,16 +1583,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const barcode = req.params.barcode;
+      const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : null;
+      const excludeIdsStr = req.query.excludeIds as string;
+      const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];
 
-      let results = await db
-        .select()
-        .from(factoryBales)
-        .where(
-          and(
-            eq(factoryBales.companyId, companyId),
-            or(eq(factoryBales.referenceNumber, barcode), eq(factoryBales.baleCode, barcode))
-          )
-        );
+      let results: any[] = [];
+
+      const baseConditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        or(
+          eq(factoryBales.referenceNumber, barcode),
+          eq(factoryBales.baleCode, barcode),
+          eq(factoryBales.articleCode, barcode)
+        ),
+      ];
+      if (batchId) {
+        baseConditions.push(eq(factoryBales.pressingBatchId, batchId));
+        baseConditions.push(eq(factoryBales.status, "PENDING_PRESSING"));
+      }
+      results = await db.select().from(factoryBales)
+        .where(and(...baseConditions))
+        .orderBy(factoryBales.id);
 
       if (results.length === 0) {
         const labelResults = await db
@@ -1606,30 +1617,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           );
 
         if (labelResults.length > 0 && labelResults[0].productionBaleId) {
-          results = await db
+          const labelBale = await db
             .select()
             .from(factoryBales)
             .where(eq(factoryBales.id, labelResults[0].productionBaleId));
+          if (labelBale.length > 0) {
+            if (!batchId || labelBale[0].pressingBatchId === batchId) {
+              results = labelBale;
+            }
+          }
         }
       }
 
-      if (results.length === 0) {
-        const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : null;
-        const excludeIdsStr = req.query.excludeIds as string;
-        const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];
-        const articleConditions: any[] = [
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.articleCode, barcode),
-          eq(factoryBales.status, "PENDING_PRESSING"),
-        ];
-        if (batchId) {
-          articleConditions.push(eq(factoryBales.pressingBatchId, batchId));
-        }
-        let articleResults = await db.select().from(factoryBales).where(and(...articleConditions)).orderBy(factoryBales.id);
-        if (excludeIds.length > 0) {
-          articleResults = articleResults.filter((b: any) => !excludeIds.includes(b.id));
-        }
-        results = articleResults;
+      if (excludeIds.length > 0) {
+        results = results.filter((b: any) => !excludeIds.includes(b.id));
       }
 
       if (results.length === 0) return res.status(404).json({ message: "Bale not found" });
