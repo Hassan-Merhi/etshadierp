@@ -16,7 +16,8 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory } from "lucide-react";
+import { FactorySidebar } from "@/components/FactorySidebar";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -72,6 +73,14 @@ import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
 import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
+import ProductionRawStock from "@/pages/ProductionRawStock";
+import PressingBales from "@/pages/PressingBales";
+import BalesHistory from "@/pages/BalesHistory";
+import BarcodeLookup from "@/pages/BarcodeLookup";
+import ProductionSummary from "@/pages/ProductionSummary";
+import BaleTransfers from "@/pages/BaleTransfers";
+import FactorySuppliers from "@/pages/FactorySuppliers";
+import FactoryContainers from "@/pages/FactoryContainers";
 import BarcodeManager from "@/pages/BarcodeManager";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
@@ -174,12 +183,12 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
       <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
-      <Route path="/factory-production" component={FactoryProduction} />
+      <Route path="/factory-production"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/barcode-manager" component={BarcodeManager} />
-      <Route path="/bales"><Redirect to="/factory-production" /></Route>
-      <Route path="/mix-batches"><Redirect to="/factory-production" /></Route>
-      <Route path="/production-bales"><Redirect to="/factory-production" /></Route>
-      <Route path="/bale-products"><Redirect to="/factory-production" /></Route>
+      <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
+      <Route path="/mix-batches"><Redirect to="/factory/mix-batches" /></Route>
+      <Route path="/production-bales"><Redirect to="/factory/finalize" /></Route>
+      <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
@@ -411,7 +420,70 @@ function AuthenticatedApp() {
     );
   }
 
-  // Full interface for Admin, Owner, Manager
+  const isFactoryRoute = currentLocation.startsWith("/factory/");
+
+  if (isFactoryRoute) {
+    return (
+      <>
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
+            <FactorySidebar user={user} />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-orange-600/10 border border-orange-600/20">
+                    <Factory className="h-4 w-4 text-orange-600" />
+                    <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Factory Mode</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation("/")}
+                    data-testid="button-switch-erp"
+                  >
+                    <Package className="h-4 w-4 mr-1" />
+                    Switch to ERP
+                  </Button>
+                  <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
+                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                  <CompanySelector />
+                  <CurrencyToggle />
+                  <ThemeToggle />
+                </div>
+              </header>
+              <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+                <div className="w-full">
+                  <Switch>
+                    <Route path="/factory/suppliers" component={FactorySuppliers} />
+                    <Route path="/factory/containers" component={FactoryContainers} />
+                    <Route path="/factory/bale-products" component={BaleProducts} />
+                    <Route path="/factory/raw-stock" component={ProductionRawStock} />
+                    <Route path="/factory/mix-batches" component={MixBatches} />
+                    <Route path="/factory/pressing" component={PressingBales} />
+                    <Route path="/factory/finalize" component={ProductionBales} />
+                    <Route path="/factory/bales-history" component={BalesHistory} />
+                    <Route path="/factory/bale-transfers" component={BaleTransfers} />
+                    <Route path="/factory/production-summary" component={ProductionSummary} />
+                    <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
+                    <Route><Redirect to="/factory/raw-stock" /></Route>
+                  </Switch>
+                </div>
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+        {leaveConfirmDialog}
+      </>
+    );
+  }
+
+  // Full ERP interface for Admin, Owner, Manager
   return (
     <>
       <SidebarProvider style={style as React.CSSProperties}>
@@ -422,6 +494,17 @@ function AuthenticatedApp() {
             <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                {selectedCompany?.companyType === "factory" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation("/factory/raw-stock")}
+                    data-testid="button-switch-factory"
+                  >
+                    <Factory className="h-4 w-4 mr-1" />
+                    Factory
+                  </Button>
+                )}
                 <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                 <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="h-4 w-4" />

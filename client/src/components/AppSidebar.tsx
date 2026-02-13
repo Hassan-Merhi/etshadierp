@@ -111,7 +111,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
-      { title: "Factory Production", url: "/factory-production", icon: Factory },
+      { title: "Factory Production", url: "/factory/raw-stock", icon: Factory },
       { title: "Barcode Manager", url: "/barcode-manager", icon: Barcode },
     ],
   },
@@ -173,7 +173,7 @@ export function AppSidebar({ user }: { user?: any }) {
     const isAdmin = user?.role === "Admin";
     const featureKey = ROUTE_TO_FEATURE[item.url];
 
-    if (item.url === "/factory-production") {
+    if (item.url === "/factory/raw-stock") {
       const isFactoryCompany = selectedCompany?.companyType === "factory";
       if (!isFactoryCompany) return false;
     }
