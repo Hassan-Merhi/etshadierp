@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import CryptoJS from "crypto-js";
 import {
   factorySuppliers,
   factoryCategories,
@@ -16,6 +18,7 @@ import {
   baleLabelPrints,
   stockItems,
   stockGroups,
+  users,
   insertFactorySupplierSchema,
   insertFactoryCategorySchema,
   insertFactoryBaleProductSchema,
@@ -36,6 +39,7 @@ import {
   customers,
   companies,
   locations,
+  userCompanyRoles,
   insertCustomerProformaSchema,
   insertCustomerProformaLineSchema,
   insertCustomerOrderSchema,
@@ -76,6 +80,375 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       createdBy: opts.createdBy || null,
     });
   }
+
+  function isLegacySHA256Hash(hash: string): boolean {
+    return /^[a-f0-9]{64}$/i.test(hash);
+  }
+
+  async function verifySupervisorPassword(password: string, hash: string): Promise<boolean> {
+    if (isLegacySHA256Hash(hash)) {
+      return CryptoJS.SHA256(password).toString().toLowerCase() === hash.toLowerCase();
+    }
+    return bcrypt.compare(password, hash);
+  }
+
+  // ───────────────────────────────────────────────
+  // STOCK ENTRY - Direct to stock (replaces pressing/finalize)
+  // ───────────────────────────────────────────────
+
+  app.post("/api/factory/stock-entry", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { items, erpLocationId, mixBatchId } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "items array is required" });
+      }
+      if (!erpLocationId) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+      if (!mixBatchId) {
+        return res.status(400).json({ message: "Mix batch is required" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        const [mixBatch] = await tx
+          .select()
+          .from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, mixBatchId), eq(factoryMixBatches.companyId, companyId)))
+          .for("update");
+
+        if (!mixBatch) throw new Error("Mix batch not found");
+
+        const totalExpected = items.reduce((sum: number, item: any) => sum + parseInt(item.quantity || item.qty || "1"), 0);
+
+        const [seqRecord] = await tx
+          .select()
+          .from(factoryBaleSequences)
+          .where(eq(factoryBaleSequences.companyId, companyId))
+          .for("update");
+
+        let nextNumber: number;
+        if (seqRecord) {
+          nextNumber = seqRecord.nextNumber;
+          await tx
+            .update(factoryBaleSequences)
+            .set({ nextNumber: nextNumber + totalExpected })
+            .where(eq(factoryBaleSequences.id, seqRecord.id));
+        } else {
+          nextNumber = 1;
+          await tx.insert(factoryBaleSequences).values({
+            companyId,
+            nextNumber: 1 + totalExpected,
+          });
+        }
+
+        const costPerKg = parseFloat(mixBatch.costPerKg || "0");
+        const now = new Date();
+        const bales: any[] = [];
+        let baleIndex = 0;
+        let totalWeight = 0;
+
+        const productIds: number[] = [];
+        for (const item of items) {
+          if (item.productId && !productIds.includes(item.productId)) productIds.push(item.productId);
+        }
+        const factoryProducts = productIds.length > 0
+          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          : [];
+        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+
+        for (const item of items) {
+          const qty = parseInt(item.quantity || item.qty || "1");
+          const weight = parseFloat(item.weightPerBale || "25");
+          const product = productMap.get(item.productId);
+          if (!product) throw new Error(`Product ID ${item.productId} not found`);
+
+          for (let i = 0; i < qty; i++) {
+            const refNum = `HD${String(nextNumber + baleIndex).padStart(5, "0")}`;
+            const baleTotalCost = weight * costPerKg;
+
+            const [bale] = await tx
+              .insert(factoryBales)
+              .values({
+                companyId,
+                mixBatchId,
+                productId: item.productId,
+                erpLocationId,
+                baleCode: product.code,
+                referenceNumber: refNum,
+                articleCode: product.articleCode,
+                productName: product.name,
+                weightKg: String(weight),
+                costPerKg: String(costPerKg),
+                totalCost: String(baleTotalCost),
+                status: "IN_STOCK",
+                finalizedAt: now,
+              })
+              .returning();
+
+            bales.push({ ...bale, _product: product });
+            totalWeight += weight;
+            baleIndex++;
+          }
+        }
+
+        const mixRemaining = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
+        if (totalWeight > mixRemaining + 0.001) {
+          throw new Error(`Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`);
+        }
+
+        await tx
+          .update(factoryMixBatches)
+          .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalWeight}`, updatedAt: now })
+          .where(eq(factoryMixBatches.id, mixBatchId));
+
+        const categoryIdSet = new Set<number>();
+        factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
+        const categoryIds = Array.from(categoryIdSet);
+        const factoryCats = categoryIds.length > 0
+          ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
+          : [];
+        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+
+        const stockGroupCache = new Map<string, number>();
+        const stockItemCache = new Map<string, number>();
+
+        for (const bale of bales) {
+          const factoryProduct = productMap.get(bale.productId as number);
+          if (!factoryProduct) continue;
+
+          const itemCode: string = factoryProduct.articleCode || factoryProduct.code;
+          if (!itemCode) continue;
+
+          let stockGroupId: number | null = null;
+          if (factoryProduct.categoryId) {
+            const cat = categoryMap.get(factoryProduct.categoryId);
+            if (cat) {
+              const catName = cat.name as string;
+              const cached = stockGroupCache.get(catName);
+              if (cached) {
+                stockGroupId = cached;
+              } else {
+                const [existingGroup] = await tx
+                  .select({ id: stockGroups.id })
+                  .from(stockGroups)
+                  .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.name, catName)));
+
+                if (existingGroup) {
+                  stockGroupId = existingGroup.id;
+                } else {
+                  const groupCode = "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  const [created] = await tx
+                    .insert(stockGroups)
+                    .values({ companyId, name: catName, code: groupCode })
+                    .returning({ id: stockGroups.id });
+                  stockGroupId = created.id;
+                }
+                stockGroupCache.set(catName, stockGroupId!);
+              }
+            }
+          }
+
+          let erpStockItemId: number | undefined = stockItemCache.get(itemCode);
+
+          if (!erpStockItemId) {
+            const [existing] = await tx
+              .select({ id: stockItems.id, stockGroupId: stockItems.stockGroupId })
+              .from(stockItems)
+              .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+
+            if (existing) {
+              erpStockItemId = existing.id;
+              if (stockGroupId && !existing.stockGroupId) {
+                await tx.update(stockItems).set({ stockGroupId }).where(eq(stockItems.id, existing.id));
+              }
+            } else {
+              const [created] = await tx
+                .insert(stockItems)
+                .values({
+                  companyId,
+                  code: itemCode,
+                  name: factoryProduct.name as string,
+                  uom: "BALE",
+                  active: true,
+                  ...(stockGroupId ? { stockGroupId } : {}),
+                })
+                .returning({ id: stockItems.id });
+              erpStockItemId = created.id;
+            }
+            stockItemCache.set(itemCode, erpStockItemId!);
+          }
+
+          const baleWeight = parseFloat(bale.weightKg);
+          const baleRate = baleWeight * costPerKg;
+          await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
+        }
+
+        return { bales, totalWeight };
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_STOCK_ENTRY",
+        description: `Stock entry: ${result.bales.length} bales entered into location`,
+      });
+
+      res.json({ bales: result.bales, totalWeight: result.totalWeight });
+    } catch (error: any) {
+      console.error("Error in stock entry:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/stock-entry/remove", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { baleIds, supervisorUsername, supervisorPassword, reason } = req.body;
+
+      if (!baleIds || !Array.isArray(baleIds) || baleIds.length === 0) {
+        return res.status(400).json({ message: "baleIds array is required" });
+      }
+      if (!supervisorUsername || !supervisorPassword) {
+        return res.status(400).json({ message: "Supervisor credentials are required" });
+      }
+
+      const [supervisor] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, supervisorUsername));
+
+      if (!supervisor) {
+        return res.status(403).json({ message: "Supervisor not found" });
+      }
+
+      const passwordValid = await verifySupervisorPassword(supervisorPassword, supervisor.password);
+      if (!passwordValid) {
+        return res.status(403).json({ message: "Invalid supervisor password" });
+      }
+
+      const [role] = await db
+        .select()
+        .from(userCompanyRoles)
+        .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
+
+      if (!role || !["Admin", "Owner", "Manager"].includes(role.role)) {
+        return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        const balesToRemove = await tx
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+
+        const removedBales: any[] = [];
+        const now = new Date();
+
+        const productIds: number[] = [];
+        for (const bale of balesToRemove) {
+          if (bale.productId && !productIds.includes(bale.productId)) productIds.push(bale.productId);
+        }
+        const factoryProducts = productIds.length > 0
+          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          : [];
+        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+
+        const stockItemCache = new Map<string, number>();
+
+        for (const bale of balesToRemove) {
+          if (bale.status !== "IN_STOCK" && bale.status !== "FINALIZED") {
+            throw new Error(`Bale ${bale.referenceNumber} is not in stock (status: ${bale.status})`);
+          }
+
+          if (!bale.erpLocationId) {
+            throw new Error(`Bale ${bale.referenceNumber} has no location assigned`);
+          }
+
+          const [updated] = await tx
+            .update(factoryBales)
+            .set({
+              status: "REMOVED",
+              updatedAt: now,
+            })
+            .where(eq(factoryBales.id, bale.id))
+            .returning();
+
+          removedBales.push(updated);
+
+          const factoryProduct = productMap.get(bale.productId as number);
+          const itemCode = factoryProduct?.articleCode || factoryProduct?.code || bale.articleCode || bale.baleCode;
+
+          if (itemCode) {
+            let erpStockItemId = stockItemCache.get(itemCode);
+            if (!erpStockItemId) {
+              const [existing] = await tx
+                .select({ id: stockItems.id })
+                .from(stockItems)
+                .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+              if (existing) {
+                erpStockItemId = existing.id;
+                stockItemCache.set(itemCode, erpStockItemId!);
+              }
+            }
+
+            if (erpStockItemId) {
+              await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+            }
+          }
+        }
+
+        return { removed: removedBales };
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_REMOVAL",
+        description: `Removed ${result.removed.length} bale(s) from stock. Supervisor: ${supervisorUsername}. Reason: ${reason || "N/A"}`,
+      });
+
+      res.json({ removed: result.removed.length, bales: result.removed });
+    } catch (error: any) {
+      console.error("Error removing bales:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { locationId } = req.query;
+
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+      ];
+
+      if (locationId) {
+        conditions.push(eq(factoryBales.erpLocationId, parseInt(locationId as string)));
+      }
+
+      const results = await db
+        .select()
+        .from(factoryBales)
+        .where(and(...conditions))
+        .orderBy(desc(factoryBales.finalizedAt));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error fetching in-stock bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // ───────────────────────────────────────────────
   // 1. Factory Suppliers CRUD

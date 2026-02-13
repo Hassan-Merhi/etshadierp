@@ -76,6 +76,7 @@ import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
 import ProductionRawStock from "@/pages/ProductionRawStock";
 import PressingBales from "@/pages/PressingBales";
+import BaleStockEntry from "@/pages/BaleStockEntry";
 import BalesHistory from "@/pages/BalesHistory";
 import BarcodeLookup from "@/pages/BarcodeLookup";
 import ProductionSummary from "@/pages/ProductionSummary";
@@ -193,7 +194,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/barcode-manager" component={BarcodeManager} />
       <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/mix-batches"><Redirect to="/factory/mix-batches" /></Route>
-      <Route path="/production-bales"><Redirect to="/factory/finalize" /></Route>
+      <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
       <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
@@ -473,8 +474,9 @@ function AuthenticatedApp() {
                     <Route path="/factory/bale-products" component={BaleProducts} />
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />
                     <Route path="/factory/mix-batches" component={MixBatches} />
-                    <Route path="/factory/pressing" component={PressingBales} />
-                    <Route path="/factory/finalize" component={ProductionBales} />
+                    <Route path="/factory/pressing"><Redirect to="/factory/stock-entry" /></Route>
+                    <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>
+                    <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bale-transfers" component={BaleTransfers} />
                     <Route path="/factory/location-inventory">{() => <LocationInventory />}</Route>
