@@ -13,6 +13,7 @@ import {
   factoryBales,
   factoryBaleSequences,
   factoryContainerCommissions,
+  baleLabelPrints,
   stockItems,
   stockGroups,
   insertFactorySupplierSchema,
@@ -1583,7 +1584,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const barcode = req.params.barcode;
 
-      const results = await db
+      let results = await db
         .select()
         .from(factoryBales)
         .where(
@@ -1592,6 +1593,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             or(eq(factoryBales.referenceNumber, barcode), eq(factoryBales.baleCode, barcode))
           )
         );
+
+      if (results.length === 0) {
+        const labelResults = await db
+          .select()
+          .from(baleLabelPrints)
+          .where(
+            and(
+              eq(baleLabelPrints.companyId, companyId),
+              eq(baleLabelPrints.referenceNumber, barcode)
+            )
+          );
+
+        if (labelResults.length > 0 && labelResults[0].productionBaleId) {
+          results = await db
+            .select()
+            .from(factoryBales)
+            .where(eq(factoryBales.id, labelResults[0].productionBaleId));
+        }
+      }
 
       if (results.length === 0) return res.status(404).json({ message: "Bale not found" });
       res.json(results[0]);

@@ -198,7 +198,11 @@ export default function ProductionBales() {
         return;
       }
 
-      setScannedBaleIds((prev) => new Set([...prev, bale.id]));
+      setScannedBaleIds((prev) => {
+        const next = new Set(Array.from(prev));
+        next.add(bale.id);
+        return next;
+      });
     } catch (error: any) {
       setScanError(error.message || "Bale not found");
     }
@@ -269,23 +273,48 @@ export default function ProductionBales() {
       const locName = selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "";
 
       const finalizedBales = pendingBalesInBatch.filter((b: any) => scannedBaleIds.has(b.id));
-      const labels = finalizedBales.map((bale: any) => ({
-        referenceNumber: bale.referenceNumber || bale.baleCode,
-        articleCode: bale.articleCode || "",
-        pieces: 1,
-        approxWeightKg: bale.weightKg || "0",
-        productName: bale.productName || "",
-        locationName: locName,
-      }));
 
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(generateFinalLabelHtml(labels));
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
-      } else {
-        toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+      try {
+        const labelData = finalizedBales.map((bale: any) => ({
+          productionBaleId: bale.id,
+          productId: bale.productId,
+          articleCode: bale.articleCode || "",
+          pieces: 1,
+          approxWeightKg: bale.weightKg || "0",
+        }));
+
+        const labelResponse = await apiRequest("POST", "/api/bale-label-prints", { bales: labelData });
+
+        if (labelResponse.ok) {
+          const { labelPrints } = await labelResponse.json();
+
+          const baleMap = new Map(finalizedBales.map((b: any) => [b.id, b]));
+          const labels = labelPrints.map((lp: any) => {
+            const bale = baleMap.get(lp.productionBaleId) || {};
+            return {
+              referenceNumber: lp.referenceNumber,
+              articleCode: lp.articleCode || (bale as any).articleCode || "",
+              pieces: lp.pieces || 1,
+              approxWeightKg: lp.approxWeightKg || (bale as any).weightKg || "0",
+              productName: (bale as any).productName || "",
+              locationName: locName,
+            };
+          });
+
+          const printWindow = window.open("", "_blank");
+          if (printWindow) {
+            printWindow.document.write(generateFinalLabelHtml(labels));
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
+          } else {
+            toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+          }
+        } else {
+          toast({ title: "Warning", description: "Finalized but could not generate new labels", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Warning", description: "Finalized but label printing failed", variant: "destructive" });
       }
 
       const count = result.updated || finalizedBales.length;
@@ -299,7 +328,7 @@ export default function ProductionBales() {
       } else {
         toast({
           title: "Finalized",
-          description: `${count} bale(s) moved to stock and labels printed`,
+          description: `${count} bale(s) moved to stock with new labels`,
         });
       }
 

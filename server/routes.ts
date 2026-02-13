@@ -92,6 +92,7 @@ import {
   insertExchangeRateSchema,
   userLocations,
   userCompanyRoles,
+  factoryBales,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -26365,6 +26366,13 @@ if (asOfDate) {
               printedAt: new Date(),
             })
             .returning();
+
+          if (bale.productionBaleId) {
+            await tx
+              .update(factoryBales)
+              .set({ referenceNumber })
+              .where(eq(factoryBales.id, bale.productionBaleId));
+          }
 
           results.push(labelPrint);
         }
