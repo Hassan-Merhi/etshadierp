@@ -14,6 +14,7 @@ import {
   factoryBaleSequences,
   factoryContainerCommissions,
   stockItems,
+  stockGroups,
   insertFactorySupplierSchema,
   insertFactoryCategorySchema,
   insertFactoryBaleProductSchema,
@@ -1213,6 +1214,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
 
+        const categoryIdSet = new Set<number>();
+        factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
+        const categoryIds = Array.from(categoryIdSet);
+        const factoryCats = categoryIds.length > 0
+          ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
+          : [];
+        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+
+        const stockGroupCache = new Map<string, number>();
+
         const stockItemCache = new Map<string, number>();
 
         for (const bale of pendingBales) {
@@ -1222,16 +1233,48 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const itemCode: string = factoryProduct.articleCode || factoryProduct.code;
           if (!itemCode) continue;
 
+          let stockGroupId: number | null = null;
+          if (factoryProduct.categoryId) {
+            const cat = categoryMap.get(factoryProduct.categoryId);
+            if (cat) {
+              const catName = cat.name as string;
+              const cached = stockGroupCache.get(catName);
+              if (cached) {
+                stockGroupId = cached;
+              } else {
+                const [existingGroup] = await tx
+                  .select({ id: stockGroups.id })
+                  .from(stockGroups)
+                  .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.name, catName)));
+
+                if (existingGroup) {
+                  stockGroupId = existingGroup.id;
+                } else {
+                  const groupCode = "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  const [created] = await tx
+                    .insert(stockGroups)
+                    .values({ companyId, name: catName, code: groupCode })
+                    .returning({ id: stockGroups.id });
+                  stockGroupId = created.id;
+                }
+                stockGroupCache.set(catName, stockGroupId!);
+              }
+            }
+          }
+
           let erpStockItemId: number | undefined = stockItemCache.get(itemCode);
 
           if (!erpStockItemId) {
             const [existing] = await tx
-              .select({ id: stockItems.id })
+              .select({ id: stockItems.id, stockGroupId: stockItems.stockGroupId })
               .from(stockItems)
               .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
 
             if (existing) {
               erpStockItemId = existing.id;
+              if (stockGroupId && !existing.stockGroupId) {
+                await tx.update(stockItems).set({ stockGroupId }).where(eq(stockItems.id, existing.id));
+              }
             } else {
               const [created] = await tx
                 .insert(stockItems)
@@ -1241,6 +1284,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                   name: factoryProduct.name as string,
                   uom: "BALE",
                   active: true,
+                  ...(stockGroupId ? { stockGroupId } : {}),
                 })
                 .returning({ id: stockItems.id });
               erpStockItemId = created.id;
