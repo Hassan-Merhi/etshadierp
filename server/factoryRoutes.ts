@@ -1082,6 +1082,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/pressing/create-multi", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { items } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "items array is required with at least one entry" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        const totalExpected = items.reduce((sum: number, item: any) => sum + parseInt(item.quantity || item.qty), 0);
+
+        const [pressingBatch] = await tx
+          .insert(factoryPressingBatches)
+          .values({
+            companyId,
+            productId: items[0].productId,
+            expectedCount: totalExpected,
+            status: "PENDING",
+          })
+          .returning();
+
+        const [seqRecord] = await tx
+          .select()
+          .from(factoryBaleSequences)
+          .where(eq(factoryBaleSequences.companyId, companyId))
+          .for("update");
+
+        let nextNumber: number;
+        if (seqRecord) {
+          nextNumber = seqRecord.nextNumber;
+          await tx
+            .update(factoryBaleSequences)
+            .set({ nextNumber: nextNumber + totalExpected })
+            .where(eq(factoryBaleSequences.id, seqRecord.id));
+        } else {
+          nextNumber = 1;
+          await tx.insert(factoryBaleSequences).values({
+            companyId,
+            nextNumber: 1 + totalExpected,
+          });
+        }
+
+        const bales: any[] = [];
+        let baleIndex = 0;
+
+        for (const item of items) {
+          const qty = parseInt(item.quantity || item.qty);
+          const weight = item.weightPerBale;
+
+          const [product] = await tx
+            .select()
+            .from(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.id, item.productId), eq(factoryBaleProducts.companyId, companyId)));
+
+          if (!product) throw new Error(`Product ID ${item.productId} not found`);
+
+          for (let i = 0; i < qty; i++) {
+            const refNum = `HD${String(nextNumber + baleIndex).padStart(5, "0")}`;
+            const [bale] = await tx
+              .insert(factoryBales)
+              .values({
+                companyId,
+                pressingBatchId: pressingBatch.id,
+                productId: item.productId,
+                baleCode: product.code,
+                referenceNumber: refNum,
+                articleCode: product.articleCode,
+                productName: product.name,
+                weightKg: String(weight),
+                status: "PENDING_PRESSING",
+              })
+              .returning();
+            bales.push({ ...bale, _product: product });
+            baleIndex++;
+          }
+        }
+
+        return { pressingBatchId: pressingBatch.id, bales };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error creating multi-product pressing batch:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bales/create-batch", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -1195,14 +1284,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const enriched = await Promise.all(
         batches.map(async (batch: any) => {
           const balesForBatch = await db
-            .select({ status: factoryBales.status })
+            .select()
             .from(factoryBales)
-            .where(eq(factoryBales.pressingBatchId, batch.id));
+            .where(eq(factoryBales.pressingBatchId, batch.id))
+            .orderBy(factoryBales.referenceNumber);
 
           const pendingCount = balesForBatch.filter((b: any) => b.status === "PENDING_PRESSING").length;
           const finalizedCount = balesForBatch.filter((b: any) => b.status === "FINALIZED").length;
 
-          return { ...batch, pendingCount, finalizedCount };
+          return { ...batch, pendingCount, finalizedCount, bales: balesForBatch };
         })
       );
 
@@ -1262,7 +1352,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .where(and(eq(factoryPressingBatches.id, pressingBatchId), eq(factoryPressingBatches.companyId, companyId)));
 
         if (!pressingBatch) throw new Error("Pressing batch not found");
-        if (pressingBatch.status !== "PENDING") throw new Error("Pressing batch is not in PENDING status");
+        if (pressingBatch.status === "FINALIZED") throw new Error("Pressing batch is already fully finalized");
 
         const [mixBatch] = await tx
           .select()
@@ -1279,10 +1369,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .from(factoryBales)
           .where(and(eq(factoryBales.pressingBatchId, pressingBatchId), eq(factoryBales.status, "PENDING_PRESSING")));
 
-        if (scannedBaleIds.length !== pendingBales.length) {
-          throw new Error(`Expected ${pendingBales.length} bales but received ${scannedBaleIds.length} scanned bales`);
-        }
-
+        const scannedSet = new Set(scannedBaleIds);
         const pendingBaleIds = new Set(pendingBales.map((b: any) => b.id));
         for (const scannedId of scannedBaleIds) {
           if (!pendingBaleIds.has(scannedId)) {
@@ -1290,8 +1377,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
         }
 
+        const balesToFinalize = pendingBales.filter((b: any) => scannedSet.has(b.id));
+        const missingBales = pendingBales.filter((b: any) => !scannedSet.has(b.id));
+
         let totalWeight = 0;
-        for (const bale of pendingBales) {
+        for (const bale of balesToFinalize) {
           totalWeight += parseFloat(bale.weightKg);
         }
 
@@ -1303,7 +1393,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const now = new Date();
         const updatedBales: any[] = [];
 
-        for (const bale of pendingBales) {
+        for (const bale of balesToFinalize) {
           const weight = parseFloat(bale.weightKg);
           const baleTotalCost = weight * costPerKg;
 
@@ -1329,18 +1419,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalWeight}`, updatedAt: now })
           .where(eq(factoryMixBatches.id, mixBatchId));
 
+        const isFullyFinalized = missingBales.length === 0;
         await tx
           .update(factoryPressingBatches)
           .set({
-            status: "FINALIZED",
+            status: isFullyFinalized ? "FINALIZED" : "PARTIALLY_FINALIZED",
             mixBatchId,
-            finalizedAt: now,
+            finalizedAt: isFullyFinalized ? now : null,
             finalizedLocationId: erpLocationId,
           })
           .where(eq(factoryPressingBatches.id, pressingBatchId));
 
         const productIds: number[] = [];
-        for (const b of pendingBales) {
+        for (const b of balesToFinalize) {
           if (b.productId && !productIds.includes(b.productId)) productIds.push(b.productId);
         }
         const factoryProducts = productIds.length > 0
@@ -1361,7 +1452,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const stockItemCache = new Map<string, number>();
 
-        for (const bale of pendingBales) {
+        for (const bale of balesToFinalize) {
           const factoryProduct = productMap.get(bale.productId as number);
           if (!factoryProduct) continue;
 
@@ -1434,7 +1525,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
         }
 
-        return { updated: updatedBales.length, bales: updatedBales };
+        return {
+          updated: updatedBales.length,
+          bales: updatedBales,
+          missingBales: missingBales.map((b: any) => ({
+            id: b.id,
+            referenceNumber: b.referenceNumber,
+            productName: b.productName,
+            articleCode: b.articleCode,
+            weightKg: b.weightKg,
+          })),
+          isFullyFinalized,
+        };
       });
 
       res.json(result);

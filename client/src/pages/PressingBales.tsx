@@ -241,34 +241,30 @@ export default function PressingBales() {
         throw new Error("Please add items to cart");
       }
 
-      const allBales: any[] = [];
-      const allProducts: FactoryBaleProduct[] = [];
-      const allWeights: string[] = [];
+      const items = cart.map((item) => ({
+        productId: item.productId,
+        quantity: item.qty,
+        weightPerBale: item.weightPerBaleKg.toString(),
+      }));
 
-      for (const item of cart) {
-        const payload: any = {
-          productId: item.productId,
-          quantity: item.qty.toString(),
-          weightPerBale: item.weightPerBaleKg.toString(),
-          mode: "pressing",
-        };
+      const response = await apiRequest("POST", "/api/factory/pressing/create-multi", { items });
 
-        const response = await apiRequest("POST", "/api/factory/pressing/create-and-print", payload);
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.message || "Failed to create bales");
-        }
-
-        const result = await response.json();
-        allBales.push(...result.bales);
-        for (let i = 0; i < result.bales.length; i++) {
-          allProducts.push(item.product);
-          allWeights.push(item.weightPerBaleKg.toString());
-        }
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to create bales");
       }
 
-      return { bales: allBales, products: allProducts, weights: allWeights };
+      const result = await response.json();
+
+      const allProducts: FactoryBaleProduct[] = [];
+      const allWeights: string[] = [];
+      for (const bale of result.bales) {
+        const cartItem = cart.find((c) => c.productId === bale.productId);
+        allProducts.push(cartItem?.product || ({} as FactoryBaleProduct));
+        allWeights.push(bale.weightKg || cartItem?.weightPerBaleKg.toString() || "25");
+      }
+
+      return { bales: result.bales, products: allProducts, weights: allWeights };
     },
     onSuccess: async ({ bales, products, weights }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
