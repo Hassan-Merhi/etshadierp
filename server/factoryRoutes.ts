@@ -106,6 +106,141 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // 1b. Factory Suppliers - Balances & Statement
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/suppliers/with-balances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const suppliers = await db
+        .select()
+        .from(factorySuppliers)
+        .where(eq(factorySuppliers.companyId, companyId))
+        .orderBy(factorySuppliers.name);
+
+      const containers = await db
+        .select()
+        .from(factoryContainers)
+        .where(eq(factoryContainers.companyId, companyId));
+
+      const suppliersWithBalances = suppliers.map((s: any) => {
+        const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
+        const totalContainers = supplierContainers.length;
+        const totalKg = supplierContainers.reduce((sum: number, c: any) => {
+          return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
+        }, 0);
+        const totalValue = supplierContainers.reduce((sum: number, c: any) => {
+          if (c.finalPayableAmount) return sum + parseFloat(c.finalPayableAmount);
+          const kg = parseFloat(c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          return sum + (kg * rate);
+        }, 0);
+        const pendingContainers = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT").length;
+        const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED").length;
+        const lastContainerDate = supplierContainers.length > 0
+          ? supplierContainers.reduce((latest: string | null, c: any) => {
+              const d = c.arrivalDate || c.createdAt;
+              if (!latest) return d;
+              return new Date(d) > new Date(latest) ? d : latest;
+            }, null)
+          : null;
+
+        return {
+          ...s,
+          totalContainers,
+          totalKg: totalKg.toFixed(3),
+          totalValue: totalValue.toFixed(2),
+          pendingContainers,
+          receivedContainers,
+          lastContainerDate,
+        };
+      });
+
+      res.json(suppliersWithBalances);
+    } catch (error: any) {
+      console.error("Error fetching factory suppliers with balances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const supplierId = parseInt(req.params.id);
+
+      const [supplier] = await db
+        .select()
+        .from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
+
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+      const containers = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          eq(factoryContainers.supplierId, supplierId)
+        ))
+        .orderBy(desc(factoryContainers.createdAt));
+
+      const commissions = await db
+        .select()
+        .from(factoryContainerCommissions)
+        .where(eq(factoryContainerCommissions.companyId, companyId));
+
+      const statement = containers.map((c: any) => {
+        const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+        const rate = parseFloat(c.ratePerKg || "0");
+        const value = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+        const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
+        const totalCommission = containerCommissions.reduce((sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"), 0);
+
+        return {
+          id: c.id,
+          containerNumber: c.containerNumber,
+          date: c.arrivalDate || c.createdAt,
+          origin: c.origin,
+          status: c.status,
+          declaredKg: c.declaredKg,
+          actualReceivedKg: c.actualReceivedKg,
+          totalKg: c.totalKg,
+          ratePerKg: c.ratePerKg,
+          differenceKg: c.differenceKg,
+          value: value.toFixed(2),
+          finalPayableAmount: c.finalPayableAmount,
+          commissions: containerCommissions,
+          totalCommission: totalCommission.toFixed(2),
+          notes: c.notes,
+        };
+      });
+
+      const totalValue = statement.reduce((sum: number, s: any) => sum + parseFloat(s.value), 0);
+      const totalKg = statement.reduce((sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"), 0);
+      const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
+
+      res.json({
+        supplier,
+        statement,
+        summary: {
+          totalContainers: statement.length,
+          totalKg: totalKg.toFixed(3),
+          totalValue: totalValue.toFixed(2),
+          totalCommissions: totalCommissions.toFixed(2),
+          netPayable: (totalValue - totalCommissions).toFixed(2),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching supplier statement:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
   // 2. Factory Categories CRUD
   // ───────────────────────────────────────────────
 
