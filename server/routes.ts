@@ -26349,7 +26349,7 @@ if (asOfDate) {
               .where(eq(referenceSequences.id, sequence.id));
           }
 
-          const referenceNumber = `REF${String(refNum).padStart(7, '0')}`;
+          const referenceNumber = `REF${String(refNum).padStart(5, '0')}`;
 
           const [labelPrint] = await tx
             .insert(baleLabelPrints)
