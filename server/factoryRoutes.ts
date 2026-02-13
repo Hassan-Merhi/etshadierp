@@ -1613,6 +1613,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
+      if (results.length === 0) {
+        const batchId = req.query.batchId ? parseInt(req.query.batchId as string) : null;
+        const excludeIdsStr = req.query.excludeIds as string;
+        const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];
+        const articleConditions: any[] = [
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.articleCode, barcode),
+          eq(factoryBales.status, "PENDING_PRESSING"),
+        ];
+        if (batchId) {
+          articleConditions.push(eq(factoryBales.pressingBatchId, batchId));
+        }
+        let articleResults = await db.select().from(factoryBales).where(and(...articleConditions)).orderBy(factoryBales.id);
+        if (excludeIds.length > 0) {
+          articleResults = articleResults.filter((b: any) => !excludeIds.includes(b.id));
+        }
+        results = articleResults;
+      }
+
       if (results.length === 0) return res.status(404).json({ message: "Bale not found" });
       res.json(results[0]);
     } catch (error: any) {
