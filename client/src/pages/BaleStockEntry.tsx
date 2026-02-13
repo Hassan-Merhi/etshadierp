@@ -96,7 +96,7 @@ function generateA4LabelHtml(labels: Array<{
   </style></head><body><div class="print-note">Label A (A4 format) - disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
-function generateHalfA4LabelHtml(labels: Array<{
+function generateBigNameLabelHtml(labels: Array<{
   referenceNumber: string;
   articleCode: string;
   pieces: number;
@@ -106,58 +106,20 @@ function generateHalfA4LabelHtml(labels: Array<{
   let labelsHtml = '';
   for (const label of labels) {
     labelsHtml += `
-      <div class="page-container">
-        <div class="code-label">
-          <div class="label-top">
-            <div class="logo-section">
-              <div class="logo-text">HMD</div>
-              <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-            </div>
-            <div class="info-section">
-              <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
-              <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
-              <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-            </div>
-          </div>
-          <div class="barcode-area">
-            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-            <div class="barcode-number">${label.referenceNumber}</div>
-          </div>
-          <div class="article-barcode-area">
-            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="article-barcode-number">${label.productName}</div>
-          </div>
-        </div>
-        <div class="name-label">
-          <div class="name-label-text">${label.productName}</div>
-        </div>
+      <div class="name-page">
+        <div class="name-text">${label.productName}</div>
       </div>`;
   }
-  return `<html><head><title>Stock Entry Labels (Half A4)</title><style>
-    @page { size: 76mm 105mm; margin: 0; }
+  return `<html><head><title>Stock Entry Labels (Big Name)</title><style>
+    @page { size: A5 landscape; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .page-container { width: 76mm; height: 105mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
-    .page-container:last-child { page-break-after: auto; }
-    .code-label { width: 76mm; height: 55mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
-    .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
-    .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-text { font-size: 18pt; font-weight: 900; letter-spacing: 2px; color: #000; line-height: 1; }
-    .logo-subtitle { font-size: 5pt; font-weight: 700; letter-spacing: 1px; color: #000; margin-top: 0.5mm; }
-    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
-    .info-key { font-weight: 900; }
-    .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
-    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
-    .name-label { width: 76mm; height: 50mm; display: flex; align-items: center; justify-content: center; background: #fff; border-top: 0.3mm solid #ddd; }
-    .name-label-text { font-size: 36pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+    .name-page { width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff; padding: 10mm; }
+    .name-page:last-child { page-break-after: auto; }
+    .name-text { font-size: clamp(40pt, 12vw, 120pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; width: 100%; overflow: hidden; text-overflow: clip; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Label B (Half A4 format) - no logo background (pre-printed). Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">Label B (Big Name - A5 Landscape). Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
@@ -321,12 +283,12 @@ function StockEntryTab() {
       setTimeout(() => {
         const printWindowHalf = window.open("", "_blank");
         if (printWindowHalf) {
-          printWindowHalf.document.write(generateHalfA4LabelHtml(labels));
+          printWindowHalf.document.write(generateBigNameLabelHtml(labels));
           printWindowHalf.document.close();
           printWindowHalf.focus();
           setTimeout(() => printWindowHalf.print(), 500);
         } else {
-          toast({ title: "Warning", description: "Please allow pop-ups to print half-A4 labels", variant: "destructive" });
+          toast({ title: "Warning", description: "Please allow pop-ups to print big name labels", variant: "destructive" });
         }
       }, 1000);
     } catch (error: any) {
