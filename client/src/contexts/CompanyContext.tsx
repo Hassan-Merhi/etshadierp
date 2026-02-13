@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface Company {
   id: number;
@@ -20,15 +20,23 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+async function switchCompanyOnServer(companyId: number): Promise<boolean> {
+  try {
+    const res = await apiRequest("POST", "/api/companies/switch", { companyId });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const lastSyncedCompanyId = useRef<number | null>(null);
 
-  // Fetch user's companies with roles
   const { data: userCompanies = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/user/companies"],
   });
 
-  // Extract unique companies from user's company roles
   const companies: Company[] = userCompanies
     .map((uc) => ({
       id: uc.companyId,
@@ -41,17 +49,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       index === self.findIndex((c) => c.id === company.id)
     );
 
-  const selectCompany = (company: Company) => {
-    setSelectedCompany(company);
-    // Store in localStorage for persistence
-    localStorage.setItem("selectedCompanyId", company.id.toString());
-    
-    // Invalidate all queries to refresh data for the new company
-    // Using a predicate to catch all queries except auth-related ones
+  const invalidateCompanyQueries = () => {
     queryClient.invalidateQueries({
       predicate: (query) => {
         const key = query.queryKey[0];
-        // Don't invalidate auth-related queries
         if (typeof key === 'string' && (key.includes('/api/auth') || key.includes('/api/user/companies'))) {
           return false;
         }
@@ -60,20 +61,41 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Initialize selected company once when companies are loaded
-  // Priority: 1) localStorage saved preference, 2) first company in list
+  const selectCompany = async (company: Company) => {
+    setSelectedCompany(company);
+    localStorage.setItem("selectedCompanyId", company.id.toString());
+
+    const ok = await switchCompanyOnServer(company.id);
+    if (ok) {
+      lastSyncedCompanyId.current = company.id;
+      invalidateCompanyQueries();
+    } else {
+      invalidateCompanyQueries();
+    }
+  };
+
   useEffect(() => {
     if (companies.length > 0 && !selectedCompany) {
       const savedCompanyId = localStorage.getItem("selectedCompanyId");
+      let companyToSelect: Company | undefined;
+
       if (savedCompanyId) {
-        const savedCompany = companies.find((c) => c.id === parseInt(savedCompanyId));
-        if (savedCompany) {
-          setSelectedCompany(savedCompany);
-          return;
-        }
+        companyToSelect = companies.find((c) => c.id === parseInt(savedCompanyId));
       }
-      // Fall back to first company if no valid saved preference
-      setSelectedCompany(companies[0]);
+      if (!companyToSelect) {
+        companyToSelect = companies[0];
+      }
+
+      setSelectedCompany(companyToSelect);
+
+      if (companyToSelect && lastSyncedCompanyId.current !== companyToSelect.id) {
+        switchCompanyOnServer(companyToSelect.id).then((ok) => {
+          if (ok) {
+            lastSyncedCompanyId.current = companyToSelect!.id;
+          }
+          invalidateCompanyQueries();
+        });
+      }
     }
   }, [companies, selectedCompany]);
 
