@@ -819,8 +819,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
       }
       
+      const companyId = req.session.currentCompanyId;
       const history = await db.select()
         .from(loginHistory)
+        .where(companyId ? eq(loginHistory.companyId, companyId) : undefined)
         .orderBy(desc(loginHistory.loginAt))
         .limit(500);
       
