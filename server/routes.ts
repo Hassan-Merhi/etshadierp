@@ -776,12 +776,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Try to get geo info from IP (skip for localhost/private IPs)
           if (clientIp && clientIp !== 'unknown' && !clientIp.startsWith('127.') && !clientIp.startsWith('10.') && !clientIp.startsWith('192.168.') && !clientIp.startsWith('::1')) {
             try {
-              const geoRes = await fetch(`http://ip-api.com/json/${clientIp}?fields=city,country,status`);
+              const geoRes = await fetch(`https://ipapi.co/${clientIp}/json/`);
               if (geoRes.ok) {
                 const geoData = await geoRes.json();
-                if (geoData.status === 'success') {
+                if (!geoData.error) {
                   city = geoData.city || null;
-                  country = geoData.country || null;
+                  country = geoData.country_name || null;
                 }
               }
             } catch (geoErr) {
