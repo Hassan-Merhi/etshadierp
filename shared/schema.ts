@@ -2231,6 +2231,10 @@ export const factoryContainers = pgTable("factory_containers", {
   origin: text("origin"),
   totalKg: decimal("total_kg", { precision: 15, scale: 3 }),
   ratePerKg: decimal("rate_per_kg", { precision: 20, scale: 4 }),
+  declaredKg: decimal("declared_kg", { precision: 15, scale: 3 }),
+  actualReceivedKg: decimal("actual_received_kg", { precision: 15, scale: 3 }),
+  finalPayableAmount: decimal("final_payable_amount", { precision: 20, scale: 4 }),
+  differenceKg: decimal("difference_kg", { precision: 15, scale: 3 }),
   arrivalDate: date("arrival_date"),
   notes: text("notes"),
   status: text("status").notNull().default("PENDING"),
@@ -2434,3 +2438,19 @@ export const factoryBaleSequences = pgTable("factory_bale_sequences", {
 }));
 
 export type FactoryBaleSequence = typeof factoryBaleSequences.$inferSelect;
+
+export const factoryContainerCommissions = pgTable("factory_container_commissions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  personName: text("person_name").notNull(),
+  commissionType: text("commission_type").notNull().default("PER_KG"),
+  commissionRate: decimal("commission_rate", { precision: 20, scale: 4 }).notNull(),
+  commissionTotal: decimal("commission_total", { precision: 20, scale: 4 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("factory_container_commissions_container_idx").on(t.containerId),
+  companyIdx: index("factory_container_commissions_company_idx").on(t.companyId),
+}));
+
+export type FactoryContainerCommission = typeof factoryContainerCommissions.$inferSelect;

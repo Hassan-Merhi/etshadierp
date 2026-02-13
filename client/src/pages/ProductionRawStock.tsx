@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -58,8 +59,11 @@ interface ContainerOption {
 export default function ProductionRawStock() {
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
   const [selectedContainerId, setSelectedContainerId] = useState("");
-  const [receivedKg, setReceivedKg] = useState("");
+  const [actualReceivedKg, setActualReceivedKg] = useState("");
   const [costPerKg, setCostPerKg] = useState("");
+  const [commissionPersonName, setCommissionPersonName] = useState("");
+  const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
+  const [commissionRate, setCommissionRate] = useState("");
   const { toast } = useToast();
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
@@ -71,8 +75,26 @@ export default function ProductionRawStock() {
     enabled: offloadDialogOpen,
   });
 
+  const selectedContainer = useMemo(() => {
+    return availableContainers?.find((c) => c.id.toString() === selectedContainerId);
+  }, [availableContainers, selectedContainerId]);
+
+  const declaredKg = parseFloat(selectedContainer?.totalKg || "0");
+  const actualKg = parseFloat(actualReceivedKg || "0");
+  const rate = parseFloat(costPerKg || "0");
+  const differenceKg = declaredKg - actualKg;
+  const totalPayable = actualKg * rate;
+  const declaredTotal = declaredKg * rate;
+  const costDifference = differenceKg * rate;
+  const hasWeightDiff = actualKg > 0 && declaredKg > 0 && actualKg !== declaredKg;
+
+  const commRateNum = parseFloat(commissionRate || "0");
+  const commissionTotal = commissionType === "PER_KG"
+    ? commRateNum * actualKg
+    : commRateNum;
+
   const offloadMutation = useMutation({
-    mutationFn: async (data: { containerId: string; receivedKg: string; costPerKg: string }) => {
+    mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/factory/raw-stock/offload", data);
       if (!response.ok) {
         const err = await response.json();
@@ -83,6 +105,7 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       toast({ title: "Success", description: "Container offloaded to production raw stock" });
       handleCloseDialog();
     },
@@ -94,7 +117,7 @@ export default function ProductionRawStock() {
   const handleContainerSelect = (id: string) => {
     setSelectedContainerId(id);
     const container = availableContainers?.find((c) => c.id.toString() === id);
-    setReceivedKg(container?.totalKg || "");
+    setActualReceivedKg(container?.totalKg || "");
     setCostPerKg(container?.ratePerKg || "");
   };
 
@@ -103,25 +126,40 @@ export default function ProductionRawStock() {
       toast({ title: "Missing fields", description: "Please select a container", variant: "destructive" });
       return;
     }
-    const container = availableContainers?.find((c) => c.id.toString() === selectedContainerId);
-    const finalReceivedKg = receivedKg || container?.totalKg || "";
-    const finalCostPerKg = costPerKg || container?.ratePerKg || "";
-    if (!finalReceivedKg) {
-      toast({ title: "Missing weight", description: "This container has no saved Total KG. Please enter the received weight to offload.", variant: "destructive" });
+    if (!actualReceivedKg || parseFloat(actualReceivedKg) <= 0) {
+      toast({ title: "Missing weight", description: "Please enter the actual received weight", variant: "destructive" });
       return;
     }
-    if (!finalCostPerKg) {
-      toast({ title: "Missing cost", description: "This container has no saved Rate per KG. Please enter the cost per kg to offload.", variant: "destructive" });
+    if (!costPerKg || parseFloat(costPerKg) <= 0) {
+      toast({ title: "Missing cost", description: "Please enter the cost per kg", variant: "destructive" });
       return;
     }
-    offloadMutation.mutate({ containerId: selectedContainerId, receivedKg: finalReceivedKg, costPerKg: finalCostPerKg });
+
+    const payload: any = {
+      containerId: selectedContainerId,
+      receivedKg: actualReceivedKg,
+      costPerKg,
+    };
+
+    if (commissionPersonName.trim() && commRateNum > 0) {
+      payload.commission = {
+        personName: commissionPersonName.trim(),
+        commissionType,
+        commissionRate: commissionRate,
+      };
+    }
+
+    offloadMutation.mutate(payload);
   };
 
   const handleCloseDialog = () => {
     setOffloadDialogOpen(false);
     setSelectedContainerId("");
-    setReceivedKg("");
+    setActualReceivedKg("");
     setCostPerKg("");
+    setCommissionPersonName("");
+    setCommissionType("PER_KG");
+    setCommissionRate("");
   };
 
   const totalReceived = rawStock?.reduce((sum, r) => sum + parseFloat(r.receivedKg), 0) || 0;
@@ -131,7 +169,7 @@ export default function ProductionRawStock() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Production Raw Stock</h1>
           <p className="text-muted-foreground mt-1">Container-led raw material tracking for production</p>
@@ -255,15 +293,15 @@ export default function ProductionRawStock() {
       </Card>
 
       <Dialog open={offloadDialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Offload Container to Production</DialogTitle>
             <DialogDescription>
-              Select a container and specify the kg to offload into production raw stock
+              Enter the actual received weight and verify cost details
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div className="space-y-2">
               <Label>Container</Label>
               <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
@@ -280,33 +318,159 @@ export default function ProductionRawStock() {
               </Select>
             </div>
 
-            <div className="space-y-1">
-              <Label>Received Weight (kg)</Label>
-              <Input
-                type="number"
-                value={receivedKg}
-                onChange={(e) => setReceivedKg(e.target.value)}
-                placeholder="e.g. 20000"
-                step="0.001"
-                data-testid="input-received-kg"
-              />
-              <p className="text-xs text-muted-foreground">Auto-filled from container. Edit only if actual differs.</p>
-            </div>
+            {selectedContainer && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Declared Weight (kg)</Label>
+                    <Input
+                      value={selectedContainer.totalKg ? formatNumber(parseFloat(selectedContainer.totalKg)) : "N/A"}
+                      disabled
+                      className="font-mono bg-muted"
+                      data-testid="input-declared-kg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Declared Rate/kg ($)</Label>
+                    <Input
+                      value={selectedContainer.ratePerKg ? parseFloat(selectedContainer.ratePerKg).toFixed(4) : "N/A"}
+                      disabled
+                      className="font-mono bg-muted"
+                      data-testid="input-declared-rate"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-1">
-              <Label>Cost per kg ($)</Label>
-              <Input
-                type="number"
-                value={costPerKg}
-                onChange={(e) => setCostPerKg(e.target.value)}
-                placeholder="e.g. 1.85"
-                step="0.0001"
-                data-testid="input-cost-per-kg"
-              />
-              <p className="text-xs text-muted-foreground">Auto-filled from container. Edit only if actual differs.</p>
-            </div>
+                <Separator />
 
-            <div className="flex justify-end gap-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Actual Arrived KG</Label>
+                    <Input
+                      type="number"
+                      value={actualReceivedKg}
+                      onChange={(e) => setActualReceivedKg(e.target.value)}
+                      placeholder="e.g. 19600"
+                      step="0.001"
+                      data-testid="input-actual-kg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Rate per KG ($)</Label>
+                    <Input
+                      type="number"
+                      value={costPerKg}
+                      onChange={(e) => setCostPerKg(e.target.value)}
+                      placeholder="e.g. 1.85"
+                      step="0.0001"
+                      data-testid="input-cost-per-kg"
+                    />
+                  </div>
+                </div>
+
+                {hasWeightDiff && (
+                  <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${differenceKg > 0 ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : "text-blue-600 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>
+                      Weight difference: <strong className="font-mono">{differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg</strong>
+                      {rate > 0 && (
+                        <> (cost difference: <strong className="font-mono">${formatNumber(Math.abs(costDifference))}</strong>)</>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div>
+                  <Label className="text-sm font-semibold">Commission (optional)</Label>
+                  <div className="space-y-3 mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Commission Person</Label>
+                      <Input
+                        value={commissionPersonName}
+                        onChange={(e) => setCommissionPersonName(e.target.value)}
+                        placeholder="Person name"
+                        data-testid="input-commission-person"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Commission Type</Label>
+                        <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
+                          <SelectTrigger data-testid="select-commission-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PER_KG">Per KG</SelectItem>
+                            <SelectItem value="FIXED">Fixed Amount</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">
+                          {commissionType === "PER_KG" ? "Rate per KG ($)" : "Fixed Amount ($)"}
+                        </Label>
+                        <Input
+                          type="number"
+                          value={commissionRate}
+                          onChange={(e) => setCommissionRate(e.target.value)}
+                          placeholder={commissionType === "PER_KG" ? "e.g. 0.05" : "e.g. 500"}
+                          step="0.01"
+                          data-testid="input-commission-rate"
+                        />
+                      </div>
+                    </div>
+                    {commissionPersonName && commRateNum > 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        Commission Total: <span className="font-mono font-medium text-foreground">${formatNumber(commissionTotal)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="rounded-md border p-3 space-y-1.5 text-sm" data-testid="section-offload-summary">
+                  <p className="font-semibold text-base mb-2">Offload Summary</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Declared</span>
+                    <span className="font-mono">{formatNumber(declaredKg)} kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Actual</span>
+                    <span className={`font-mono font-medium ${hasWeightDiff ? "text-amber-600" : ""}`}>
+                      {formatNumber(actualKg)} kg
+                    </span>
+                  </div>
+                  {hasWeightDiff && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Difference</span>
+                      <span className="font-mono text-amber-600">
+                        {differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Rate</span>
+                    <span className="font-mono">${rate.toFixed(4)}/kg</span>
+                  </div>
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-medium">
+                    <span>Total Payable</span>
+                    <span className="font-mono text-base">${formatNumber(totalPayable)}</span>
+                  </div>
+                  {commissionPersonName && commRateNum > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Commission ({commissionPersonName})</span>
+                      <span className="font-mono">${formatNumber(commissionTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-offload">
                 Cancel
               </Button>
@@ -315,7 +479,7 @@ export default function ProductionRawStock() {
                 disabled={offloadMutation.isPending || !selectedContainerId}
                 data-testid="button-confirm-offload"
               >
-                {offloadMutation.isPending ? "Offloading..." : "Offload to Production"}
+                {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
               </Button>
             </div>
           </div>

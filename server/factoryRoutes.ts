@@ -12,6 +12,7 @@ import {
   factoryPressingBatches,
   factoryBales,
   factoryBaleSequences,
+  factoryContainerCommissions,
   stockItems,
   insertFactorySupplierSchema,
   insertFactoryCategorySchema,
@@ -567,7 +568,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { containerId, receivedKg, costPerKg } = req.body;
+      const { containerId, receivedKg, costPerKg, commission } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
       const [container] = await db
@@ -584,28 +585,79 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       if (existing) return res.status(400).json({ message: "This container has already been offloaded" });
 
-      const finalReceivedKg = receivedKg || container.totalKg || "0";
+      const declaredKg = container.totalKg || "0";
+      const actualKg = receivedKg || declaredKg;
       const finalCostPerKg = costPerKg || container.ratePerKg || "0";
+      const differenceKg = String(parseFloat(declaredKg) - parseFloat(actualKg));
+      const finalPayableAmount = String(parseFloat(actualKg) * parseFloat(finalCostPerKg));
+
+      const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
 
       const [rawStock] = await db
         .insert(factoryRawStock)
         .values({
           companyId,
           containerId,
-          receivedKg: String(finalReceivedKg),
+          receivedKg: String(actualKg),
           costPerKg: String(finalCostPerKg),
         })
         .returning();
 
       await db
         .update(factoryContainers)
-        .set({ status: "OFFLOADED", updatedAt: new Date() })
+        .set({
+          status: newStatus,
+          declaredKg: String(declaredKg),
+          actualReceivedKg: String(actualKg),
+          finalPayableAmount,
+          differenceKg,
+          updatedAt: new Date(),
+        })
         .where(eq(factoryContainers.id, containerId));
 
-      res.json(rawStock);
+      let commissionRecord = null;
+      if (commission && commission.personName && commission.commissionRate) {
+        const commType = commission.commissionType || "PER_KG";
+        const commRate = parseFloat(commission.commissionRate) || 0;
+        const commTotal = commType === "PER_KG"
+          ? commRate * parseFloat(actualKg)
+          : commRate;
+
+        [commissionRecord] = await db
+          .insert(factoryContainerCommissions)
+          .values({
+            companyId,
+            containerId,
+            personName: commission.personName,
+            commissionType: commType,
+            commissionRate: String(commRate),
+            commissionTotal: String(commTotal),
+          })
+          .returning();
+      }
+
+      res.json({ rawStock, commission: commissionRecord });
     } catch (error: any) {
       console.error("Error offloading container:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/container-commissions/:containerId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const containerId = parseInt(req.params.containerId);
+      const results = await db
+        .select()
+        .from(factoryContainerCommissions)
+        .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId)));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error fetching commissions:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 
