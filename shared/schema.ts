@@ -2686,3 +2686,21 @@ export const insertFactoryDaybookEntrySchema = createInsertSchema(factoryDaybook
 
 export type InsertFactoryDaybookEntry = z.infer<typeof insertFactoryDaybookEntrySchema>;
 export type FactoryDaybookEntry = typeof factoryDaybookEntries.$inferSelect;
+
+export const loginHistory = pgTable("login_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  username: text("username").notNull(),
+  companyId: integer("company_id"),
+  companyName: text("company_name"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  city: text("city"),
+  country: text("country"),
+  loginAt: timestamp("login_at").notNull().defaultNow(),
+}, (t) => ({
+  userIdx: index("login_history_user_idx").on(t.userId),
+  loginAtIdx: index("login_history_login_at_idx").on(t.loginAt),
+}));
+
+export type LoginHistory = typeof loginHistory.$inferSelect;

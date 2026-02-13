@@ -93,6 +93,7 @@ import {
   userLocations,
   userCompanyRoles,
   factoryBales,
+  loginHistory,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -761,10 +762,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("✅ Login successful, session saved");
+
+      // Record login history asynchronously
+      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+      const userAgentStr = req.headers['user-agent'] || 'unknown';
+      const loginCompanyId = userCompanies.length > 0 ? userCompanies[0].companyId : null;
+      const loginCompanyName = userCompanies.length > 0 ? userCompanies[0].companyName : null;
       
+      (async () => {
+        try {
+          let city: string | null = null;
+          let country: string | null = null;
+          // Try to get geo info from IP (skip for localhost/private IPs)
+          if (clientIp && clientIp !== 'unknown' && !clientIp.startsWith('127.') && !clientIp.startsWith('10.') && !clientIp.startsWith('192.168.') && !clientIp.startsWith('::1')) {
+            try {
+              const geoRes = await fetch(`http://ip-api.com/json/${clientIp}?fields=city,country,status`);
+              if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                if (geoData.status === 'success') {
+                  city = geoData.city || null;
+                  country = geoData.country || null;
+                }
+              }
+            } catch (geoErr) {
+              // Silently ignore geo lookup failures
+            }
+          }
+          await db.insert(loginHistory).values({
+            userId: user.id,
+            username: user.username,
+            companyId: loginCompanyId,
+            companyName: loginCompanyName,
+            ipAddress: clientIp,
+            userAgent: userAgentStr,
+            city,
+            country,
+          });
+        } catch (err) {
+          console.error("Failed to record login history:", err);
+        }
+      })();
+
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Login History endpoint (Admin only)
+  app.get("/api/login-history", requireAuth, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (!userRole || !["Admin", "Owner"].includes(userRole)) {
+        return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
+      }
+      
+      const history = await db.select()
+        .from(loginHistory)
+        .orderBy(desc(loginHistory.loginAt))
+        .limit(500);
+      
+      res.json(history);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
