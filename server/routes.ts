@@ -485,6 +485,42 @@ async function calculateHistoricalLocationInventory(
   }
 
   console.log(`[HIST-INV] Final result: ${result.length} items`);
+
+  const ungroupedCodes = result
+    .filter((r: any) => !r.stockGroupId && r.stockItemCode)
+    .map((r: any) => r.stockItemCode as string);
+
+  if (ungroupedCodes.length > 0) {
+    try {
+      const factoryLookupResult = await db.execute(sql`
+        SELECT fbp.article_code, fbp.code, fc.name AS category_name
+        FROM factory_bale_products fbp
+        LEFT JOIN factory_categories fc ON fc.id = fbp.category_id AND fc.company_id = fbp.company_id
+        WHERE (fbp.article_code = ANY(${ungroupedCodes}) OR fbp.code = ANY(${ungroupedCodes}))
+      `);
+      const factoryLookup = (factoryLookupResult as any).rows || factoryLookupResult;
+      const factoryCategoryMap = new Map<string, string>();
+      for (const row of factoryLookup as any[]) {
+        if (row.category_name) {
+          if (row.article_code) factoryCategoryMap.set(row.article_code, row.category_name);
+          if (row.code) factoryCategoryMap.set(row.code, row.category_name);
+        }
+      }
+      if (factoryCategoryMap.size > 0) {
+        for (const item of result) {
+          if (!item.stockGroupId && item.stockItemCode) {
+            const catName = factoryCategoryMap.get(item.stockItemCode);
+            if (catName) {
+              item.stockGroupName = catName;
+              item.stockGroupCode = "FACTORY";
+            }
+          }
+        }
+      }
+    } catch (e) {
+    }
+  }
+
   return result;
 }
 
