@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, Users, type LucideIcon } from "lucide-react";
+import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, Users, Upload, type LucideIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
@@ -13,6 +13,7 @@ const BaleTransfers = lazy(() => import("./BaleTransfers"));
 const PressingBales = lazy(() => import("./PressingBales"));
 const FactorySuppliers = lazy(() => import("./FactorySuppliers"));
 const FactoryContainers = lazy(() => import("./FactoryContainers"));
+const FactoryImport = lazy(() => import("./FactoryImport"));
 
 function LoadingFallback() {
   return (
@@ -23,7 +24,7 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "raw-stock" | "mix-batches" | "pressing-bales" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers" | "factory-suppliers" | "factory-containers";
+type SectionKey = "raw-stock" | "mix-batches" | "pressing-bales" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers" | "factory-suppliers" | "factory-containers" | "factory-import";
 
 interface SidebarItem {
   key: SectionKey;
@@ -79,6 +80,12 @@ export default function FactoryProduction() {
       label: "Traceability",
       items: [
         { key: "barcode-lookup", label: "Barcode Lookup", icon: Search },
+      ],
+    },
+    {
+      label: "Data",
+      items: [
+        { key: "factory-import", label: "Import Data", icon: Upload },
       ],
     },
   ];
@@ -140,6 +147,7 @@ export default function FactoryProduction() {
             {activeSection === "bale-transfers" && <BaleTransfers />}
             {activeSection === "factory-suppliers" && <FactorySuppliers />}
             {activeSection === "factory-containers" && <FactoryContainers />}
+            {activeSection === "factory-import" && <FactoryImport />}
           </Suspense>
         </div>
       </div>

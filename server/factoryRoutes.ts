@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, or, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
 import {
   factorySuppliers,
   factoryCategories,
@@ -1706,6 +1706,248 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
     } catch (error: any) {
       console.error("Error fetching production summary:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // Factory Import API Endpoints
+  // ───────────────────────────────────────────────
+
+  app.post("/api/factory/import/suppliers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { suppliers: supplierList } = req.body;
+      if (!Array.isArray(supplierList) || supplierList.length === 0) {
+        return res.status(400).json({ message: "No suppliers provided" });
+      }
+
+      let imported = 0;
+      let updated = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < supplierList.length; i++) {
+        const s = supplierList[i];
+        try {
+          if (!s.name || !s.name.trim()) {
+            errors.push(`Row ${i + 1}: Name is required`);
+            continue;
+          }
+
+          const [existing] = await db
+            .select()
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, s.name.trim())));
+
+          if (existing) {
+            await db
+              .update(factorySuppliers)
+              .set({
+                openingBalance: s.openingBalance || existing.openingBalance,
+                contactPerson: s.contactPerson !== undefined ? s.contactPerson : existing.contactPerson,
+                phone: s.phone !== undefined ? s.phone : existing.phone,
+                email: s.email !== undefined ? s.email : existing.email,
+                updatedAt: new Date(),
+              })
+              .where(eq(factorySuppliers.id, existing.id));
+            updated++;
+          } else {
+            await db.insert(factorySuppliers).values({
+              companyId,
+              name: s.name.trim(),
+              openingBalance: s.openingBalance || "0",
+              contactPerson: s.contactPerson || null,
+              phone: s.phone || null,
+              email: s.email || null,
+            });
+            imported++;
+          }
+        } catch (err: any) {
+          errors.push(`Row ${i + 1}: ${err.message}`);
+        }
+      }
+
+      res.json({ imported, updated, errors });
+    } catch (error: any) {
+      console.error("Error importing suppliers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/import/raw-stock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "No items provided" });
+      }
+
+      let imported = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          if (!item.containerNumber || !item.containerNumber.trim()) {
+            errors.push(`Row ${i + 1}: Container number is required`);
+            continue;
+          }
+          if (!item.receivedKg) {
+            errors.push(`Row ${i + 1}: Received KG is required`);
+            continue;
+          }
+          if (!item.costPerKg) {
+            errors.push(`Row ${i + 1}: Cost per KG is required`);
+            continue;
+          }
+
+          let supplierId: number | null = null;
+          if (item.supplierName && item.supplierName.trim()) {
+            const [supplier] = await db
+              .select()
+              .from(factorySuppliers)
+              .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, item.supplierName.trim())));
+            if (supplier) {
+              supplierId = supplier.id;
+            }
+          }
+
+          let [container] = await db
+            .select()
+            .from(factoryContainers)
+            .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.containerNumber, item.containerNumber.trim())));
+
+          if (!container) {
+            [container] = await db.insert(factoryContainers).values({
+              companyId,
+              containerNumber: item.containerNumber.trim(),
+              supplierId,
+              totalKg: item.receivedKg,
+              ratePerKg: item.costPerKg,
+              arrivalDate: item.arrivalDate || null,
+              status: "RECEIVED",
+            }).returning();
+          } else if (supplierId && !container.supplierId) {
+            await db.update(factoryContainers).set({ supplierId }).where(eq(factoryContainers.id, container.id));
+          }
+
+          await db.insert(factoryRawStock).values({
+            companyId,
+            containerId: container.id,
+            receivedKg: item.receivedKg,
+            usedKg: item.usedKg || "0",
+            costPerKg: item.costPerKg,
+          });
+          imported++;
+        } catch (err: any) {
+          errors.push(`Row ${i + 1}: ${err.message}`);
+        }
+      }
+
+      res.json({ imported, errors });
+    } catch (error: any) {
+      console.error("Error importing raw stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/import/bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { bales } = req.body;
+      if (!Array.isArray(bales) || bales.length === 0) {
+        return res.status(400).json({ message: "No bales provided" });
+      }
+
+      const maxRef = await db.select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
+      let nextRef = (maxRef[0]?.maxRef || 0) + 1;
+
+      let imported = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < bales.length; i++) {
+        const bale = bales[i];
+        try {
+          if (!bale.baleCode || !bale.baleCode.trim()) {
+            errors.push(`Row ${i + 1}: Bale code is required`);
+            continue;
+          }
+          if (!bale.weightKg) {
+            errors.push(`Row ${i + 1}: Weight KG is required`);
+            continue;
+          }
+
+          const referenceNumber = `REF${String(nextRef).padStart(5, "0")}`;
+          nextRef++;
+
+          const status = bale.status || "FINALIZED";
+          const costPerKg = bale.costPerKg || "0";
+          const weight = parseFloat(bale.weightKg);
+          const cost = parseFloat(costPerKg);
+          const totalCost = (weight * cost).toFixed(2);
+
+          await db.insert(factoryBales).values({
+            companyId,
+            baleCode: bale.baleCode.trim(),
+            referenceNumber,
+            articleCode: bale.articleCode || null,
+            productName: bale.productName || null,
+            category: bale.category || null,
+            grade: bale.grade || null,
+            quantity: 1,
+            weightKg: bale.weightKg,
+            costPerKg,
+            totalCost,
+            status,
+            finalizedAt: status === "FINALIZED" ? new Date() : null,
+          });
+          imported++;
+        } catch (err: any) {
+          errors.push(`Row ${i + 1}: ${err.message}`);
+        }
+      }
+
+      res.json({ imported, errors });
+    } catch (error: any) {
+      console.error("Error importing bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/import/template/:type", requireAuth, async (req: any, res: any) => {
+    try {
+      const type = req.params.type;
+      let csv = "";
+      let filename = "";
+
+      switch (type) {
+        case "suppliers":
+          csv = "name,openingBalance,contactPerson,phone,email";
+          filename = "factory_suppliers_template.csv";
+          break;
+        case "raw-stock":
+          csv = "containerNumber,supplierName,receivedKg,usedKg,costPerKg,arrivalDate";
+          filename = "factory_raw_stock_template.csv";
+          break;
+        case "bales":
+          csv = "baleCode,articleCode,productName,category,grade,weightKg,costPerKg,status";
+          filename = "factory_bales_template.csv";
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid template type. Use: suppliers, raw-stock, or bales" });
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Error generating template:", error);
       res.status(500).json({ message: error.message });
     }
   });
