@@ -37,7 +37,7 @@ function formatLabelNum(val: string | number): string {
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
 
-function generateA4LabelHtml(labels: Array<{
+function generateCombinedLabelsHtml(labels: Array<{
   referenceNumber: string;
   articleCode: string;
   pieces: number;
@@ -47,7 +47,7 @@ function generateA4LabelHtml(labels: Array<{
   let labelsHtml = '';
   for (const label of labels) {
     labelsHtml += `
-      <div class="label-page">
+      <div class="detail-page">
         <div class="code-label">
           <div class="label-top">
             <div class="logo-section">
@@ -69,14 +69,22 @@ function generateA4LabelHtml(labels: Array<{
             <div class="article-barcode-number">${label.productName}</div>
           </div>
         </div>
+      </div>
+      <div class="name-page">
+        <div class="name-barcode">
+          <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+          <div class="name-barcode-number">${label.referenceNumber}</div>
+        </div>
+        <div class="name-text">${label.productName}</div>
       </div>`;
   }
-  return `<html><head><title>Stock Entry Labels (A4)</title><style>
-    @page { size: 76mm 62mm; margin: 0; }
+  return `<html><head><title>Stock Entry Labels</title><style>
+    @page detail { size: 76mm 62mm; margin: 0; }
+    @page bigname { size: 210mm 148mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .label-page { width: 76mm; height: 62mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
-    .label-page:last-child { page-break-after: auto; }
+
+    .detail-page { page: detail; width: 76mm; height: 62mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
@@ -91,35 +99,17 @@ function generateA4LabelHtml(labels: Array<{
     .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
-    .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Label A (A4 format) - disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
-}
 
-function generateBigNameLabelHtml(labels: Array<{
-  referenceNumber: string;
-  articleCode: string;
-  pieces: number;
-  approxWeightKg: string;
-  productName: string;
-}>) {
-  let labelsHtml = '';
-  for (const label of labels) {
-    labelsHtml += `
-      <div class="name-page">
-        <div class="name-text">${label.productName}</div>
-      </div>`;
-  }
-  return `<html><head><title>Stock Entry Labels (Big Name)</title><style>
-    @page { size: A5 landscape; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-    .name-page { width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fff; padding: 10mm; }
+    .name-page { page: bigname; width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10mm; background: #fff; padding: 10mm; }
     .name-page:last-child { page-break-after: auto; }
-    .name-text { font-size: clamp(40pt, 12vw, 120pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; width: 100%; overflow: hidden; text-overflow: clip; }
+    .name-barcode { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .name-barcode-img { width: 50mm; height: 20mm; object-fit: contain; }
+    .name-barcode-number { font-size: 10pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 1mm; letter-spacing: 1px; }
+    .name-text { font-size: clamp(40pt, 10vw, 100pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: clip; flex: 1; }
+
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Label B (Big Name - A5 Landscape). Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">Bale Labels - Detail + Big Name. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
@@ -270,27 +260,15 @@ function StockEntryTab() {
         };
       });
 
-      const printWindowA4 = window.open("", "_blank");
-      if (printWindowA4) {
-        printWindowA4.document.write(generateA4LabelHtml(labels));
-        printWindowA4.document.close();
-        printWindowA4.focus();
-        setTimeout(() => printWindowA4.print(), 500);
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(generateCombinedLabelsHtml(labels));
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
       } else {
-        toast({ title: "Warning", description: "Please allow pop-ups to print A4 labels", variant: "destructive" });
+        toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
       }
-
-      setTimeout(() => {
-        const printWindowHalf = window.open("", "_blank");
-        if (printWindowHalf) {
-          printWindowHalf.document.write(generateBigNameLabelHtml(labels));
-          printWindowHalf.document.close();
-          printWindowHalf.focus();
-          setTimeout(() => printWindowHalf.print(), 500);
-        } else {
-          toast({ title: "Warning", description: "Please allow pop-ups to print big name labels", variant: "destructive" });
-        }
-      }, 1000);
     } catch (error: any) {
       toast({ title: "Label Error", description: error.message || "Failed to generate labels", variant: "destructive" });
     }
