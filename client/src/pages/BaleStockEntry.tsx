@@ -71,9 +71,28 @@ function generateCombinedLabelsHtml(labels: Array<{
         </div>
       </div>
       <div class="name-page">
-        <div class="name-barcode">
-          <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-          <div class="name-barcode-number">${label.referenceNumber}</div>
+        <div class="name-left-label">
+          <div class="code-label">
+            <div class="label-top">
+              <div class="logo-section">
+                <div class="logo-text">HMD</div>
+                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+              </div>
+              <div class="info-section">
+                <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
+                <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
+                <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+              </div>
+            </div>
+            <div class="barcode-area">
+              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+              <div class="barcode-number">${label.referenceNumber}</div>
+            </div>
+            <div class="article-barcode-area">
+              <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <div class="article-barcode-number">${label.productName}</div>
+            </div>
+          </div>
         </div>
         <div class="name-text">${label.productName}</div>
       </div>`;
@@ -100,12 +119,11 @@ function generateCombinedLabelsHtml(labels: Array<{
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
 
-    .name-page { page: bigname; width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10mm; background: #fff; padding: 10mm; }
+    .name-page { page: bigname; width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8mm; background: #fff; padding: 10mm; }
     .name-page:last-child { page-break-after: auto; }
-    .name-barcode { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-    .name-barcode-img { width: 50mm; height: 20mm; object-fit: contain; }
-    .name-barcode-number { font-size: 10pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 1mm; letter-spacing: 1px; }
-    .name-text { font-size: clamp(40pt, 10vw, 100pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: clip; flex: 1; }
+    .name-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
+    .name-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .name-text { font-size: clamp(40pt, 10vw, 100pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: clip; flex: 1; display: flex; align-items: center; justify-content: center; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
