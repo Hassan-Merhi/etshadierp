@@ -74,17 +74,17 @@ if (!process.env.SESSION_SECRET) {
 }
 
 const sessionConfig: session.SessionOptions = {
-  name: 'erp.session', // Explicit cookie name
+  name: 'erp.session',
   secret: process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   cookie: {
-    // Replit serves over HTTPS even in dev mode, so we need secure cookies
     secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    path: '/', // Explicit path
-    sameSite: 'lax', // Lax allows same-site requests and top-level navigation
+    path: '/',
+    sameSite: 'lax',
   },
 };
 

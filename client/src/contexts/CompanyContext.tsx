@@ -22,7 +22,7 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 async function switchCompanyOnServer(companyId: number): Promise<boolean> {
   try {
-    const res = await apiRequest("POST", "/api/companies/switch", { companyId });
+    const res = await apiRequest("POST", "/api/auth/set-company", { companyId });
     return res.ok;
   } catch {
     return false;

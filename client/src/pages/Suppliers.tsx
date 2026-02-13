@@ -73,7 +73,7 @@ export default function Suppliers() {
     const targetCompany = companies.find((c: any) => c.id === txn.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== txn.companyId)) {
       // Switch company via API first
-      await apiRequest("POST", "/api/companies/switch", { companyId: txn.companyId });
+      await apiRequest("POST", "/api/auth/set-company", { companyId: txn.companyId });
       selectCompany(targetCompany);
     }
 
@@ -142,7 +142,7 @@ export default function Suppliers() {
     // First switch to the correct company if different
     const targetCompany = companies.find((c: any) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
-      await apiRequest("POST", "/api/companies/switch", { companyId: po.companyId });
+      await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
       selectCompany(targetCompany);
     }
 
