@@ -719,6 +719,7 @@ export const vouchers = pgTable("vouchers", {
   optional: boolean("optional").notNull().default(false),
   shiftId: integer("shift_id"),
   exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }),
+  sourceModule: text("source_module").default("ERP"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -738,6 +739,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   optional: z.boolean().optional().default(false),
   shiftId: z.number().optional(),
   exchangeRate: z.string().optional(),
+  sourceModule: z.enum(["ERP", "FACTORY"]).optional().default("ERP"),
 });
 
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;

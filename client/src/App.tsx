@@ -88,6 +88,7 @@ import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
+import FactoryImport from "@/pages/FactoryImport";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -460,6 +461,8 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <Switch>
+                    <Route path="/factory/dashboard" component={Dashboard} />
+                    <Route path="/factory/daybook">{() => <Daybook user={user} />}</Route>
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
@@ -469,9 +472,24 @@ function AuthenticatedApp() {
                     <Route path="/factory/finalize" component={ProductionBales} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bale-transfers" component={BaleTransfers} />
+                    <Route path="/factory/location-inventory">{() => <LocationInventory />}</Route>
+                    <Route path="/factory/stock-otw" component={StockOTW} />
+                    <Route path="/factory/stock-query/:id" component={StockItemDetail} />
+                    <Route path="/factory/stock-query" component={StockQuery} />
+                    <Route path="/factory/accounts" component={Accounts} />
+                    <Route path="/factory/vouchers">{() => <Vouchers />}</Route>
+                    <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
+                    <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
+                    <Route path="/factory/create" component={AccountingCreate} />
+                    <Route path="/factory/payroll" component={Payroll} />
+                    <Route path="/factory/analytics" component={Analytics} />
                     <Route path="/factory/production-summary" component={ProductionSummary} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
-                    <Route><Redirect to="/factory/raw-stock" /></Route>
+                    <Route path="/factory/import" component={FactoryImport} />
+                    <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
+                    <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+                    {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
+                    <Route><Redirect to="/factory/dashboard" /></Route>
                   </Switch>
                 </div>
               </main>

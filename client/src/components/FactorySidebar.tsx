@@ -12,6 +12,18 @@ import {
   Users,
   Factory,
   ChevronRight,
+  LayoutDashboard,
+  BookOpen,
+  Landmark,
+  FileText,
+  PlusCircle,
+  Wallet,
+  TrendingUp,
+  MapPin,
+  Ship,
+  Database,
+  Settings,
+  Upload,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,6 +48,7 @@ interface MenuItem {
   title: string;
   url: string;
   icon: any;
+  adminOnly?: boolean;
 }
 
 interface MenuGroup {
@@ -44,7 +57,15 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-const menuGroups: MenuGroup[] = [
+const allMenuGroups: MenuGroup[] = [
+  {
+    title: "Overview",
+    icon: LayoutDashboard,
+    items: [
+      { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard },
+      { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
+    ],
+  },
   {
     title: "Master Data",
     icon: Tags,
@@ -79,9 +100,29 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "Analytics",
-    icon: BarChart3,
+    title: "Inventory",
+    icon: MapPin,
     items: [
+      { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
+      { title: "Stock OTW", url: "/factory/stock-otw", icon: Ship },
+      { title: "Stock Query", url: "/factory/stock-query", icon: Database },
+    ],
+  },
+  {
+    title: "Accounting",
+    icon: Landmark,
+    items: [
+      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+      { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
+      { title: "Create", url: "/factory/create", icon: PlusCircle },
+    ],
+  },
+  {
+    title: "Finance",
+    icon: Wallet,
+    items: [
+      { title: "Payroll", url: "/factory/payroll", icon: Wallet },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
     ],
   },
@@ -92,11 +133,25 @@ const menuGroups: MenuGroup[] = [
       { title: "Barcode Lookup", url: "/factory/barcode-lookup", icon: Search },
     ],
   },
+  {
+    title: "Data",
+    icon: Upload,
+    items: [
+      { title: "Import Data", url: "/factory/import", icon: Upload },
+      { title: "Settings", url: "/factory/settings", icon: Settings, adminOnly: true },
+    ],
+  },
 ];
 
 export function FactorySidebar({ user }: { user?: any }) {
   const [location] = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const isAdmin = user?.role === "Admin";
+
+  const menuGroups = allMenuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => !item.adminOnly || isAdmin),
+  })).filter(group => group.items.length > 0);
 
   useEffect(() => {
     const activeGroup = menuGroups.find(group =>
