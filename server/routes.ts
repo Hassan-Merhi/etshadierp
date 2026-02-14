@@ -5021,7 +5021,7 @@ if (asOfDate) {
               return sum - debit;
             }
             return sum;
-          }, companyId ? 0 : openingBalance);
+          }, openingBalance);
 
           return {
             ...supplier,
