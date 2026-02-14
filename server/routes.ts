@@ -5027,7 +5027,7 @@ if (asOfDate) {
             ...supplier,
             containerCount,
             balance,
-            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0,
+            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0 || openingBalance !== 0,
           };
         }),
       );
@@ -12895,24 +12895,43 @@ if (asOfDate) {
           });
         }
 
-        // Sort by date (newest first)
+        // Sort by date ascending (oldest first) for correct running balance
         transactions.sort((a, b) => {
           const dateA = a.date ? new Date(a.date).getTime() : 0;
           const dateB = b.date ? new Date(b.date).getTime() : 0;
-          return dateB - dateA;
+          return dateA - dateB;
         });
 
-        // Calculate running balance
-        let balance = 0;
-        const transactionsWithBalance = transactions.map((t) => {
+        // Get supplier opening balance
+        const supplier = await storage.getSupplierById(supplierId);
+        const openingBalance = parseFloat(supplier?.openingBalance || "0");
+
+        // Add opening balance as first row if it exists
+        const result: any[] = [];
+        if (openingBalance !== 0) {
+          result.push({
+            type: "opening",
+            date: null,
+            companyId: null,
+            companyName: "Opening Balance",
+            docNumber: "-",
+            voucherId: null,
+            description: "Opening Balance",
+            voucherType: "Opening",
+            debit: 0,
+            credit: 0,
+            balance: openingBalance,
+          });
+        }
+
+        // Calculate running balance starting from opening balance
+        let balance = openingBalance;
+        for (const t of transactions) {
           balance += t.credit - t.debit;
-          return {
-            ...t,
-            balance: balance,
-          };
-        });
+          result.push({ ...t, balance });
+        }
 
-        res.json(transactionsWithBalance.reverse()); // Return chronological order with running balance
+        res.json(result); // Already in chronological order
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
@@ -19677,12 +19696,11 @@ if (asOfDate) {
         return totalBalance;
       };
 
-      // 1. Supplier Balance - calculated from voucher entries only (company-scoped)
-      // NOTE: Supplier opening balances are global and cannot be attributed to a single company
-      // Future enhancement: Add per-company supplier opening balances table
+      // 1. Supplier Balance - calculated from voucher entries + opening balances
       // Credits to suppliers increase what we owe (liability), debits decrease it
       const supplierEntries = await db
         .select({
+          supplierId: voucherEntries.supplierId,
           creditAmount: voucherEntries.creditAmount,
           debitAmount: voucherEntries.debitAmount,
         })
@@ -19697,12 +19715,24 @@ if (asOfDate) {
           )
         );
       
+      // Include supplier opening balances only for suppliers with activity in this company
+      const allSuppliersNP = await storage.getAllSuppliers();
+      const supplierIdsWithActivity = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
+      // Also check containers for supplier activity
+      const companyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
+      for (const c of companyContainers) {
+        if (c.supplierId) supplierIdsWithActivity.add(c.supplierId);
+      }
+      const supplierOpeningTotal = allSuppliersNP
+        .filter(s => supplierIdsWithActivity.has(s.id))
+        .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
+      
       // Supplier is a liability: Credits increase (we owe more), Debits decrease (we paid)
       const supplierBalance = supplierEntries.reduce((sum, entry) => {
         const credit = parseFloat(entry.creditAmount || "0");
         const debit = parseFloat(entry.debitAmount || "0");
         return sum + credit - debit;
-      }, 0);
+      }, supplierOpeningTotal);
 
       // 2. Stock OTW (containers with OTW status - asset, shows as positive/debit)
       const otwContainers = await db
@@ -22495,9 +22525,26 @@ if (asOfDate) {
           )
         );
       
+      // Include supplier opening balances only for suppliers with activity in this company
+      const allSuppliersBS = await storage.getAllSuppliers();
+      const bsSupplierIdsWithActivity = new Set(
+        (await db.select({ supplierId: voucherEntries.supplierId })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(isNotNull(voucherEntries.supplierId), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false))))
+          .map(e => e.supplierId).filter(Boolean)
+      );
+      const bsCompanyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
+      for (const c of bsCompanyContainers) {
+        if (c.supplierId) bsSupplierIdsWithActivity.add(c.supplierId);
+      }
+      const supplierOpeningTotalBS = allSuppliersBS
+        .filter(s => bsSupplierIdsWithActivity.has(s.id))
+        .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
+      
       const supplierBalance = supplierEntries.reduce((sum, entry) => {
         return sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0");
-      }, 0);
+      }, supplierOpeningTotalBS);
 
       const otwContainers = await db.select().from(containers).where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
       const stockOtwValue = otwContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);

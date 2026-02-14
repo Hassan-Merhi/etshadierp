@@ -460,10 +460,9 @@ export default function Suppliers() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {[...unifiedLedger]
-                          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                          .map((txn: any, idx: number) => {
+                        {unifiedLedger.map((txn: any, idx: number) => {
                             const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                            const isOpening = txn.type === "opening";
                             return (
                               <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
                                 <TableCell className="font-mono text-sm">
@@ -473,19 +472,23 @@ export default function Suppliers() {
                                   <Badge variant="secondary">{txn.companyName}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant={isPayment ? "default" : "outline"}>
-                                    {isPayment ? "Payment" : txn.voucherType}
+                                  <Badge variant={isOpening ? "secondary" : isPayment ? "default" : "outline"}>
+                                    {isOpening ? "Opening" : isPayment ? "Payment" : txn.voucherType}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <button
-                                    onClick={() => handleTransactionClick(txn)}
-                                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                    data-testid={`link-transaction-${idx}`}
-                                  >
-                                    <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
-                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                  </button>
+                                  {isOpening ? (
+                                    <span className="text-sm text-muted-foreground">Opening Balance</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleTransactionClick(txn)}
+                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                      data-testid={`link-transaction-${idx}`}
+                                    >
+                                      <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
+                                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                    </button>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono font-semibold">
                                   {formatAmount(txn.balance)}
@@ -497,10 +500,9 @@ export default function Suppliers() {
                     </Table>
                   </div>
                   <div className="md:hidden space-y-3">
-                    {[...unifiedLedger]
-                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                      .map((txn: any, idx: number) => {
+                    {unifiedLedger.map((txn: any, idx: number) => {
                         const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                        const isOpening = txn.type === "opening";
                         return (
                           <Card key={`${txn.type}-${txn.docNumber}-${idx}`}>
                             <CardContent className="p-3 space-y-2">
@@ -508,18 +510,22 @@ export default function Suppliers() {
                                 <span className="font-mono text-xs text-muted-foreground">
                                   {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
                                 </span>
-                                <Badge variant={isPayment ? "default" : "outline"}>
-                                  {isPayment ? "Payment" : txn.voucherType}
+                                <Badge variant={isOpening ? "secondary" : isPayment ? "default" : "outline"}>
+                                  {isOpening ? "Opening" : isPayment ? "Payment" : txn.voucherType}
                                 </Badge>
                               </div>
-                              <button
-                                onClick={() => handleTransactionClick(txn)}
-                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                data-testid={`link-transaction-${idx}`}
-                              >
-                                <span className="truncate">{txn.description || txn.docNumber || "-"}</span>
-                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                              </button>
+                              {isOpening ? (
+                                <span className="text-sm text-muted-foreground">Opening Balance</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleTransactionClick(txn)}
+                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                  data-testid={`link-transaction-${idx}`}
+                                >
+                                  <span className="truncate">{txn.description || txn.docNumber || "-"}</span>
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </button>
+                              )}
                               <div className="flex items-center justify-between gap-2">
                                 <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
                                 <span className="font-mono font-semibold">{formatAmount(txn.balance)}</span>
@@ -536,7 +542,7 @@ export default function Suppliers() {
                       <span className="text-muted-foreground">Total Balance: </span>
                       <span className="font-mono font-semibold text-lg">
                         {formatAmount(unifiedLedger.length > 0 
-                          ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
+                          ? unifiedLedger[unifiedLedger.length - 1]?.balance 
                           : 0)}
                       </span>
                     </div>

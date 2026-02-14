@@ -75,6 +75,7 @@ export default function EditSupplier() {
         description: `Supplier "${data.legalName}" updated successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers/stats"] });
       queryClient.invalidateQueries({ queryKey: [`/api/suppliers/${supplierId}`] });
       navigate("/suppliers");
     },
