@@ -54,7 +54,8 @@ export default function FactoryMixOptimizer() {
         desiredMargin,
         materials,
       });
-      return res.json();
+      const data = await res.json();
+      return data.suggestions || [];
     },
   });
 

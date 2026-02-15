@@ -237,8 +237,8 @@ export default function FactoryKpis() {
                           <TableCell className="font-mono">{mix.totalInputKg}</TableCell>
                           <TableCell className="font-mono">{mix.totalOutputKg}</TableCell>
                           <TableCell className="font-mono">{mix.wasteKg}</TableCell>
-                          <TableCell className={`font-mono font-medium ${getWasteColor(mix.wastePercent)}`} data-testid={`text-waste-percent-${idx}`}>
-                            {mix.wastePercent.toFixed(1)}%
+                          <TableCell className={`font-mono font-medium ${getWasteColor(mix.wastePercent ?? 0)}`} data-testid={`text-waste-percent-${idx}`}>
+                            {(mix.wastePercent ?? 0).toFixed(1)}%
                           </TableCell>
                         </TableRow>
                       ))}
