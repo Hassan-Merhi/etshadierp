@@ -29,6 +29,15 @@ import {
   ClipboardList,
   HardHat,
   ClipboardCheck,
+  Activity,
+  Bell,
+  Award,
+  Beaker,
+  Trash2,
+  DollarSign,
+  Camera,
+  Link,
+  Gauge,
 } from "lucide-react";
 import {
   Sidebar,
@@ -46,6 +55,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 
@@ -54,6 +64,7 @@ interface MenuItem {
   url: string;
   icon: any;
   adminOnly?: boolean;
+  featureFlag?: string;
 }
 
 interface MenuGroup {
@@ -149,6 +160,21 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
+    title: "Intelligence",
+    icon: Gauge,
+    items: [
+      { title: "Factory Dashboard", url: "/factory/intelligence/dashboard", icon: Activity, featureFlag: "dashboardEnabled" },
+      { title: "KPIs", url: "/factory/intelligence/kpis", icon: Gauge, featureFlag: "kpisEnabled" },
+      { title: "Profitability", url: "/factory/intelligence/profitability", icon: DollarSign, featureFlag: "profitabilityEnabled" },
+      { title: "Waste Tracking", url: "/factory/intelligence/waste", icon: Trash2, featureFlag: "wasteTrackingEnabled" },
+      { title: "Alerts", url: "/factory/intelligence/alerts", icon: Bell, featureFlag: "alertsEnabled" },
+      { title: "Supplier Scores", url: "/factory/intelligence/supplier-scores", icon: Award, featureFlag: "supplierScoringEnabled" },
+      { title: "Mix Optimizer", url: "/factory/intelligence/mix-optimizer", icon: Beaker, featureFlag: "mixOptimizerEnabled" },
+      { title: "Cash Flow", url: "/factory/intelligence/cashflow", icon: DollarSign, featureFlag: "cashflowEnabled" },
+      { title: "Intelligence Settings", url: "/factory/intelligence/settings", icon: Settings, adminOnly: true },
+    ],
+  },
+  {
     title: "Traceability",
     icon: Search,
     items: [
@@ -170,9 +196,26 @@ export function FactorySidebar({ user }: { user?: any }) {
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const isAdmin = user?.role === "Admin";
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/factory/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/settings");
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
   const menuGroups = allMenuGroups.map(group => ({
     ...group,
-    items: group.items.filter(item => !item.adminOnly || isAdmin),
+    items: group.items.filter(item => {
+      if (item.adminOnly && !isAdmin) return false;
+      if (item.featureFlag && settings) {
+        return settings[item.featureFlag] === true;
+      }
+      if (item.featureFlag && !settings) return false;
+      return true;
+    }),
   })).filter(group => group.items.length > 0);
 
   useEffect(() => {

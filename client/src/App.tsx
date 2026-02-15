@@ -99,6 +99,15 @@ import CustomerProformas from "@/pages/CustomerProformas";
 import CustomerInvoiceCreate from "@/pages/CustomerInvoiceCreate";
 import CustomerInvoices from "@/pages/CustomerInvoices";
 import CustomerInvoiceDetail from "@/pages/CustomerInvoiceDetail";
+import FactoryDashboardIntel from "@/pages/FactoryDashboard";
+import FactoryKpis from "@/pages/FactoryKpis";
+import FactoryProfitability from "@/pages/FactoryProfitability";
+import FactoryAlerts from "@/pages/FactoryAlerts";
+import FactorySupplierScoreboard from "@/pages/FactorySupplierScoreboard";
+import FactoryMixOptimizer from "@/pages/FactoryMixOptimizer";
+import FactoryCashflow from "@/pages/FactoryCashflow";
+import FactoryWaste from "@/pages/FactoryWaste";
+import FactoryIntelSettings from "@/pages/FactorySettings";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -515,6 +524,15 @@ function AuthenticatedApp() {
                     <Route path="/factory/import" component={FactoryImport} />
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
                     <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+                    <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
+                    <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
+                    <Route path="/factory/intelligence/profitability" component={FactoryProfitability} />
+                    <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
+                    <Route path="/factory/intelligence/supplier-scores" component={FactorySupplierScoreboard} />
+                    <Route path="/factory/intelligence/mix-optimizer" component={FactoryMixOptimizer} />
+                    <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
+                    <Route path="/factory/intelligence/waste" component={FactoryWaste} />
+                    <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
                     <Route><Redirect to="/factory/dashboard" /></Route>
                   </Switch>

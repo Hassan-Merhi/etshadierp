@@ -13,6 +13,7 @@ import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
 import { registerFactoryPayrollRoutes } from "./factoryPayrollRoutes";
 import { registerFactoryReportRoutes } from "./factoryReportRoutes";
+import { registerFactoryIntelligenceRoutes } from "./factoryIntelligenceRoutes";
 import {
   requireAuth,
   requireRole,
@@ -701,6 +702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryWorkerRoutes(app, requireAuth, db);
   registerFactoryPayrollRoutes(app, requireAuth, db);
   registerFactoryReportRoutes(app, requireAuth, db);
+  registerFactoryIntelligenceRoutes(app, requireAuth, db);
 
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {

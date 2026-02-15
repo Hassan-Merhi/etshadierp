@@ -2976,3 +2976,196 @@ export const insertFactoryPayrollSchema = createInsertSchema(factoryPayrolls).om
 
 export type InsertFactoryPayroll = z.infer<typeof insertFactoryPayrollSchema>;
 export type FactoryPayroll = typeof factoryPayrolls.$inferSelect;
+
+export const factorySettings = pgTable("factory_settings", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  dashboardEnabled: boolean("dashboard_enabled").notNull().default(false),
+  kpisEnabled: boolean("kpis_enabled").notNull().default(false),
+  profitabilityEnabled: boolean("profitability_enabled").notNull().default(false),
+  alertsEnabled: boolean("alerts_enabled").notNull().default(false),
+  supplierScoringEnabled: boolean("supplier_scoring_enabled").notNull().default(false),
+  mixOptimizerEnabled: boolean("mix_optimizer_enabled").notNull().default(false),
+  traceabilityEnabled: boolean("traceability_enabled").notNull().default(false),
+  balePhotosEnabled: boolean("bale_photos_enabled").notNull().default(false),
+  wasteTrackingEnabled: boolean("waste_tracking_enabled").notNull().default(false),
+  cashflowEnabled: boolean("cashflow_enabled").notNull().default(false),
+  rolesEnabled: boolean("roles_enabled").notNull().default(false),
+  laborCostPerKg: decimal("labor_cost_per_kg", { precision: 10, scale: 4 }).default("0"),
+  overheadPerKg: decimal("overhead_per_kg", { precision: 10, scale: 4 }).default("0"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyUnique: uniqueIndex("factory_settings_company_unique").on(t.companyId),
+}));
+
+export const insertFactorySettingsSchema = createInsertSchema(factorySettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertFactorySettings = z.infer<typeof insertFactorySettingsSchema>;
+export type FactorySettings = typeof factorySettings.$inferSelect;
+
+export const factoryAlerts = pgTable("factory_alerts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  severity: varchar("severity", { length: 20 }).notNull().default("info"),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message"),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: integer("entity_id"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_alerts_company_idx").on(t.companyId),
+  readIdx: index("factory_alerts_read_idx").on(t.companyId, t.isRead),
+}));
+
+export const insertFactoryAlertSchema = createInsertSchema(factoryAlerts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryAlert = z.infer<typeof insertFactoryAlertSchema>;
+export type FactoryAlert = typeof factoryAlerts.$inferSelect;
+
+export const factoryWasteEntries = pgTable("factory_waste_entries", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  date: date("date").notNull(),
+  mixBatchId: integer("mix_batch_id"),
+  supplierId: integer("supplier_id"),
+  containerId: integer("container_id"),
+  kgWaste: decimal("kg_waste", { precision: 15, scale: 3 }).notNull(),
+  reason: text("reason"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_waste_company_idx").on(t.companyId),
+  dateIdx: index("factory_waste_date_idx").on(t.companyId, t.date),
+}));
+
+export const insertFactoryWasteEntrySchema = createInsertSchema(factoryWasteEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryWasteEntry = z.infer<typeof insertFactoryWasteEntrySchema>;
+export type FactoryWasteEntry = typeof factoryWasteEntries.$inferSelect;
+
+export const factoryBalePhotos = pgTable("factory_bale_photos", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  url: text("url").notNull(),
+  fileName: varchar("file_name", { length: 255 }),
+  uploadedBy: integer("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (t) => ({
+  baleIdx: index("factory_bale_photos_bale_idx").on(t.baleId),
+  companyIdx: index("factory_bale_photos_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryBalePhotoSchema = createInsertSchema(factoryBalePhotos).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertFactoryBalePhoto = z.infer<typeof insertFactoryBalePhotoSchema>;
+export type FactoryBalePhoto = typeof factoryBalePhotos.$inferSelect;
+
+export const factoryDailyKpiSnapshots = pgTable("factory_daily_kpi_snapshots", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  date: date("date").notNull(),
+  totalKgIn: decimal("total_kg_in", { precision: 15, scale: 3 }).default("0"),
+  totalKgPressed: decimal("total_kg_pressed", { precision: 15, scale: 3 }).default("0"),
+  totalBalesProduced: integer("total_bales_produced").default(0),
+  totalWasteKg: decimal("total_waste_kg", { precision: 15, scale: 3 }).default("0"),
+  topWorkerId: integer("top_worker_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyDateUnique: uniqueIndex("factory_kpi_company_date_unique").on(t.companyId, t.date),
+}));
+
+export const insertFactoryDailyKpiSnapshotSchema = createInsertSchema(factoryDailyKpiSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryDailyKpiSnapshot = z.infer<typeof insertFactoryDailyKpiSnapshotSchema>;
+export type FactoryDailyKpiSnapshot = typeof factoryDailyKpiSnapshots.$inferSelect;
+
+export const factorySupplierScoreSnapshots = pgTable("factory_supplier_score_snapshots", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  supplierId: integer("supplier_id").notNull(),
+  fromDate: date("from_date").notNull(),
+  toDate: date("to_date").notNull(),
+  totalKg: decimal("total_kg", { precision: 15, scale: 3 }).default("0"),
+  wasteKg: decimal("waste_kg", { precision: 15, scale: 3 }).default("0"),
+  wastePct: decimal("waste_pct", { precision: 8, scale: 2 }).default("0"),
+  avgCostPerKg: decimal("avg_cost_per_kg", { precision: 12, scale: 4 }).default("0"),
+  outputBales: integer("output_bales").default(0),
+  score0to100: integer("score_0_to_100").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companySupplierIdx: index("factory_supplier_score_company_idx").on(t.companyId, t.supplierId),
+}));
+
+export const insertFactorySupplierScoreSnapshotSchema = createInsertSchema(factorySupplierScoreSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactorySupplierScoreSnapshot = z.infer<typeof insertFactorySupplierScoreSnapshotSchema>;
+export type FactorySupplierScoreSnapshot = typeof factorySupplierScoreSnapshots.$inferSelect;
+
+export const factoryBaleCostSnapshots = pgTable("factory_bale_cost_snapshots", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  materialCost: decimal("material_cost", { precision: 15, scale: 4 }).default("0"),
+  laborCost: decimal("labor_cost", { precision: 15, scale: 4 }).default("0"),
+  overheadCost: decimal("overhead_cost", { precision: 15, scale: 4 }).default("0"),
+  freightAllocated: decimal("freight_allocated", { precision: 15, scale: 4 }).default("0"),
+  totalCost: decimal("total_cost", { precision: 15, scale: 4 }).default("0"),
+  salePrice: decimal("sale_price", { precision: 15, scale: 4 }),
+  profit: decimal("profit", { precision: 15, scale: 4 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  baleIdx: index("factory_bale_cost_bale_idx").on(t.baleId),
+  companyIdx: index("factory_bale_cost_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryBaleCostSnapshotSchema = createInsertSchema(factoryBaleCostSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryBaleCostSnapshot = z.infer<typeof insertFactoryBaleCostSnapshotSchema>;
+export type FactoryBaleCostSnapshot = typeof factoryBaleCostSnapshots.$inferSelect;
+
+export const factoryContainerProfitSnapshots = pgTable("factory_container_profit_snapshots", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  totalRevenue: decimal("total_revenue", { precision: 20, scale: 4 }).default("0"),
+  totalCost: decimal("total_cost", { precision: 20, scale: 4 }).default("0"),
+  profit: decimal("profit", { precision: 20, scale: 4 }).default("0"),
+  marginPct: decimal("margin_pct", { precision: 8, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("factory_container_profit_container_idx").on(t.containerId),
+  companyIdx: index("factory_container_profit_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryContainerProfitSnapshotSchema = createInsertSchema(factoryContainerProfitSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryContainerProfitSnapshot = z.infer<typeof insertFactoryContainerProfitSnapshotSchema>;
+export type FactoryContainerProfitSnapshot = typeof factoryContainerProfitSnapshots.$inferSelect;
