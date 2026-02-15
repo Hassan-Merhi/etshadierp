@@ -432,9 +432,14 @@ function AuthenticatedApp() {
     );
   }
 
+  const isFactoryCompany = selectedCompany?.companyType === "factory";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
-  if (isFactoryRoute) {
+  if (isFactoryCompany && !isFactoryRoute) {
+    return <Redirect to="/factory/dashboard" />;
+  }
+
+  if (isFactoryRoute || isFactoryCompany) {
     return (
       <>
         <SidebarProvider style={style as React.CSSProperties}>
@@ -451,15 +456,17 @@ function AuthenticatedApp() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLocation("/")}
-                    data-testid="button-switch-erp"
-                  >
-                    <Package className="h-4 w-4 mr-1" />
-                    Switch to ERP
-                  </Button>
+                  {!isFactoryCompany && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation("/")}
+                      data-testid="button-switch-erp"
+                    >
+                      <Package className="h-4 w-4 mr-1" />
+                      Switch to ERP
+                    </Button>
+                  )}
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                     <LogOut className="h-4 w-4" />
@@ -532,17 +539,6 @@ function AuthenticatedApp() {
             <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                {selectedCompany?.companyType === "factory" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLocation("/factory/raw-stock")}
-                    data-testid="button-switch-factory"
-                  >
-                    <Factory className="h-4 w-4 mr-1" />
-                    Factory
-                  </Button>
-                )}
                 <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                 <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="h-4 w-4" />
