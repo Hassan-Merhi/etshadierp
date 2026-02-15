@@ -2845,3 +2845,134 @@ export const loginHistory = pgTable("login_history", {
 }));
 
 export type LoginHistory = typeof loginHistory.$inferSelect;
+
+// ─── Factory Workers ───
+export const factoryWorkers = pgTable("factory_workers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  employeeCode: varchar("employee_code", { length: 50 }),
+  fullName: varchar("full_name", { length: 200 }).notNull(),
+  fatherName: varchar("father_name", { length: 200 }),
+  motherName: varchar("mother_name", { length: 200 }),
+  nationalId: varchar("national_id", { length: 100 }),
+  passportNumber: varchar("passport_number", { length: 100 }),
+  dateOfBirth: date("date_of_birth"),
+  gender: varchar("gender", { length: 20 }),
+  nationality: varchar("nationality", { length: 100 }),
+  maritalStatus: varchar("marital_status", { length: 30 }),
+  numberOfChildren: integer("number_of_children").default(0),
+  phone1: varchar("phone1", { length: 50 }),
+  phone2: varchar("phone2", { length: 50 }),
+  emergencyContactName: varchar("emergency_contact_name", { length: 200 }),
+  emergencyContactPhone: varchar("emergency_contact_phone", { length: 50 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  country: varchar("country", { length: 100 }),
+  position: varchar("position", { length: 100 }),
+  department: varchar("department", { length: 100 }),
+  dateJoined: date("date_joined"),
+  contractStartDate: date("contract_start_date"),
+  contractEndDate: date("contract_end_date"),
+  salaryType: varchar("salary_type", { length: 30 }).notNull().default("Monthly"),
+  baseSalary: decimal("base_salary", { precision: 20, scale: 2 }).default("0"),
+  perBaleRate: decimal("per_bale_rate", { precision: 20, scale: 4 }).default("0"),
+  perKgRate: decimal("per_kg_rate", { precision: 20, scale: 4 }).default("0"),
+  overtimeRate: decimal("overtime_rate", { precision: 20, scale: 2 }).default("0"),
+  shiftType: varchar("shift_type", { length: 50 }),
+  active: boolean("active").notNull().default(true),
+  bankName: varchar("bank_name", { length: 200 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 100 }),
+  paymentMethod: varchar("payment_method", { length: 30 }).default("Cash"),
+  photoUrl: text("photo_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_workers_company_idx").on(t.companyId),
+  activeIdx: index("factory_workers_active_idx").on(t.active),
+  codeIdx: index("factory_workers_code_idx").on(t.companyId, t.employeeCode),
+}));
+
+export const insertFactoryWorkerSchema = createInsertSchema(factoryWorkers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  fullName: z.string().min(1, "Full name is required"),
+  fatherName: z.string().optional().nullable(),
+  motherName: z.string().optional().nullable(),
+  nationalId: z.string().optional().nullable(),
+  passportNumber: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  nationality: z.string().optional().nullable(),
+  maritalStatus: z.string().optional().nullable(),
+  numberOfChildren: z.number().optional().nullable(),
+  phone1: z.string().optional().nullable(),
+  phone2: z.string().optional().nullable(),
+  emergencyContactName: z.string().optional().nullable(),
+  emergencyContactPhone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  employeeCode: z.string().optional().nullable(),
+  position: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
+  dateJoined: z.string().optional().nullable(),
+  contractStartDate: z.string().optional().nullable(),
+  contractEndDate: z.string().optional().nullable(),
+  salaryType: z.enum(["Monthly", "Daily", "Per Bale", "Per KG"]).optional(),
+  baseSalary: z.string().optional().nullable(),
+  perBaleRate: z.string().optional().nullable(),
+  perKgRate: z.string().optional().nullable(),
+  overtimeRate: z.string().optional().nullable(),
+  shiftType: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+  bankName: z.string().optional().nullable(),
+  bankAccountNumber: z.string().optional().nullable(),
+  paymentMethod: z.enum(["Cash", "Bank", "Transfer"]).optional(),
+  photoUrl: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export type InsertFactoryWorker = z.infer<typeof insertFactoryWorkerSchema>;
+export type FactoryWorker = typeof factoryWorkers.$inferSelect;
+
+// ─── Factory Payroll ───
+export const factoryPayrolls = pgTable("factory_payrolls", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  workerId: integer("worker_id").notNull(),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  baseSalary: decimal("base_salary", { precision: 20, scale: 2 }).default("0"),
+  baleEarnings: decimal("bale_earnings", { precision: 20, scale: 2 }).default("0"),
+  kgEarnings: decimal("kg_earnings", { precision: 20, scale: 2 }).default("0"),
+  overtimePay: decimal("overtime_pay", { precision: 20, scale: 2 }).default("0"),
+  bonuses: decimal("bonuses", { precision: 20, scale: 2 }).default("0"),
+  deductions: decimal("deductions", { precision: 20, scale: 2 }).default("0"),
+  advances: decimal("advances", { precision: 20, scale: 2 }).default("0"),
+  netSalary: decimal("net_salary", { precision: 20, scale: 2 }).default("0"),
+  balesCount: integer("bales_count").default(0),
+  kgProcessed: decimal("kg_processed", { precision: 15, scale: 3 }).default("0"),
+  overtimeHours: decimal("overtime_hours", { precision: 10, scale: 2 }).default("0"),
+  notes: text("notes"),
+  status: varchar("status", { length: 30 }).notNull().default("DRAFT"),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: integer("approved_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_payrolls_company_idx").on(t.companyId),
+  workerIdx: index("factory_payrolls_worker_idx").on(t.workerId),
+  periodIdx: index("factory_payrolls_period_idx").on(t.periodStart, t.periodEnd),
+}));
+
+export const insertFactoryPayrollSchema = createInsertSchema(factoryPayrolls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryPayroll = z.infer<typeof insertFactoryPayrollSchema>;
+export type FactoryPayroll = typeof factoryPayrolls.$inferSelect;
