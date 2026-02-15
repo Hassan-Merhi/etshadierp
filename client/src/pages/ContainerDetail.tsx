@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer, Upload, CheckCircle2, Circle, XCircle, Plus, CreditCard, Ship } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +90,130 @@ export default function ContainerDetail() {
   });
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
+
+  const { data: docsData, isLoading: docsLoading } = useQuery<{
+    documents: any[];
+    docTypes: any[];
+    completeness: { total: number; uploaded: number; complete: boolean };
+  }>({
+    queryKey: ["/api/factory/containers", containerId, "documents"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/containers/${containerId}/documents`);
+      if (!res.ok) throw new Error("Failed to load documents");
+      return res.json();
+    },
+    enabled: !!containerId,
+  });
+
+  const { data: freightData = [], isLoading: freightLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/containers", containerId, "freight"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/containers/${containerId}/freight`);
+      if (!res.ok) throw new Error("Failed to load freight");
+      return res.json();
+    },
+    enabled: !!containerId,
+  });
+
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showFreightDialog, setShowFreightDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState<number | null>(null);
+  const [uploadDocTypeId, setUploadDocTypeId] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadDocMutation = useMutation({
+    mutationFn: async ({ docTypeId, file }: { docTypeId: number; file: File }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docTypeId", String(docTypeId));
+      const res = await fetch(`/api/factory/containers/${containerId}/documents`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      setShowUploadDialog(false);
+      setUploadDocTypeId("");
+      setUploadFile(null);
+      toast({ title: "Document uploaded" });
+    },
+    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: async (docId: number) => {
+      await apiRequest("DELETE", `/api/factory/containers/${containerId}/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({ title: "Document deleted" });
+    },
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+  });
+
+  const freightForm = useForm({
+    defaultValues: { vendorName: "", freightAmount: "", currency: "USD", dueDate: "", notes: "" },
+  });
+
+  const addFreightMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", `/api/factory/containers/${containerId}/freight`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
+      setShowFreightDialog(false);
+      freightForm.reset();
+      toast({ title: "Freight charge added" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteFreightMutation = useMutation({
+    mutationFn: async (freightId: number) => {
+      await apiRequest("DELETE", `/api/factory/containers/${containerId}/freight/${freightId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
+      toast({ title: "Freight charge removed" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const paymentForm = useForm({
+    defaultValues: { paymentDate: new Date().toISOString().split("T")[0], amount: "", method: "", reference: "" },
+  });
+
+  const addPaymentMutation = useMutation({
+    mutationFn: async ({ freightId, data }: { freightId: number; data: any }) => {
+      const res = await apiRequest("POST", `/api/factory/freight/${freightId}/payments`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
+      setShowPaymentDialog(null);
+      paymentForm.reset({ paymentDate: new Date().toISOString().split("T")[0], amount: "", method: "", reference: "" });
+      toast({ title: "Payment recorded" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async ({ freightId, paymentId }: { freightId: number; paymentId: number }) => {
+      await apiRequest("DELETE", `/api/factory/freight/${freightId}/payments/${paymentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
+      toast({ title: "Payment deleted" });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
 
   const handleExportContainer = async () => {
     try {
@@ -650,6 +775,178 @@ export default function ContainerDetail() {
       )}
 
       <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Documents
+            {docsData?.completeness && (
+              <Badge variant={docsData.completeness.complete ? "default" : "secondary"} data-testid="badge-doc-completeness">
+                {docsData.completeness.uploaded}/{docsData.completeness.total}
+              </Badge>
+            )}
+          </CardTitle>
+          <Button size="sm" className="gap-1" onClick={() => setShowUploadDialog(true)} data-testid="button-upload-doc">
+            <Upload className="h-3 w-3" />
+            Upload
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {docsLoading ? (
+            <Skeleton className="h-20 w-full" />
+          ) : (
+            <div className="space-y-3">
+              {(docsData?.docTypes || []).filter((dt: any) => dt.isRequired).map((dt: any) => {
+                const uploaded = docsData?.documents?.find((d: any) => d.docTypeId === dt.id);
+                return (
+                  <div key={dt.id} className="flex items-center justify-between gap-2 p-2 rounded-md border" data-testid={`doc-row-${dt.code}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {uploaded ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{dt.label}</p>
+                        {uploaded && (
+                          <p className="text-xs text-muted-foreground truncate">{uploaded.fileName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {uploaded && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => window.open(`/api/factory/uploads/${uploaded.storageKey}`, "_blank")}
+                            data-testid={`button-view-doc-${dt.code}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              if (confirm(`Delete ${uploaded.fileName}?`)) deleteDocMutation.mutate(uploaded.id);
+                            }}
+                            data-testid={`button-delete-doc-${dt.code}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {(docsData?.documents || []).filter((d: any) => {
+                const docType = docsData?.docTypes?.find((dt: any) => dt.id === d.docTypeId);
+                return !docType?.isRequired;
+              }).map((d: any) => {
+                const docType = docsData?.docTypes?.find((dt: any) => dt.id === d.docTypeId);
+                return (
+                  <div key={d.id} className="flex items-center justify-between gap-2 p-2 rounded-md border" data-testid={`doc-row-optional-${d.id}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{docType?.label || "Other"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{d.fileName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="icon" variant="ghost" onClick={() => window.open(`/api/factory/uploads/${d.storageKey}`, "_blank")} data-testid={`button-view-doc-opt-${d.id}`}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Delete ${d.fileName}?`)) deleteDocMutation.mutate(d.id); }} data-testid={`button-delete-doc-opt-${d.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Ship className="h-5 w-5" />
+            Freight Charges
+          </CardTitle>
+          <Button size="sm" className="gap-1" onClick={() => setShowFreightDialog(true)} data-testid="button-add-freight">
+            <Plus className="h-3 w-3" />
+            Add Freight
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {freightLoading ? (
+            <Skeleton className="h-20 w-full" />
+          ) : freightData.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4 text-sm">No freight charges recorded</p>
+          ) : (
+            <div className="space-y-3">
+              {freightData.map((fr: any) => (
+                <div key={fr.id} className="rounded-md border p-3 space-y-2" data-testid={`freight-row-${fr.id}`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium">{fr.vendorName || "Unnamed vendor"}</p>
+                      <p className="text-lg font-bold">{fr.currency} {Number(fr.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={fr.computedStatus === "PAID" ? "default" : fr.computedStatus === "PARTIAL" ? "secondary" : "destructive"} data-testid={`badge-freight-status-${fr.id}`}>
+                        {fr.computedStatus}
+                      </Badge>
+                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this freight charge and all its payments?")) deleteFreightMutation.mutate(fr.id); }} data-testid={`button-delete-freight-${fr.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {fr.dueDate && (
+                    <p className="text-xs text-muted-foreground">Due: {new Date(fr.dueDate).toLocaleDateString()}</p>
+                  )}
+                  {fr.notes && <p className="text-xs text-muted-foreground">{fr.notes}</p>}
+
+                  {fr.payments && fr.payments.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t">
+                      <p className="text-xs font-medium text-muted-foreground">Payments</p>
+                      {fr.payments.map((p: any) => (
+                        <div key={p.id} className="flex items-center justify-between text-sm" data-testid={`payment-row-${p.id}`}>
+                          <span>{new Date(p.paymentDate).toLocaleDateString()} - {p.method || "Cash"} {p.reference ? `(${p.reference})` : ""}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono">{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate({ freightId: fr.id, paymentId: p.id }); }} data-testid={`button-delete-payment-${p.id}`}>
+                              <XCircle className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-sm font-medium pt-1 border-t">
+                        <span>Balance remaining</span>
+                        <span className="font-mono">{(Number(fr.freightAmount) - fr.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    onClick={() => setShowPaymentDialog(fr.id)}
+                    data-testid={`button-add-payment-${fr.id}`}
+                  >
+                    <CreditCard className="h-3 w-3" />
+                    Record Payment
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Summary</CardTitle>
         </CardHeader>
@@ -805,6 +1102,152 @@ export default function ContainerDetail() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent data-testid="dialog-upload-doc">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>Upload a document for this container</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Document Type</label>
+              <Select value={uploadDocTypeId} onValueChange={setUploadDocTypeId}>
+                <SelectTrigger data-testid="select-doc-type">
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(docsData?.docTypes || []).map((dt: any) => (
+                    <SelectItem key={dt.id} value={String(dt.id)}>{dt.label}{dt.isRequired ? " *" : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">File</label>
+              <Input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                data-testid="input-doc-file"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowUploadDialog(false)} data-testid="button-cancel-upload">Cancel</Button>
+              <Button
+                disabled={!uploadDocTypeId || !uploadFile || uploadDocMutation.isPending}
+                onClick={() => uploadDocMutation.mutate({ docTypeId: Number(uploadDocTypeId), file: uploadFile! })}
+                data-testid="button-submit-upload"
+              >
+                {uploadDocMutation.isPending ? "Uploading..." : "Upload"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFreightDialog} onOpenChange={setShowFreightDialog}>
+        <DialogContent data-testid="dialog-add-freight">
+          <DialogHeader>
+            <DialogTitle>Add Freight Charge</DialogTitle>
+            <DialogDescription>Record a freight/shipping charge for this container</DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={freightForm.handleSubmit((data) => addFreightMutation.mutate(data))}
+            className="space-y-4"
+          >
+            <div>
+              <label className="text-sm font-medium">Vendor Name</label>
+              <Input {...freightForm.register("vendorName")} placeholder="Shipping company" data-testid="input-freight-vendor" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm font-medium">Amount</label>
+                <Input {...freightForm.register("freightAmount")} type="number" step="0.01" placeholder="0.00" data-testid="input-freight-amount" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Currency</label>
+                <Select value={freightForm.watch("currency")} onValueChange={(v) => freightForm.setValue("currency", v)}>
+                  <SelectTrigger data-testid="select-freight-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="XOF">XOF (CFA)</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Due Date (optional)</label>
+              <Input {...freightForm.register("dueDate")} type="date" data-testid="input-freight-due" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Notes (optional)</label>
+              <Textarea {...freightForm.register("notes")} placeholder="Additional details" data-testid="input-freight-notes" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowFreightDialog(false)} data-testid="button-cancel-freight">Cancel</Button>
+              <Button type="submit" disabled={addFreightMutation.isPending} data-testid="button-submit-freight">
+                {addFreightMutation.isPending ? "Adding..." : "Add Freight"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPaymentDialog !== null} onOpenChange={(open) => { if (!open) setShowPaymentDialog(null); }}>
+        <DialogContent data-testid="dialog-add-payment">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>Record a payment toward this freight charge</DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={paymentForm.handleSubmit((data) => {
+              if (showPaymentDialog !== null) addPaymentMutation.mutate({ freightId: showPaymentDialog, data });
+            })}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm font-medium">Payment Date</label>
+                <Input {...paymentForm.register("paymentDate")} type="date" data-testid="input-payment-date" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Amount</label>
+                <Input {...paymentForm.register("amount")} type="number" step="0.01" placeholder="0.00" data-testid="input-payment-amount" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm font-medium">Method</label>
+                <Select value={paymentForm.watch("method")} onValueChange={(v) => paymentForm.setValue("method", v)}>
+                  <SelectTrigger data-testid="select-payment-method">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                    <SelectItem value="Check">Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Reference</label>
+                <Input {...paymentForm.register("reference")} placeholder="Transaction ref" data-testid="input-payment-reference" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(null)} data-testid="button-cancel-payment">Cancel</Button>
+              <Button type="submit" disabled={addPaymentMutation.isPending} data-testid="button-submit-payment">
+                {addPaymentMutation.isPending ? "Recording..." : "Record Payment"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

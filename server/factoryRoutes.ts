@@ -46,6 +46,12 @@ import {
   factoryFxRates,
   insertFactoryFxRateSchema,
   factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -56,7 +62,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     txDate: string;
     txType: string;
     referenceId?: number;
+    referenceTable?: string;
     description: string;
+    metaJson?: string;
     currencyCode?: string;
     amountCurrency?: number;
     fxRateToUsd?: number;
@@ -72,7 +80,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       txDate: opts.txDate,
       txType: opts.txType,
       referenceId: opts.referenceId || null,
+      referenceTable: opts.referenceTable || null,
       description: opts.description,
+      metaJson: opts.metaJson || null,
       currencyCode: currency,
       amountCurrency: String(amtCurrency),
       fxRateToUsd: String(fxRate),
@@ -3329,6 +3339,437 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       res.send(html);
     } catch (error: any) {
       console.error("Error exporting order to PDF:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── CONTAINER DOCUMENT TYPES ───────
+
+  app.get("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
+    try {
+      const rows = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
+    try {
+      const [row] = await db.insert(containerDocumentTypes).values(req.body).returning();
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── CONTAINER DOCUMENTS (upload / list / delete) ───────
+
+  app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
+    try {
+      const containerId = Number(req.params.containerId);
+      const docs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
+      const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
+      const requiredTypes = docTypes.filter((dt: any) => dt.isRequired);
+      const uploadedTypeIds = new Set(docs.map((d: any) => d.docTypeId));
+      const completeness = {
+        total: requiredTypes.length,
+        uploaded: requiredTypes.filter((rt: any) => uploadedTypeIds.has(rt.id)).length,
+        complete: requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id)),
+      };
+      res.json({ documents: docs, docTypes, completeness });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
+    try {
+      const multer = (await import("multer")).default;
+      const path = await import("path");
+      const fs = await import("fs");
+      const uploadDir = path.default.join(process.cwd(), "uploads", "container-docs");
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const storage = multer.diskStorage({
+        destination: (_req: any, _file: any, cb: any) => cb(null, uploadDir),
+        filename: (_req: any, file: any, cb: any) => {
+          const ext = path.default.extname(file.originalname);
+          cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+        },
+      });
+      const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+
+      upload.single("file")(req, res, async (err: any) => {
+        try {
+          if (err) return res.status(400).json({ message: err.message });
+          if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+          const containerId = Number(req.params.containerId);
+          const companyId = (req.session as any).currentCompanyId;
+          const docTypeId = Number(req.body.docTypeId);
+          if (!companyId || !docTypeId) return res.status(400).json({ message: "Missing companyId or docTypeId" });
+
+          const storageKey = `container-docs/${req.file.filename}`;
+          const [doc] = await db.insert(containerDocuments).values({
+            companyId,
+            containerId,
+            docTypeId,
+            fileName: req.file.originalname,
+            storageKey,
+            mimeType: req.file.mimetype,
+            uploadedBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+          }).returning();
+
+          const docType = await db.select().from(containerDocumentTypes).where(eq(containerDocumentTypes.id, docTypeId));
+          const docTypeName = docType[0]?.label || "Document";
+
+          await writeDaybookEntry(db, {
+            companyId,
+            txDate: new Date().toISOString().split("T")[0],
+            txType: "DOC_UPLOAD",
+            referenceId: containerId,
+            referenceTable: "containers",
+            description: `Uploaded ${docTypeName}: ${req.file.originalname} for container #${containerId}`,
+            metaJson: JSON.stringify({ docId: doc.id, docTypeId, fileName: req.file.originalname }),
+            createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+          });
+
+          const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
+          const allDocTypes = await db.select().from(containerDocumentTypes);
+          const requiredTypes = allDocTypes.filter((dt: any) => dt.isRequired);
+          const uploadedTypeIds = new Set(allDocs.map((d: any) => d.docTypeId));
+          const allComplete = requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id));
+          await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
+
+          res.json(doc);
+        } catch (innerErr: any) {
+          console.error("Error uploading container document:", innerErr);
+          res.status(500).json({ message: innerErr.message });
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/containers/:containerId/documents/:docId", requireAuth, async (req: any, res: any) => {
+    try {
+      const containerId = Number(req.params.containerId);
+      const docId = Number(req.params.docId);
+      const companyId = (req.session as any).currentCompanyId;
+
+      const [deleted] = await db.delete(containerDocuments)
+        .where(and(eq(containerDocuments.id, docId), eq(containerDocuments.containerId, containerId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Document not found" });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const filePath = path.default.join(process.cwd(), "uploads", deleted.storageKey);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+      await writeDaybookEntry(db, {
+        companyId: companyId || deleted.companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "DOC_DELETE",
+        referenceId: containerId,
+        referenceTable: "containers",
+        description: `Deleted document: ${deleted.fileName} from container #${containerId}`,
+        metaJson: JSON.stringify({ docId: deleted.id, fileName: deleted.fileName }),
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+      });
+
+      const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
+      const allDocTypes = await db.select().from(containerDocumentTypes);
+      const requiredTypes = allDocTypes.filter((dt: any) => dt.isRequired);
+      const uploadedTypeIds = new Set(allDocs.map((d: any) => d.docTypeId));
+      const allComplete = requiredTypes.length > 0 && requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id));
+      await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/uploads/:folder/:filename", async (req: any, res: any) => {
+    try {
+      const path = await import("path");
+      const fs = await import("fs");
+      const filePath = path.default.join(process.cwd(), "uploads", req.params.folder, req.params.filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+      res.sendFile(filePath);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── CONTAINER FREIGHT ───────
+
+  app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
+    try {
+      const containerId = Number(req.params.containerId);
+      const freightRows = await db.select().from(containerFreight).where(eq(containerFreight.containerId, containerId));
+      const freightWithPayments = await Promise.all(freightRows.map(async (fr: any) => {
+        const payments = await db.select().from(containerFreightPayments)
+          .where(eq(containerFreightPayments.containerFreightId, fr.id));
+        const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        const freightAmount = Number(fr.freightAmount);
+        const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
+        return { ...fr, payments, totalPaid, computedStatus };
+      }));
+      res.json(freightWithPayments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
+    try {
+      const containerId = Number(req.params.containerId);
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [row] = await db.insert(containerFreight).values({
+        companyId,
+        containerId,
+        vendorName: req.body.vendorName || null,
+        vendorSupplierId: req.body.vendorSupplierId || null,
+        freightAmount: String(req.body.freightAmount || 0),
+        currency: req.body.currency || "USD",
+        dueDate: req.body.dueDate || null,
+        status: "UNPAID",
+        notes: req.body.notes || null,
+      }).returning();
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "FREIGHT_ADD",
+        referenceId: containerId,
+        referenceTable: "containers",
+        description: `Added freight charge ${row.currency} ${row.freightAmount} for container #${containerId}${row.vendorName ? ` (${row.vendorName})` : ""}`,
+        currencyCode: row.currency,
+        amountCurrency: Number(row.freightAmount),
+        metaJson: JSON.stringify({ freightId: row.id, vendorName: row.vendorName }),
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+      });
+
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/containers/:containerId/freight/:freightId", requireAuth, async (req: any, res: any) => {
+    try {
+      const freightId = Number(req.params.freightId);
+      const containerId = Number(req.params.containerId);
+      const companyId = (req.session as any).currentCompanyId;
+
+      await db.delete(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
+      const [deleted] = await db.delete(containerFreight)
+        .where(and(eq(containerFreight.id, freightId), eq(containerFreight.containerId, containerId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Freight not found" });
+
+      await writeDaybookEntry(db, {
+        companyId: companyId || deleted.companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "FREIGHT_DELETE",
+        referenceId: containerId,
+        referenceTable: "containers",
+        description: `Deleted freight charge ${deleted.currency} ${deleted.freightAmount} from container #${containerId}`,
+        currencyCode: deleted.currency,
+        amountCurrency: Number(deleted.freightAmount),
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── FREIGHT PAYMENTS ───────
+
+  app.post("/api/factory/freight/:freightId/payments", requireAuth, async (req: any, res: any) => {
+    try {
+      const freightId = Number(req.params.freightId);
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [payment] = await db.insert(containerFreightPayments).values({
+        companyId,
+        containerFreightId: freightId,
+        paymentDate: req.body.paymentDate,
+        amount: String(req.body.amount),
+        method: req.body.method || null,
+        reference: req.body.reference || null,
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+      }).returning();
+
+      const [fr] = await db.select().from(containerFreight).where(eq(containerFreight.id, freightId));
+      const payments = await db.select().from(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
+      const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+      const freightAmount = Number(fr.freightAmount);
+      const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
+      await db.update(containerFreight).set({ status: newStatus, updatedAt: new Date() }).where(eq(containerFreight.id, freightId));
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: req.body.paymentDate || new Date().toISOString().split("T")[0],
+        txType: "FREIGHT_PAYMENT",
+        referenceId: fr.containerId,
+        referenceTable: "containers",
+        description: `Freight payment ${fr.currency} ${req.body.amount} for container #${fr.containerId}${fr.vendorName ? ` (${fr.vendorName})` : ""}`,
+        currencyCode: fr.currency,
+        amountCurrency: Number(req.body.amount),
+        metaJson: JSON.stringify({ freightId, paymentId: payment.id }),
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+      });
+
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/freight/:freightId/payments/:paymentId", requireAuth, async (req: any, res: any) => {
+    try {
+      const freightId = Number(req.params.freightId);
+      const paymentId = Number(req.params.paymentId);
+      const companyId = (req.session as any).currentCompanyId;
+
+      const [deleted] = await db.delete(containerFreightPayments)
+        .where(and(eq(containerFreightPayments.id, paymentId), eq(containerFreightPayments.containerFreightId, freightId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Payment not found" });
+
+      const [fr] = await db.select().from(containerFreight).where(eq(containerFreight.id, freightId));
+      if (fr) {
+        const payments = await db.select().from(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
+        const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        const freightAmount = Number(fr.freightAmount);
+        const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
+        await db.update(containerFreight).set({ status: newStatus, updatedAt: new Date() }).where(eq(containerFreight.id, freightId));
+      }
+
+      await writeDaybookEntry(db, {
+        companyId: companyId || deleted.companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "FREIGHT_PAYMENT_DELETE",
+        referenceId: fr?.containerId,
+        referenceTable: "containers",
+        description: `Deleted freight payment of ${deleted.amount} for freight #${freightId}`,
+        amountCurrency: Number(deleted.amount),
+        createdBy: (req.session as any).userId ? Number((req.session as any).userId) : undefined,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── BATCH OTW FREIGHT STATUS ───────
+
+  app.get("/api/factory/containers/freight-status", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.json({});
+      const allFreight = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
+      const freightIds = allFreight.map((f: any) => f.id);
+      let allPayments: any[] = [];
+      if (freightIds.length > 0) {
+        allPayments = await db.select().from(containerFreightPayments).where(inArray(containerFreightPayments.containerFreightId, freightIds));
+      }
+      const paymentsByFreight = new Map<number, number>();
+      for (const p of allPayments) {
+        paymentsByFreight.set(p.containerFreightId, (paymentsByFreight.get(p.containerFreightId) || 0) + Number(p.amount));
+      }
+
+      const statusByContainer: Record<number, { totalFreight: number; totalPaid: number; status: string }> = {};
+      for (const fr of allFreight) {
+        const cid = fr.containerId;
+        if (!statusByContainer[cid]) statusByContainer[cid] = { totalFreight: 0, totalPaid: 0, status: "NONE" };
+        statusByContainer[cid].totalFreight += Number(fr.freightAmount);
+        statusByContainer[cid].totalPaid += paymentsByFreight.get(fr.id) || 0;
+      }
+      for (const cid of Object.keys(statusByContainer)) {
+        const s = statusByContainer[Number(cid)];
+        s.status = s.totalFreight === 0 ? "NONE" : s.totalPaid >= s.totalFreight ? "PAID" : s.totalPaid > 0 ? "PARTIAL" : "UNPAID";
+      }
+      res.json(statusByContainer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────── DAYBOOK ENTRY EDIT ───────
+
+  app.put("/api/factory/daybook/:entryId", requireAuth, async (req: any, res: any) => {
+    try {
+      const entryId = Number(req.params.entryId);
+      const session = req.session as any;
+      const userId = session.userId ? Number(session.userId) : null;
+      const { reason, description, amountCurrency, amountUsd, currencyCode, fxRateToUsd, txDate } = req.body;
+
+      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Edit reason is required" });
+      }
+
+      const canEdit = session.role === "admin" || session.daybookEditDays > 0;
+      if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
+
+      const [existing] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, entryId));
+      if (!existing) return res.status(404).json({ message: "Daybook entry not found" });
+
+      if (session.role !== "admin" && session.daybookEditDays) {
+        const entryDate = new Date(existing.txDate);
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - session.daybookEditDays);
+        if (entryDate < cutoff) {
+          return res.status(403).json({ message: `Entry is older than ${session.daybookEditDays} days and cannot be edited` });
+        }
+      }
+
+      const beforeJson = JSON.stringify(existing);
+
+      const updates: any = {};
+      if (description !== undefined) updates.description = description;
+      if (amountCurrency !== undefined) updates.amountCurrency = String(amountCurrency);
+      if (amountUsd !== undefined) updates.amountUsd = String(amountUsd);
+      if (currencyCode !== undefined) updates.currencyCode = currencyCode;
+      if (fxRateToUsd !== undefined) updates.fxRateToUsd = String(fxRateToUsd);
+      if (txDate !== undefined) updates.txDate = txDate;
+
+      const [updated] = await db.update(factoryDaybookEntries).set(updates).where(eq(factoryDaybookEntries.id, entryId)).returning();
+      const afterJson = JSON.stringify(updated);
+
+      await db.insert(factoryDaybookEntryEdits).values({
+        daybookEntryId: entryId,
+        editedBy: userId,
+        beforeJson,
+        afterJson,
+        reason: reason.trim(),
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error editing daybook entry:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/daybook/:entryId/edits", requireAuth, async (req: any, res: any) => {
+    try {
+      const entryId = Number(req.params.entryId);
+      const edits = await db.select().from(factoryDaybookEntryEdits)
+        .where(eq(factoryDaybookEntryEdits.daybookEntryId, entryId))
+        .orderBy(desc(factoryDaybookEntryEdits.editedAt));
+      res.json(edits);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

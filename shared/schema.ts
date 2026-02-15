@@ -2656,7 +2656,9 @@ export const factoryDaybookEntries = pgTable("factory_daybook_entries", {
   txDate: date("tx_date").notNull(),
   txType: text("tx_type").notNull(),
   referenceId: integer("reference_id"),
+  referenceTable: text("reference_table"),
   description: text("description").notNull(),
+  metaJson: text("meta_json"),
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
   amountCurrency: decimal("amount_currency", { precision: 20, scale: 2 }).notNull().default("0"),
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
@@ -2681,11 +2683,150 @@ export const insertFactoryDaybookEntrySchema = createInsertSchema(factoryDaybook
   fxRateToUsd: z.string().optional(),
   amountUsd: z.string().optional(),
   referenceId: z.number().optional().nullable(),
+  referenceTable: z.string().optional().nullable(),
+  metaJson: z.string().optional().nullable(),
   createdBy: z.number().optional().nullable(),
 });
 
 export type InsertFactoryDaybookEntry = z.infer<typeof insertFactoryDaybookEntrySchema>;
 export type FactoryDaybookEntry = typeof factoryDaybookEntries.$inferSelect;
+
+// ─── Container Document Types ───
+export const containerDocumentTypes = pgTable("container_document_types", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id"),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  label: text("label").notNull(),
+  isRequired: boolean("is_required").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContainerDocumentTypeSchema = createInsertSchema(containerDocumentTypes).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  code: z.string().min(1, "Code is required"),
+  label: z.string().min(1, "Label is required"),
+  isRequired: z.boolean().optional(),
+  companyId: z.number().nullable().optional(),
+});
+
+export type InsertContainerDocumentType = z.infer<typeof insertContainerDocumentTypeSchema>;
+export type ContainerDocumentType = typeof containerDocumentTypes.$inferSelect;
+
+// ─── Container Documents ───
+export const containerDocuments = pgTable("container_documents", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  docTypeId: integer("doc_type_id").notNull(),
+  fileName: text("file_name").notNull(),
+  storageKey: text("storage_key").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  uploadedBy: integer("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("container_docs_container_idx").on(t.containerId),
+}));
+
+export const insertContainerDocumentSchema = createInsertSchema(containerDocuments).omit({
+  id: true,
+  uploadedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  containerId: z.number().min(1),
+  docTypeId: z.number().min(1),
+  fileName: z.string().min(1),
+  storageKey: z.string().min(1),
+  mimeType: z.string().optional().nullable(),
+  uploadedBy: z.number().optional().nullable(),
+});
+
+export type InsertContainerDocument = z.infer<typeof insertContainerDocumentSchema>;
+export type ContainerDocument = typeof containerDocuments.$inferSelect;
+
+// ─── Container Freight ───
+export const containerFreight = pgTable("container_freight", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  vendorName: text("vendor_name"),
+  vendorSupplierId: integer("vendor_supplier_id"),
+  freightAmount: decimal("freight_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
+  dueDate: date("due_date"),
+  status: text("status").notNull().default("UNPAID"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("container_freight_container_idx").on(t.containerId),
+}));
+
+export const insertContainerFreightSchema = createInsertSchema(containerFreight).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  containerId: z.number().min(1),
+  vendorName: z.string().optional().nullable(),
+  vendorSupplierId: z.number().optional().nullable(),
+  freightAmount: z.string().min(1, "Freight amount is required"),
+  currency: z.string().optional(),
+  dueDate: z.string().optional().nullable(),
+  status: z.string().optional(),
+  notes: z.string().optional().nullable(),
+});
+
+export type InsertContainerFreight = z.infer<typeof insertContainerFreightSchema>;
+export type ContainerFreight = typeof containerFreight.$inferSelect;
+
+// ─── Container Freight Payments ───
+export const containerFreightPayments = pgTable("container_freight_payments", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerFreightId: integer("container_freight_id").notNull(),
+  paymentDate: date("payment_date").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  method: varchar("method", { length: 50 }),
+  reference: text("reference"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  freightIdx: index("freight_payments_freight_idx").on(t.containerFreightId),
+}));
+
+export const insertContainerFreightPaymentSchema = createInsertSchema(containerFreightPayments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  containerFreightId: z.number().min(1),
+  paymentDate: z.string().min(1, "Payment date is required"),
+  amount: z.string().min(1, "Amount is required"),
+  method: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  createdBy: z.number().optional().nullable(),
+});
+
+export type InsertContainerFreightPayment = z.infer<typeof insertContainerFreightPaymentSchema>;
+export type ContainerFreightPayment = typeof containerFreightPayments.$inferSelect;
+
+// ─── Factory Daybook Entry Edits (audit trail) ───
+export const factoryDaybookEntryEdits = pgTable("factory_daybook_entry_edits", {
+  id: serial("id").primaryKey(),
+  daybookEntryId: integer("daybook_entry_id").notNull(),
+  editedAt: timestamp("edited_at").notNull().defaultNow(),
+  editedBy: integer("edited_by"),
+  beforeJson: text("before_json"),
+  afterJson: text("after_json"),
+  reason: text("reason").notNull(),
+}, (t) => ({
+  entryIdx: index("daybook_edits_entry_idx").on(t.daybookEntryId),
+}));
+
+export type FactoryDaybookEntryEdit = typeof factoryDaybookEntryEdits.$inferSelect;
 
 export const loginHistory = pgTable("login_history", {
   id: serial("id").primaryKey(),

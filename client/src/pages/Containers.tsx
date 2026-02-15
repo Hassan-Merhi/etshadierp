@@ -162,6 +162,16 @@ export default function Containers() {
     queryKey: ["/api/suppliers"],
   });
 
+  const { data: freightStatusMap = {} } = useQuery<Record<number, { totalFreight: number; totalPaid: number; status: string }>>({
+    queryKey: ["/api/factory/containers/freight-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/containers/freight-status");
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: !!selectedCompany?.id,
+  });
+
   const updateTrackingMutation = useMutation({
     mutationFn: async ({
       id,
@@ -1247,6 +1257,7 @@ export default function Containers() {
                         Duty
                       </TableHead>
                       <TableHead className="whitespace-nowrap">Doc</TableHead>
+                      <TableHead className="whitespace-nowrap">Freight</TableHead>
                       <TableHead className="whitespace-nowrap min-w-[150px]">
                         Description
                       </TableHead>
@@ -1550,6 +1561,17 @@ export default function Containers() {
                             }
                             data-testid={`checkbox-doc-${container.id}`}
                           />
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const fs = freightStatusMap[container.id];
+                            if (!fs || fs.status === "NONE") return <span className="text-xs text-muted-foreground">--</span>;
+                            return (
+                              <Badge variant={fs.status === "PAID" ? "default" : fs.status === "PARTIAL" ? "secondary" : "destructive"} data-testid={`badge-freight-${container.id}`}>
+                                {fs.status}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Input
