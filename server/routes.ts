@@ -10,6 +10,9 @@ import { db } from "./db";
 import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
 import { adjustInventory } from "./inventoryHelper";
 import { registerFactoryRoutes } from "./factoryRoutes";
+import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
+import { registerFactoryPayrollRoutes } from "./factoryPayrollRoutes";
+import { registerFactoryReportRoutes } from "./factoryReportRoutes";
 import {
   requireAuth,
   requireRole,
@@ -695,6 +698,9 @@ async function syncEmployeeBalancesFromEntries(
 
 export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryRoutes(app, requireAuth, db);
+  registerFactoryWorkerRoutes(app, requireAuth, db);
+  registerFactoryPayrollRoutes(app, requireAuth, db);
+  registerFactoryReportRoutes(app, requireAuth, db);
 
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {

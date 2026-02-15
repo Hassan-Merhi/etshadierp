@@ -57,6 +57,12 @@ const TX_TYPE_LABELS: Record<string, string> = {
   FREIGHT_DELETE: "Freight Delete",
   FREIGHT_PAYMENT: "Freight Payment",
   FREIGHT_PAYMENT_DELETE: "Freight Pmt Delete",
+  WORKER_CREATED: "Worker Created",
+  WORKER_EDITED: "Worker Edited",
+  CONTRACT_ENDED: "Contract Ended",
+  WORKER_PHOTO_UPLOADED: "Worker Photo",
+  PAYROLL_GENERATED: "Payroll Generated",
+  REPORT_GENERATED: "Report Generated",
 };
 
 const TX_TYPE_COLORS: Record<string, string> = {
@@ -73,6 +79,12 @@ const TX_TYPE_COLORS: Record<string, string> = {
   FREIGHT_DELETE: "destructive",
   FREIGHT_PAYMENT: "secondary",
   FREIGHT_PAYMENT_DELETE: "destructive",
+  WORKER_CREATED: "default",
+  WORKER_EDITED: "outline",
+  CONTRACT_ENDED: "destructive",
+  WORKER_PHOTO_UPLOADED: "outline",
+  PAYROLL_GENERATED: "secondary",
+  REPORT_GENERATED: "outline",
 };
 
 export default function FactoryDaybook() {

@@ -27,6 +27,8 @@ import {
   ShoppingCart,
   Receipt,
   ClipboardList,
+  HardHat,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -76,6 +78,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Suppliers", url: "/factory/suppliers", icon: Users },
       { title: "Containers", url: "/factory/containers", icon: Container },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
+      { title: "Workers", url: "/factory/workers", icon: HardHat },
     ],
   },
   {
@@ -133,8 +136,16 @@ const allMenuGroups: MenuGroup[] = [
     icon: Wallet,
     items: [
       { title: "Payroll", url: "/factory/payroll", icon: Wallet },
+      { title: "Worker Payroll", url: "/factory/worker-payroll", icon: HardHat },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Reports",
+    icon: ClipboardCheck,
+    items: [
+      { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
     ],
   },
   {
