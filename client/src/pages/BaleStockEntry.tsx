@@ -133,9 +133,9 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     @media print {
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { color: #000 !important; -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000; }
-      .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.6px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
-      .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 2px #000; text-shadow: 0 0 2px #000, 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+      * { color: #000 !important; }
+      .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
@@ -211,9 +211,9 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     @media print {
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { color: #000 !important; -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000; }
-      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.6px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
-      .name-only-text, .product-name-text { -webkit-text-stroke: 1.5px #000; text-shadow: 0 0 2px #000, 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000; }
+      * { color: #000 !important; }
+      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .name-only-text, .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;

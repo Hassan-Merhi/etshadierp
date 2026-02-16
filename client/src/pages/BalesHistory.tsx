@@ -128,9 +128,9 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
       .print-note { display: none !important; }
       header, .print-header, .page-header { display: none !important; }
       body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { color: #000 !important; -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000; }
-      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.6px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
-      .name-label-text, .product-name-text { -webkit-text-stroke: 1.5px #000; text-shadow: 0 0 2px #000, 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000; }
+      * { color: #000 !important; }
+      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .name-label-text, .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">Set printer to BEST quality, max darkness. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
