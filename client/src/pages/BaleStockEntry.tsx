@@ -196,8 +196,8 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(1.6); } }
-  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set label printer darkness to 60-70. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(10); } }
+  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Laser print - max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {

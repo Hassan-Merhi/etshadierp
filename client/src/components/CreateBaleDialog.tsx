@@ -240,7 +240,7 @@ function generateLabelHtml(labels: Array<{
           @media print {
             .print-note { display: none !important; }
             header, .print-header, .page-header { display: none !important; }
-            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(1.6); }
+            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(10); }
           }
           .info-section {
             text-align: right;
@@ -295,7 +295,7 @@ function generateLabelHtml(labels: Array<{
         </style>
       </head>
       <body>
-        <div class="print-note">Set label printer darkness to 60-70. Disable "Headers and Footers" in print settings.</div>
+        <div class="print-note">Laser print - max darkness. Disable "Headers and Footers" in print settings.</div>
         ${labelsHtml}
       </body>
     </html>
