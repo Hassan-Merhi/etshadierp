@@ -274,45 +274,42 @@ function generateLabelHtml(labels: Array<{
           }
           .ref-barcode-section {
             text-align: center;
-            margin-top: 1mm;
+            margin-top: 0.5mm;
           }
           .ref-barcode-img {
-            width: 65mm;
-            height: 12mm;
+            width: 60mm;
+            height: 10mm;
             object-fit: contain;
           }
           .ref-barcode-number {
-            font-size: 7pt;
+            font-size: 6pt;
             font-weight: 700;
             font-family: 'Courier New', monospace;
-            margin-top: 0.3mm;
+            margin-top: 0.2mm;
             letter-spacing: 1px;
           }
           .article-barcode-section {
             text-align: center;
-            margin-top: 0.5mm;
+            margin-top: 0.3mm;
           }
           .article-barcode-img {
-            width: 50mm;
-            height: 8mm;
+            width: 45mm;
+            height: 7mm;
             object-fit: contain;
           }
           .product-name-section {
             text-align: center;
-            margin-top: 0.5mm;
+            margin-top: 0.3mm;
             border-top: 0.3mm dashed #ccc;
             padding-top: 0.5mm;
           }
           .product-name-text {
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
             color: #000;
             text-transform: uppercase;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
+            word-break: break-word;
           }
         </style>
       </head>
