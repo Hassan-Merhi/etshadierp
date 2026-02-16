@@ -1091,6 +1091,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           offloadedAt: factoryRawStock.offloadedAt,
           createdAt: factoryRawStock.createdAt,
           containerNumber: factoryContainers.containerNumber,
+          supplierId: factoryContainers.supplierId,
           supplierName: factorySuppliers.name,
           origin: factoryContainers.origin,
         })
@@ -1099,16 +1100,53 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
         .where(eq(factoryRawStock.companyId, companyId));
 
-      const enriched = results.map((r: any) => {
-        const received = parseFloat(r.receivedKg) || 0;
-        const used = parseFloat(r.usedKg) || 0;
-        const costPerKg = parseFloat(r.costPerKg) || 0;
-        const remainingKg = received - used;
-        const valueRemaining = remainingKg * costPerKg;
-        return { ...r, remainingKg: remainingKg.toFixed(3), valueRemaining: valueRemaining.toFixed(2) };
+      const supplierMap = new Map<string, any>();
+      for (const r of results) {
+        const key = r.supplierName || `unknown-${r.containerId}`;
+        const received = parseFloat(r.receivedKg as string) || 0;
+        const used = parseFloat(r.usedKg as string) || 0;
+        const costPerKg = parseFloat(r.costPerKg as string) || 0;
+
+        if (supplierMap.has(key)) {
+          const existing = supplierMap.get(key)!;
+          const prevTotalCost = existing._totalReceived * existing._avgCostPerKg;
+          const newTotalCost = received * costPerKg;
+          existing._totalReceived += received;
+          existing._totalUsed += used;
+          existing._avgCostPerKg = existing._totalReceived > 0
+            ? (prevTotalCost + newTotalCost) / existing._totalReceived
+            : 0;
+          if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
+            existing.lastOffloaded = r.offloadedAt;
+          }
+        } else {
+          supplierMap.set(key, {
+            supplierName: r.supplierName || "Unknown",
+            supplierId: r.supplierId,
+            _totalReceived: received,
+            _totalUsed: used,
+            _avgCostPerKg: costPerKg,
+            lastOffloaded: r.offloadedAt,
+          });
+        }
+      }
+
+      const aggregated = Array.from(supplierMap.values()).map((s: any) => {
+        const remainingKg = s._totalReceived - s._totalUsed;
+        const valueRemaining = remainingKg * s._avgCostPerKg;
+        return {
+          supplierName: s.supplierName,
+          supplierId: s.supplierId,
+          receivedKg: s._totalReceived.toFixed(3),
+          usedKg: s._totalUsed.toFixed(3),
+          remainingKg: remainingKg.toFixed(3),
+          costPerKg: s._avgCostPerKg.toFixed(4),
+          valueRemaining: valueRemaining.toFixed(2),
+          lastOffloaded: s.lastOffloaded,
+        };
       });
 
-      res.json(enriched);
+      res.json(aggregated);
     } catch (error: any) {
       console.error("Error fetching factory raw stock:", error);
       res.status(500).json({ message: error.message });

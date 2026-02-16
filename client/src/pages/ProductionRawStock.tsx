@@ -35,18 +35,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 
 interface RawStockRow {
-  id: number;
-  companyId: number;
-  containerId: number;
+  supplierName: string;
+  supplierId: number | null;
   receivedKg: string;
   usedKg: string;
-  costPerKg: string;
-  offloadedAt: string;
-  containerNumber: string;
-  supplierId: number;
-  supplierName: string | null;
   remainingKg: string;
+  costPerKg: string;
   valueRemaining: string;
+  lastOffloaded: string;
 }
 
 interface SupplierOption {
@@ -264,7 +260,7 @@ export default function ProductionRawStock() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Production Raw Stock</h1>
-          <p className="text-muted-foreground mt-1">Container-led raw material tracking for production</p>
+          <p className="text-muted-foreground mt-1">Supplier-based raw material tracking for production</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setObDialogOpen(true)} data-testid="button-opening-balance">
@@ -315,7 +311,7 @@ export default function ProductionRawStock() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Raw Stock by Container</CardTitle>
+          <CardTitle>Raw Stock by Supplier</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -328,26 +324,22 @@ export default function ProductionRawStock() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Container</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
-                  <TableHead className="text-right">Cost/kg</TableHead>
+                  <TableHead className="text-right">Avg Cost/kg</TableHead>
                   <TableHead className="text-right">Value Remaining</TableHead>
-                  <TableHead>Offloaded</TableHead>
+                  <TableHead>Last Offloaded</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rawStock.map((row) => {
+                {rawStock.map((row, idx) => {
                   const remaining = parseFloat(row.remainingKg);
                   return (
-                    <TableRow key={row.id} data-testid={`row-raw-stock-${row.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-container-${row.id}`}>
-                        {row.containerNumber}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.supplierName || "-"}
+                    <TableRow key={row.supplierId || idx} data-testid={`row-raw-stock-${row.supplierId || idx}`}>
+                      <TableCell className="font-medium" data-testid={`text-supplier-${row.supplierId || idx}`}>
+                        {row.supplierName}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(row.receivedKg))}
@@ -367,7 +359,7 @@ export default function ProductionRawStock() {
                         ${formatNumber(parseFloat(row.valueRemaining))}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(row.offloadedAt).toLocaleDateString()}
+                        {new Date(row.lastOffloaded).toLocaleDateString()}
                       </TableCell>
                     </TableRow>
                   );
