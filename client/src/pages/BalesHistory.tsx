@@ -56,11 +56,10 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
 
   const fullLabel = `
     <div class="label">
+      <img class="label-bg" src="/hmd-label-bg.jpeg" alt="" />
       <div class="label-content">
         <div class="label-top">
-          <div class="logo-section">
-            <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
-          </div>
+          <div class="logo-section"></div>
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -98,28 +97,28 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
   const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
   return `<html><head><title></title><style>
     @page { ${pageSize} margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
     .page-container { width: 3in; height: 3.94in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .page-container:last-child { page-break-after: auto; }
     .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
+    .label-bg { position: absolute; top: 0; left: 0; width: 100%; height: 50%; object-fit: contain; z-index: 0; pointer-events: none; opacity: 0.12; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
-    .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
+    .label-top { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 14mm; width: auto; object-fit: contain; mix-blend-mode: multiply; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .ref-barcode-section { text-align: center; margin-top: 0.5mm; }
+    .ref-barcode-section { text-align: center; margin-top: 1mm; }
     .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.2mm; letter-spacing: 1px; }
-    .article-barcode-section { text-align: center; margin-top: 1.5mm; }
+    .ref-barcode-number { font-size: 7pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; }
+    .article-barcode-section { text-align: center; margin-top: 2mm; }
     .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .product-name-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
@@ -131,7 +130,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
       .name-label-text, .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">Set printer to BEST quality, max darkness. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }

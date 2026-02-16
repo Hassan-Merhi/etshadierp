@@ -147,11 +147,10 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     labelsHtml += `
       <div class="sticker-page">
         <div class="label">
+          <img class="label-bg" src="/hmd-label-bg.jpeg" alt="" />
           <div class="label-content">
             <div class="label-top">
-              <div class="logo-section">
-                <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
-              </div>
+              <div class="logo-section"></div>
               <div class="info-section">
                 <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
                 <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -181,40 +180,37 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
   }
   return `<html><head><title>Sticker Labels</title><style>
     @page { size: 3in 1.97in; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
     .sticker-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .sticker-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
+    .label-bg { position: absolute; top: 0; left: 0; width: 100%; height: 50%; object-fit: contain; z-index: 0; pointer-events: none; opacity: 0.12; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-    .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
+    .label-top { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 14mm; width: auto; object-fit: contain; mix-blend-mode: multiply; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .ref-barcode-section { text-align: center; margin-top: 0.5mm; }
+    .ref-barcode-section { text-align: center; margin-top: 1mm; }
     .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.2mm; letter-spacing: 1px; }
-    .article-barcode-section { text-align: center; margin-top: 1.5mm; }
+    .ref-barcode-number { font-size: 7pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; }
+    .article-barcode-section { text-align: center; margin-top: 2mm; }
     .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .product-section { text-align: center; margin-top: 0.5mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
+    .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
 
     .name-only-label { justify-content: center; align-items: center; }
     .name-only-content { justify-content: center; align-items: center; }
-    .name-barcode-section { text-align: center; margin-bottom: 2mm; }
-    .name-barcode-img { width: 55mm; height: 14mm; object-fit: contain; }
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
       .print-note { display: none !important; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
       .name-only-text, .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -375,7 +371,12 @@ function StockEntryTab() {
       stickerWindow.document.write(generateStickerLabelsHtml(labels));
       stickerWindow.document.close();
       stickerWindow.focus();
-      setTimeout(() => stickerWindow.print(), 800);
+      const imgs = stickerWindow.document.images;
+      let loaded = 0;
+      const total = imgs.length;
+      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
+      if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
+      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
     }
     if (!a4Window && !stickerWindow) {
       toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });

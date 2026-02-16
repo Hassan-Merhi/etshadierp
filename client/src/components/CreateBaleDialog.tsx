@@ -70,11 +70,10 @@ function generateFullLabelHtml(label: {
 }) {
   return `
     <div class="label">
+      <img class="label-bg" src="/hmd-label-bg.jpeg" alt="" />
       <div class="label-content">
         <div class="label-top">
-          <div class="logo-section">
-            <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
-          </div>
+          <div class="logo-section"></div>
           <div class="info-section">
             <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
             <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -136,7 +135,7 @@ function generateLabelHtml(labels: Array<{
             ${pageSize}
             margin: 0;
           }
-          * { box-sizing: border-box; margin: 0; padding: 0; }
+          * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           body {
             font-family: Arial, Helvetica, sans-serif;
             margin: 0;
@@ -174,6 +173,17 @@ function generateLabelHtml(labels: Array<{
             overflow: hidden;
             position: relative;
             background: #fff;
+          }
+          .label-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            object-fit: contain;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.12;
           }
           .label-content {
             position: relative;
@@ -217,7 +227,7 @@ function generateLabelHtml(labels: Array<{
           }
           .label-top {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: flex-start;
             margin-bottom: 1mm;
           }
@@ -225,12 +235,6 @@ function generateLabelHtml(labels: Array<{
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-          }
-          .logo-img {
-            height: 14mm;
-            width: auto;
-            object-fit: contain;
-            mix-blend-mode: multiply;
           }
           .print-note {
             text-align: center;
@@ -247,7 +251,7 @@ function generateLabelHtml(labels: Array<{
             * { color: #000 !important; }
             .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
             .product-name-text, .name-label-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-            img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+            .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
           }
           .info-section {
             text-align: right;
@@ -262,7 +266,7 @@ function generateLabelHtml(labels: Array<{
           }
           .ref-barcode-section {
             text-align: center;
-            margin-top: 0.5mm;
+            margin-top: 1mm;
           }
           .ref-barcode-img {
             width: 100%;
@@ -270,15 +274,15 @@ function generateLabelHtml(labels: Array<{
             object-fit: fill;
           }
           .ref-barcode-number {
-            font-size: 6pt;
-            font-weight: 700;
+            font-size: 7pt;
+            font-weight: 900;
             font-family: 'Courier New', monospace;
-            margin-top: 0.2mm;
-            letter-spacing: 1px;
+            margin-top: 0.5mm;
+            letter-spacing: 1.5px;
           }
           .article-barcode-section {
             text-align: center;
-            margin-top: 1.5mm;
+            margin-top: 2mm;
           }
           .article-barcode-img {
             width: 100%;
