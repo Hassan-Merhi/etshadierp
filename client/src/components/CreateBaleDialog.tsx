@@ -234,7 +234,7 @@ function generateLabelHtml(labels: Array<{
             align-items: flex-start;
           }
           .logo-img {
-            height: 13mm;
+            height: 10mm;
             width: auto;
             object-fit: contain;
           }
