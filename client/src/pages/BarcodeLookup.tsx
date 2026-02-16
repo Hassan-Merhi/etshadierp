@@ -81,6 +81,26 @@ export default function BarcodeLookup() {
     },
   });
 
+  const markScanned = useMutation({
+    mutationFn: async (refNum: string) => {
+      const response = await apiRequest("POST", `/api/lookup/reference/${encodeURIComponent(refNum)}/scan`, {});
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to mark as scanned");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setReferenceResult((prev) =>
+        prev ? { ...prev, labelPrint: { ...prev.labelPrint!, scannedAt: data.scannedAt, scannedByUserId: data.scannedByUserId, scannedByName: data.scannedByName } } : prev
+      );
+      toast({ title: "Scanned", description: "Label marked as scanned" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSearch = () => {
     if (!searchValue.trim()) return;
     if (activeTab === "article") {
@@ -276,7 +296,7 @@ export default function BarcodeLookup() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap"><User className="h-3 w-3" /> Printed By</p>
-                    <p className="font-medium" data-testid="text-ref-printed-by">{referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
+                    <p className="font-medium" data-testid="text-ref-printed-by">{referenceResult.labelPrint.printedByName || referenceResult.labelPrint.printedByUserId || "Unknown"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Scanned At</p>
@@ -289,7 +309,19 @@ export default function BarcodeLookup() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap"><User className="h-3 w-3" /> Scanned By</p>
-                    <p className="font-medium" data-testid="text-ref-scanned-by">{referenceResult.labelPrint.scannedByUserId || "N/A"}</p>
+                    <p className="font-medium" data-testid="text-ref-scanned-by">{referenceResult.labelPrint.scannedByName || referenceResult.labelPrint.scannedByUserId || "N/A"}</p>
+                    {!referenceResult.labelPrint.scannedAt && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        disabled={markScanned.isPending}
+                        onClick={() => markScanned.mutate(referenceResult.labelPrint!.referenceNumber)}
+                        data-testid="button-mark-scanned"
+                      >
+                        {markScanned.isPending ? "Scanning..." : "Mark as Scanned"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

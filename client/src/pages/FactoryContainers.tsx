@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2 } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -150,6 +150,84 @@ export default function FactoryContainers() {
     },
   });
 
+  const [importOpen, setImportOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const importMutation = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const res = await apiRequest("POST", "/api/factory/containers/import-excel", { rows });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Import failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      setImportResult(data);
+      toast({
+        title: "Import Complete",
+        description: `${data.imported} of ${data.total} containers imported${data.errors.length > 0 ? ` (${data.errors.length} errors)` : ""}`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Import Failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const XLSX = await import("xlsx");
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+    const mapped = jsonRows.map((row: any) => {
+      const get = (keys: string[]) => {
+        for (const k of keys) {
+          const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()];
+          if (val !== undefined && val !== "") return String(val).trim();
+        }
+        return "";
+      };
+      return {
+        containerNumber: get(["Container Number", "Container #", "ContainerNumber", "container_number", "Container"]),
+        supplierName: get(["Supplier", "Supplier Name", "SupplierName", "supplier_name"]),
+        origin: get(["Origin", "Country", "origin"]),
+        totalKg: get(["Total Kg", "TotalKg", "Weight", "total_kg", "KG", "Kg"]),
+        ratePerKg: get(["Rate/Kg", "Rate Per Kg", "RatePerKg", "rate_per_kg", "Rate", "Price"]),
+        currencyCode: get(["Currency", "CurrencyCode", "currency_code"]) || "USD",
+        fxRateToUsd: get(["FX Rate", "FxRate", "fx_rate_to_usd", "Exchange Rate"]) || "1",
+        arrivalDate: get(["Arrival Date", "ArrivalDate", "arrival_date", "Date"]),
+        notes: get(["Notes", "notes", "Remarks"]),
+        status: get(["Status", "status"]) || "PENDING",
+      };
+    }).filter((r: any) => r.containerNumber);
+
+    setImportPreview(mapped);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const downloadTemplate = () => {
+    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "Arrival Date", "Status", "Notes"];
+    const sample = ["CNTR-2024-001", "ABC Trading", "China", "25000", "1.50", "USD", "1", "2024-06-01", "PENDING", "Sample row"];
+    const csvContent = [headers.join(","), sample.join(",")].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "factory_containers_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const resetForm = () => {
     setFormData({
       containerNumber: "",
@@ -209,13 +287,23 @@ export default function FactoryContainers() {
             Track incoming containers (separate from ERP containers)
           </p>
         </div>
-        <Button
-          onClick={() => { resetForm(); setCreateOpen(true); }}
-          data-testid="button-add-factory-container"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Container
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
+            data-testid="button-import-containers"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Excel
+          </Button>
+          <Button
+            onClick={() => { resetForm(); setCreateOpen(true); }}
+            data-testid="button-add-factory-container"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Container
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -447,6 +535,116 @@ export default function FactoryContainers() {
               data-testid="button-save-container"
             >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingContainer ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={(open) => { if (!open) { setImportOpen(false); setImportPreview([]); setImportResult(null); } }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Containers from Excel
+            </DialogTitle>
+            <DialogDescription>
+              Upload an Excel or CSV file to bulk-import containers. New suppliers will be created automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-download-template">
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Expected columns: Container Number, Supplier, Origin, Total Kg, Rate/Kg, Currency, FX Rate, Arrival Date, Status, Notes
+              </div>
+            </div>
+
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground cursor-pointer"
+                data-testid="input-import-file"
+              />
+            </div>
+
+            {importPreview.length > 0 && !importResult && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-sm font-medium">{importPreview.length} rows ready to import</p>
+                  <Button
+                    onClick={() => importMutation.mutate(importPreview)}
+                    disabled={importMutation.isPending}
+                    data-testid="button-confirm-import"
+                  >
+                    {importMutation.isPending ? "Importing..." : `Import ${importPreview.length} Containers`}
+                  </Button>
+                </div>
+                <div className="border rounded-md overflow-auto max-h-64">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Origin</TableHead>
+                        <TableHead className="text-right">Kg</TableHead>
+                        <TableHead className="text-right">Rate/Kg</TableHead>
+                        <TableHead>Currency</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.map((row, i) => (
+                        <TableRow key={i} data-testid={`row-import-preview-${i}`}>
+                          <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="font-mono font-medium">{row.containerNumber}</TableCell>
+                          <TableCell>{row.supplierName || "-"}</TableCell>
+                          <TableCell>{row.origin || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">{row.totalKg || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">{row.ratePerKg || "-"}</TableCell>
+                          <TableCell>{row.currencyCode}</TableCell>
+                          <TableCell><Badge variant="secondary">{row.status}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {importResult && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <p className="font-medium">
+                    {importResult.imported} of {importResult.total} containers imported successfully
+                  </p>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="border border-destructive/30 rounded-md p-3 space-y-1">
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      {importResult.errors.length} error(s):
+                    </p>
+                    {importResult.errors.map((err, i) => (
+                      <p key={i} className="text-sm text-muted-foreground">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportOpen(false); setImportPreview([]); setImportResult(null); }}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

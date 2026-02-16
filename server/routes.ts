@@ -26537,6 +26537,17 @@ if (asOfDate) {
         return res.status(404).json({ message: "Reference number not found" });
       }
 
+      let printedByName = null;
+      let scannedByName = null;
+      if (labelPrint.printedByUserId) {
+        const printedUser = await storage.getUser(labelPrint.printedByUserId);
+        printedByName = printedUser?.username || null;
+      }
+      if (labelPrint.scannedByUserId) {
+        const scannedUser = await storage.getUser(labelPrint.scannedByUserId);
+        scannedByName = scannedUser?.username || null;
+      }
+
       let product = null;
       if (labelPrint.productId) {
         product = await storage.getBaleProductById(labelPrint.productId);
@@ -26544,9 +26555,49 @@ if (asOfDate) {
         product = await storage.getBaleProductByArticleCode(labelPrint.articleCode, companyId);
       }
 
-      res.json({ labelPrint, product: product || null });
+      res.json({
+        labelPrint: { ...labelPrint, printedByName, scannedByName },
+        product: product || null,
+      });
     } catch (error: any) {
       console.error("Error looking up reference:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark a label as scanned
+  app.post("/api/lookup/reference/:referenceNumber/scan", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const { baleLabelPrints } = await import("@shared/schema");
+
+      const [updated] = await db
+        .update(baleLabelPrints)
+        .set({
+          scannedByUserId: req.session.userId || null,
+          scannedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(baleLabelPrints.referenceNumber, referenceNumber),
+            eq(baleLabelPrints.companyId, companyId)
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Reference number not found" });
+      }
+
+      const scannedUser = await storage.getUser(req.session.userId!);
+      res.json({ ...updated, scannedByName: scannedUser?.username || null });
+    } catch (error: any) {
+      console.error("Error scanning label:", error);
       res.status(500).json({ message: error.message });
     }
   });
