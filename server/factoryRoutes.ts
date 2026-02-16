@@ -1514,9 +1514,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { sources = [], batchSources = [], name, notes } = req.body;
+      const { supplierSources = [], openingBatchId, name, notes,
+              sources = [], batchSources = [] } = req.body;
 
-      if (sources.length === 0 && batchSources.length === 0) {
+      const hasSupplierSources = supplierSources.length > 0;
+      const hasOpeningBatch = openingBatchId && openingBatchId !== "none";
+      const hasLegacySources = sources.length > 0 || batchSources.length > 0;
+
+      if (!hasSupplierSources && !hasOpeningBatch && !hasLegacySources) {
         return res.status(400).json({ message: "At least one source is required" });
       }
 
@@ -1539,6 +1544,103 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         let totalCost = 0;
         const sourceRecords: any[] = [];
 
+        if (hasOpeningBatch) {
+          const [srcBatch] = await tx
+            .select()
+            .from(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, openingBatchId), eq(factoryMixBatches.companyId, companyId)))
+            .for("update");
+
+          if (!srcBatch) throw new Error(`Opening batch not found`);
+
+          const remaining = parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg);
+          if (remaining <= 0.001) throw new Error(`Opening batch has no remaining stock`);
+
+          const cost = parseFloat(srcBatch.costPerKg);
+
+          await tx
+            .update(factoryMixBatches)
+            .set({
+              usedKg: srcBatch.totalWeightKg,
+              status: "CLOSED",
+              updatedAt: new Date(),
+            })
+            .where(eq(factoryMixBatches.id, srcBatch.id));
+
+          totalWeightKg += remaining;
+          totalCost += remaining * cost;
+          sourceRecords.push({
+            sourceBatchId: srcBatch.id,
+            weightKg: String(remaining),
+            costPerKg: String(cost),
+            totalCost: String(remaining * cost),
+          });
+        }
+
+        for (const source of supplierSources) {
+          const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
+          const weight = parseFloat(weightKg);
+
+          const supplierRawStocks = await tx
+            .select({
+              id: factoryRawStock.id,
+              receivedKg: factoryRawStock.receivedKg,
+              usedKg: factoryRawStock.usedKg,
+              costPerKg: factoryRawStock.costPerKg,
+              costPerKgUsd: factoryRawStock.costPerKgUsd,
+              containerId: factoryRawStock.containerId,
+              offloadedAt: factoryRawStock.offloadedAt,
+            })
+            .from(factoryRawStock)
+            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+            .where(and(
+              eq(factoryRawStock.companyId, companyId),
+              eq(factoryContainers.supplierId, supplierId)
+            ))
+            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
+            .for("update");
+
+          let totalAvailable = 0;
+          let weightedCostSum = 0;
+          let weightedCostWeight = 0;
+          for (const rs of supplierRawStocks) {
+            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+            totalAvailable += avail;
+            const rsCost = parseFloat(rs.costPerKgUsd || rs.costPerKg);
+            weightedCostSum += avail * rsCost;
+            weightedCostWeight += avail;
+          }
+
+          if (weight > totalAvailable + 0.001) {
+            throw new Error(`Not enough raw stock from supplier. Available: ${totalAvailable.toFixed(3)} kg, requested: ${weight.toFixed(3)} kg`);
+          }
+
+          let remaining = weight;
+          for (const rs of supplierRawStocks) {
+            if (remaining <= 0.001) break;
+            const avail = parseFloat(rs.receivedKg) - parseFloat(rs.usedKg);
+            if (avail <= 0) continue;
+
+            const deduct = Math.min(remaining, avail);
+            await tx
+              .update(factoryRawStock)
+              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${deduct}` })
+              .where(eq(factoryRawStock.id, rs.id));
+
+            remaining -= deduct;
+          }
+
+          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
+          totalWeightKg += weight;
+          totalCost += weight * costPerKg;
+          sourceRecords.push({
+            supplierId,
+            weightKg: String(weight),
+            costPerKg: String(costPerKg),
+            totalCost: String(weight * costPerKg),
+          });
+        }
+
         for (const source of sources) {
           const { containerId, weightKg, costPerKg: srcCostPerKg } = source;
           const [rawStock] = await tx
@@ -1549,10 +1651,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           if (!rawStock) throw new Error(`Raw stock not found for container ${containerId}`);
 
-          const remaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
+          const containerRemaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
           const weight = parseFloat(weightKg);
-          if (weight > remaining + 0.001) {
-            throw new Error(`Not enough raw stock for container ${containerId}. Available: ${remaining.toFixed(3)} kg`);
+          if (weight > containerRemaining + 0.001) {
+            throw new Error(`Not enough raw stock for container ${containerId}. Available: ${containerRemaining.toFixed(3)} kg`);
           }
 
           const costUsd = srcCostPerKg ? parseFloat(srcCostPerKg) : parseFloat(rawStock.costPerKgUsd || rawStock.costPerKg);
@@ -1577,10 +1679,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           if (!srcBatch) throw new Error(`Source batch ${sourceBatchId} not found`);
 
-          const remaining = parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg);
+          const batchRemaining = parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg);
           const weight = parseFloat(weightKg);
-          if (weight > remaining + 0.001) {
-            throw new Error(`Not enough in batch ${srcBatch.batchCode}. Available: ${remaining.toFixed(3)} kg`);
+          if (weight > batchRemaining + 0.001) {
+            throw new Error(`Not enough in batch ${srcBatch.batchCode}. Available: ${batchRemaining.toFixed(3)} kg`);
           }
 
           const cost = parseFloat(srcBatch.costPerKg);
@@ -1614,6 +1716,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           await tx.insert(factoryMixBatchSources).values({
             mixBatchId: mixBatch.id,
             containerId: sr.containerId || null,
+            supplierId: sr.supplierId || null,
             sourceBatchId: sr.sourceBatchId || null,
             weightKg: sr.weightKg,
             costPerKg: sr.costPerKg,

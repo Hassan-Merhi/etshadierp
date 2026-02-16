@@ -33,19 +33,19 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { FactoryMixBatch } from "@shared/schema";
 
-interface RawStockRow {
-  id: number;
-  containerId: number;
-  containerNumber: string;
+interface SupplierRawStock {
+  supplierName: string;
+  supplierId: number | null;
   receivedKg: string;
   usedKg: string;
   remainingKg: string;
   costPerKg: string;
-  supplierName: string | null;
+  valueRemaining: string;
+  lastOffloaded: string;
 }
 
 interface SourceSelection {
-  type: "container" | "batch";
+  type: "supplier" | "batch";
   sourceId: number;
   label: string;
   weightKg: number;
@@ -65,14 +65,15 @@ export function CreateMixBatchDialog({
 }: CreateMixBatchDialogProps) {
   const { toast } = useToast();
   const [selectedSources, setSelectedSources] = useState<SourceSelection[]>([]);
-  const [sourceType, setSourceType] = useState<"container" | "batch">("container");
+  const [sourceType, setSourceType] = useState<"supplier" | "batch">("supplier");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [weightInput, setWeightInput] = useState<string>("");
   const [batchName, setBatchName] = useState("");
   const [notes, setNotes] = useState("");
+  const [openingBatchId, setOpeningBatchId] = useState<string>("");
 
-  const { data: rawStock } = useQuery<RawStockRow[]>({
-    queryKey: ["/api/factory/raw-stock/by-container"],
+  const { data: supplierStock } = useQuery<SupplierRawStock[]>({
+    queryKey: ["/api/factory/raw-stock"],
     enabled: open,
   });
 
@@ -81,37 +82,36 @@ export function CreateMixBatchDialog({
     enabled: open,
   });
 
-  const availableRawStock = rawStock?.filter(
-    (r) =>
-      parseFloat(r.remainingKg) > 0 &&
-      !selectedSources.some((s) => s.type === "container" && s.sourceId === r.containerId)
+  const availableSuppliers = supplierStock?.filter(
+    (s) =>
+      parseFloat(s.remainingKg) > 0 &&
+      s.supplierId !== null &&
+      !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
   );
 
-  const availableBatches = existingBatches?.filter((b) => {
+  const availableBatchesForOpening = existingBatches?.filter((b) => {
     const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
-    return (
-      remaining > 0.001 &&
-      b.status === "ACTIVE" &&
-      !selectedSources.some((s) => s.type === "batch" && s.sourceId === b.id)
-    );
+    return remaining > 0.001 && b.status === "ACTIVE";
   });
+
+  const openingBatch = openingBatchId && openingBatchId !== "none"
+    ? existingBatches?.find((b) => b.id.toString() === openingBatchId)
+    : null;
+
+  const openingBatchRemaining = openingBatch
+    ? parseFloat(openingBatch.totalWeightKg) - parseFloat(openingBatch.usedKg)
+    : 0;
+  const openingBatchCost = openingBatch ? parseFloat(openingBatch.costPerKg) : 0;
+  const openingBatchTotalCost = openingBatchRemaining * openingBatchCost;
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const containerSources = selectedSources
-        .filter((s) => s.type === "container")
+      const supplierSources = selectedSources
+        .filter((s) => s.type === "supplier")
         .map((s) => ({
-          containerId: s.sourceId,
+          supplierId: s.sourceId,
           weightKg: s.weightKg.toString(),
           costPerKg: s.costPerKg.toString(),
-          totalCost: s.totalCost.toString(),
-        }));
-
-      const batchSourcesList = selectedSources
-        .filter((s) => s.type === "batch")
-        .map((s) => ({
-          sourceBatchId: s.sourceId,
-          weightKg: s.weightKg.toString(),
         }));
 
       const response = await fetch("/api/factory/mix-batches", {
@@ -121,8 +121,8 @@ export function CreateMixBatchDialog({
         body: JSON.stringify({
           name: batchName || undefined,
           notes: notes || undefined,
-          sources: containerSources.length > 0 ? containerSources : undefined,
-          batchSources: batchSourcesList.length > 0 ? batchSourcesList : undefined,
+          supplierSources: supplierSources.length > 0 ? supplierSources : undefined,
+          openingBatchId: openingBatchId && openingBatchId !== "none" ? parseInt(openingBatchId) : undefined,
         }),
       });
 
@@ -146,15 +146,9 @@ export function CreateMixBatchDialog({
 
   const handleSourceSelect = (id: string) => {
     setSelectedSourceId(id);
-    if (sourceType === "container") {
-      const stock = rawStock?.find((r) => r.containerId.toString() === id);
+    if (sourceType === "supplier") {
+      const stock = supplierStock?.find((s) => s.supplierId?.toString() === id);
       if (stock) setWeightInput(stock.remainingKg);
-    } else {
-      const batch = existingBatches?.find((b) => b.id.toString() === id);
-      if (batch) {
-        const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
-        setWeightInput(remaining.toFixed(3));
-      }
     }
   };
 
@@ -170,13 +164,13 @@ export function CreateMixBatchDialog({
       return;
     }
 
-    if (sourceType === "container") {
-      const stock = rawStock?.find((r) => r.containerId.toString() === selectedSourceId);
-      if (!stock) return;
+    if (sourceType === "supplier") {
+      const stock = supplierStock?.find((s) => s.supplierId?.toString() === selectedSourceId);
+      if (!stock || !stock.supplierId) return;
 
       const available = parseFloat(stock.remainingKg);
       if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available from this container`, variant: "destructive" });
+        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available from ${stock.supplierName}`, variant: "destructive" });
         return;
       }
 
@@ -184,32 +178,9 @@ export function CreateMixBatchDialog({
       setSelectedSources((prev) => [
         ...prev,
         {
-          type: "container",
-          sourceId: stock.containerId,
-          label: stock.containerNumber,
-          weightKg: weight,
-          costPerKg,
-          totalCost: weight * costPerKg,
-          availableKg: available,
-        },
-      ]);
-    } else {
-      const batch = existingBatches?.find((b) => b.id.toString() === selectedSourceId);
-      if (!batch) return;
-
-      const available = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
-      if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg remaining in this batch`, variant: "destructive" });
-        return;
-      }
-
-      const costPerKg = parseFloat(batch.costPerKg);
-      setSelectedSources((prev) => [
-        ...prev,
-        {
-          type: "batch",
-          sourceId: batch.id,
-          label: batch.name || batch.batchCode,
+          type: "supplier",
+          sourceId: stock.supplierId!,
+          label: stock.supplierName,
           weightKg: weight,
           costPerKg,
           totalCost: weight * costPerKg,
@@ -233,12 +204,16 @@ export function CreateMixBatchDialog({
     setWeightInput("");
     setBatchName("");
     setNotes("");
-    setSourceType("container");
+    setSourceType("supplier");
+    setOpeningBatchId("");
   };
 
-  const totalWeight = selectedSources.reduce((sum, s) => sum + s.weightKg, 0);
-  const totalCost = selectedSources.reduce((sum, s) => sum + s.totalCost, 0);
+  const supplierWeight = selectedSources.reduce((sum, s) => sum + s.weightKg, 0);
+  const supplierCost = selectedSources.reduce((sum, s) => sum + s.totalCost, 0);
+  const totalWeight = supplierWeight + openingBatchRemaining;
+  const totalCost = supplierCost + openingBatchTotalCost;
   const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
+  const hasAnySources = selectedSources.length > 0 || (openingBatchId && openingBatchId !== "none");
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -246,7 +221,7 @@ export function CreateMixBatchDialog({
         <DialogHeader>
           <DialogTitle>Create Mix Batch</DialogTitle>
           <DialogDescription>
-            Combine raw stock containers and/or existing batch leftovers into a new batch.
+            Combine supplier raw stock and/or an existing batch opening balance into a new batch.
             The batch code will be auto-generated.
           </DialogDescription>
         </DialogHeader>
@@ -263,62 +238,57 @@ export function CreateMixBatchDialog({
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-medium">Add Sources</h3>
+            <h3 className="font-medium">Opening Stock (optional)</h3>
+            <p className="text-sm text-muted-foreground">
+              Select an existing batch to carry its remaining balance into the new batch. The old batch will be closed.
+            </p>
+            <Select value={openingBatchId} onValueChange={setOpeningBatchId}>
+              <SelectTrigger data-testid="select-opening-batch">
+                <SelectValue placeholder="No opening stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No opening stock</SelectItem>
+                {availableBatchesForOpening?.map((batch) => {
+                  const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
+                  return (
+                    <SelectItem key={batch.id} value={batch.id.toString()}>
+                      {batch.name || batch.batchCode} ({formatNumber(remaining)} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg)
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
 
-            <div className="flex gap-2 mb-2">
-              <Button
-                type="button"
-                variant={sourceType === "container" ? "default" : "outline"}
-                size="sm"
-                onClick={() => { setSourceType("container"); setSelectedSourceId(""); setWeightInput(""); }}
-                data-testid="button-source-type-container"
-              >
-                <Package className="h-4 w-4 mr-1" />
-                Raw Stock Container
-              </Button>
-              <Button
-                type="button"
-                variant={sourceType === "batch" ? "default" : "outline"}
-                size="sm"
-                onClick={() => { setSourceType("batch"); setSelectedSourceId(""); setWeightInput(""); }}
-                data-testid="button-source-type-batch"
-              >
-                <Layers className="h-4 w-4 mr-1" />
-                Existing Batch
-              </Button>
-            </div>
+            {openingBatch && (
+              <div className="p-3 border rounded-md bg-muted/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <Layers className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">{openingBatch.name || openingBatch.batchCode}</span>
+                  <Badge variant="secondary">Opening Stock</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Remaining: <span className="font-mono">{formatNumber(openingBatchRemaining)} kg</span> @ <span className="font-mono">${openingBatchCost.toFixed(4)}/kg</span> = <span className="font-mono">${formatNumber(openingBatchTotalCost)}</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-medium">Add Supplier Sources</h3>
 
             <div className="grid grid-cols-3 gap-2">
-              {sourceType === "container" ? (
-                <Select value={selectedSourceId} onValueChange={handleSourceSelect}>
-                  <SelectTrigger data-testid="select-raw-stock-container">
-                    <SelectValue placeholder="Select container" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRawStock?.map((stock) => (
-                      <SelectItem key={stock.containerId} value={stock.containerId.toString()}>
-                        {stock.containerNumber} ({formatNumber(parseFloat(stock.remainingKg))} kg @ ${parseFloat(stock.costPerKg).toFixed(4)}/kg)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Select value={selectedSourceId} onValueChange={handleSourceSelect}>
-                  <SelectTrigger data-testid="select-existing-batch">
-                    <SelectValue placeholder="Select batch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBatches?.map((batch) => {
-                      const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
-                      return (
-                        <SelectItem key={batch.id} value={batch.id.toString()}>
-                          {batch.name || batch.batchCode} ({formatNumber(remaining)} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg)
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              )}
+              <Select value={selectedSourceId} onValueChange={handleSourceSelect}>
+                <SelectTrigger data-testid="select-supplier-source">
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSuppliers?.map((stock) => (
+                    <SelectItem key={stock.supplierId!} value={stock.supplierId!.toString()}>
+                      {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ ${parseFloat(stock.costPerKg).toFixed(4)}/kg)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <Input
                 type="number"
@@ -346,10 +316,9 @@ export function CreateMixBatchDialog({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>Supplier</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right">Cost/kg</TableHead>
+                    <TableHead className="text-right">Avg Cost/kg</TableHead>
                     <TableHead className="text-right">Total Cost</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
@@ -358,11 +327,6 @@ export function CreateMixBatchDialog({
                   {selectedSources.map((selection) => (
                     <TableRow key={`${selection.type}-${selection.sourceId}`}>
                       <TableCell className="font-medium">{selection.label}</TableCell>
-                      <TableCell>
-                        <Badge variant={selection.type === "container" ? "outline" : "secondary"}>
-                          {selection.type === "container" ? "Container" : "Batch"}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {selection.weightKg.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                       </TableCell>
@@ -427,7 +391,7 @@ export function CreateMixBatchDialog({
             </Button>
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || selectedSources.length === 0}
+              disabled={createMutation.isPending || !hasAnySources}
               data-testid="button-submit"
             >
               {createMutation.isPending ? "Creating..." : "Create Batch"}

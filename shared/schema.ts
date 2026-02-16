@@ -2341,6 +2341,7 @@ export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
   id: serial("id").primaryKey(),
   mixBatchId: integer("mix_batch_id").notNull(),
   containerId: integer("container_id"),
+  supplierId: integer("supplier_id"),
   sourceBatchId: integer("source_batch_id"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
@@ -2354,6 +2355,7 @@ export const insertFactoryMixBatchSourceSchema = createInsertSchema(factoryMixBa
 }).extend({
   mixBatchId: z.number().min(1, "Mix batch is required"),
   containerId: z.number().optional().nullable(),
+  supplierId: z.number().optional().nullable(),
   sourceBatchId: z.number().optional().nullable(),
   weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
