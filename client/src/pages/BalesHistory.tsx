@@ -56,7 +56,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
 
   const fullLabel = `
     <div class="label">
-      <span class="hmd-text">HMD</span>
+      <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
       <div class="label-content">
         <div class="label-top">
           <div class="info-section">
@@ -103,7 +103,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
-    .hmd-text { position: absolute; top: 2mm; left: 3mm; font-size: 28pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; opacity: 0.10; z-index: 0; pointer-events: none; letter-spacing: 3px; line-height: 1; }
+    .hmd-logo { position: absolute; top: 1mm; left: 1mm; height: 12mm; width: auto; object-fit: contain; z-index: 0; pointer-events: none; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }

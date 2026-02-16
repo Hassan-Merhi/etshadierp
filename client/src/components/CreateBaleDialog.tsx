@@ -70,7 +70,7 @@ function generateFullLabelHtml(label: {
 }) {
   return `
     <div class="label">
-      <span class="hmd-text">HMD</span>
+      <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
       <div class="label-content">
         <div class="label-top">
           <div class="info-section">
@@ -173,19 +173,15 @@ function generateLabelHtml(labels: Array<{
             position: relative;
             background: #fff;
           }
-          .hmd-text {
+          .hmd-logo {
             position: absolute;
-            top: 2mm;
-            left: 3mm;
-            font-size: 28pt;
-            font-weight: 900;
-            font-family: Arial, Helvetica, sans-serif;
-            color: #000;
-            opacity: 0.10;
+            top: 1mm;
+            left: 1mm;
+            height: 12mm;
+            width: auto;
+            object-fit: contain;
             z-index: 0;
             pointer-events: none;
-            letter-spacing: 3px;
-            line-height: 1;
           }
           .label-content {
             position: relative;
