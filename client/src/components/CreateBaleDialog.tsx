@@ -227,7 +227,7 @@ function generateLabelHtml(labels: Array<{
             align-items: flex-start;
           }
           .logo-img {
-            height: 10mm;
+            height: 14mm;
             width: auto;
             object-fit: contain;
             mix-blend-mode: multiply;
@@ -267,7 +267,7 @@ function generateLabelHtml(labels: Array<{
           .ref-barcode-img {
             width: 100%;
             height: 10mm;
-            object-fit: contain;
+            object-fit: fill;
           }
           .ref-barcode-number {
             font-size: 6pt;
@@ -283,7 +283,7 @@ function generateLabelHtml(labels: Array<{
           .article-barcode-img {
             width: 100%;
             height: 10mm;
-            object-fit: contain;
+            object-fit: fill;
           }
           .product-name-section {
             text-align: center;

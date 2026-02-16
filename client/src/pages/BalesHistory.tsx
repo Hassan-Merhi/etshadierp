@@ -112,15 +112,15 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 10mm; width: auto; object-fit: contain; mix-blend-mode: multiply; }
+    .logo-img { height: 14mm; width: auto; object-fit: contain; mix-blend-mode: multiply; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; margin-top: 0.5mm; }
-    .ref-barcode-img { width: 100%; height: 10mm; object-fit: contain; }
+    .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .ref-barcode-number { font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.2mm; letter-spacing: 1px; }
     .article-barcode-section { text-align: center; margin-top: 1.5mm; }
-    .article-barcode-img { width: 100%; height: 10mm; object-fit: contain; }
+    .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .product-name-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
