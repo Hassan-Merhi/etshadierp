@@ -49,8 +49,7 @@ function buildDetailBlock(label: LabelData) {
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <div class="logo-text">HMD</div>
-        <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+        <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
@@ -96,13 +95,12 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-text { font-size: 18pt; font-weight: 900; letter-spacing: 2px; color: #000; line-height: 1; }
-    .logo-subtitle { font-size: 5pt; font-weight: 700; letter-spacing: 1px; color: #000; margin-top: 0.5mm; }
+    .logo-img { height: 12mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
+    .barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
     .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
     .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
@@ -111,18 +109,18 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
     .logo-reserve-top { width: 100%; height: 65mm; flex-shrink: 0; }
-    .top-row { display: flex; flex-direction: row; align-items: stretch; padding: 0 10mm; gap: 8mm; flex-shrink: 0; }
+    .top-row { display: flex; flex-direction: row; align-items: stretch; padding: 0 12mm; gap: 10mm; flex-shrink: 0; }
     .top-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
     .top-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .top-right-name { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
     .name-right-spacer { height: 20mm; flex-shrink: 0; }
-    .name-right-text { font-size: clamp(28pt, 8vw, 60pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; word-break: break-word; }
+    .name-right-text { font-size: clamp(24pt, 6vw, 48pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; word-break: break-word; }
     .logo-reserve-bottom { width: 100%; height: 50mm; flex-shrink: 0; }
-    .bottom-name { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(60pt, 20vw, 160pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 4px; padding: 10mm; word-break: break-word; }
+    .bottom-name { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(48pt, 16vw, 120pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 4px; padding: 10mm; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">A4 Bale Labels (pre-printed logo paper). Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body><div class="print-note">A4 Bale Labels. Set printer darkness to 30. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function generateStickerLabelsHtml(labels: LabelData[]) {
@@ -134,8 +132,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
           <div class="label-content">
             <div class="label-top">
               <div class="logo-section">
-                <div class="logo-text">HMD</div>
-                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+                <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
               </div>
               <div class="info-section">
                 <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
@@ -175,8 +172,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
-    .logo-subtitle { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; color: #000; margin-top: 0.5mm; }
+    .logo-img { height: 10mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
@@ -195,8 +191,8 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Sticker Labels (2 per bale: full-info + name-only). Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set label printer darkness to 30. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {

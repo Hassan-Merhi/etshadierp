@@ -57,8 +57,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
       <div class="label-content">
         <div class="label-top">
           <div class="logo-section">
-            <div class="logo-text">HMD</div>
-            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+            <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
           </div>
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
@@ -112,8 +111,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
-    .logo-subtitle { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; color: #000; margin-top: 0.5mm; }
+    .logo-img { height: 10mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
@@ -125,8 +123,8 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .product-name-section { text-align: center; margin-top: 0.3mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
-  </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body><div class="print-note">Set label printer darkness to 30. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
 const STATUS_COLORS: Record<string, string> = {

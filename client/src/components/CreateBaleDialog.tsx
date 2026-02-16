@@ -71,8 +71,7 @@ function generateFullLabelHtml(label: {
       <div class="label-content">
         <div class="label-top">
           <div class="logo-section">
-            <div class="logo-text">HMD</div>
-            <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+            <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
           </div>
           <div class="info-section">
             <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
@@ -234,19 +233,10 @@ function generateLabelHtml(labels: Array<{
             flex-direction: column;
             align-items: flex-start;
           }
-          .logo-text {
-            font-size: 28pt;
-            font-weight: 900;
-            letter-spacing: 3px;
-            color: #000;
-            line-height: 1;
-          }
-          .logo-subtitle {
-            font-size: 6pt;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            color: #000;
-            margin-top: 0.5mm;
+          .logo-img {
+            height: 10mm;
+            width: auto;
+            object-fit: contain;
           }
           .print-note {
             text-align: center;
@@ -259,7 +249,7 @@ function generateLabelHtml(labels: Array<{
           @media print {
             .print-note { display: none !important; }
             header, .print-header, .page-header { display: none !important; }
-            body { margin: 0; }
+            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
           .info-section {
             text-align: right;
@@ -314,7 +304,7 @@ function generateLabelHtml(labels: Array<{
         </style>
       </head>
       <body>
-        <div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>
+        <div class="print-note">Set label printer darkness to 30. Disable "Headers and Footers" in print settings.</div>
         ${labelsHtml}
       </body>
     </html>
