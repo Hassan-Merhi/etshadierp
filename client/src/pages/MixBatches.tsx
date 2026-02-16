@@ -28,7 +28,7 @@ import type { FactoryMixBatch } from "@shared/schema";
 const BatchDetail = lazy(() => import("./BatchDetail"));
 
 export default function MixBatches() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("ACTIVE");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
@@ -98,9 +98,10 @@ export default function MixBatches() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Batches</SelectItem>
                 <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="CLOSED">Closed</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="all">All Batches</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -181,11 +182,11 @@ export default function MixBatches() {
               <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No batches found</h3>
               <p className="text-muted-foreground mb-4">
-                {statusFilter === "all"
+                {statusFilter === "all" || statusFilter === "ACTIVE"
                   ? "Create your first mix batch to get started"
                   : `No batches with status: ${statusFilter}`}
               </p>
-              {statusFilter === "all" && (
+              {(statusFilter === "all" || statusFilter === "ACTIVE") && (
                 <Button onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create First Batch
