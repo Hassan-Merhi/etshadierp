@@ -73,18 +73,22 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
   for (const label of labels) {
     labelsHtml += `
       <div class="a4-page">
-        <div class="logo-reserve-top"></div>
-        <div class="top-row">
-          <div class="top-left-label">
-            ${buildDetailBlock(label)}
-          </div>
-          <div class="top-right-name">
-            <div class="name-right-spacer"></div>
-            <div class="name-right-text">${label.productName}</div>
+        <div class="a4-top-half">
+          <div class="a4-top-preprint-gap"></div>
+          <div class="a4-top-content">
+            <div class="a4-detail-left">
+              ${buildDetailBlock(label)}
+            </div>
+            <div class="a4-name-right">
+              <div class="a4-name-right-text">${label.productName}</div>
+            </div>
           </div>
         </div>
-        <div class="logo-reserve-bottom"></div>
-        <div class="bottom-name">${label.productName}</div>
+        <div class="a4-bottom-half">
+          <div class="a4-bottom-namebox">
+            <div class="a4-bottom-name-text">${label.productName}</div>
+          </div>
+        </div>
       </div>`;
   }
   return `<html><head><title>Stock Entry Labels - A4</title><style>
@@ -92,7 +96,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .logo-img { height: 10mm; width: auto; object-fit: contain; }
@@ -108,15 +112,17 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
-    .logo-reserve-top { width: 100%; height: 65mm; flex-shrink: 0; }
-    .top-row { display: flex; flex-direction: row; align-items: stretch; padding: 0 12mm; gap: 10mm; flex-shrink: 0; }
-    .top-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
-    .top-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
-    .top-right-name { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
-    .name-right-spacer { height: 20mm; flex-shrink: 0; }
-    .name-right-text { font-size: clamp(24pt, 6vw, 48pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; word-break: break-word; }
-    .logo-reserve-bottom { width: 100%; height: 50mm; flex-shrink: 0; }
-    .bottom-name { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(48pt, 16vw, 120pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 4px; padding: 10mm; word-break: break-word; }
+
+    .a4-top-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .a4-top-preprint-gap { height: 90mm; flex-shrink: 0; }
+    .a4-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
+    .a4-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
+    .a4-name-right { flex: 1; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; height: 58.5mm; }
+    .a4-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.05; color: #000; padding-top: 4mm; }
+
+    .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; }
+    .a4-bottom-namebox { height: 40mm; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: 8mm; }
+    .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(22pt, 5vw, 48pt); line-height: 1.05; color: #000; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
