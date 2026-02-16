@@ -203,6 +203,7 @@ function StockEntryTab() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [selectedMixBatchId, setSelectedMixBatchId] = useState<string>("");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -265,6 +266,33 @@ function StockEntryTab() {
       e.preventDefault();
       handleScan(scanInput);
     }
+  };
+
+  const filteredProducts = scanInput.trim().length > 0
+    ? (activeProducts || []).filter((p) => {
+        const term = scanInput.trim().toLowerCase();
+        return (
+          p.name.toLowerCase().includes(term) ||
+          (p.articleCode?.toLowerCase().includes(term)) ||
+          p.code.toLowerCase().includes(term)
+        );
+      }).slice(0, 10)
+    : [];
+
+  const selectProduct = (product: FactoryBaleProduct) => {
+    const defaultWeight = product.weightPerBaleKg ? parseFloat(product.weightPerBaleKg) : 25;
+    setCart((prev) => {
+      const existing = prev.find((item) => item.productId === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
+        );
+      }
+      return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
+    });
+    setScanInput("");
+    setScanError("");
+    setShowDropdown(false);
   };
 
   const updateQty = (productId: number, delta: number) => {
@@ -480,16 +508,50 @@ function StockEntryTab() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Input
                   ref={scanRef}
                   value={scanInput}
-                  onChange={(e) => { setScanInput(e.target.value); setScanError(""); }}
-                  onKeyDown={handleScanKeyDown}
-                  placeholder="Scan barcode or type article code..."
+                  onChange={(e) => { setScanInput(e.target.value); setScanError(""); setShowDropdown(true); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (filteredProducts.length === 1) {
+                        selectProduct(filteredProducts[0]);
+                      } else {
+                        handleScan(scanInput);
+                      }
+                    }
+                    if (e.key === "Escape") {
+                      setShowDropdown(false);
+                    }
+                  }}
+                  onFocus={() => { if (scanInput.trim()) setShowDropdown(true); }}
+                  placeholder="Scan barcode or type name / article code..."
                   autoFocus
                   data-testid="input-stock-entry-scan"
                 />
+                {showDropdown && scanInput.trim().length > 0 && filteredProducts.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="dropdown-product-suggestions">
+                    {filteredProducts.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover-elevate flex items-center justify-between gap-2 text-sm"
+                        onClick={() => selectProduct(p)}
+                        data-testid={`button-select-product-${p.id}`}
+                      >
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-muted-foreground font-mono text-xs">{p.articleCode || p.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showDropdown && scanInput.trim().length > 0 && filteredProducts.length === 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg px-3 py-2 text-sm text-muted-foreground">
+                    No products found
+                  </div>
+                )}
                 {scanError && (
                   <div className="flex items-center gap-2 text-destructive text-sm" data-testid="text-scan-error">
                     <AlertCircle className="h-4 w-4" />
