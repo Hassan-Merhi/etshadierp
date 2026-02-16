@@ -1292,6 +1292,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/raw-stock/opening-balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { supplierId, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes } = req.body;
+
+      if (!supplierId) return res.status(400).json({ message: "Supplier is required" });
+      if (!receivedKg || parseFloat(receivedKg) <= 0) return res.status(400).json({ message: "Received KG must be positive" });
+      if (!costPerKg || parseFloat(costPerKg) < 0) return res.status(400).json({ message: "Cost per KG must be non-negative" });
+
+      const currencyCode = reqCurrency || "USD";
+      const fxRate = parseFloat(reqFxRate || "1");
+      const kgVal = parseFloat(receivedKg);
+      const rateVal = parseFloat(costPerKg);
+      const costPerKgUsd = currencyCode === "USD" ? rateVal : rateVal * fxRate;
+      const totalPayable = kgVal * rateVal;
+      const totalPayableUsd = kgVal * costPerKgUsd;
+
+      const result = await db.transaction(async (tx: any) => {
+        const year = new Date().getFullYear();
+        const existingOBs = await tx
+          .select({ containerNumber: factoryContainers.containerNumber })
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.companyId, companyId), sql`${factoryContainers.containerNumber} LIKE ${"OB-" + year + "-%"}`));
+
+        let nextNum = 1;
+        for (const c of existingOBs) {
+          const parts = c.containerNumber.split("-");
+          const num = parseInt(parts[2]) || 0;
+          if (num >= nextNum) nextNum = num + 1;
+        }
+        const containerNumber = `OB-${year}-${String(nextNum).padStart(4, "0")}`;
+
+        const [container] = await tx
+          .insert(factoryContainers)
+          .values({
+            companyId,
+            containerNumber,
+            supplierId: parseInt(supplierId),
+            origin: "Opening Balance",
+            totalKg: String(kgVal),
+            ratePerKg: String(rateVal),
+            declaredKg: String(kgVal),
+            actualReceivedKg: String(kgVal),
+            finalPayableAmount: String(totalPayable),
+            differenceKg: "0",
+            currencyCode,
+            fxRateToUsd: String(fxRate),
+            ratePerKgUsd: String(costPerKgUsd),
+            finalPayableAmountUsd: String(totalPayableUsd),
+            notes: notes || "Opening balance import",
+            status: "OPENING_BALANCE",
+          })
+          .returning();
+
+        const [rawStock] = await tx
+          .insert(factoryRawStock)
+          .values({
+            companyId,
+            containerId: container.id,
+            receivedKg: String(kgVal),
+            costPerKg: String(rateVal),
+            costPerKgUsd: String(costPerKgUsd),
+          })
+          .returning();
+
+        const today = new Date().toISOString().split('T')[0];
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: today,
+          txType: "OPENING_BALANCE_RAW",
+          referenceId: rawStock.id,
+          description: `Opening balance: ${containerNumber} - ${kgVal} kg at ${rateVal}/kg (${currencyCode})`,
+          currencyCode,
+          amountCurrency: totalPayable,
+          fxRateToUsd: fxRate,
+        });
+
+        return { container, rawStock };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error creating opening balance:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 6. Factory Mix Batches
   // ───────────────────────────────────────────────

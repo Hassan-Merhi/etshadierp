@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,11 @@ interface RawStockRow {
   valueRemaining: string;
 }
 
+interface SupplierOption {
+  id: number;
+  name: string;
+}
+
 interface ContainerOption {
   id: number;
   containerNumber: string;
@@ -68,6 +73,13 @@ export default function ProductionRawStock() {
   const [commissionRate, setCommissionRate] = useState("");
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
+  const [obDialogOpen, setObDialogOpen] = useState(false);
+  const [obSupplierId, setObSupplierId] = useState("");
+  const [obReceivedKg, setObReceivedKg] = useState("");
+  const [obCostPerKg, setObCostPerKg] = useState("");
+  const [obCurrency, setObCurrency] = useState("USD");
+  const [obFxRate, setObFxRate] = useState("1");
+  const [obNotes, setObNotes] = useState("");
   const { toast } = useToast();
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
@@ -77,6 +89,11 @@ export default function ProductionRawStock() {
   const { data: availableContainers } = useQuery<ContainerOption[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
     enabled: offloadDialogOpen,
+  });
+
+  const { data: suppliers } = useQuery<SupplierOption[]>({
+    queryKey: ["/api/factory/suppliers"],
+    enabled: obDialogOpen,
   });
 
   const selectedContainer = useMemo(() => {
@@ -176,6 +193,67 @@ export default function ProductionRawStock() {
     setFxRateToUsd("1");
   };
 
+  const obKg = parseFloat(obReceivedKg || "0");
+  const obRate = parseFloat(obCostPerKg || "0");
+  const obFxRateNum = parseFloat(obFxRate || "1");
+  const obRateUsd = obCurrency === "USD" ? obRate : obRate * obFxRateNum;
+  const obTotal = obKg * obRate;
+  const obTotalUsd = obKg * obRateUsd;
+
+  const openingBalanceMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to create opening balance");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      toast({ title: "Success", description: "Opening balance added to production raw stock" });
+      handleCloseObDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCloseObDialog = () => {
+    setObDialogOpen(false);
+    setObSupplierId("");
+    setObReceivedKg("");
+    setObCostPerKg("");
+    setObCurrency("USD");
+    setObFxRate("1");
+    setObNotes("");
+  };
+
+  const handleSubmitOpeningBalance = () => {
+    if (!obSupplierId) {
+      toast({ title: "Missing fields", description: "Please select a supplier", variant: "destructive" });
+      return;
+    }
+    if (!obReceivedKg || obKg <= 0) {
+      toast({ title: "Missing weight", description: "Please enter the weight in KG", variant: "destructive" });
+      return;
+    }
+    if (!obCostPerKg || obRate < 0) {
+      toast({ title: "Missing cost", description: "Please enter the cost per KG", variant: "destructive" });
+      return;
+    }
+
+    openingBalanceMutation.mutate({
+      supplierId: obSupplierId,
+      receivedKg: obReceivedKg,
+      costPerKg: obCostPerKg,
+      currencyCode: obCurrency,
+      fxRateToUsd: obFxRate,
+      notes: obNotes || undefined,
+    });
+  };
+
   const totalReceived = rawStock?.reduce((sum, r) => sum + parseFloat(r.receivedKg), 0) || 0;
   const totalUsed = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg), 0) || 0;
   const totalRemaining = rawStock?.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0) || 0;
@@ -188,10 +266,16 @@ export default function ProductionRawStock() {
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Production Raw Stock</h1>
           <p className="text-muted-foreground mt-1">Container-led raw material tracking for production</p>
         </div>
-        <Button onClick={() => setOffloadDialogOpen(true)} data-testid="button-offload-container">
-          <ArrowDown className="h-4 w-4 mr-2" />
-          Offload Container
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setObDialogOpen(true)} data-testid="button-opening-balance">
+            <Upload className="h-4 w-4 mr-2" />
+            Add Opening Balance
+          </Button>
+          <Button onClick={() => setOffloadDialogOpen(true)} data-testid="button-offload-container">
+            <ArrowDown className="h-4 w-4 mr-2" />
+            Offload Container
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -537,6 +621,148 @@ export default function ProductionRawStock() {
                 data-testid="button-confirm-offload"
               >
                 {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={obDialogOpen} onOpenChange={handleCloseObDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Opening Balance</DialogTitle>
+            <DialogDescription>
+              Import raw stock directly by supplier without requiring a container
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-2">
+              <Label>Supplier</Label>
+              <Select value={obSupplierId} onValueChange={setObSupplierId}>
+                <SelectTrigger data-testid="select-ob-supplier">
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers?.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Weight (KG)</Label>
+                <Input
+                  type="number"
+                  value={obReceivedKg}
+                  onChange={(e) => setObReceivedKg(e.target.value)}
+                  placeholder="e.g. 145451"
+                  step="0.001"
+                  data-testid="input-ob-kg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cost per KG</Label>
+                <Input
+                  type="number"
+                  value={obCostPerKg}
+                  onChange={(e) => setObCostPerKg(e.target.value)}
+                  placeholder="e.g. 1.85"
+                  step="0.0001"
+                  data-testid="input-ob-cost"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">Currency</Label>
+                <Select value={obCurrency} onValueChange={(v) => { setObCurrency(v); if (v === "USD") setObFxRate("1"); }}>
+                  <SelectTrigger data-testid="select-ob-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                <Input
+                  type="number"
+                  value={obFxRate}
+                  onChange={(e) => setObFxRate(e.target.value)}
+                  placeholder="1.0"
+                  step="0.0001"
+                  disabled={obCurrency === "USD"}
+                  data-testid="input-ob-fx-rate"
+                />
+              </div>
+            </div>
+            {obCurrency !== "USD" && obRate > 0 && (
+              <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
+                Rate in USD: <span className="font-mono font-medium">${obRateUsd.toFixed(4)}/kg</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-xs">Notes (optional)</Label>
+              <Input
+                value={obNotes}
+                onChange={(e) => setObNotes(e.target.value)}
+                placeholder="e.g. Opening stock as of Jan 2026"
+                data-testid="input-ob-notes"
+              />
+            </div>
+
+            {obKg > 0 && obRate >= 0 && (
+              <>
+                <Separator />
+                <div className="rounded-md border p-3 space-y-1.5 text-sm" data-testid="section-ob-summary">
+                  <p className="font-semibold text-base mb-2">Opening Balance Summary</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Weight</span>
+                    <span className="font-mono">{formatNumber(obKg)} kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Rate</span>
+                    <span className="font-mono">{obCurrency === "USD" ? "$" : obCurrency + " "}{obRate.toFixed(4)}/kg</span>
+                  </div>
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-medium">
+                    <span>Total Value</span>
+                    <span className="font-mono text-base">
+                      {obCurrency !== "USD" ? `${obCurrency} ${formatNumber(obTotal)}` : `$${formatNumber(obTotal)}`}
+                    </span>
+                  </div>
+                  {obCurrency !== "USD" && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Total Value (USD)</span>
+                      <span className="font-mono">${formatNumber(obTotalUsd)}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={handleCloseObDialog} data-testid="button-cancel-ob">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitOpeningBalance}
+                disabled={openingBalanceMutation.isPending || !obSupplierId}
+                data-testid="button-confirm-ob"
+              >
+                {openingBalanceMutation.isPending ? "Adding..." : "Add Opening Balance"}
               </Button>
             </div>
           </div>
