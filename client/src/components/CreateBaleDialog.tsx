@@ -70,9 +70,9 @@ function generateFullLabelHtml(label: {
 }) {
   return `
     <div class="label">
-      <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
       <div class="label-content">
         <div class="label-top">
+          <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
           <div class="info-section">
             <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
             <div class="info-row"><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -173,19 +173,7 @@ function generateLabelHtml(labels: Array<{
             position: relative;
             background: #fff;
           }
-          .hmd-logo {
-            position: absolute;
-            top: 1mm;
-            left: 1mm;
-            height: 12mm;
-            width: auto;
-            object-fit: contain;
-            z-index: 0;
-            pointer-events: none;
-          }
           .label-content {
-            position: relative;
-            z-index: 1;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -225,9 +213,15 @@ function generateLabelHtml(labels: Array<{
           }
           .label-top {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 1mm;
+            gap: 2mm;
+          }
+          .hmd-logo {
+            height: 11mm;
+            width: auto;
+            object-fit: contain;
+            flex-shrink: 0;
           }
           .print-note {
             text-align: center;

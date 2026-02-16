@@ -56,9 +56,9 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
 
   const fullLabel = `
     <div class="label">
-      <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
       <div class="label-content">
         <div class="label-top">
+          <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -103,13 +103,13 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
-    .hmd-logo { position: absolute; top: 1mm; left: 1mm; height: 12mm; width: auto; object-fit: contain; z-index: 0; pointer-events: none; }
-    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+    .label-content { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
-    .label-top { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 1mm; }
+    .label-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
+    .hmd-logo { height: 11mm; width: auto; object-fit: contain; flex-shrink: 0; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
