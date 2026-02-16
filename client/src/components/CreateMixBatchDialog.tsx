@@ -72,7 +72,7 @@ export function CreateMixBatchDialog({
   const [notes, setNotes] = useState("");
 
   const { data: rawStock } = useQuery<RawStockRow[]>({
-    queryKey: ["/api/factory/raw-stock"],
+    queryKey: ["/api/factory/raw-stock/by-container"],
     enabled: open,
   });
 

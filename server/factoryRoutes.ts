@@ -1153,6 +1153,46 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/raw-stock/by-container", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const results = await db
+        .select({
+          id: factoryRawStock.id,
+          companyId: factoryRawStock.companyId,
+          containerId: factoryRawStock.containerId,
+          receivedKg: factoryRawStock.receivedKg,
+          usedKg: factoryRawStock.usedKg,
+          costPerKg: factoryRawStock.costPerKg,
+          costPerKgUsd: factoryRawStock.costPerKgUsd,
+          offloadedAt: factoryRawStock.offloadedAt,
+          createdAt: factoryRawStock.createdAt,
+          containerNumber: factoryContainers.containerNumber,
+          supplierName: factorySuppliers.name,
+          origin: factoryContainers.origin,
+        })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+        .where(eq(factoryRawStock.companyId, companyId));
+
+      const enriched = results.map((r: any) => {
+        const received = parseFloat(r.receivedKg) || 0;
+        const used = parseFloat(r.usedKg) || 0;
+        const costPerKg = parseFloat(r.costPerKg) || 0;
+        const remainingKg = received - used;
+        return { ...r, remainingKg: remainingKg.toFixed(3) };
+      });
+
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("Error fetching factory raw stock by container:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
