@@ -230,6 +230,7 @@ function generateLabelHtml(labels: Array<{
             height: 10mm;
             width: auto;
             object-fit: contain;
+            mix-blend-mode: multiply;
           }
           .print-note {
             text-align: center;
