@@ -57,8 +57,10 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
   const fullLabel = `
     <div class="label">
       <div class="label-content">
-        <div class="label-top">
-          <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
+        <div class="label-header">
+          <div class="logo-area">
+            <img class="hmd-logo" src="/hmd-logo-white.png" alt="HMD" />
+          </div>
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
