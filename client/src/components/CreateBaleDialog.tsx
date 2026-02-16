@@ -277,16 +277,16 @@ function generateLabelHtml(labels: Array<{
           }
           .article-barcode-section {
             text-align: center;
-            margin-top: 0.3mm;
+            margin-top: 2mm;
           }
           .article-barcode-img {
-            width: 45mm;
-            height: 7mm;
+            width: 65mm;
+            height: 10mm;
             object-fit: contain;
           }
           .product-name-section {
             text-align: center;
-            margin-top: 0.3mm;
+            margin-top: 1mm;
             border-top: 0.3mm dashed #ccc;
             padding-top: 0.5mm;
           }

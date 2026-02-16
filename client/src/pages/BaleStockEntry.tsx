@@ -66,7 +66,7 @@ function buildDetailBlock(label: LabelData) {
     </div>
     <div class="article-barcode-area">
       <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-      <div class="article-barcode-number">${label.productName}</div>
+      <div class="article-barcode-number">${label.articleCode}</div>
     </div>
   </div>`;
 }
@@ -110,8 +110,8 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .barcode-area { text-align: center; margin-top: auto; }
     .barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
     .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
+    .article-barcode-area { text-align: center; margin-top: 3mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 65mm; height: 10mm; object-fit: contain; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
@@ -196,9 +196,9 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .ref-barcode-section { text-align: center; margin-top: 0.5mm; }
     .ref-barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
     .ref-barcode-number { font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.2mm; letter-spacing: 1px; }
-    .article-barcode-section { text-align: center; margin-top: 0.3mm; }
-    .article-barcode-img { width: 45mm; height: 7mm; object-fit: contain; }
-    .product-section { text-align: center; margin-top: 0.3mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
+    .article-barcode-section { text-align: center; margin-top: 2mm; }
+    .article-barcode-img { width: 65mm; height: 10mm; object-fit: contain; }
+    .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; }
 
     .name-only-label { justify-content: center; align-items: center; }
