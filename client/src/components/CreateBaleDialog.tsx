@@ -264,8 +264,8 @@ function generateLabelHtml(labels: Array<{
             margin-top: 0.5mm;
           }
           .ref-barcode-img {
-            width: 60mm;
-            height: 10mm;
+            width: 100%;
+            height: 12mm;
             object-fit: contain;
           }
           .ref-barcode-number {
@@ -280,8 +280,8 @@ function generateLabelHtml(labels: Array<{
             margin-top: 2mm;
           }
           .article-barcode-img {
-            width: 65mm;
-            height: 10mm;
+            width: 100%;
+            height: 12mm;
             object-fit: contain;
           }
           .product-name-section {
