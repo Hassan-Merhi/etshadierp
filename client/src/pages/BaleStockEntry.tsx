@@ -85,6 +85,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
           </div>
         </div>
         <div class="a4-bottom-half">
+          <div class="a4-bottom-preprint-gap"></div>
           <div class="a4-bottom-namebox">
             <div class="a4-bottom-name-text">${label.productName}</div>
           </div>
@@ -117,11 +118,12 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .a4-top-preprint-gap { height: 90mm; flex-shrink: 0; }
     .a4-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
     .a4-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
-    .a4-name-right { flex: 1; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; height: 58.5mm; }
-    .a4-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; padding-top: 4mm; word-break: break-word; }
+    .a4-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 58.5mm; }
+    .a4-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; word-break: break-word; }
 
-    .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; }
-    .a4-bottom-namebox { height: 60mm; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: 8mm; padding: 0 10mm; }
+    .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .a4-bottom-preprint-gap { height: 90mm; flex-shrink: 0; }
+    .a4-bottom-namebox { height: 58.5mm; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 10mm; }
     .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
