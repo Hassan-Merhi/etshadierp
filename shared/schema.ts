@@ -3171,3 +3171,41 @@ export const insertFactoryContainerProfitSnapshotSchema = createInsertSchema(fac
 
 export type InsertFactoryContainerProfitSnapshot = z.infer<typeof insertFactoryContainerProfitSnapshotSchema>;
 export type FactoryContainerProfitSnapshot = typeof factoryContainerProfitSnapshots.$inferSelect;
+
+export const factoryUserProfiles = pgTable("factory_user_profiles", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  displayName: text("display_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyUser: uniqueIndex("factory_user_profiles_unique").on(t.companyId, t.userId),
+}));
+
+export const insertFactoryUserProfileSchema = createInsertSchema(factoryUserProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFactoryUserProfile = z.infer<typeof insertFactoryUserProfileSchema>;
+export type FactoryUserProfile = typeof factoryUserProfiles.$inferSelect;
+
+export const factoryUserPageAccess = pgTable("factory_user_page_access", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  pageKey: text("page_key").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyUserPage: uniqueIndex("factory_user_page_access_unique").on(t.companyId, t.userId, t.pageKey),
+}));
+
+export const insertFactoryUserPageAccessSchema = createInsertSchema(factoryUserPageAccess).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryUserPageAccess = z.infer<typeof insertFactoryUserPageAccessSchema>;
+export type FactoryUserPageAccess = typeof factoryUserPageAccess.$inferSelect;
