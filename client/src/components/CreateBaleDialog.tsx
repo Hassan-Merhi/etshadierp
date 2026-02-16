@@ -171,16 +171,7 @@ function generateLabelHtml(labels: Array<{
             justify-content: space-between;
             overflow: hidden;
             position: relative;
-            background-image: url('/hmd-label-bg.jpeg');
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: contain;
-          }
-          .label::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: rgba(255,255,255,0.80);
+            background: #fff;
           }
           .label-content {
             position: relative;
@@ -249,7 +240,7 @@ function generateLabelHtml(labels: Array<{
           @media print {
             .print-note { display: none !important; }
             header, .print-header, .page-header { display: none !important; }
-            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(1.6); }
           }
           .info-section {
             text-align: right;
@@ -304,7 +295,7 @@ function generateLabelHtml(labels: Array<{
         </style>
       </head>
       <body>
-        <div class="print-note">Set label printer darkness to 30. Disable "Headers and Footers" in print settings.</div>
+        <div class="print-note">Set label printer darkness to 60-70. Disable "Headers and Footers" in print settings.</div>
         ${labelsHtml}
       </body>
     </html>

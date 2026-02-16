@@ -102,8 +102,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .page-container:last-child { page-break-after: auto; }
     .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
-    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background-image: url('/hmd-label-bg.jpeg'); background-repeat: no-repeat; background-position: center; background-size: contain; }
-    .label::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.80); }
+    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
@@ -123,8 +122,8 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .product-name-section { text-align: center; margin-top: 0.3mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  </style></head><body><div class="print-note">Set label printer darkness to 30. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(1.6); } }
+  </style></head><body><div class="print-note">Set label printer darkness to 60-70. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
 const STATUS_COLORS: Record<string, string> = {

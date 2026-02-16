@@ -99,7 +99,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 10mm; width: auto; object-fit: contain; }
+    .logo-img { height: 14mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
@@ -118,11 +118,11 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .a4-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
     .a4-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
     .a4-name-right { flex: 1; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; height: 58.5mm; }
-    .a4-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.05; color: #000; padding-top: 4mm; }
+    .a4-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; padding-top: 4mm; word-break: break-word; }
 
     .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; }
-    .a4-bottom-namebox { height: 40mm; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: 8mm; }
-    .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(22pt, 5vw, 48pt); line-height: 1.05; color: #000; }
+    .a4-bottom-namebox { height: 60mm; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: 8mm; padding: 0 10mm; }
+    .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
@@ -173,8 +173,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
     .sticker-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .sticker-page:last-child { page-break-after: auto; }
-    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background-image: url('/hmd-label-bg.jpeg'); background-repeat: no-repeat; background-position: center; background-size: contain; }
-    .label::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.80); }
+    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
@@ -197,8 +196,8 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set label printer darkness to 30. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(1.6); } }
+  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set label printer darkness to 60-70. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
