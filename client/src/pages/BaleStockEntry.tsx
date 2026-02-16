@@ -679,14 +679,37 @@ function StockEntryTab() {
           <DialogHeader>
             <DialogTitle>Confirm Stock Entry</DialogTitle>
             <DialogDescription>
-              {totalQty} bale(s) will be entered directly into stock at the selected location. An A4 label and a sticker label will print for each bale.
+              {totalQty} bale(s) will be entered into stock. An A4 label and a sticker label will print for each bale.
             </DialogDescription>
           </DialogHeader>
-          <div className="text-sm space-y-1">
-            <p>Location: <span className="font-medium">{selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "-"}</span></p>
-            <p>Mix Batch: <span className="font-medium">{selectedMixBatch?.name || selectedMixBatch?.batchCode || "-"}</span></p>
-            <p>Total Bales: <span className="font-medium">{totalQty}</span></p>
-            <p>Total Weight: <span className="font-medium">{formatNumber(totalKg)} kg</span></p>
+          <div className="text-sm space-y-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-right">Wt/Bale</TableHead>
+                  <TableHead className="text-right">Total KG</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cart.map((item) => (
+                  <TableRow key={item.productId}>
+                    <TableCell>
+                      <div className="font-medium">{item.product.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
+                    </TableCell>
+                    <TableCell className="text-center font-medium">{item.qty}</TableCell>
+                    <TableCell className="text-right">{formatNumber(item.weightPerBaleKg)} kg</TableCell>
+                    <TableCell className="text-right font-medium">{formatNumber(item.qty * item.weightPerBaleKg)} kg</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="border-t pt-2 flex justify-between items-center font-semibold">
+              <span>Total: {totalQty} bales</span>
+              <span>{formatNumber(totalKg)} kg</span>
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
