@@ -130,7 +130,13 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    @media print {
+      .print-note { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-text-stroke: 0.4px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000, 0 0.3px 0 #000, 0 -0.3px 0 #000; }
+      .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 1px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
+      img { filter: contrast(2) brightness(0.9); }
+    }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer darkness to 30. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
@@ -201,7 +207,13 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(10); } }
+    @media print {
+      .print-note { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
+      .name-only-text, .product-name-text { -webkit-text-stroke: 0.8px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
+      img { filter: contrast(2) brightness(0.9); }
+    }
   </style></head><body><div class="print-note">Sticker Labels (2 per bale). Laser print - max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 

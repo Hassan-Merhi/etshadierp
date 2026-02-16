@@ -242,7 +242,10 @@ function generateLabelHtml(labels: Array<{
           @media print {
             .print-note { display: none !important; }
             header, .print-header, .page-header { display: none !important; }
-            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(10); }
+            body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            * { -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
+            .product-name-text { -webkit-text-stroke: 0.8px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
+            img { filter: contrast(2) brightness(0.9); }
           }
           .info-section {
             text-align: right;

@@ -124,7 +124,14 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .product-name-section { text-align: center; margin-top: 0.3mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
-    @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; filter: contrast(10); } }
+    @media print {
+      .print-note { display: none !important; }
+      header, .print-header, .page-header { display: none !important; }
+      body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
+      .name-label-text, .product-name-text { -webkit-text-stroke: 0.8px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
+      img { filter: contrast(2) brightness(0.9); }
+    }
   </style></head><body><div class="print-note">Laser print - max darkness. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
