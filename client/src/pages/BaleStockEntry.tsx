@@ -37,73 +37,58 @@ function formatLabelNum(val: string | number): string {
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
 
-function generateCombinedLabelsHtml(labels: Array<{
+type LabelData = {
   referenceNumber: string;
   articleCode: string;
   pieces: number;
   approxWeightKg: string;
   productName: string;
-}>) {
+};
+
+function buildDetailBlock(label: LabelData) {
+  return `<div class="code-label">
+    <div class="label-top">
+      <div class="logo-section">
+        <div class="logo-text">HMD</div>
+        <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+      </div>
+      <div class="info-section">
+        <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
+        <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
+        <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+      </div>
+    </div>
+    <div class="barcode-area">
+      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+      <div class="barcode-number">${label.referenceNumber}</div>
+    </div>
+    <div class="article-barcode-area">
+      <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+      <div class="article-barcode-number">${label.productName}</div>
+    </div>
+  </div>`;
+}
+
+function generateCombinedLabelsHtml(labels: LabelData[]) {
   let labelsHtml = '';
   for (const label of labels) {
     labelsHtml += `
-      <div class="detail-page">
-        <div class="code-label">
-          <div class="label-top">
-            <div class="logo-section">
-              <div class="logo-text">HMD</div>
-              <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-            </div>
-            <div class="info-section">
-              <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
-              <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
-              <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-            </div>
+      <div class="a4-page">
+        <div class="logo-reserve"></div>
+        <div class="top-row">
+          <div class="top-left-label">
+            ${buildDetailBlock(label)}
           </div>
-          <div class="barcode-area">
-            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-            <div class="barcode-number">${label.referenceNumber}</div>
-          </div>
-          <div class="article-barcode-area">
-            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="article-barcode-number">${label.productName}</div>
-          </div>
+          <div class="top-right-name">${label.productName}</div>
         </div>
-      </div>
-      <div class="name-page">
-        <div class="name-left-label">
-          <div class="code-label">
-            <div class="label-top">
-              <div class="logo-section">
-                <div class="logo-text">HMD</div>
-                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
-              </div>
-              <div class="info-section">
-                <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
-                <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
-                <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-              </div>
-            </div>
-            <div class="barcode-area">
-              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-              <div class="barcode-number">${label.referenceNumber}</div>
-            </div>
-            <div class="article-barcode-area">
-              <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-              <div class="article-barcode-number">${label.productName}</div>
-            </div>
-          </div>
-        </div>
-        <div class="name-text">${label.productName}</div>
+        <div class="bottom-name">${label.productName}</div>
       </div>`;
   }
-  return `<html><head><title>Stock Entry Labels</title><style>
-    @page detail { size: 76mm 62mm; margin: 0; }
-    @page bigname { size: 210mm 148mm; margin: 0; }
+  return `<html><head><title>Stock Entry Labels - A4</title><style>
+    @page { size: 210mm 297mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .detail-page { page: detail; width: 76mm; height: 62mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
@@ -119,15 +104,73 @@ function generateCombinedLabelsHtml(labels: Array<{
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
 
-    .name-page { page: bigname; width: 210mm; height: 148mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8mm; background: #fff; padding: 10mm; }
-    .name-page:last-child { page-break-after: auto; }
-    .name-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
-    .name-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
-    .name-text { font-size: clamp(40pt, 10vw, 100pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; white-space: nowrap; overflow: hidden; text-overflow: clip; flex: 1; display: flex; align-items: center; justify-content: center; }
+    .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+    .a4-page:last-child { page-break-after: auto; }
+    .logo-reserve { width: 100%; height: 65mm; flex-shrink: 0; }
+    .top-row { display: flex; flex-direction: row; align-items: center; padding: 0 10mm; gap: 8mm; flex-shrink: 0; }
+    .top-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
+    .top-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+    .top-right-name { flex: 1; font-size: clamp(28pt, 8vw, 60pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; word-break: break-word; }
+    .bottom-name { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(60pt, 20vw, 160pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 4px; padding: 10mm; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Bale Labels - Detail + Big Name. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">A4 Bale Labels (pre-printed logo paper). Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+}
+
+function generateStickerLabelsHtml(labels: LabelData[]) {
+  let labelsHtml = '';
+  for (const label of labels) {
+    labelsHtml += `
+      <div class="sticker-page">
+        <div class="label">
+          <div class="label-content">
+            <div class="label-top">
+              <div class="logo-section">
+                <div class="logo-text">HMD</div>
+                <div class="logo-subtitle">INTERNATIONAL GROUP</div>
+              </div>
+              <div class="info-section">
+                <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
+                <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+                <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+              </div>
+            </div>
+            <div class="barcode-section">
+              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+              <div class="barcode-number">${label.referenceNumber}</div>
+            </div>
+            <div class="product-section">
+              <div class="product-name-text">${label.productName}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+  return `<html><head><title>Sticker Labels</title><style>
+    @page { size: 3in 1.97in; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
+    .sticker-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
+    .sticker-page:last-child { page-break-after: auto; }
+    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background-image: url('/hmd-label-bg.jpeg'); background-repeat: no-repeat; background-position: center; background-size: contain; }
+    .label::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.80); }
+    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+    .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
+    .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
+    .logo-text { font-size: 28pt; font-weight: 900; letter-spacing: 3px; color: #000; line-height: 1; }
+    .logo-subtitle { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; color: #000; margin-top: 0.5mm; }
+    .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
+    .info-label { font-weight: 900; }
+    .info-value { font-weight: 900; }
+    .barcode-section { text-align: center; margin-top: 1mm; }
+    .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
+    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
+    @media print { .print-note { display: none !important; } }
+  </style></head><body><div class="print-note">Sticker Labels. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
@@ -278,13 +321,23 @@ function StockEntryTab() {
         };
       });
 
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(generateCombinedLabelsHtml(labels));
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
-      } else {
+      const a4Window = window.open("", "_blank");
+      if (a4Window) {
+        a4Window.document.write(generateCombinedLabelsHtml(labels));
+        a4Window.document.close();
+        a4Window.focus();
+        setTimeout(() => a4Window.print(), 500);
+      }
+
+      const stickerWindow = window.open("", "_blank");
+      if (stickerWindow) {
+        stickerWindow.document.write(generateStickerLabelsHtml(labels));
+        stickerWindow.document.close();
+        stickerWindow.focus();
+        setTimeout(() => stickerWindow.print(), 800);
+      }
+
+      if (!a4Window && !stickerWindow) {
         toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
       }
     } catch (error: any) {
@@ -538,7 +591,7 @@ function StockEntryTab() {
           <DialogHeader>
             <DialogTitle>Confirm Stock Entry</DialogTitle>
             <DialogDescription>
-              {totalQty} bale(s) will be entered directly into stock at the selected location. Two sets of labels will print.
+              {totalQty} bale(s) will be entered directly into stock at the selected location. An A4 label and a sticker label will print for each bale.
             </DialogDescription>
           </DialogHeader>
           <div className="text-sm space-y-1">
