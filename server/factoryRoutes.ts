@@ -4443,7 +4443,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         await tx.insert(userCompanyRoles).values({
           userId: newUser.id,
           companyId,
-          role: "Manager",
+          role: "User",
         });
 
         await tx.insert(factoryUserProfiles).values({
