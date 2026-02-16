@@ -130,7 +130,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
   for (const label of labels) {
     labelsHtml += `
       <div class="sticker-page">
-        <div class="label full-info-label">
+        <div class="label">
           <div class="label-content">
             <div class="label-top">
               <div class="logo-section">
@@ -143,9 +143,9 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
                 <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
               </div>
             </div>
-            <div class="barcode-section">
-              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-              <div class="barcode-number">${label.referenceNumber}</div>
+            <div class="ref-barcode-section">
+              <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+              <div class="ref-barcode-number">${label.referenceNumber}</div>
             </div>
             <div class="article-barcode-section">
               <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
@@ -183,17 +183,18 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
-    .barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; }
+    .ref-barcode-section { text-align: center; margin-top: 1mm; }
+    .ref-barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
+    .ref-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; }
     .article-barcode-section { text-align: center; margin-top: 0.5mm; }
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
     .product-section { text-align: center; margin-top: 0.5mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
+    .name-only-label { justify-content: center; align-items: center; }
     .name-only-content { justify-content: center; align-items: center; }
     .name-barcode-section { text-align: center; margin-bottom: 2mm; }
-    .name-barcode-img { width: 60mm; height: 14mm; object-fit: contain; }
+    .name-barcode-img { width: 55mm; height: 14mm; object-fit: contain; }
     .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }

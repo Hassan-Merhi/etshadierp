@@ -66,8 +66,14 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
             <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${label.weightKg} KGS</span></div>
           </div>
         </div>
-        <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        <div class="ref-barcode-section">
+          <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.baleCode)}" alt="REF Barcode" />
+          <div class="ref-barcode-number">${label.baleCode}</div>
+        </div>
+        <div class="article-barcode-section">
+          <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        </div>
+        <div class="product-name-section">
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
@@ -80,7 +86,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
         ${fullLabel}
         <div class="label name-label">
           <div class="name-label-content">
-            <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+            <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
             <div class="name-label-text">${label.productName}</div>
           </div>
         </div>
@@ -112,9 +118,13 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
-    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .ref-barcode-section { text-align: center; margin-top: 1mm; }
+    .ref-barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
+    .ref-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; }
+    .article-barcode-section { text-align: center; margin-top: 0.5mm; }
+    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
+    .product-name-section { text-align: center; margin-top: 0.5mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
+    .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } header, .print-header, .page-header { display: none !important; } body { margin: 0; } }
   </style></head><body><div class="print-note">For cleanest output, disable "Headers and Footers" in your print settings.</div>${labelsHtml}</body></html>`;

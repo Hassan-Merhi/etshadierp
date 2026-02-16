@@ -80,8 +80,14 @@ function generateFullLabelHtml(label: {
             <div class="info-row"><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
           </div>
         </div>
-        <div class="barcode-section">
-          <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        <div class="ref-barcode-section">
+          <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="REF Barcode" />
+          <div class="ref-barcode-number">${label.referenceNumber}</div>
+        </div>
+        <div class="article-barcode-section">
+          <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+        </div>
+        <div class="product-name-section">
           <div class="product-name-text">${label.productName}</div>
         </div>
       </div>
@@ -106,7 +112,7 @@ function generateLabelHtml(labels: Array<{
           ${fullLabel}
           <div class="label name-label">
             <div class="name-label-content">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
               <div class="name-label-text">${label.productName}</div>
             </div>
           </div>
@@ -267,20 +273,41 @@ function generateLabelHtml(labels: Array<{
           .info-value {
             font-weight: 900;
           }
-          .barcode-section {
+          .ref-barcode-section {
             text-align: center;
             margin-top: 1mm;
           }
-          .barcode-img {
+          .ref-barcode-img {
             width: 65mm;
-            height: 14mm;
+            height: 12mm;
             object-fit: contain;
+          }
+          .ref-barcode-number {
+            font-size: 7pt;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            margin-top: 0.3mm;
+            letter-spacing: 1px;
+          }
+          .article-barcode-section {
+            text-align: center;
+            margin-top: 0.5mm;
+          }
+          .article-barcode-img {
+            width: 50mm;
+            height: 8mm;
+            object-fit: contain;
+          }
+          .product-name-section {
+            text-align: center;
+            margin-top: 0.5mm;
+            border-top: 0.3mm dashed #ccc;
+            padding-top: 0.5mm;
           }
           .product-name-text {
             font-size: 10pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
-            margin-top: 0.5mm;
             color: #000;
             text-transform: uppercase;
             white-space: nowrap;
