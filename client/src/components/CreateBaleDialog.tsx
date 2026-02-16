@@ -176,7 +176,7 @@ function generateLabelHtml(labels: Array<{
           .hmd-text {
             position: absolute;
             top: 2mm;
-            right: 3mm;
+            left: 3mm;
             font-size: 28pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
