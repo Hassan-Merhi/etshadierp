@@ -59,7 +59,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
       <div class="label-content">
         <div class="label-top">
           <div class="logo-section">
-            <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
+            <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
           </div>
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>

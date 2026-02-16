@@ -73,7 +73,7 @@ function generateFullLabelHtml(label: {
       <div class="label-content">
         <div class="label-top">
           <div class="logo-section">
-            <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
+            <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
           </div>
           <div class="info-section">
             <div class="info-row"><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>

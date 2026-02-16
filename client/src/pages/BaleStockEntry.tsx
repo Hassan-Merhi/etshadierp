@@ -52,7 +52,7 @@ function buildDetailBlock(label: LabelData) {
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
+        <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
@@ -150,7 +150,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
           <div class="label-content">
             <div class="label-top">
               <div class="logo-section">
-                <img class="logo-img" src="/hmd-logo.jpeg" alt="HMD" />
+                <img class="logo-img" src="/hmd-logo-clean.png" alt="HMD" />
               </div>
               <div class="info-section">
                 <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
@@ -453,21 +453,21 @@ function StockEntryTab() {
 
       return await response.json();
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
 
-      await printLabels(result.bales);
-
       toast({
         title: "Stock Entry Complete",
-        description: `${result.bales.length} bale(s) entered into stock and sent to printer`,
+        description: `${result.bales.length} bale(s) entered into stock. Preparing labels...`,
       });
 
-      setCart([]);
       setConfirmDialogOpen(false);
+      setCart([]);
+
+      printLabels(result.bales);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
