@@ -111,7 +111,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
     .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-area { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
@@ -191,13 +191,13 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .label-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1mm; }
     .logo-section { flex-shrink: 0; }
-    .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
+    .sticker-logo { height: 14mm; width: auto; object-fit: contain; display: block; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; margin-top: 1mm; }
     .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 7pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; }
+    .ref-barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-section { text-align: center; margin-top: 2mm; }
     .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }

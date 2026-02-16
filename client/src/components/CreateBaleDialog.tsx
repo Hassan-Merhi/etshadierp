@@ -225,7 +225,7 @@ function generateLabelHtml(labels: Array<{
             flex-shrink: 0;
           }
           .hmd-logo {
-            height: 10mm;
+            height: 14mm;
             width: auto;
             object-fit: contain;
             display: block;
@@ -268,11 +268,12 @@ function generateLabelHtml(labels: Array<{
             object-fit: fill;
           }
           .ref-barcode-number {
-            font-size: 7pt;
+            font-size: 9pt;
             font-weight: 900;
             font-family: 'Courier New', monospace;
             margin-top: 0.5mm;
             letter-spacing: 1.5px;
+            -webkit-text-stroke: 0.5px #000;
           }
           .article-barcode-section {
             text-align: center;

@@ -114,13 +114,13 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; }
     .logo-area { flex-shrink: 0; }
-    .hmd-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
+    .hmd-logo { height: 14mm; width: auto; object-fit: contain; display: block; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; margin-top: 1mm; }
     .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 7pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; }
+    .ref-barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-section { text-align: center; margin-top: 2mm; }
     .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .product-name-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
