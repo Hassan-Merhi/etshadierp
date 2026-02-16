@@ -22,6 +22,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
+import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
+import { buildZplBatch } from "@/lib/zplBuilder";
+import { LabelPrintSettings } from "@/components/LabelPrintSettings";
 import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
 
 interface CartItem {
@@ -345,6 +348,26 @@ function StockEntryTab() {
     setConfirmDialogOpen(true);
   };
 
+  const openBrowserPrint = (labels: LabelData[]) => {
+    const a4Window = window.open("", "_blank");
+    if (a4Window) {
+      a4Window.document.write(generateCombinedLabelsHtml(labels));
+      a4Window.document.close();
+      a4Window.focus();
+      setTimeout(() => a4Window.print(), 500);
+    }
+    const stickerWindow = window.open("", "_blank");
+    if (stickerWindow) {
+      stickerWindow.document.write(generateStickerLabelsHtml(labels));
+      stickerWindow.document.close();
+      stickerWindow.focus();
+      setTimeout(() => stickerWindow.print(), 800);
+    }
+    if (!a4Window && !stickerWindow) {
+      toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+    }
+  };
+
   const printLabels = async (bales: any[]) => {
     try {
       const labelData = bales.map((bale: any) => {
@@ -378,24 +401,17 @@ function StockEntryTab() {
         };
       });
 
-      const a4Window = window.open("", "_blank");
-      if (a4Window) {
-        a4Window.document.write(generateCombinedLabelsHtml(labels));
-        a4Window.document.close();
-        a4Window.focus();
-        setTimeout(() => a4Window.print(), 500);
-      }
-
-      const stickerWindow = window.open("", "_blank");
-      if (stickerWindow) {
-        stickerWindow.document.write(generateStickerLabelsHtml(labels));
-        stickerWindow.document.close();
-        stickerWindow.focus();
-        setTimeout(() => stickerWindow.print(), 800);
-      }
-
-      if (!a4Window && !stickerWindow) {
-        toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+      if (isZebraMode()) {
+        try {
+          const zpl = buildZplBatch(labels, true);
+          await printRawZpl(zpl);
+          toast({ title: "Labels sent to Zebra printer" });
+        } catch (err: any) {
+          toast({ title: "Zebra print failed", description: err.message + " — Falling back to browser print.", variant: "destructive" });
+          openBrowserPrint(labels);
+        }
+      } else {
+        openBrowserPrint(labels);
       }
     } catch (error: any) {
       toast({ title: "Label Error", description: error.message || "Failed to generate labels", variant: "destructive" });
@@ -996,7 +1012,10 @@ export default function BaleStockEntry() {
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
           <p className="text-muted-foreground text-sm mt-1">Scan products and enter bales directly into stock</p>
         </div>
-        <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <LabelPrintSettings />
+          <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="entry">

@@ -32,6 +32,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
+import { buildZplBatch } from "@/lib/zplBuilder";
 import type { FactoryMixBatch, FactoryBaleProduct, Location } from "@shared/schema";
 
 const formSchema = z.object({
@@ -417,23 +419,32 @@ export function CreateBaleDialog({
         productName: product.name,
       }));
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: "Error",
-          description: "Please allow pop-ups to print labels",
-          variant: "destructive",
-        });
-        return;
+      if (isZebraMode()) {
+        try {
+          const zpl = buildZplBatch(labels, dualLabel);
+          await printRawZpl(zpl);
+          toast({ title: "Labels sent to Zebra printer" });
+        } catch (err: any) {
+          toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.write(generateLabelHtml(labels, dualLabel));
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
+          }
+        }
+      } else {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          toast({ title: "Error", description: "Please allow pop-ups to print labels", variant: "destructive" });
+          return;
+        }
+        printWindow.document.write(generateLabelHtml(labels, dualLabel));
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
       }
-
-      printWindow.document.write(generateLabelHtml(labels, dualLabel));
-      printWindow.document.close();
-      printWindow.focus();
-
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
     } catch (error: any) {
       toast({
         title: "Error",

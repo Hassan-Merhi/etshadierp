@@ -32,6 +32,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
+import { buildZplBatch } from "@/lib/zplBuilder";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
 
 function formatLabelNum(val: string | number): string {
@@ -214,13 +216,29 @@ export default function BalesHistory() {
     }
   };
 
-  const handleReprint = (baleRow: any) => {
-    const html = generateReprintHtml(baleRow.bale, baleRow.product, true);
-    const w = window.open("", "_blank", "width=400,height=600");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      setTimeout(() => w.print(), 500);
+  const handleReprint = async (baleRow: any) => {
+    if (isZebraMode()) {
+      try {
+        const label = {
+          referenceNumber: baleRow.bale.baleCode,
+          articleCode: baleRow.product?.articleCode || baleRow.bale.category || "",
+          pieces: baleRow.bale.quantity || 1,
+          approxWeightKg: baleRow.bale.weightKg || "0",
+          productName: baleRow.product?.name || baleRow.bale.category || "",
+        };
+        const zpl = buildZplBatch([label], true);
+        await printRawZpl(zpl);
+        toast({ title: "Label sent to Zebra printer" });
+      } catch (err: any) {
+        toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
+        const html = generateReprintHtml(baleRow.bale, baleRow.product, true);
+        const w = window.open("", "_blank", "width=400,height=600");
+        if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
+      }
+    } else {
+      const html = generateReprintHtml(baleRow.bale, baleRow.product, true);
+      const w = window.open("", "_blank", "width=400,height=600");
+      if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
     }
   };
 
