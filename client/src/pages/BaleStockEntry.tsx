@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-  XCircle, ShieldAlert, Lock
+  XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,9 @@ import { formatNumber } from "@/lib/formatNumber";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings } from "@/components/LabelPrintSettings";
-import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
+import { Label } from "@/components/ui/label";
+import * as XLSX from "xlsx";
+import type { FactoryBaleProduct, Location, FactoryMixBatch, FactoryCategory } from "@shared/schema";
 
 interface CartItem {
   productId: number;
@@ -223,6 +225,43 @@ function StockEntryTab() {
   });
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: mixBatches } = useQuery<FactoryMixBatch[]>({ queryKey: ["/api/factory/mix-batches"] });
+  const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
+
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState("");
+  const [quickCreateCategoryId, setQuickCreateCategoryId] = useState("");
+  const [quickCreateWeight, setQuickCreateWeight] = useState("");
+
+  const activeCategories = categories?.filter((c) => c.isActive);
+
+  const quickCreateMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = { name: quickCreateName };
+      if (quickCreateCategoryId) body.categoryId = parseInt(quickCreateCategoryId);
+      if (quickCreateWeight) body.weightPerBaleKg = quickCreateWeight;
+      const response = await apiRequest("POST", "/api/factory/bale-products", body);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to create product");
+      }
+      return await response.json();
+    },
+    onSuccess: (newProduct: FactoryBaleProduct) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      toast({ title: "Product Created", description: `"${newProduct.name}" created successfully` });
+      setQuickCreateOpen(false);
+      setQuickCreateName("");
+      setQuickCreateCategoryId("");
+      setQuickCreateWeight("");
+      setScanInput("");
+      setShowDropdown(false);
+      const defaultWeight = newProduct.weightPerBaleKg ? parseFloat(newProduct.weightPerBaleKg) : 25;
+      setCart((prev) => [...prev, { productId: newProduct.id, product: newProduct, qty: 1, weightPerBaleKg: defaultWeight }]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const activeProducts = baleProducts?.filter((p) => p.active);
   const activeLocations = locations?.filter((l) => l.active);
@@ -586,8 +625,21 @@ function StockEntryTab() {
                   </div>
                 )}
                 {showDropdown && scanInput.trim().length > 0 && filteredProducts.length === 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg px-3 py-2 text-sm text-muted-foreground">
-                    No products found
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg" data-testid="dropdown-no-products">
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No products found</div>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover-elevate flex items-center gap-2 text-sm font-medium border-t"
+                      onClick={() => {
+                        setQuickCreateName(scanInput.trim());
+                        setQuickCreateOpen(true);
+                        setShowDropdown(false);
+                      }}
+                      data-testid="button-quick-create-product"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create New Product "{scanInput.trim()}"
+                    </button>
                   </div>
                 )}
                 {scanError && (
@@ -758,6 +810,65 @@ function StockEntryTab() {
             >
               <Printer className="h-4 w-4 mr-2" />
               {stockEntryMutation.isPending ? "Processing..." : "Enter Stock & Print"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quickCreateOpen} onOpenChange={setQuickCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Create Product</DialogTitle>
+            <DialogDescription>Create a new bale product. Article code will be auto-generated.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="quick-create-name">Name</Label>
+              <Input
+                id="quick-create-name"
+                value={quickCreateName}
+                onChange={(e) => setQuickCreateName(e.target.value)}
+                placeholder="Product name..."
+                data-testid="input-quick-create-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quick-create-category">Category</Label>
+              <Select value={quickCreateCategoryId} onValueChange={setQuickCreateCategoryId}>
+                <SelectTrigger data-testid="select-quick-create-category">
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCategories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quick-create-weight">Weight per Bale (kg)</Label>
+              <Input
+                id="quick-create-weight"
+                type="number"
+                value={quickCreateWeight}
+                onChange={(e) => setQuickCreateWeight(e.target.value)}
+                placeholder="Optional - leave empty for default"
+                step="0.1"
+                min={0}
+                data-testid="input-quick-create-weight"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setQuickCreateOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => quickCreateMutation.mutate()}
+              disabled={!quickCreateName.trim() || quickCreateMutation.isPending}
+              data-testid="button-quick-create-submit"
+            >
+              {quickCreateMutation.isPending ? "Creating..." : "Create & Add to Cart"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1045,6 +1156,226 @@ function RemoveFromStockTab() {
   );
 }
 
+interface ImportBaleRow {
+  itemName: string;
+  weight: string;
+  barcode: string;
+  quantity: number;
+  productionDate: string;
+}
+
+function ImportBalesTab() {
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [importRows, setImportRows] = useState<ImportBaleRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
+  const activeLocations = locations?.filter((l) => l.active);
+
+  useEffect(() => {
+    if (activeLocations && activeLocations.length === 1 && !selectedLocationId) {
+      setSelectedLocationId(activeLocations[0].id.toString());
+    }
+  }, [activeLocations, selectedLocationId]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+          const row = jsonData[i] as any[];
+          if (row && row.some((cell: any) => String(cell).toUpperCase().includes("ITEM NAME"))) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          toast({ title: "Error", description: "Could not find header row with 'ITEM NAME' column", variant: "destructive" });
+          return;
+        }
+
+        const headers = (jsonData[headerRowIdx] as any[]).map((h: any) => String(h).toUpperCase().trim());
+        const nameIdx = headers.findIndex((h) => h.includes("ITEM NAME"));
+        const weightIdx = headers.findIndex((h) => h.includes("WEIGHT"));
+        const barcodeIdx = headers.findIndex((h) => h.includes("BARCODE"));
+        const qtyIdx = headers.findIndex((h) => h.includes("QUANTITY"));
+        const dateIdx = headers.findIndex((h) => h.includes("PRODUCTION DATE"));
+
+        const rows: ImportBaleRow[] = [];
+        for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
+          const row = jsonData[i] as any[];
+          if (!row || !row[nameIdx]) continue;
+          const itemName = String(row[nameIdx] || "").trim();
+          if (!itemName) continue;
+          rows.push({
+            itemName,
+            weight: String(row[weightIdx] || "").trim(),
+            barcode: String(row[barcodeIdx] || "").trim(),
+            quantity: parseInt(String(row[qtyIdx] || "1")) || 1,
+            productionDate: String(row[dateIdx] || "").trim(),
+          });
+        }
+
+        if (rows.length === 0) {
+          toast({ title: "Warning", description: "No data rows found in the Excel file", variant: "destructive" });
+          return;
+        }
+
+        setImportRows(rows);
+        toast({ title: "File Parsed", description: `Found ${rows.length} bale(s) to import` });
+      } catch (err: any) {
+        toast({ title: "Parse Error", description: err.message || "Failed to parse Excel file", variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/factory/bales/import", {
+        erpLocationId: parseInt(selectedLocationId),
+        bales: importRows,
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to import bales");
+      }
+      return await response.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      toast({ title: "Import Complete", description: `${result.imported || importRows.length} bale(s) imported successfully` });
+      setImportRows([]);
+      setFileName("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
+          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+            <SelectTrigger data-testid="select-import-location">
+              <SelectValue placeholder="Select Location..." />
+            </SelectTrigger>
+            <SelectContent>
+              {activeLocations?.map((loc) => (
+                <SelectItem key={loc.id} value={loc.id.toString()}>
+                  {loc.code} - {loc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground mb-1.5">Upload Excel File</p>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              data-testid="input-import-file"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="button-upload-excel"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {fileName || "Choose File..."}
+            </Button>
+            {fileName && (
+              <Badge variant="secondary" data-testid="badge-file-name">
+                <FileSpreadsheet className="h-3 w-3 mr-1" />
+                {fileName}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {importRows.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-lg">Preview ({importRows.length} rows)</CardTitle>
+              <Button
+                onClick={() => importMutation.mutate()}
+                disabled={!selectedLocationId || importMutation.isPending}
+                data-testid="button-import-submit"
+              >
+                {importMutation.isPending ? "Importing..." : `Import ${importRows.length} Bales`}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-96 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead className="text-right">Weight</TableHead>
+                    <TableHead>Barcode</TableHead>
+                    <TableHead className="text-center">Qty</TableHead>
+                    <TableHead>Production Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importRows.map((row, idx) => (
+                    <TableRow key={idx} data-testid={`row-import-${idx}`}>
+                      <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-import-name-${idx}`}>{row.itemName}</TableCell>
+                      <TableCell className="text-right" data-testid={`text-import-weight-${idx}`}>{row.weight}</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-import-barcode-${idx}`}>{row.barcode}</TableCell>
+                      <TableCell className="text-center" data-testid={`text-import-qty-${idx}`}>{row.quantity}</TableCell>
+                      <TableCell data-testid={`text-import-date-${idx}`}>{row.productionDate}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {importRows.length === 0 && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-muted-foreground">
+              <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="font-medium" data-testid="text-import-empty">Upload an Excel file to preview bales for import</p>
+              <p className="text-sm mt-1">Expected columns: ITEM NAME, WEIGHT, ITEM BARCODE, QUANTITY, PRODUCTION DATE</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function BaleStockEntry() {
   return (
     <div className="space-y-6">
@@ -1069,12 +1400,19 @@ export default function BaleStockEntry() {
             <ShieldAlert className="h-4 w-4 mr-1" />
             Remove from Stock
           </TabsTrigger>
+          <TabsTrigger value="import" data-testid="tab-import-bales">
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Import Bales
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="entry" className="mt-4">
           <StockEntryTab />
         </TabsContent>
         <TabsContent value="remove" className="mt-4">
           <RemoveFromStockTab />
+        </TabsContent>
+        <TabsContent value="import" className="mt-4">
+          <ImportBalesTab />
         </TabsContent>
       </Tabs>
     </div>

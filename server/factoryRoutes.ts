@@ -317,6 +317,165 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ───────────────────────────────────────────────
+  // BALE IMPORT - Historical bales from Excel
+  // ───────────────────────────────────────────────
+
+  app.post("/api/factory/bales/import", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { erpLocationId, bales } = req.body;
+      if (!erpLocationId) return res.status(400).json({ message: "Location is required" });
+      if (!bales || !Array.isArray(bales) || bales.length === 0) {
+        return res.status(400).json({ message: "No bales to import" });
+      }
+
+      for (const b of bales) {
+        if (!b.itemName || !b.barcode || !b.weight) {
+          return res.status(400).json({ message: `Each bale must have itemName, barcode, and weight. Problem row: ${b.itemName || b.barcode || "unknown"}` });
+        }
+        if (isNaN(parseFloat(b.weight)) || parseFloat(b.weight) <= 0) {
+          return res.status(400).json({ message: `Invalid weight for ${b.itemName}: ${b.weight}` });
+        }
+      }
+
+      const allIntendedRefs: string[] = [];
+      const payloadDupes = new Set<string>();
+      for (const b of bales) {
+        const barcode = b.barcode.trim();
+        const qty = parseInt(b.quantity) || 1;
+        const refs = qty === 1 ? [barcode] : Array.from({ length: qty }, (_, i) => `${barcode}-${i + 1}`);
+        for (const ref of refs) {
+          if (allIntendedRefs.includes(ref)) payloadDupes.add(ref);
+          allIntendedRefs.push(ref);
+        }
+      }
+      if (payloadDupes.size > 0) {
+        return res.status(400).json({ message: `Duplicate barcodes within import file: ${Array.from(payloadDupes).join(", ")}` });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        const existingBarcodes = await tx
+          .select({ referenceNumber: factoryBales.referenceNumber })
+          .from(factoryBales)
+          .where(eq(factoryBales.companyId, companyId));
+        const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+
+        const conflicting = allIntendedRefs.filter((ref) => existingRefSet.has(ref));
+        if (conflicting.length > 0) {
+          throw new Error(`Barcodes already exist in system: ${conflicting.slice(0, 10).join(", ")}${conflicting.length > 10 ? ` and ${conflicting.length - 10} more` : ""}`);
+        }
+
+        const allProducts = await tx
+          .select()
+          .from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.companyId, companyId));
+        const productByName = new Map(allProducts.map((p: any) => [p.name.toLowerCase(), p]));
+
+        const createdBales: any[] = [];
+        let totalWeight = 0;
+
+        for (const b of bales) {
+          const itemName = b.itemName.trim();
+          const weight = parseFloat(b.weight);
+          const qty = parseInt(b.quantity) || 1;
+          const barcode = b.barcode.trim();
+
+          let product = productByName.get(itemName.toLowerCase());
+          if (!product) {
+            const autoCode = itemName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 20);
+            const articleCode = "IMP-" + autoCode + "-" + Date.now().toString(36).slice(-4).toUpperCase();
+            const code = articleCode;
+
+            const [newProduct] = await tx.insert(factoryBaleProducts).values({
+              companyId,
+              code,
+              articleCode,
+              name: itemName,
+              active: true,
+            }).returning();
+            product = newProduct;
+            productByName.set(itemName.toLowerCase(), product);
+          }
+
+          for (let i = 0; i < qty; i++) {
+            const pressedAt = b.productionDate ? new Date(b.productionDate) : null;
+            const refNum = qty === 1 ? barcode : `${barcode}-${i + 1}`;
+
+            const [bale] = await tx
+              .insert(factoryBales)
+              .values({
+                companyId,
+                productId: product.id,
+                erpLocationId,
+                baleCode: product.code,
+                referenceNumber: refNum,
+                articleCode: product.articleCode,
+                productName: product.name,
+                weightKg: String(weight),
+                costPerKg: "0",
+                totalCost: "0",
+                status: "IN_STOCK",
+                finalizedAt: new Date(),
+                ...(pressedAt && !isNaN(pressedAt.getTime()) ? { pressedAt } : {}),
+              })
+              .returning();
+
+            createdBales.push(bale);
+            totalWeight += weight;
+          }
+        }
+
+        const stockItemCache = new Map<string, number>();
+
+        for (const bale of createdBales) {
+          const product = productByName.get((bale.productName as string).toLowerCase());
+          if (!product) continue;
+          const itemCode: string = product.articleCode || product.code;
+          if (!itemCode) continue;
+
+          let erpStockItemId = stockItemCache.get(itemCode);
+          if (!erpStockItemId) {
+            const [existing] = await tx
+              .select({ id: stockItems.id })
+              .from(stockItems)
+              .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+
+            if (existing) {
+              erpStockItemId = existing.id;
+            } else {
+              const [created] = await tx
+                .insert(stockItems)
+                .values({ companyId, code: itemCode, name: product.name as string, uom: "BALE", active: true })
+                .returning({ id: stockItems.id });
+              erpStockItemId = created.id;
+            }
+            stockItemCache.set(itemCode, erpStockItemId!);
+          }
+
+          await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, 0);
+        }
+
+        return { bales: createdBales, totalWeight, count: createdBales.length };
+      });
+
+      const today = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_IMPORT",
+        description: `Imported ${result.count} historical bale(s) into stock (${result.totalWeight.toFixed(1)} kg)`,
+      });
+
+      res.json({ imported: result.count, totalWeight: result.totalWeight, bales: result.bales });
+    } catch (error: any) {
+      console.error("Error importing bales:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/stock-entry/remove", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -4225,7 +4384,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .from(factoryUserPageAccess)
         .where(eq(factoryUserPageAccess.companyId, companyId));
 
-      const profileMap = new Map(profiles.map((p: any) => [p.userId, p]));
+      const profileMap = new Map(profiles.map((p: any) => [p.userId, p as { displayName: string | null }]));
       const accessMap = new Map<string, string[]>();
       access.forEach((a: any) => {
         if (!accessMap.has(a.userId)) accessMap.set(a.userId, []);
