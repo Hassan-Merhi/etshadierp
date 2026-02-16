@@ -186,6 +186,7 @@ const allMenuGroups: MenuGroup[] = [
     icon: Upload,
     items: [
       { title: "Import Data", url: "/factory/import", icon: Upload },
+      { title: "Users", url: "/factory/users", icon: Users },
       { title: "Settings", url: "/factory/settings", icon: Settings, adminOnly: true },
     ],
   },
@@ -206,14 +207,23 @@ export function FactorySidebar({ user }: { user?: any }) {
     staleTime: 60000,
   });
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+    staleTime: 30000,
+  });
+
   const menuGroups = allMenuGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
       if (item.adminOnly && !isAdmin) return false;
       if (item.featureFlag && settings) {
-        return settings[item.featureFlag] === true;
+        if (settings[item.featureFlag] !== true) return false;
       }
       if (item.featureFlag && !settings) return false;
+      if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0) {
+        const pageKey = item.url.replace(/^\//, "");
+        if (!myAccess.pageKeys.includes(pageKey)) return false;
+      }
       return true;
     }),
   })).filter(group => group.items.length > 0);

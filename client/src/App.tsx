@@ -91,6 +91,7 @@ import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
 import FactoryImport from "@/pages/FactoryImport";
+import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkers from "@/pages/FactoryWorkers";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
 import FactoryPayrollPage from "@/pages/FactoryPayroll";
@@ -522,6 +523,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
+                    <Route path="/factory/users" component={FactoryUsers} />
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
                     <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
                     <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />

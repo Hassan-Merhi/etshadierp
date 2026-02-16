@@ -52,6 +52,9 @@ import {
   containerFreightPayments,
   factoryDaybookEntryEdits,
   containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -4190,6 +4193,210 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .orderBy(desc(factoryDaybookEntryEdits.editedAt));
       res.json(edits);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // Factory User Management
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/users", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const currentRole = (req.session as any).currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      }
+
+      const allUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        active: users.active,
+        createdAt: users.createdAt,
+      }).from(users);
+
+      const profiles = await db.select()
+        .from(factoryUserProfiles)
+        .where(eq(factoryUserProfiles.companyId, companyId));
+
+      const access = await db.select()
+        .from(factoryUserPageAccess)
+        .where(eq(factoryUserPageAccess.companyId, companyId));
+
+      const profileMap = new Map(profiles.map((p: any) => [p.userId, p]));
+      const accessMap = new Map<string, string[]>();
+      access.forEach((a: any) => {
+        if (!accessMap.has(a.userId)) accessMap.set(a.userId, []);
+        accessMap.get(a.userId)!.push(a.pageKey);
+      });
+
+      const result = allUsers.map((u: any) => ({
+        ...u,
+        displayName: profileMap.get(u.id)?.displayName || null,
+        pageAccess: accessMap.get(u.id) || [],
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching factory users:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/users", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const currentRole = (req.session as any).currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      }
+
+      const { username, password, displayName, pageAccess } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      if (password.length < 4) {
+        return res.status(400).json({ message: "Password must be at least 4 characters" });
+      }
+
+      const existing = await db.select().from(users).where(eq(users.username, username));
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      await db.transaction(async (tx: any) => {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const [newUser] = await tx.insert(users).values({
+          username,
+          password: hashedPassword,
+          active: true,
+        }).returning();
+
+        await tx.insert(userCompanyRoles).values({
+          userId: newUser.id,
+          companyId,
+          role: "Manager",
+        });
+
+        if (displayName) {
+          await tx.insert(factoryUserProfiles).values({
+            companyId,
+            userId: newUser.id,
+            displayName,
+          });
+        }
+
+        if (Array.isArray(pageAccess) && pageAccess.length > 0) {
+          await tx.insert(factoryUserPageAccess).values(
+            pageAccess.map((pk: string) => ({
+              companyId,
+              userId: newUser.id,
+              pageKey: pk,
+            }))
+          );
+        }
+
+        const { password: _, ...userWithoutPassword } = newUser;
+        res.status(201).json({
+          ...userWithoutPassword,
+          displayName: displayName || null,
+          pageAccess: pageAccess || [],
+        });
+      });
+    } catch (error: any) {
+      console.error("Error creating factory user:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const currentRole = (req.session as any).currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      }
+
+      const { userId } = req.params;
+      const { displayName, pageAccess, password } = req.body;
+
+      await db.transaction(async (tx: any) => {
+        if (password && password.length >= 4) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await tx.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+        }
+
+        if (displayName !== undefined) {
+          const existingProfile = await tx.select()
+            .from(factoryUserProfiles)
+            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+
+          if (existingProfile.length > 0) {
+            await tx.update(factoryUserProfiles)
+              .set({ displayName, updatedAt: new Date() })
+              .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+          } else {
+            await tx.insert(factoryUserProfiles).values({
+              companyId,
+              userId,
+              displayName,
+            });
+          }
+        }
+
+        if (Array.isArray(pageAccess)) {
+          await tx.delete(factoryUserPageAccess)
+            .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
+
+          if (pageAccess.length > 0) {
+            await tx.insert(factoryUserPageAccess).values(
+              pageAccess.map((pk: string) => ({
+                companyId,
+                userId,
+                pageKey: pk,
+              }))
+            );
+          }
+        }
+      });
+
+      res.json({ message: "User updated" });
+    } catch (error: any) {
+      console.error("Error updating factory user:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/my-access", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const userId = (req.session as any).userId;
+      if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
+
+      const role = (req.session as any).currentRole;
+      if (role === "Admin" || role === "Owner") {
+        return res.json({ fullAccess: true, pageKeys: [] });
+      }
+
+      const access = await db.select({ pageKey: factoryUserPageAccess.pageKey })
+        .from(factoryUserPageAccess)
+        .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
+
+      if (access.length === 0) {
+        return res.json({ fullAccess: true, pageKeys: [] });
+      }
+
+      res.json({
+        fullAccess: false,
+        pageKeys: access.map((a: any) => a.pageKey),
+      });
+    } catch (error: any) {
+      console.error("Error fetching my access:", error);
       res.status(500).json({ message: error.message });
     }
   });

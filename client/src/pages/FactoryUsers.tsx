@@ -1,0 +1,439 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Users, Plus, Pencil, Shield, Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+
+interface FactoryUser {
+  id: string;
+  username: string;
+  active: boolean;
+  displayName: string | null;
+  pageAccess: string[];
+  createdAt: string;
+}
+
+const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
+  { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
+  { key: "factory/daybook", label: "Daybook", group: "Overview" },
+  { key: "factory/suppliers", label: "Suppliers", group: "Master Data" },
+  { key: "factory/containers", label: "Containers", group: "Master Data" },
+  { key: "factory/bale-products", label: "Bale Products", group: "Master Data" },
+  { key: "factory/workers", label: "Workers", group: "Master Data" },
+  { key: "factory/raw-stock", label: "Raw Stock", group: "Raw Materials" },
+  { key: "factory/mix-batches", label: "Mix Batches", group: "Raw Materials" },
+  { key: "factory/stock-entry", label: "Stock Entry", group: "Production" },
+  { key: "factory/bales-history", label: "Bales History", group: "Production" },
+  { key: "factory/sales/new", label: "New Invoice", group: "Sales" },
+  { key: "factory/sales/invoices", label: "Invoices", group: "Sales" },
+  { key: "factory/sales/proformas", label: "Proformas", group: "Sales" },
+  { key: "factory/bale-transfers", label: "Bale Transfers", group: "Logistics" },
+  { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
+  { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
+  { key: "factory/stock-query", label: "Stock Query", group: "Inventory" },
+  { key: "factory/accounts", label: "Accounts", group: "Accounting" },
+  { key: "factory/vouchers", label: "Vouchers", group: "Accounting" },
+  { key: "factory/create", label: "Create Voucher", group: "Accounting" },
+  { key: "factory/payroll", label: "Payroll", group: "Finance" },
+  { key: "factory/worker-payroll", label: "Worker Payroll", group: "Finance" },
+  { key: "factory/analytics", label: "Analytics", group: "Finance" },
+  { key: "factory/production-summary", label: "Production Summary", group: "Finance" },
+  { key: "factory/supplier-report", label: "Supplier Report", group: "Reports" },
+  { key: "factory/barcode-lookup", label: "Barcode Lookup", group: "Traceability" },
+  { key: "factory/import", label: "Import Data", group: "Data" },
+  { key: "factory/settings", label: "Settings", group: "Data" },
+  { key: "factory/users", label: "User Management", group: "Data" },
+];
+
+const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
+
+export default function FactoryUsers() {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
+  const [formData, setFormData] = useState({
+    username: "",
+    password: "",
+    displayName: "",
+  });
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+
+  const { data: factoryUsers, isLoading } = useQuery<FactoryUser[]>({
+    queryKey: ["/api/factory/users"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[] }) => {
+      const res = await apiRequest("POST", "/api/factory/users", data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users"] });
+      toast({ title: "Created", description: "User created successfully" });
+      resetForm();
+      setCreateOpen(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+      const res = await apiRequest("PUT", `/api/factory/users/${userId}`, data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users"] });
+      toast({ title: "Updated", description: "User access updated" });
+      resetForm();
+      setEditingUser(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({ username: "", password: "", displayName: "" });
+    setSelectedPages(new Set());
+  };
+
+  const openEdit = (user: FactoryUser) => {
+    setEditingUser(user);
+    setFormData({
+      username: user.username,
+      password: "",
+      displayName: user.displayName || "",
+    });
+    setSelectedPages(new Set(user.pageAccess));
+  };
+
+  const handleSubmit = () => {
+    if (editingUser) {
+      updateMutation.mutate({
+        userId: editingUser.id,
+        data: {
+          displayName: formData.displayName,
+          pageAccess: Array.from(selectedPages),
+          password: formData.password || undefined,
+        },
+      });
+    } else {
+      createMutation.mutate({
+        username: formData.username,
+        password: formData.password,
+        displayName: formData.displayName,
+        pageAccess: Array.from(selectedPages),
+      });
+    }
+  };
+
+  const togglePage = (pageKey: string) => {
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(pageKey)) next.delete(pageKey);
+      else next.add(pageKey);
+      return next;
+    });
+  };
+
+  const toggleGroup = (group: string) => {
+    const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group).map(p => p.key);
+    const allSelected = groupPages.every(k => selectedPages.has(k));
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      groupPages.forEach(k => {
+        if (allSelected) next.delete(k);
+        else next.add(k);
+      });
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedPages(new Set(ALL_FACTORY_PAGES.map(p => p.key)));
+  };
+
+  const selectNone = () => {
+    setSelectedPages(new Set());
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-factory-users-title">Factory Users</h1>
+          <p className="text-muted-foreground mt-1">
+            Create users and control which pages they can access
+          </p>
+        </div>
+        <Button
+          onClick={() => { resetForm(); setCreateOpen(true); }}
+          data-testid="button-add-factory-user"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add User
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-lg">
+              Users ({factoryUsers?.length || 0})
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {factoryUsers && factoryUsers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Display Name</TableHead>
+                  <TableHead>Pages Access</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {factoryUsers.map((user) => (
+                  <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
+                    <TableCell className="font-medium font-mono">{user.username}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
+                    <TableCell>
+                      {user.pageAccess.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {user.pageAccess.length <= 3 ? (
+                            user.pageAccess.map(pk => {
+                              const page = ALL_FACTORY_PAGES.find(p => p.key === pk);
+                              return (
+                                <Badge key={pk} variant="secondary">
+                                  {page?.label || pk}
+                                </Badge>
+                              );
+                            })
+                          ) : (
+                            <Badge variant="secondary">
+                              {user.pageAccess.length} pages
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Full access</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.active ? "default" : "secondary"}>
+                        {user.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(user)}
+                        data-testid={`button-edit-user-${user.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">No users configured</p>
+              <p className="text-sm mt-1">Add users and assign them specific page access</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={createOpen || !!editingUser} onOpenChange={(open) => {
+        if (!open) { setCreateOpen(false); setEditingUser(null); resetForm(); }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              {editingUser ? `Edit User: ${editingUser.username}` : "Add New User"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingUser
+                ? "Update display name, password, or page access"
+                : "Create a new user and choose which factory pages they can see"
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Username *</Label>
+                <Input
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="Enter username"
+                  disabled={!!editingUser}
+                  data-testid="input-factory-user-username"
+                />
+              </div>
+              <div>
+                <Label>{editingUser ? "New Password (leave blank to keep)" : "Password *"}</Label>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder={editingUser ? "Leave blank to keep" : "Min 4 characters"}
+                  data-testid="input-factory-user-password"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Display Name</Label>
+              <Input
+                value={formData.displayName}
+                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                placeholder="Name shown in the system (e.g., John, Warehouse Manager)"
+                data-testid="input-factory-user-display-name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <Label className="text-base font-semibold">Page Access</Label>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all-pages">
+                    <Check className="h-3 w-3 mr-1" />
+                    All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={selectNone} data-testid="button-select-none-pages">
+                    <X className="h-3 w-3 mr-1" />
+                    None
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Select which pages this user can see. If no pages are selected, the user gets full access.
+              </p>
+
+              <div className="space-y-4 border rounded-md p-4 max-h-80 overflow-y-auto">
+                {PAGE_GROUPS.map(group => {
+                  const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group);
+                  const allGroupSelected = groupPages.every(p => selectedPages.has(p.key));
+                  const someGroupSelected = groupPages.some(p => selectedPages.has(p.key));
+
+                  return (
+                    <div key={group} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={allGroupSelected}
+                          ref={undefined}
+                          onCheckedChange={() => toggleGroup(group)}
+                          data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
+                        />
+                        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          {group}
+                        </span>
+                        {someGroupSelected && !allGroupSelected && (
+                          <span className="text-xs text-muted-foreground">(partial)</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 ml-6">
+                        {groupPages.map(page => (
+                          <div key={page.key} className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedPages.has(page.key)}
+                              onCheckedChange={() => togglePage(page.key)}
+                              data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`}
+                            />
+                            <span className="text-sm">{page.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {selectedPages.size > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedPages.size} of {ALL_FACTORY_PAGES.length} pages selected
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setCreateOpen(false); setEditingUser(null); resetForm(); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                (!editingUser && (!formData.username || !formData.password)) ||
+                createMutation.isPending ||
+                updateMutation.isPending
+              }
+              data-testid="button-save-factory-user"
+            >
+              {createMutation.isPending || updateMutation.isPending
+                ? "Saving..."
+                : editingUser ? "Update" : "Create"
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
