@@ -27583,7 +27583,7 @@ if (asOfDate) {
         bcid: "code128",
         text: code,
         scale: 8,
-        height: 15,
+        height: 30,
         includetext: false,
         textxalign: "center",
         barcolor: "000000",

@@ -108,10 +108,10 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 100%; height: 14mm; object-fit: contain; }
+    .barcode-img { width: 100%; height: 20mm; object-fit: contain; }
     .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
     .article-barcode-area { text-align: center; margin-top: 3mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 100%; height: 12mm; object-fit: contain; }
+    .article-barcode-img { width: 100%; height: 18mm; object-fit: contain; }
     .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
@@ -194,10 +194,10 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; margin-top: 0.5mm; }
-    .ref-barcode-img { width: 100%; height: 12mm; object-fit: contain; }
+    .ref-barcode-img { width: 100%; height: 18mm; object-fit: contain; }
     .ref-barcode-number { font-size: 6pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.2mm; letter-spacing: 1px; }
     .article-barcode-section { text-align: center; margin-top: 2mm; }
-    .article-barcode-img { width: 100%; height: 12mm; object-fit: contain; }
+    .article-barcode-img { width: 100%; height: 18mm; object-fit: contain; }
     .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; }
 
