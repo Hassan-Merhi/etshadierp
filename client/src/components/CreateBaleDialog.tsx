@@ -216,17 +216,15 @@ function generateLabelHtml(labels: Array<{
           .label-header {
             display: flex;
             flex-direction: row;
-            align-items: flex-start;
-            gap: 0;
+            justify-content: space-between;
+            align-items: center;
           }
           .logo-area {
             flex-shrink: 0;
-            width: 18mm;
           }
           .hmd-logo {
             height: 10mm;
             width: auto;
-            max-width: 18mm;
             object-fit: contain;
             display: block;
           }

@@ -110,8 +110,9 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
-    .label-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
-    .hmd-logo { height: 11mm; width: auto; object-fit: contain; flex-shrink: 0; }
+    .label-header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; }
+    .logo-area { flex-shrink: 0; }
+    .hmd-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
