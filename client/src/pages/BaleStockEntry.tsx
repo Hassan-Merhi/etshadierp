@@ -234,6 +234,18 @@ function StockEntryTab() {
     : 0;
 
   useEffect(() => {
+    if (activeLocations && activeLocations.length === 1 && !selectedLocationId) {
+      setSelectedLocationId(activeLocations[0].id.toString());
+    }
+  }, [activeLocations, selectedLocationId]);
+
+  useEffect(() => {
+    if (activeMixBatches && activeMixBatches.length === 1 && !selectedMixBatchId) {
+      setSelectedMixBatchId(activeMixBatches[0].id.toString());
+    }
+  }, [activeMixBatches, selectedMixBatchId]);
+
+  useEffect(() => {
     if (scanRef.current) scanRef.current.focus();
   }, [cart]);
 
@@ -756,6 +768,7 @@ function StockEntryTab() {
 
 function RemoveFromStockTab() {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [supervisorUsername, setSupervisorUsername] = useState("");
@@ -779,6 +792,12 @@ function RemoveFromStockTab() {
     enabled: true,
   });
 
+  const filteredBales = inStockBales?.filter((bale: any) => {
+    if (!dateFilter) return true;
+    const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toISOString().split("T")[0] : null;
+    return baleDate === dateFilter;
+  });
+
   const toggleBale = (baleId: number) => {
     setSelectedBaleIds((prev) => {
       const next = new Set(prev);
@@ -789,8 +808,8 @@ function RemoveFromStockTab() {
   };
 
   const selectAll = () => {
-    if (!inStockBales) return;
-    const allIds = new Set(inStockBales.map((b: any) => b.id));
+    if (!filteredBales) return;
+    const allIds = new Set(filteredBales.map((b: any) => b.id));
     setSelectedBaleIds(allIds);
   };
 
@@ -845,23 +864,38 @@ function RemoveFromStockTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="w-64">
-          <Select value={selectedLocationId} onValueChange={(v) => { setSelectedLocationId(v); setSelectedBaleIds(new Set()); }}>
-            <SelectTrigger data-testid="select-remove-location">
-              <SelectValue placeholder="Filter by location..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {activeLocations?.map((loc) => (
-                <SelectItem key={loc.id} value={loc.id.toString()}>
-                  {loc.code} - {loc.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="w-56">
+            <Select value={selectedLocationId} onValueChange={(v) => { setSelectedLocationId(v); setSelectedBaleIds(new Set()); }}>
+              <SelectTrigger data-testid="select-remove-location">
+                <SelectValue placeholder="Filter by location..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {activeLocations?.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.code} - {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-44">
+            <Input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => { setDateFilter(e.target.value); setSelectedBaleIds(new Set()); }}
+              data-testid="input-date-filter"
+            />
+          </div>
+          {dateFilter && (
+            <Button variant="ghost" size="sm" onClick={() => { setDateFilter(""); setSelectedBaleIds(new Set()); }} data-testid="button-clear-date">
+              Clear date
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {inStockBales && inStockBales.length > 0 && (
+          {filteredBales && filteredBales.length > 0 && (
             <>
               <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">Select All</Button>
               {selectedBaleIds.size > 0 && (
@@ -884,7 +918,7 @@ function RemoveFromStockTab() {
 
       {balesLoading ? (
         <Skeleton className="h-60 w-full" />
-      ) : !inStockBales || inStockBales.length === 0 ? (
+      ) : !filteredBales || filteredBales.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
@@ -911,7 +945,7 @@ function RemoveFromStockTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inStockBales.map((bale: any) => {
+                  {filteredBales.map((bale: any) => {
                     const isSelected = selectedBaleIds.has(bale.id);
                     return (
                       <TableRow
