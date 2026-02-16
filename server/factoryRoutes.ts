@@ -4384,18 +4384,23 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .from(factoryUserPageAccess)
         .where(eq(factoryUserPageAccess.companyId, companyId));
 
-      const profileMap = new Map(profiles.map((p: any) => [p.userId, p as { displayName: string | null }]));
+      const profileMap = new Map(profiles.map((p: any) => [p.userId, p]));
       const accessMap = new Map<string, string[]>();
       access.forEach((a: any) => {
         if (!accessMap.has(a.userId)) accessMap.set(a.userId, []);
         accessMap.get(a.userId)!.push(a.pageKey);
       });
 
-      const result = allUsers.map((u: any) => ({
-        ...u,
-        displayName: profileMap.get(u.id)?.displayName || null,
-        pageAccess: accessMap.get(u.id) || [],
-      }));
+      const result = allUsers.map((u: any) => {
+        const profile = profileMap.get(u.id);
+        return {
+          ...u,
+          displayName: profile?.displayName || null,
+          hasErpAccess: profile?.hasErpAccess ?? true,
+          hasFactoryAccess: profile?.hasFactoryAccess ?? true,
+          pageAccess: accessMap.get(u.id) || [],
+        };
+      });
 
       res.json(result);
     } catch (error: any) {
@@ -4413,7 +4418,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         return res.status(403).json({ message: "Only Admin or Owner can manage users" });
       }
 
-      const { username, password, displayName, pageAccess } = req.body;
+      const { username, password, displayName, pageAccess, hasErpAccess, hasFactoryAccess } = req.body;
 
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
@@ -4441,13 +4446,13 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           role: "Manager",
         });
 
-        if (displayName) {
-          await tx.insert(factoryUserProfiles).values({
-            companyId,
-            userId: newUser.id,
-            displayName,
-          });
-        }
+        await tx.insert(factoryUserProfiles).values({
+          companyId,
+          userId: newUser.id,
+          displayName: displayName || username,
+          hasErpAccess: hasErpAccess ?? true,
+          hasFactoryAccess: hasFactoryAccess ?? true,
+        });
 
         if (Array.isArray(pageAccess) && pageAccess.length > 0) {
           await tx.insert(factoryUserPageAccess).values(
@@ -4462,7 +4467,9 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         const { password: _, ...userWithoutPassword } = newUser;
         res.status(201).json({
           ...userWithoutPassword,
-          displayName: displayName || null,
+          displayName: displayName || username,
+          hasErpAccess: hasErpAccess ?? true,
+          hasFactoryAccess: hasFactoryAccess ?? true,
           pageAccess: pageAccess || [],
         });
       });
@@ -4482,7 +4489,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }
 
       const { userId } = req.params;
-      const { displayName, pageAccess, password } = req.body;
+      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess } = req.body;
 
       await db.transaction(async (tx: any) => {
         if (password && password.length >= 4) {
@@ -4490,22 +4497,27 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           await tx.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
         }
 
-        if (displayName !== undefined) {
-          const existingProfile = await tx.select()
-            .from(factoryUserProfiles)
-            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+        const profileUpdates: any = { updatedAt: new Date() };
+        if (displayName !== undefined) profileUpdates.displayName = displayName;
+        if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
+        if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
 
-          if (existingProfile.length > 0) {
-            await tx.update(factoryUserProfiles)
-              .set({ displayName, updatedAt: new Date() })
-              .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
-          } else {
-            await tx.insert(factoryUserProfiles).values({
-              companyId,
-              userId,
-              displayName,
-            });
-          }
+        const existingProfile = await tx.select()
+          .from(factoryUserProfiles)
+          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+
+        if (existingProfile.length > 0) {
+          await tx.update(factoryUserProfiles)
+            .set(profileUpdates)
+            .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+        } else {
+          await tx.insert(factoryUserProfiles).values({
+            companyId,
+            userId,
+            displayName: displayName || "User",
+            hasErpAccess: hasErpAccess ?? true,
+            hasFactoryAccess: hasFactoryAccess ?? true,
+          });
         }
 
         if (Array.isArray(pageAccess)) {
@@ -4539,20 +4551,32 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner") {
-        return res.json({ fullAccess: true, pageKeys: [] });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true });
       }
+
+      const [profile] = await db.select({
+        hasErpAccess: factoryUserProfiles.hasErpAccess,
+        hasFactoryAccess: factoryUserProfiles.hasFactoryAccess,
+      })
+        .from(factoryUserProfiles)
+        .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+
+      const hasErpAccess = profile ? profile.hasErpAccess : true;
+      const hasFactoryAccess = profile ? profile.hasFactoryAccess : true;
 
       const access = await db.select({ pageKey: factoryUserPageAccess.pageKey })
         .from(factoryUserPageAccess)
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
       if (access.length === 0) {
-        return res.json({ fullAccess: true, pageKeys: [] });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess });
       }
 
       res.json({
         fullAccess: false,
         pageKeys: access.map((a: any) => a.pageKey),
+        hasErpAccess,
+        hasFactoryAccess,
       });
     } catch (error: any) {
       console.error("Error fetching my access:", error);

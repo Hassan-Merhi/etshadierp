@@ -289,6 +289,15 @@ function AuthenticatedApp() {
   });
   const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean }>({
+    queryKey: ["/api/factory/my-access"],
+    enabled: !!user && !isPOS,
+    staleTime: 30000,
+  });
+
+  const hasErpAccess = !myAccess || myAccess.hasErpAccess;
+  const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
+
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
@@ -449,6 +458,14 @@ function AuthenticatedApp() {
     return <Redirect to="/factory/dashboard" />;
   }
 
+  if (isFactoryRoute && !hasFactoryAccess) {
+    return <Redirect to="/" />;
+  }
+
+  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute) {
+    return <Redirect to="/factory/dashboard" />;
+  }
+
   if (isFactoryRoute || isFactoryCompany) {
     return (
       <>
@@ -466,7 +483,7 @@ function AuthenticatedApp() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                  {!isFactoryCompany && (
+                  {!isFactoryCompany && hasErpAccess && (
                     <Button
                       variant="outline"
                       size="sm"

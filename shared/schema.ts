@@ -3177,6 +3177,8 @@ export const factoryUserProfiles = pgTable("factory_user_profiles", {
   companyId: integer("company_id").notNull(),
   userId: varchar("user_id").notNull(),
   displayName: text("display_name").notNull(),
+  hasErpAccess: boolean("has_erp_access").notNull().default(true),
+  hasFactoryAccess: boolean("has_factory_access").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

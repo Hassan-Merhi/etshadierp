@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -33,7 +34,10 @@ interface FactoryUser {
   active: boolean;
   displayName: string | null;
   pageAccess: string[];
+  hasErpAccess: boolean;
+  hasFactoryAccess: boolean;
   createdAt: string;
+  role?: string;
 }
 
 const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
@@ -77,6 +81,8 @@ export default function FactoryUsers() {
     username: "",
     password: "",
     displayName: "",
+    hasErpAccess: true,
+    hasFactoryAccess: true,
   });
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const { toast } = useToast();
@@ -86,7 +92,7 @@ export default function FactoryUsers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[] }) => {
+    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean }) => {
       const res = await apiRequest("POST", "/api/factory/users", data);
       if (!res.ok) {
         const err = await res.json();
@@ -126,7 +132,7 @@ export default function FactoryUsers() {
   });
 
   const resetForm = () => {
-    setFormData({ username: "", password: "", displayName: "" });
+    setFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
     setSelectedPages(new Set());
   };
 
@@ -136,18 +142,46 @@ export default function FactoryUsers() {
       username: user.username,
       password: "",
       displayName: user.displayName || "",
+      hasErpAccess: user.hasErpAccess ?? true,
+      hasFactoryAccess: user.hasFactoryAccess ?? true,
     });
     setSelectedPages(new Set(user.pageAccess));
   };
 
+  const isAdminOrOwner = (user: FactoryUser) => {
+    const role = user.role?.toLowerCase();
+    return role === "admin" || role === "owner";
+  };
+
+  const toggleAccessMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: { hasErpAccess?: boolean; hasFactoryAccess?: boolean } }) => {
+      const res = await apiRequest("PUT", `/api/factory/users/${userId}`, data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update access");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users"] });
+      toast({ title: "Updated", description: "Access updated successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleSubmit = () => {
     if (editingUser) {
+      const isPrivileged = isAdminOrOwner(editingUser);
       updateMutation.mutate({
         userId: editingUser.id,
         data: {
           displayName: formData.displayName,
           pageAccess: Array.from(selectedPages),
           password: formData.password || undefined,
+          hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
+          hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
         },
       });
     } else {
@@ -156,6 +190,8 @@ export default function FactoryUsers() {
         password: formData.password,
         displayName: formData.displayName,
         pageAccess: Array.from(selectedPages),
+        hasErpAccess: formData.hasErpAccess,
+        hasFactoryAccess: formData.hasFactoryAccess,
       });
     }
   };
@@ -233,6 +269,8 @@ export default function FactoryUsers() {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Display Name</TableHead>
+                  <TableHead>ERP Access</TableHead>
+                  <TableHead>Factory Access</TableHead>
                   <TableHead>Pages Access</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
@@ -243,6 +281,32 @@ export default function FactoryUsers() {
                   <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
                     <TableCell className="font-medium font-mono">{user.username}</TableCell>
                     <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={isAdminOrOwner(user) ? true : (user.hasErpAccess ?? true)}
+                        disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          toggleAccessMutation.mutate({
+                            userId: user.id,
+                            data: { hasErpAccess: checked },
+                          });
+                        }}
+                        data-testid={`switch-erp-access-${user.id}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={isAdminOrOwner(user) ? true : (user.hasFactoryAccess ?? true)}
+                        disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          toggleAccessMutation.mutate({
+                            userId: user.id,
+                            data: { hasFactoryAccess: checked },
+                          });
+                        }}
+                        data-testid={`switch-factory-access-${user.id}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       {user.pageAccess.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -343,6 +407,29 @@ export default function FactoryUsers() {
                 placeholder="Name shown in the system (e.g., John, Warehouse Manager)"
                 data-testid="input-factory-user-display-name"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <Label htmlFor="form-erp-access" className="cursor-pointer">ERP Access</Label>
+                <Switch
+                  id="form-erp-access"
+                  checked={editingUser && isAdminOrOwner(editingUser) ? true : formData.hasErpAccess}
+                  disabled={!!editingUser && isAdminOrOwner(editingUser)}
+                  onCheckedChange={(checked) => setFormData({ ...formData, hasErpAccess: checked })}
+                  data-testid="switch-form-erp-access"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <Label htmlFor="form-factory-access" className="cursor-pointer">Factory Access</Label>
+                <Switch
+                  id="form-factory-access"
+                  checked={editingUser && isAdminOrOwner(editingUser) ? true : formData.hasFactoryAccess}
+                  disabled={!!editingUser && isAdminOrOwner(editingUser)}
+                  onCheckedChange={(checked) => setFormData({ ...formData, hasFactoryAccess: checked })}
+                  data-testid="switch-form-factory-access"
+                />
+              </div>
             </div>
 
             <div className="space-y-3">
