@@ -56,10 +56,9 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
 
   const fullLabel = `
     <div class="label">
-      <img class="label-bg" src="/hmd-label-bg.jpeg" alt="" />
+      <span class="hmd-text">HMD</span>
       <div class="label-content">
         <div class="label-top">
-          <div class="logo-section"></div>
           <div class="info-section">
             <div><span class="info-label">PIECES:</span> <span class="info-value">${label.pieces}</span></div>
             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
@@ -104,14 +103,13 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .single-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .single-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
-    .label-bg { position: absolute; top: 0; left: 0; width: 100%; height: 50%; object-fit: contain; z-index: 0; pointer-events: none; opacity: 0.12; }
+    .hmd-text { position: absolute; top: 2mm; right: 3mm; font-size: 28pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; opacity: 0.10; z-index: 0; pointer-events: none; letter-spacing: 3px; line-height: 1; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .name-label { justify-content: center; align-items: center; }
     .name-label-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; gap: 1mm; }
     .name-barcode-img { width: 60mm; height: 12mm; object-fit: contain; }
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 1mm; }
-    .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
