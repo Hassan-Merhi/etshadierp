@@ -2175,11 +2175,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (mixBatchId) conditions.push(eq(factoryBales.mixBatchId, parseInt(mixBatchId as string)));
       if (pressingBatchId) conditions.push(eq(factoryBales.pressingBatchId, parseInt(pressingBatchId as string)));
 
-      const results = await db
+      const bales = await db
         .select()
         .from(factoryBales)
         .where(and(...conditions))
         .orderBy(desc(factoryBales.createdAt));
+
+      const productIds: number[] = Array.from(new Set(bales.map((b: any) => b.productId).filter(Boolean)));
+      const batchIds: number[] = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean)));
+
+      const products = productIds.length > 0
+        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+        : [];
+      const batches = batchIds.length > 0
+        ? await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
+        : [];
+
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
+      const batchMap = new Map(batches.map((b: any) => [b.id, b]));
+
+      const results = bales.map((bale: any) => ({
+        bale,
+        product: bale.productId ? productMap.get(bale.productId) || null : null,
+        mixBatch: bale.mixBatchId ? batchMap.get(bale.mixBatchId) || null : null,
+      }));
 
       res.json(results);
     } catch (error: any) {
