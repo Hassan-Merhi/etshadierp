@@ -111,7 +111,7 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
     .name-label-text { font-size: 16pt; font-weight: 900; color: #000; text-align: center; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; max-width: 100%; display: block; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 10mm; width: auto; object-fit: contain; }
+    .logo-img { height: 13mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }

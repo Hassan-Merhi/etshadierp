@@ -95,7 +95,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 12mm; width: auto; object-fit: contain; }
+    .logo-img { height: 16mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
@@ -172,7 +172,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
     .label-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1mm; }
     .logo-section { display: flex; flex-direction: column; align-items: flex-start; }
-    .logo-img { height: 10mm; width: auto; object-fit: contain; }
+    .logo-img { height: 13mm; width: auto; object-fit: contain; }
     .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
