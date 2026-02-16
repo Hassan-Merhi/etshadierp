@@ -74,13 +74,17 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
   for (const label of labels) {
     labelsHtml += `
       <div class="a4-page">
-        <div class="logo-reserve"></div>
+        <div class="logo-reserve-top"></div>
         <div class="top-row">
           <div class="top-left-label">
             ${buildDetailBlock(label)}
           </div>
-          <div class="top-right-name">${label.productName}</div>
+          <div class="top-right-name">
+            <div class="name-right-spacer"></div>
+            <div class="name-right-text">${label.productName}</div>
+          </div>
         </div>
+        <div class="logo-reserve-bottom"></div>
         <div class="bottom-name">${label.productName}</div>
       </div>`;
   }
@@ -106,11 +110,14 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
-    .logo-reserve { width: 100%; height: 65mm; flex-shrink: 0; }
-    .top-row { display: flex; flex-direction: row; align-items: center; padding: 0 10mm; gap: 8mm; flex-shrink: 0; }
+    .logo-reserve-top { width: 100%; height: 65mm; flex-shrink: 0; }
+    .top-row { display: flex; flex-direction: row; align-items: stretch; padding: 0 10mm; gap: 8mm; flex-shrink: 0; }
     .top-left-label { flex-shrink: 0; width: 76mm; height: 62mm; border: 0.3mm solid #ccc; }
     .top-left-label .code-label { width: 76mm; height: 62mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
-    .top-right-name { flex: 1; font-size: clamp(28pt, 8vw, 60pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; word-break: break-word; }
+    .top-right-name { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+    .name-right-spacer { height: 20mm; flex-shrink: 0; }
+    .name-right-text { font-size: clamp(28pt, 8vw, 60pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 2px; word-break: break-word; }
+    .logo-reserve-bottom { width: 100%; height: 50mm; flex-shrink: 0; }
     .bottom-name { flex: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(60pt, 20vw, 160pt); font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 4px; padding: 10mm; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
@@ -123,7 +130,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
   for (const label of labels) {
     labelsHtml += `
       <div class="sticker-page">
-        <div class="label">
+        <div class="label full-info-label">
           <div class="label-content">
             <div class="label-top">
               <div class="logo-section">
@@ -140,9 +147,22 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
               <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
               <div class="barcode-number">${label.referenceNumber}</div>
             </div>
+            <div class="article-barcode-section">
+              <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+            </div>
             <div class="product-section">
               <div class="product-name-text">${label.productName}</div>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="sticker-page">
+        <div class="label name-only-label">
+          <div class="label-content name-only-content">
+            <div class="name-barcode-section">
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
+            </div>
+            <div class="name-only-text">${label.productName}</div>
           </div>
         </div>
       </div>`;
@@ -164,13 +184,21 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .barcode-section { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 65mm; height: 14mm; object-fit: contain; }
-    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .barcode-img { width: 65mm; height: 12mm; object-fit: contain; }
+    .barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; }
+    .article-barcode-section { text-align: center; margin-top: 0.5mm; }
+    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
+    .product-section { text-align: center; margin-top: 0.5mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 10pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+    .name-only-content { justify-content: center; align-items: center; }
+    .name-barcode-section { text-align: center; margin-bottom: 2mm; }
+    .name-barcode-img { width: 60mm; height: 14mm; object-fit: contain; }
+    .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
+
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
-  </style></head><body><div class="print-note">Sticker Labels. Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">Sticker Labels (2 per bale: full-info + name-only). Disable "Headers and Footers" in print settings.</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
