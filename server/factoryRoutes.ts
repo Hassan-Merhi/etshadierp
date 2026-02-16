@@ -1611,10 +1611,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             weightedCostWeight += avail;
           }
 
-          if (weight > totalAvailable + 0.001) {
-            throw new Error(`Not enough raw stock from supplier. Available: ${totalAvailable.toFixed(3)} kg, requested: ${weight.toFixed(3)} kg`);
-          }
-
           let remaining = weight;
           for (const rs of supplierRawStocks) {
             if (remaining <= 0.001) break;
@@ -1628,6 +1624,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               .where(eq(factoryRawStock.id, rs.id));
 
             remaining -= deduct;
+          }
+
+          if (remaining > 0.001 && supplierRawStocks.length > 0) {
+            const lastRs = supplierRawStocks[supplierRawStocks.length - 1];
+            await tx
+              .update(factoryRawStock)
+              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${remaining}` })
+              .where(eq(factoryRawStock.id, lastRs.id));
+            remaining = 0;
           }
 
           const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;

@@ -84,7 +84,6 @@ export function CreateMixBatchDialog({
 
   const availableSuppliers = supplierStock?.filter(
     (s) =>
-      parseFloat(s.remainingKg) > 0 &&
       s.supplierId !== null &&
       !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
   );
@@ -148,7 +147,10 @@ export function CreateMixBatchDialog({
     setSelectedSourceId(id);
     if (sourceType === "supplier") {
       const stock = supplierStock?.find((s) => s.supplierId?.toString() === id);
-      if (stock) setWeightInput(stock.remainingKg);
+      if (stock) {
+        const remaining = parseFloat(stock.remainingKg);
+        setWeightInput(remaining > 0 ? stock.remainingKg : "");
+      }
     }
   };
 
@@ -169,11 +171,6 @@ export function CreateMixBatchDialog({
       if (!stock || !stock.supplierId) return;
 
       const available = parseFloat(stock.remainingKg);
-      if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available from ${stock.supplierName}`, variant: "destructive" });
-        return;
-      }
-
       const costPerKg = parseFloat(stock.costPerKg);
       setSelectedSources((prev) => [
         ...prev,

@@ -143,6 +143,7 @@ const STATUS_COLORS: Record<string, string> = {
   LABEL_PRINTED: "secondary",
   PRESSED: "default",
   FINALIZED: "default",
+  IN_STOCK: "default",
   RESERVED: "outline",
   SOLD: "destructive",
 };
@@ -332,6 +333,7 @@ export default function BalesHistory() {
                 <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                 <SelectItem value="PRESSED">Pressed</SelectItem>
                 <SelectItem value="FINALIZED">Finalized</SelectItem>
+                <SelectItem value="IN_STOCK">In Stock</SelectItem>
                 <SelectItem value="RESERVED">Reserved</SelectItem>
                 <SelectItem value="SOLD">Sold</SelectItem>
               </SelectContent>
@@ -351,6 +353,7 @@ export default function BalesHistory() {
                   <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                   <SelectItem value="PRESSED">Pressed</SelectItem>
                   <SelectItem value="FINALIZED">Finalized</SelectItem>
+                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
                   <SelectItem value="RESERVED">Reserved</SelectItem>
                   <SelectItem value="SOLD">Sold</SelectItem>
                 </SelectContent>
@@ -392,10 +395,8 @@ export default function BalesHistory() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead>Bale Code</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Article</TableHead>
-                    <TableHead>Batch</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
                     <TableHead className="text-right">Cost/kg</TableHead>
@@ -418,10 +419,8 @@ export default function BalesHistory() {
                             data-testid={`checkbox-bale-${bale.id}`}
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{bale.baleCode}</TableCell>
                         <TableCell>{product?.name || "-"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
-                        <TableCell className="text-xs">{batch?.name || "-"}</TableCell>
                         <TableCell className="text-right">{bale.quantity}</TableCell>
                         <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
                         <TableCell className="text-right font-mono text-muted-foreground">{formatLabelNum(bale.costPerKg)}</TableCell>
@@ -440,6 +439,7 @@ export default function BalesHistory() {
                               <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
                               <SelectItem value="PRESSED">Pressed</SelectItem>
                               <SelectItem value="FINALIZED">Finalized</SelectItem>
+                              <SelectItem value="IN_STOCK">In Stock</SelectItem>
                               <SelectItem value="RESERVED">Reserved</SelectItem>
                               <SelectItem value="SOLD">Sold</SelectItem>
                             </SelectContent>
