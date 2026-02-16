@@ -265,7 +265,7 @@ function generateLabelHtml(labels: Array<{
           }
           .ref-barcode-img {
             width: 100%;
-            height: 20mm;
+            height: 10mm;
             object-fit: contain;
           }
           .ref-barcode-number {
@@ -277,11 +277,11 @@ function generateLabelHtml(labels: Array<{
           }
           .article-barcode-section {
             text-align: center;
-            margin-top: 2mm;
+            margin-top: 1.5mm;
           }
           .article-barcode-img {
             width: 100%;
-            height: 20mm;
+            height: 10mm;
             object-fit: contain;
           }
           .product-name-section {
@@ -291,12 +291,13 @@ function generateLabelHtml(labels: Array<{
             padding-top: 0.5mm;
           }
           .product-name-text {
-            font-size: 11pt;
+            font-size: 9pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
             color: #000;
             text-transform: uppercase;
             word-break: break-word;
+            line-height: 1.1;
           }
         </style>
       </head>
