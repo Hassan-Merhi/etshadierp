@@ -297,6 +297,8 @@ function AuthenticatedApp() {
 
   const hasErpAccess = !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
+  const isAdminOwner = user?.role === "Admin" || user?.role === "Owner";
+  const hasDashboardAccess = isAdminOwner || (myAccess && !myAccess.fullAccess && myAccess.pageKeys.includes("factory/dashboard"));
 
   const handleLogout = async () => {
     try {
@@ -454,8 +456,10 @@ function AuthenticatedApp() {
   const isFactoryCompany = selectedCompany?.companyType === "factory";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
+  const factoryDefaultPage = hasDashboardAccess ? "/factory/dashboard" : "/factory/stock-entry";
+
   if (isFactoryCompany && !isFactoryRoute) {
-    return <Redirect to="/factory/dashboard" />;
+    return <Redirect to={factoryDefaultPage} />;
   }
 
   if (isFactoryRoute && !hasFactoryAccess) {
@@ -463,7 +467,7 @@ function AuthenticatedApp() {
   }
 
   if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute) {
-    return <Redirect to="/factory/dashboard" />;
+    return <Redirect to={factoryDefaultPage} />;
   }
 
   if (isFactoryRoute || isFactoryCompany) {
@@ -506,7 +510,7 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <Switch>
-                    <Route path="/factory/dashboard" component={Dashboard} />
+                    {hasDashboardAccess && <Route path="/factory/dashboard" component={Dashboard} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers" component={FactoryContainers} />
@@ -553,7 +557,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
-                    <Route><Redirect to="/factory/dashboard" /></Route>
+                    <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                 </div>
               </main>

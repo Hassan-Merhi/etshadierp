@@ -65,6 +65,7 @@ interface MenuItem {
   icon: any;
   adminOnly?: boolean;
   featureFlag?: string;
+  requiresExplicitAccess?: boolean;
 }
 
 interface MenuGroup {
@@ -78,7 +79,7 @@ const allMenuGroups: MenuGroup[] = [
     title: "Overview",
     icon: LayoutDashboard,
     items: [
-      { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard },
+      { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard, requiresExplicitAccess: true },
       { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
     ],
   },
@@ -221,6 +222,13 @@ export function FactorySidebar({ user }: { user?: any }) {
       }
       if (item.featureFlag && !settings) return false;
       if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0) {
+        const pageKey = item.url.replace(/^\//, "");
+        if (!myAccess.pageKeys.includes(pageKey)) return false;
+      }
+      if (item.requiresExplicitAccess && !isAdmin && myAccess) {
+        if (myAccess.fullAccess) {
+          return false;
+        }
         const pageKey = item.url.replace(/^\//, "");
         if (!myAccess.pageKeys.includes(pageKey)) return false;
       }
