@@ -27579,14 +27579,14 @@ if (asOfDate) {
       // @ts-ignore - bwip-js types are incomplete
       const bwipjs = await import("bwip-js");
       
-      // Render to PNG buffer - larger for printing
       const png = await bwipjs.toBuffer({
         bcid: "code128",
         text: code,
-        scale: 4,
+        scale: 8,
         height: 15,
         includetext: false,
         textxalign: "center",
+        barcolor: "000000",
       });
 
       res.setHeader("Content-Type", "image/png");

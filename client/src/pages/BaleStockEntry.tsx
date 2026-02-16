@@ -112,7 +112,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
     .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
+    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
@@ -133,11 +133,12 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     @media print {
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { -webkit-text-stroke: 0.4px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000, 0 0.3px 0 #000, 0 -0.3px 0 #000; }
-      .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 1px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
-      img { filter: contrast(2) brightness(0.9); }
+      * { color: #000 !important; -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000; }
+      .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.6px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
+      .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 2px #000; text-shadow: 0 0 2px #000, 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
-  </style></head><body><div class="print-note">A4 Bale Labels. Set printer darkness to 30. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function generateStickerLabelsHtml(labels: LabelData[]) {
@@ -210,11 +211,12 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     @media print {
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
-      .name-only-text, .product-name-text { -webkit-text-stroke: 0.8px #000; text-shadow: 0 0 1px #000, 0.5px 0 0 #000, -0.5px 0 0 #000, 0 0.5px 0 #000, 0 -0.5px 0 #000; }
-      img { filter: contrast(2) brightness(0.9); }
+      * { color: #000 !important; -webkit-text-stroke: 0.5px #000; text-shadow: 0 0 0.5px #000, 0.3px 0 0 #000, -0.3px 0 0 #000; }
+      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.6px #000; text-shadow: 0 0 0.5px #000, 0.4px 0 0 #000, -0.4px 0 0 #000, 0 0.4px 0 #000, 0 -0.4px 0 #000; }
+      .name-only-text, .product-name-text { -webkit-text-stroke: 1.5px #000; text-shadow: 0 0 2px #000, 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000; }
+      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
-  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Laser print - max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
