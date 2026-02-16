@@ -3069,11 +3069,11 @@ function LoginHistoryTab() {
                                           <div className="flex gap-6 pl-1">
                                             <div className="flex items-center gap-2">
                                               <Switch
-                                                checked={role.role === "Admin" ? true : role.canSellNegativeStock}
+                                                checked={["Admin", "Owner", "Manager"].includes(role.role) ? true : role.canSellNegativeStock}
                                                 onCheckedChange={(checked) =>
                                                   handlePermissionToggle(role.id, user.id, role.companyId, "canSellNegativeStock", checked)
                                                 }
-                                                disabled={updatePermissionMutation.isPending || role.role === "Admin"}
+                                                disabled={updatePermissionMutation.isPending || ["Admin", "Owner", "Manager"].includes(role.role)}
                                                 data-testid={`toggle-can-sell-${role.id}`}
                                               />
                                               <Label className="text-sm cursor-pointer">Can Sell</Label>
