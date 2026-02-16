@@ -159,9 +159,6 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
       <div class="sticker-page">
         <div class="label name-only-label">
           <div class="label-content name-only-content">
-            <div class="name-barcode-section">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
-            </div>
             <div class="name-only-text">${label.productName}</div>
           </div>
         </div>

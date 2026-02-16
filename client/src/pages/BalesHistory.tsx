@@ -86,7 +86,6 @@ function generateReprintHtml(bale: any, product: any, dualLabel: boolean): strin
         ${fullLabel}
         <div class="label name-label">
           <div class="name-label-content">
-            <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
             <div class="name-label-text">${label.productName}</div>
           </div>
         </div>
