@@ -172,13 +172,6 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
             </div>
           </div>
         </div>
-      </div>
-      <div class="sticker-page">
-        <div class="label name-only-label">
-          <div class="label-content name-only-content">
-            <div class="name-only-text">${label.productName}</div>
-          </div>
-        </div>
       </div>`;
   }
   return `<html><head><title>Sticker Labels</title><style>
@@ -203,19 +196,15 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
     .product-name-text { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
 
-    .name-only-label { justify-content: center; align-items: center; }
-    .name-only-content { justify-content: center; align-items: center; }
-    .name-only-text { font-size: 24pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 3px; word-break: break-word; }
-
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
       .print-note { display: none !important; }
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
-      .name-only-text, .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
+      .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
-  </style></head><body><div class="print-note">Sticker Labels (2 per bale). Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">Sticker Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function StockEntryTab() {
