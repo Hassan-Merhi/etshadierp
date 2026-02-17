@@ -118,13 +118,13 @@ export function LabelPrintSettings() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="A4">A4 - 1 label per sheet</SelectItem>
-                <SelectItem value="A5">A5 - 2 labels per sheet (cut A4 in half)</SelectItem>
+                <SelectItem value="A5">A5 - For A5 printers</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {paperFormat === 'A4'
                 ? 'Each A4 sheet prints one label: detail block on top half, product name on bottom half.'
-                : 'Each A4 sheet prints two identical labels (top + bottom). Cut the sheet in half to get two A5 labels.'}
+                : 'Each bale prints 2 A5 pages: page 1 has detail block + product name, page 2 has large product name. Same as A4 but split into separate A5 pages.'}
             </p>
           </div>
 
