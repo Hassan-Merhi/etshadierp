@@ -191,7 +191,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
 
     .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 4mm; align-items: stretch; padding: 2mm 5mm; }
     .a5-detail-left { flex-shrink: 0; width: 62mm; overflow: hidden; border: 0.3mm solid #ccc; }
-    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: -15mm; }
     .a5-name-right-text { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(14pt, 3.5vw, 26pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .a5-bottom-namebox { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 5mm; }
