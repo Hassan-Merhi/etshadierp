@@ -24,7 +24,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
-import { LabelPrintSettings } from "@/components/LabelPrintSettings";
+import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
 import { Label } from "@/components/ui/label";
 import * as XLSX from "xlsx";
 import type { FactoryBaleProduct, Location, FactoryMixBatch, FactoryCategory } from "@shared/schema";
@@ -143,6 +143,80 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+}
+
+function generateA5LabelsHtml(labels: LabelData[]) {
+  let labelsHtml = '';
+  for (let i = 0; i < labels.length; i += 2) {
+    const label1 = labels[i];
+    const label2 = i + 1 < labels.length ? labels[i + 1] : null;
+    labelsHtml += `
+      <div class="a4-page">
+        <div class="a5-half">
+          <div class="a5-preprint-gap"></div>
+          <div class="a5-content">
+            <div class="a5-detail-left">
+              ${buildDetailBlock(label1)}
+            </div>
+            <div class="a5-name-right">
+              <div class="a5-name-right-text">${label1.productName}</div>
+            </div>
+          </div>
+        </div>
+        <div class="a5-half">
+          ${label2 ? `
+          <div class="a5-preprint-gap"></div>
+          <div class="a5-content">
+            <div class="a5-detail-left">
+              ${buildDetailBlock(label2)}
+            </div>
+            <div class="a5-name-right">
+              <div class="a5-name-right-text">${label2.productName}</div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      </div>`;
+  }
+  return `<html><head><title>Stock Entry Labels - A5</title><style>
+    @page { size: 210mm 297mm; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
+
+    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
+    .label-top { display: flex; justify-content: space-between; align-items: center; }
+    .logo-section { flex-shrink: 0; }
+    .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
+    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
+    .info-key { font-weight: 900; }
+    .info-val { font-weight: 900; }
+    .barcode-area { text-align: center; margin-top: auto; }
+    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
+    .article-barcode-area { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
+
+    .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+    .a4-page:last-child { page-break-after: auto; }
+
+    .a5-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .a5-preprint-gap { height: 90mm; flex-shrink: 0; }
+    .a5-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
+    .a5-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
+    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 58.5mm; }
+    .a5-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; word-break: break-word; }
+
+    .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
+    @media print {
+      .print-note { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { color: #000 !important; }
+      .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .a5-name-right-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
+      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+    }
+  </style></head><body><div class="print-note">A5 Bale Labels (2 per A4 sheet). Cut sheet in half. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function generateStickerLabelsHtml(labels: LabelData[]) {
@@ -402,9 +476,11 @@ function StockEntryTab() {
   };
 
   const openBrowserPrint = (labels: LabelData[]) => {
+    const paperFormat = getPaperFormat();
+    const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
     const a4Window = window.open("", "_blank");
     if (a4Window) {
-      a4Window.document.write(generateCombinedLabelsHtml(labels));
+      a4Window.document.write(labelHtml);
       a4Window.document.close();
       a4Window.focus();
       setTimeout(() => a4Window.print(), 500);
@@ -769,7 +845,7 @@ function StockEntryTab() {
           <DialogHeader>
             <DialogTitle>Confirm Stock Entry</DialogTitle>
             <DialogDescription>
-              {totalQty} bale(s) will be entered into stock. An A4 label and a sticker label will print for each bale.
+              {totalQty} bale(s) will be entered into stock. A label ({getPaperFormat()} format) and a sticker label will print for each bale.
             </DialogDescription>
           </DialogHeader>
           <div className="text-sm space-y-3">

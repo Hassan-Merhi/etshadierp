@@ -28,10 +28,25 @@ import {
 } from "@/lib/zebraPrint";
 import { buildZplTestLabel } from "@/lib/zplBuilder";
 
+export type PaperFormat = "A4" | "A5";
+
+const PAPER_FORMAT_KEY = "label_paper_format";
+
+export function getPaperFormat(): PaperFormat {
+  const val = localStorage.getItem(PAPER_FORMAT_KEY);
+  if (val === "A5") return "A5";
+  return "A4";
+}
+
+export function setPaperFormatSetting(format: PaperFormat) {
+  localStorage.setItem(PAPER_FORMAT_KEY, format);
+}
+
 export function LabelPrintSettings() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PrintMode>(getPrintMode());
   const [printer, setPrinter] = useState(getPrinterName());
+  const [paperFormat, setPaperFormat] = useState<PaperFormat>(getPaperFormat());
   const [printers, setPrinters] = useState<string[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [testPrinting, setTestPrinting] = useState(false);
@@ -40,6 +55,7 @@ export function LabelPrintSettings() {
   useEffect(() => {
     setMode(getPrintMode());
     setPrinter(getPrinterName());
+    setPaperFormat(getPaperFormat());
   }, [open]);
 
   const handleModeChange = (newMode: string) => {
@@ -94,6 +110,24 @@ export function LabelPrintSettings() {
           <DialogTitle>Label Print Settings</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Paper Format</Label>
+            <Select value={paperFormat} onValueChange={(val) => { const f = val as PaperFormat; setPaperFormat(f); setPaperFormatSetting(f); }}>
+              <SelectTrigger data-testid="select-paper-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A4">A4 - 1 label per sheet</SelectItem>
+                <SelectItem value="A5">A5 - 2 labels per sheet (cut A4 in half)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {paperFormat === 'A4'
+                ? 'Each A4 sheet prints one label: detail block on top half, product name on bottom half.'
+                : 'Each A4 sheet prints two identical labels (top + bottom). Cut the sheet in half to get two A5 labels.'}
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label>Print Mode</Label>
             <Select value={mode} onValueChange={handleModeChange}>
