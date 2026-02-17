@@ -104,7 +104,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
+    .code-label { width: 76mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
@@ -172,7 +172,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
+    .code-label { width: 76mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
