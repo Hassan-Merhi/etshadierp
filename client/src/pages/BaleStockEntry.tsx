@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-  XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet
+  XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1440,6 +1440,44 @@ function ImportBalesTab() {
   );
 }
 
+function formatDailyNum(val: number): string {
+  if (val === 0) return "0";
+  return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(3)).toString();
+}
+
+function DailyStockSummary() {
+  const { data: balesData } = useQuery<any[]>({
+    queryKey: ["/api/factory/bales"],
+  });
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayInStock = (balesData || []).filter((row: any) => {
+    const bale = row.bale;
+    if (bale.status !== "IN_STOCK") return false;
+    const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+    return baleDate === todayStr;
+  });
+  const todayTotalQty = todayInStock.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const todayTotalKg = todayInStock.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+
+  return (
+    <Card className="border-dashed">
+      <CardContent className="py-2 px-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground font-medium">Today&apos;s In Stock</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold" data-testid="text-entry-today-qty">{todayTotalQty} qty</span>
+            <span className="text-sm font-semibold" data-testid="text-entry-today-kg">{formatDailyNum(todayTotalKg)} kg</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function BaleStockEntry() {
   return (
     <div className="space-y-6">
@@ -1449,6 +1487,7 @@ export default function BaleStockEntry() {
           <p className="text-muted-foreground text-sm mt-1">Scan products and enter bales directly into stock</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <DailyStockSummary />
           <LabelPrintSettings />
           <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
         </div>

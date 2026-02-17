@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -151,7 +151,8 @@ const STATUS_COLORS: Record<string, string> = {
 export default function BalesHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("IN_STOCK");
+  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split("T")[0]);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
@@ -261,6 +262,11 @@ export default function BalesHistory() {
     if (batchFilter !== "all" && String(bale.mixBatchId) !== batchFilter) return false;
     if (statusFilter !== "all" && bale.status !== statusFilter) return false;
 
+    if (dateFilter) {
+      const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+      if (baleDate !== dateFilter) return false;
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       const searchFields = [
@@ -280,6 +286,16 @@ export default function BalesHistory() {
   const totalWeight = filtered.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayInStock = (balesData || []).filter((row: any) => {
+    const bale = row.bale;
+    if (bale.status !== "IN_STOCK") return false;
+    const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
+    return baleDate === todayStr;
+  });
+  const todayTotalQty = todayInStock.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const todayTotalKg = todayInStock.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -291,11 +307,27 @@ export default function BalesHistory() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Package className="h-5 w-5 text-muted-foreground" />
-        <h2 className="text-lg font-semibold">Bales History</h2>
-        <Badge variant="secondary" data-testid="badge-total-bales">{totalBales} bales</Badge>
-        <Badge variant="outline" data-testid="badge-total-weight">{formatLabelNum(totalWeight)} kg</Badge>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Package className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Bales History</h2>
+          <Badge variant="secondary" data-testid="badge-total-bales">{totalBales} bales</Badge>
+          <Badge variant="outline" data-testid="badge-total-weight">{formatLabelNum(totalWeight)} kg</Badge>
+        </div>
+        <Card className="border-dashed">
+          <CardContent className="py-2 px-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground font-medium">Today&apos;s In Stock</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold" data-testid="text-today-qty">{todayTotalQty} qty</span>
+                <span className="text-sm font-semibold" data-testid="text-today-kg">{formatLabelNum(todayTotalKg)} kg</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -310,6 +342,20 @@ export default function BalesHistory() {
                 className="pl-9"
                 data-testid="input-bales-search"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-[160px]"
+                data-testid="input-date-filter"
+              />
+              {dateFilter && (
+                <Button variant="ghost" size="sm" onClick={() => setDateFilter("")} data-testid="button-clear-date">
+                  Clear
+                </Button>
+              )}
             </div>
             <Select value={batchFilter} onValueChange={setBatchFilter}>
               <SelectTrigger className="w-[200px]" data-testid="select-batch-filter">
