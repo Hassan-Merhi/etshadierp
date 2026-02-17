@@ -149,8 +149,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
   let labelsHtml = '';
   for (const label of labels) {
     labelsHtml += `
-      <div class="a5-page">
-        <div class="a5-preprint-gap"></div>
+      <div class="a5-page a5-page-content">
         <div class="a5-top-content">
           <div class="a5-detail-left">
             ${buildDetailBlock(label)}
@@ -160,8 +159,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
           </div>
         </div>
       </div>
-      <div class="a5-page">
-        <div class="a5-preprint-gap"></div>
+      <div class="a5-page a5-page-content">
         <div class="a5-bottom-namebox">
           <div class="a5-bottom-name-text">${label.productName}</div>
         </div>
@@ -188,8 +186,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
 
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
-
-    .a5-preprint-gap { height: 80mm; flex-shrink: 0; }
+    .a5-page-content { padding-top: 80mm; }
 
     .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 4mm; align-items: stretch; padding: 2mm 5mm; }
     .a5-detail-left { flex-shrink: 0; width: 62mm; overflow: hidden; border: 0.3mm solid #ccc; }
