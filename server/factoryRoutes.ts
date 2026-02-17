@@ -1028,6 +1028,71 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { codePrefix, find, replace } = req.body;
+      if (!codePrefix || find === undefined || find === "" || replace === undefined) {
+        return res.status(400).json({ message: "codePrefix, find (non-empty), and replace are required" });
+      }
+
+      const products = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(
+          eq(factoryBaleProducts.companyId, companyId),
+          or(
+            ilike(factoryBaleProducts.code, `${codePrefix}%`),
+            ilike(factoryBaleProducts.articleCode, `${codePrefix}%`)
+          )
+        ))
+        .orderBy(factoryBaleProducts.name);
+
+      const matches = products
+        .filter((p) => p.name.includes(find))
+        .map((p) => ({
+          id: p.id,
+          code: p.articleCode,
+          currentName: p.name,
+          newName: p.name.replaceAll(find, replace),
+        }));
+
+      res.json({ total: products.length, matches });
+    } catch (error: any) {
+      console.error("Error previewing bulk rename:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "No items to rename" });
+      }
+
+      let updated = 0;
+      for (const item of items) {
+        const [result] = await db
+          .update(factoryBaleProducts)
+          .set({ name: item.newName, updatedAt: new Date() })
+          .where(and(eq(factoryBaleProducts.id, item.id), eq(factoryBaleProducts.companyId, companyId)))
+          .returning();
+        if (result) updated++;
+      }
+
+      res.json({ updated });
+    } catch (error: any) {
+      console.error("Error applying bulk rename:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bale-products/import-excel", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;

@@ -6,7 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FactorySettingsData {
@@ -41,9 +42,56 @@ const defaultSettings: FactorySettingsData = {
   overheadPerKg: 0,
 };
 
+interface RenamePreviewItem {
+  id: number;
+  code: string;
+  currentName: string;
+  newName: string;
+}
+
 export default function FactorySettings() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<FactorySettingsData>(defaultSettings);
+
+  const [codePrefix, setCodePrefix] = useState("HMD13");
+  const [findStr, setFindStr] = useState("-");
+  const [replaceStr, setReplaceStr] = useState(" ");
+  const [renamePreview, setRenamePreview] = useState<RenamePreviewItem[] | null>(null);
+
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/bale-products/bulk-rename-preview", {
+        codePrefix,
+        find: findStr,
+        replace: replaceStr,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { total: number; matches: RenamePreviewItem[] }) => {
+      setRenamePreview(data.matches);
+      if (data.matches.length === 0) {
+        toast({ title: "No matches", description: `Found ${data.total} products with code prefix "${codePrefix}" but none have "${findStr}" in their name.` });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async (items: RenamePreviewItem[]) => {
+      const res = await apiRequest("POST", "/api/factory/bale-products/bulk-rename-apply", { items });
+      return res.json();
+    },
+    onSuccess: (data: { updated: number }) => {
+      toast({ title: "Renamed successfully", description: `${data.updated} product name(s) updated.` });
+      setRenamePreview(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/factory/bale-products'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const { data, isLoading } = useQuery<FactorySettingsData>({
     queryKey: ['/api/factory/settings'],
@@ -198,6 +246,96 @@ export default function FactorySettings() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Wrench className="h-5 w-5 text-muted-foreground" />
+            <CardTitle data-testid="text-section-data-cleanup">Data Cleanup</CardTitle>
+          </div>
+          <CardDescription>Find products by code prefix and rename them in bulk</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="codePrefix">Code Prefix</Label>
+              <Input
+                id="codePrefix"
+                value={codePrefix}
+                onChange={(e) => { setCodePrefix(e.target.value); setRenamePreview(null); }}
+                placeholder="e.g. HMD13"
+                data-testid="input-code-prefix"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="findStr">Find in Name</Label>
+              <Input
+                id="findStr"
+                value={findStr}
+                onChange={(e) => { setFindStr(e.target.value); setRenamePreview(null); }}
+                placeholder="e.g. -"
+                data-testid="input-find-str"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="replaceStr">Replace With</Label>
+              <Input
+                id="replaceStr"
+                value={replaceStr}
+                onChange={(e) => { setReplaceStr(e.target.value); setRenamePreview(null); }}
+                placeholder="e.g. (space)"
+                data-testid="input-replace-str"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => previewMutation.mutate()}
+            disabled={previewMutation.isPending || !codePrefix.trim() || !findStr}
+            data-testid="button-preview-rename"
+          >
+            {previewMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+            Preview Changes
+          </Button>
+
+          {renamePreview && renamePreview.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {renamePreview.length} product(s) will be renamed:
+              </div>
+              <div className="max-h-80 overflow-y-auto border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Current Name</TableHead>
+                      <TableHead className="w-8"></TableHead>
+                      <TableHead>New Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renamePreview.map((item) => (
+                      <TableRow key={item.id} data-testid={`row-rename-${item.id}`}>
+                        <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                        <TableCell>{item.currentName}</TableCell>
+                        <TableCell><ArrowRight className="h-4 w-4 text-muted-foreground" /></TableCell>
+                        <TableCell className="font-medium">{item.newName}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Button
+                onClick={() => applyMutation.mutate(renamePreview)}
+                disabled={applyMutation.isPending}
+                data-testid="button-apply-rename"
+              >
+                {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                Apply {renamePreview.length} Rename(s)
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
