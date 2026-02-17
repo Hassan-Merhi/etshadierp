@@ -391,6 +391,9 @@ function StockEntryTab() {
     }
   };
 
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const filteredProducts = scanInput.trim().length > 0
     ? (activeProducts || []).filter((p) => {
         const term = scanInput.trim().toLowerCase();
@@ -399,7 +402,7 @@ function StockEntryTab() {
           (p.articleCode?.toLowerCase().includes(term)) ||
           p.code.toLowerCase().includes(term)
         );
-      }).slice(0, 10)
+      }).slice(0, 1000)
     : [];
 
   const selectProduct = (product: FactoryBaleProduct) => {
@@ -653,18 +656,42 @@ function StockEntryTab() {
                 <Input
                   ref={scanRef}
                   value={scanInput}
-                  onChange={(e) => { setScanInput(e.target.value); setScanError(""); setShowDropdown(true); }}
+                  onChange={(e) => { setScanInput(e.target.value); setScanError(""); setShowDropdown(true); setHighlightedIndex(0); }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      if (filteredProducts.length === 1) {
-                        selectProduct(filteredProducts[0]);
-                      } else {
-                        handleScan(scanInput);
+                      if (showDropdown && filteredProducts.length > 0) {
+                        setHighlightedIndex((prev) => {
+                          const next = prev < filteredProducts.length - 1 ? prev + 1 : 0;
+                          const el = dropdownRef.current?.children[next] as HTMLElement;
+                          if (el) el.scrollIntoView({ block: "nearest" });
+                          return next;
+                        });
                       }
-                    }
-                    if (e.key === "Escape") {
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      if (showDropdown && filteredProducts.length > 0) {
+                        setHighlightedIndex((prev) => {
+                          const next = prev > 0 ? prev - 1 : filteredProducts.length - 1;
+                          const el = dropdownRef.current?.children[next] as HTMLElement;
+                          if (el) el.scrollIntoView({ block: "nearest" });
+                          return next;
+                        });
+                      }
+                    } else if (e.key === "Enter" || e.key === "Tab") {
+                      if (showDropdown && filteredProducts.length > 0) {
+                        e.preventDefault();
+                        const idx = highlightedIndex >= 0 && highlightedIndex < filteredProducts.length ? highlightedIndex : 0;
+                        selectProduct(filteredProducts[idx]);
+                        setHighlightedIndex(0);
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleScan(scanInput);
+                        setHighlightedIndex(0);
+                      }
+                    } else if (e.key === "Escape") {
                       setShowDropdown(false);
+                      setHighlightedIndex(-1);
                     }
                   }}
                   onFocus={() => { if (scanInput.trim()) setShowDropdown(true); }}
@@ -673,13 +700,14 @@ function StockEntryTab() {
                   data-testid="input-stock-entry-scan"
                 />
                 {showDropdown && scanInput.trim().length > 0 && filteredProducts.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="dropdown-product-suggestions">
-                    {filteredProducts.map((p) => (
+                  <div ref={dropdownRef} className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="dropdown-product-suggestions">
+                    {filteredProducts.map((p, idx) => (
                       <button
                         key={p.id}
                         type="button"
-                        className="w-full text-left px-3 py-2 hover-elevate flex items-center justify-between gap-2 text-sm"
-                        onClick={() => selectProduct(p)}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 text-sm ${idx === highlightedIndex ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
+                        onClick={() => { selectProduct(p); setHighlightedIndex(-1); }}
+                        onMouseEnter={() => setHighlightedIndex(idx)}
                         data-testid={`button-select-product-${p.id}`}
                       >
                         <span className="font-medium">{p.name}</span>
