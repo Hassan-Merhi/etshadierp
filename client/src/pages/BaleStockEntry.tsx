@@ -246,21 +246,21 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
     .sticker-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .sticker-page:last-child { page-break-after: auto; }
-    .label { width: 3in; height: 1.97in; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
-    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-    .label-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1mm; }
+    .label { width: 3in; height: 1.97in; padding: 1.5mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
+    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.5mm; height: 100%; }
+    .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
-    .sticker-logo { height: 14mm; width: auto; object-fit: contain; display: block; }
-    .info-section { text-align: right; font-size: 9pt; line-height: 1.5; }
+    .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
+    .info-section { text-align: right; font-size: 8pt; line-height: 1.3; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .ref-barcode-section { text-align: center; margin-top: 1mm; }
-    .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .article-barcode-section { text-align: center; margin-top: 2mm; }
-    .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
-    .product-name-text { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
+    .ref-barcode-section { text-align: center; }
+    .ref-barcode-img { width: 100%; height: 9mm; object-fit: fill; }
+    .ref-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .article-barcode-section { text-align: center; }
+    .article-barcode-img { width: 100%; height: 9mm; object-fit: fill; }
+    .product-section { text-align: center; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
+    .product-name-text { font-size: 8pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; color: #000; text-transform: uppercase; word-break: break-word; line-height: 1.1; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
