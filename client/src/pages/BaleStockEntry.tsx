@@ -104,7 +104,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .code-label { width: 76mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
+    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
@@ -168,35 +168,35 @@ function generateA5LabelsHtml(labels: LabelData[]) {
       </div>`;
   }
   return `<html><head><title>Stock Entry Labels - A5</title><style>
-    @page { size: 148.5mm 210mm; margin: 0; }
+    @page { size: 210mm 148.5mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
-    .code-label { width: 100%; padding: 2mm 2mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
+    .code-label { width: 76mm; max-height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: space-between; background: #fff; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
-    .logo-img { height: 10mm; width: auto; object-fit: contain; display: block; }
-    .info-section { text-align: right; font-size: 7pt; line-height: 1.3; }
+    .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
+    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .barcode-number { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.4px #000; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
-    .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .article-barcode-number { font-size: 9pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.3mm; letter-spacing: 1px; text-transform: uppercase; color: #000; }
+    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .article-barcode-area { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .article-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; color: #000; }
 
-    .a5-page { width: 148.5mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+    .a5-page { width: 210mm; height: 148.5mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
 
     .a5-preprint-gap { height: 90mm; flex-shrink: 0; }
-    .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 3mm; align-items: stretch; padding: 2mm 5mm; overflow: hidden; }
-    .a5-detail-left { flex: 0 0 65mm; width: 65mm; max-width: 65mm; overflow: hidden; border: 0.3mm solid #ccc; }
-    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .a5-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(16pt, 5vw, 32pt); line-height: 1.15; color: #000; word-break: break-word; }
+    .a5-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
+    .a5-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
+    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 58.5mm; }
+    .a5-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; word-break: break-word; }
 
-    .a5-bottom-namebox { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 8mm; }
-    .a5-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(24pt, 7vw, 48pt); line-height: 1.15; color: #000; word-break: break-word; }
+    .a5-bottom-namebox { height: 58.5mm; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 10mm; }
+    .a5-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
@@ -207,7 +207,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
       .a5-name-right-text, .a5-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
     }
-  </style></head><body><div class="print-note">A5 Bale Labels. Select A5 paper size, Portrait, 100% scale. Set BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
+  </style></head><body><div class="print-note">A5 Bale Labels. In print dialog: select A5 paper, Landscape orientation, 100% scale (no fit-to-page). Set BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
 
 function generateStickerLabelsHtml(labels: LabelData[]) {
