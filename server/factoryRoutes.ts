@@ -121,18 +121,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!erpLocationId) {
         return res.status(400).json({ message: "Location is required" });
       }
-      if (!mixBatchId) {
-        return res.status(400).json({ message: "Mix batch is required" });
-      }
 
       const result = await db.transaction(async (tx: any) => {
-        const [mixBatch] = await tx
-          .select()
-          .from(factoryMixBatches)
-          .where(and(eq(factoryMixBatches.id, mixBatchId), eq(factoryMixBatches.companyId, companyId)))
-          .for("update");
-
-        if (!mixBatch) throw new Error("Mix batch not found");
+        let mixBatch: any = null;
+        if (mixBatchId) {
+          const [mb] = await tx
+            .select()
+            .from(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, mixBatchId), eq(factoryMixBatches.companyId, companyId)))
+            .for("update");
+          if (!mb) throw new Error("Mix batch not found");
+          mixBatch = mb;
+        }
 
         const totalExpected = items.reduce((sum: number, item: any) => sum + parseInt(item.quantity || item.qty || "1"), 0);
 
@@ -150,14 +150,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 1;
+          nextNumber = 100000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 1 + totalExpected,
+            nextNumber: 100000 + totalExpected,
           });
         }
 
-        const costPerKg = parseFloat(mixBatch.costPerKg || "0");
+        const costPerKg = mixBatch ? parseFloat(mixBatch.costPerKg || "0") : 0;
         const now = new Date();
         const bales: any[] = [];
         let baleIndex = 0;
@@ -179,14 +179,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `HD${String(nextNumber + baleIndex).padStart(5, "0")}`;
+            const refNum = `HD${String(nextNumber + baleIndex).padStart(7, "0")}`;
             const baleTotalCost = weight * costPerKg;
 
             const [bale] = await tx
               .insert(factoryBales)
               .values({
                 companyId,
-                mixBatchId,
+                mixBatchId: mixBatchId || null,
                 productId: item.productId,
                 erpLocationId,
                 baleCode: product.code,
@@ -207,15 +207,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
         }
 
-        const mixRemaining = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
-        if (totalWeight > mixRemaining + 0.001) {
-          throw new Error(`Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`);
-        }
+        if (mixBatch) {
+          const mixRemaining = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
+          if (totalWeight > mixRemaining + 0.001) {
+            throw new Error(`Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`);
+          }
 
-        await tx
-          .update(factoryMixBatches)
-          .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalWeight}`, updatedAt: now })
-          .where(eq(factoryMixBatches.id, mixBatchId));
+          await tx
+            .update(factoryMixBatches)
+            .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalWeight}`, updatedAt: now })
+            .where(eq(factoryMixBatches.id, mixBatchId));
+        }
 
         const categoryIdSet = new Set<number>();
         factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
@@ -2110,16 +2112,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 1;
+          nextNumber = 100000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 1 + quantity,
+            nextNumber: 100000 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `HD${String(nextNumber + i).padStart(5, "0")}`;
+          const refNum = `HD${String(nextNumber + i).padStart(7, "0")}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -2193,10 +2195,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 1;
+          nextNumber = 100000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 1 + totalExpected,
+            nextNumber: 100000 + totalExpected,
           });
         }
 
@@ -2215,7 +2217,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `HD${String(nextNumber + baleIndex).padStart(5, "0")}`;
+            const refNum = `HD${String(nextNumber + baleIndex).padStart(7, "0")}`;
             const [bale] = await tx
               .insert(factoryBales)
               .values({
@@ -2296,16 +2298,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 1;
+          nextNumber = 100000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 1 + quantity,
+            nextNumber: 100000 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `HD${String(nextNumber + i).padStart(5, "0")}`;
+          const refNum = `HD${String(nextNumber + i).padStart(7, "0")}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -2994,7 +2996,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             continue;
           }
 
-          const referenceNumber = `REF${String(nextRef).padStart(5, "0")}`;
+          const referenceNumber = `REF${String(nextRef).padStart(7, "0")}`;
           nextRef++;
 
           const status = bale.status || "FINALIZED";

@@ -331,7 +331,7 @@ function StockEntryTab() {
   const activeLocations = locations?.filter((l) => l.active);
   const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
-  const selectedMixBatch = activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId);
+  const selectedMixBatch = selectedMixBatchId && selectedMixBatchId !== "__none__" ? activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId) : undefined;
   const mixBatchRemaining = selectedMixBatch
     ? parseFloat(selectedMixBatch.totalWeightKg) - parseFloat(selectedMixBatch.usedKg || "0")
     : 0;
@@ -454,10 +454,6 @@ function StockEntryTab() {
       toast({ title: "Error", description: "Please select a warehouse location", variant: "destructive" });
       return;
     }
-    if (!selectedMixBatchId) {
-      toast({ title: "Error", description: "Please select a mix batch", variant: "destructive" });
-      return;
-    }
     if (cart.length === 0) {
       toast({ title: "Error", description: "Please add items to the cart", variant: "destructive" });
       return;
@@ -550,11 +546,14 @@ function StockEntryTab() {
         weightPerBale: item.weightPerBaleKg.toString(),
       }));
 
-      const response = await apiRequest("POST", "/api/factory/stock-entry", {
+      const body: any = {
         items,
         erpLocationId: parseInt(selectedLocationId),
-        mixBatchId: parseInt(selectedMixBatchId),
-      });
+      };
+      if (selectedMixBatchId && selectedMixBatchId !== "__none__") {
+        body.mixBatchId = parseInt(selectedMixBatchId);
+      }
+      const response = await apiRequest("POST", "/api/factory/stock-entry", body);
 
       if (!response.ok) {
         const err = await response.json();
@@ -612,13 +611,14 @@ function StockEntryTab() {
           </Select>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1.5">Mix Batch (raw material)</p>
+          <p className="text-sm text-muted-foreground mb-1.5">Mix Batch (optional)</p>
           <Select value={selectedMixBatchId} onValueChange={setSelectedMixBatchId}>
             <SelectTrigger data-testid="select-stock-entry-mix-batch">
-              <SelectValue placeholder="Select Mix Batch..." />
+              <SelectValue placeholder="No mix batch (cost = 0)" />
             </SelectTrigger>
             <SelectContent>
-              {activeMixBatches && activeMixBatches.length > 0 ? (
+              <SelectItem value="__none__">No mix batch (cost = 0)</SelectItem>
+              {activeMixBatches && activeMixBatches.length > 0 && (
                 activeMixBatches.map((mb) => {
                   const remaining = parseFloat(mb.totalWeightKg) - parseFloat(mb.usedKg || "0");
                   return (
@@ -627,8 +627,6 @@ function StockEntryTab() {
                     </SelectItem>
                   );
                 })
-              ) : (
-                <SelectItem value="none" disabled>No active mix batches</SelectItem>
               )}
             </SelectContent>
           </Select>
@@ -820,7 +818,7 @@ function StockEntryTab() {
 
           <Button
             className="w-full gap-2"
-            disabled={cart.length === 0 || !selectedLocationId || !selectedMixBatchId || stockEntryMutation.isPending}
+            disabled={cart.length === 0 || !selectedLocationId || stockEntryMutation.isPending}
             onClick={handleConfirmClick}
             data-testid="button-confirm-stock-entry"
           >
