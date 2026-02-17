@@ -113,10 +113,10 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
     .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
+    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-area { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
+    .article-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; color: #000; }
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
@@ -181,10 +181,10 @@ function generateA5LabelsHtml(labels: LabelData[]) {
     .info-val { font-weight: 900; }
     .barcode-area { text-align: center; margin-top: auto; }
     .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
+    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-area { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
     .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #000; }
+    .article-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; color: #000; }
 
     .a5-page { width: 210mm; height: 148.5mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
@@ -257,7 +257,7 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; margin-top: 1mm; }
     .ref-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 9pt; font-weight: 900; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1.5px; -webkit-text-stroke: 0.5px #000; }
+    .ref-barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .article-barcode-section { text-align: center; margin-top: 2mm; }
     .article-barcode-img { width: 100%; height: 10mm; object-fit: fill; }
     .product-section { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 0.5mm; }
