@@ -956,9 +956,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       let code = req.body.code;
-      const articleCode = req.body.articleCode;
+      let articleCode = req.body.articleCode;
 
-      if (!code && articleCode) {
+      if (!articleCode) {
+        const name = req.body.name || "";
+        const baseArticle = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 40);
+        const timestamp = Date.now().toString(36).toUpperCase();
+        articleCode = baseArticle ? `${baseArticle}-${timestamp}` : `PROD-${timestamp}`;
+      }
+
+      if (!code) {
         code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
       }
 
@@ -970,7 +977,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (existing) return res.status(400).json({ message: "A product with this article code already exists" });
       }
 
-      const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code });
+      const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
       const [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
       res.json(product);
     } catch (error: any) {

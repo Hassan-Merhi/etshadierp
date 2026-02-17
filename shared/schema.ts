@@ -2217,7 +2217,7 @@ export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProd
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   code: z.string().optional(),
-  articleCode: z.string().min(1, "Article code is required"),
+  articleCode: z.string().optional().nullable(),
   name: z.string().min(1, "Product name is required"),
   description: z.string().optional().nullable(),
   weightPerBaleKg: z.string().optional().nullable(),
