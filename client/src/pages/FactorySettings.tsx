@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FactorySettingsData {
@@ -57,6 +57,9 @@ export default function FactorySettings() {
   const [findStr, setFindStr] = useState("-");
   const [replaceStr, setReplaceStr] = useState(" ");
   const [renamePreview, setRenamePreview] = useState<RenamePreviewItem[] | null>(null);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelResult, setExcelResult] = useState<{ created: number; updated: number; categoriesCreated: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -90,6 +93,36 @@ export default function FactorySettings() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const excelUploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/factory/bale-products/import-excel", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: { created: number; updated: number; categoriesCreated: number }) => {
+      setExcelResult(data);
+      setExcelFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      toast({
+        title: "Excel import complete",
+        description: `${data.updated} updated, ${data.created} created${data.categoriesCreated > 0 ? `, ${data.categoriesCreated} categories created` : ""}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -332,6 +365,55 @@ export default function FactorySettings() {
                 {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                 Apply {renamePreview.length} Rename(s)
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-muted-foreground" />
+            <CardTitle data-testid="text-section-excel-import">Excel Product Import</CardTitle>
+          </div>
+          <CardDescription>Upload an Excel file to update bale product names, weights, and categories by matching on article code</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>Your Excel file should have these column headers:</p>
+            <ul className="list-disc list-inside ml-2 space-y-0.5">
+              <li><span className="font-mono text-xs">articleCode</span> (required) - matches existing products</li>
+              <li><span className="font-mono text-xs">name</span> - new product name</li>
+              <li><span className="font-mono text-xs">weightPerBaleKg</span> - weight per bale in KG</li>
+              <li><span className="font-mono text-xs">category</span> - product category (auto-created if new)</li>
+              <li><span className="font-mono text-xs">description</span> - product description (optional)</li>
+            </ul>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => {
+                setExcelFile(e.target.files?.[0] || null);
+                setExcelResult(null);
+              }}
+              className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+              data-testid="input-excel-file"
+            />
+            <Button
+              onClick={() => excelFile && excelUploadMutation.mutate(excelFile)}
+              disabled={!excelFile || excelUploadMutation.isPending}
+              data-testid="button-upload-excel"
+            >
+              {excelUploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+              {excelUploadMutation.isPending ? "Importing..." : "Import"}
+            </Button>
+          </div>
+          {excelResult && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-excel-result">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span>{excelResult.updated} product(s) updated, {excelResult.created} new product(s) created{excelResult.categoriesCreated > 0 ? `, ${excelResult.categoriesCreated} new category(ies)` : ""}</span>
             </div>
           )}
         </CardContent>
