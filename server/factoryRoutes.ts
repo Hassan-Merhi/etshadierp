@@ -150,10 +150,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100000;
+          nextNumber = 100876;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100000 + totalExpected,
+            nextNumber: 100876 + totalExpected,
           });
         }
 
@@ -179,7 +179,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `HD${String(nextNumber + baleIndex).padStart(7, "0")}`;
+            const refNum = `REF${nextNumber + baleIndex}`;
             const baleTotalCost = weight * costPerKg;
 
             const [bale] = await tx
@@ -2112,16 +2112,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100000;
+          nextNumber = 100876;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100000 + quantity,
+            nextNumber: 100876 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `HD${String(nextNumber + i).padStart(7, "0")}`;
+          const refNum = `REF${nextNumber + i}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -2195,10 +2195,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100000;
+          nextNumber = 100876;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100000 + totalExpected,
+            nextNumber: 100876 + totalExpected,
           });
         }
 
@@ -2217,7 +2217,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `HD${String(nextNumber + baleIndex).padStart(7, "0")}`;
+            const refNum = `REF${nextNumber + baleIndex}`;
             const [bale] = await tx
               .insert(factoryBales)
               .values({
@@ -2298,16 +2298,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100000;
+          nextNumber = 100876;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100000 + quantity,
+            nextNumber: 100876 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `HD${String(nextNumber + i).padStart(7, "0")}`;
+          const refNum = `REF${nextNumber + i}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -2979,7 +2979,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       const maxRef = await db.select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
-      let nextRef = (maxRef[0]?.maxRef || 0) + 1;
+      let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 100876);
 
       let imported = 0;
       const errors: string[] = [];
@@ -2996,7 +2996,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             continue;
           }
 
-          const referenceNumber = `REF${String(nextRef).padStart(7, "0")}`;
+          const referenceNumber = `REF${nextRef}`;
           nextRef++;
 
           const status = bale.status || "FINALIZED";
