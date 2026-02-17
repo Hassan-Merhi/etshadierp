@@ -190,10 +190,10 @@ function generateA5LabelsHtml(labels: LabelData[]) {
     .a5-page:last-child { page-break-after: auto; }
 
     .a5-preprint-gap { height: 90mm; flex-shrink: 0; }
-    .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 3mm; align-items: flex-start; padding: 2mm 5mm; overflow: hidden; }
-    .a5-detail-left { flex-shrink: 0; width: 65mm; overflow: hidden; border: 0.3mm solid #ccc; }
-    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 100%; }
-    .a5-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(14pt, 4vw, 28pt); line-height: 1.15; color: #000; word-break: break-word; }
+    .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 3mm; align-items: stretch; padding: 2mm 5mm; overflow: hidden; }
+    .a5-detail-left { flex: 0 0 65mm; width: 65mm; max-width: 65mm; overflow: hidden; border: 0.3mm solid #ccc; }
+    .a5-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .a5-name-right-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(16pt, 5vw, 32pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .a5-bottom-namebox { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 8mm; }
     .a5-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(24pt, 7vw, 48pt); line-height: 1.15; color: #000; word-break: break-word; }
