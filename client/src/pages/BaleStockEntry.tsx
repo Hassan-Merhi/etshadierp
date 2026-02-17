@@ -189,7 +189,7 @@ function generateA5LabelsHtml(labels: LabelData[]) {
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
 
-    .a5-preprint-gap { height: 100mm; flex-shrink: 0; }
+    .a5-preprint-gap { height: 80mm; flex-shrink: 0; }
 
     .a5-top-content { flex: 1; display: flex; flex-direction: row; gap: 4mm; align-items: stretch; padding: 2mm 5mm; }
     .a5-detail-left { flex-shrink: 0; width: 62mm; overflow: hidden; border: 0.3mm solid #ccc; }
