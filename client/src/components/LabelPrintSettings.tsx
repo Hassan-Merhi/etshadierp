@@ -124,7 +124,7 @@ export function LabelPrintSettings() {
             <p className="text-xs text-muted-foreground">
               {paperFormat === 'A4'
                 ? 'Each A4 sheet prints one label: detail block on top half, product name on bottom half.'
-                : 'Each bale prints 2 A5 pages: page 1 has detail block + product name, page 2 has large product name. Same as A4 but split into separate A5 pages.'}
+                : 'Each bale prints 2 A5 portrait pages: page 1 has detail block on top + product name below, page 2 has large product name. Select A5 paper and Portrait in print dialog.'}
             </p>
           </div>
 
