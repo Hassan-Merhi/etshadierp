@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, CalendarDays } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, CalendarDays, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
   IN_STOCK: "default",
   RESERVED: "outline",
   SOLD: "destructive",
+  REPACKED: "secondary",
 };
 
 export default function BalesHistory() {
@@ -57,6 +58,10 @@ export default function BalesHistory() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
+  const [editingNameId, setEditingNameId] = useState<number | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
+  const [repackConfirm, setRepackConfirm] = useState<any>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: balesData, isLoading } = useQuery<any[]>({
@@ -109,6 +114,60 @@ export default function BalesHistory() {
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateProductName = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      return await apiRequest("PATCH", `/api/factory/bales/${id}/product-name`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      setEditingNameId(null);
+      toast({ title: "Product name updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error updating name", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const repackBale = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/factory/bales/${id}/repack`, {});
+    },
+    onSuccess: async (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      setRepackConfirm(null);
+      const data = await response.json();
+      toast({ title: "Bale repacked", description: `New reference: ${data.newRefNum}` });
+
+      const label: LabelData = {
+        referenceNumber: data.newBale.referenceNumber || data.newRefNum,
+        articleCode: data.newBale.articleCode || data.newBale.category || "",
+        pieces: data.newBale.quantity || 1,
+        approxWeightKg: data.newBale.weightKg || "0",
+        productName: data.newBale.productName || data.newBale.category || "",
+      };
+      openBrowserReprint([label]);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error repacking bale", description: error.message, variant: "destructive" });
+      setRepackConfirm(null);
+    },
+  });
+
+  const startEditName = (baleId: number, currentName: string) => {
+    setEditingNameId(baleId);
+    setEditingNameValue(currentName);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
+
+  const saveEditName = (baleId: number) => {
+    if (editingNameValue.trim()) {
+      updateProductName.mutate({ id: baleId, name: editingNameValue.trim() });
+    } else {
+      setEditingNameId(null);
+    }
+  };
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -294,6 +353,7 @@ export default function BalesHistory() {
                 <SelectItem value="IN_STOCK">In Stock</SelectItem>
                 <SelectItem value="RESERVED">Reserved</SelectItem>
                 <SelectItem value="SOLD">Sold</SelectItem>
+                <SelectItem value="REPACKED">Repacked</SelectItem>
               </SelectContent>
             </Select>
             <LabelPrintSettings />
@@ -315,6 +375,7 @@ export default function BalesHistory() {
                   <SelectItem value="IN_STOCK">In Stock</SelectItem>
                   <SelectItem value="RESERVED">Reserved</SelectItem>
                   <SelectItem value="SOLD">Sold</SelectItem>
+                  <SelectItem value="REPACKED">Repacked</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -378,7 +439,34 @@ export default function BalesHistory() {
                             data-testid={`checkbox-bale-${bale.id}`}
                           />
                         </TableCell>
-                        <TableCell>{product?.name || "-"}</TableCell>
+                        <TableCell>
+                          {editingNameId === bale.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                ref={nameInputRef}
+                                value={editingNameValue}
+                                onChange={(e) => setEditingNameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEditName(bale.id);
+                                  if (e.key === "Escape") setEditingNameId(null);
+                                }}
+                                className="h-7 text-xs w-[160px]"
+                                data-testid={`input-edit-name-${bale.id}`}
+                              />
+                              <Button size="icon" variant="ghost" onClick={() => saveEditName(bale.id)} data-testid={`button-save-name-${bale.id}`}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => setEditingNameId(null)} data-testid={`button-cancel-name-${bale.id}`}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 group cursor-pointer" onClick={() => startEditName(bale.id, product?.name || bale.productName || "")} data-testid={`text-product-name-${bale.id}`}>
+                              <span>{product?.name || bale.productName || "-"}</span>
+                              <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
                         <TableCell className="text-right">{bale.quantity}</TableCell>
                         <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
@@ -401,6 +489,7 @@ export default function BalesHistory() {
                               <SelectItem value="IN_STOCK">In Stock</SelectItem>
                               <SelectItem value="RESERVED">Reserved</SelectItem>
                               <SelectItem value="SOLD">Sold</SelectItem>
+                              <SelectItem value="REPACKED">Repacked</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -409,6 +498,16 @@ export default function BalesHistory() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setRepackConfirm(row)}
+                              disabled={bale.status === "REPACKED" || bale.status === "SOLD"}
+                              title="Repack bale"
+                              data-testid={`button-repack-${bale.id}`}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -454,6 +553,32 @@ export default function BalesHistory() {
               data-testid="button-confirm-delete"
             >
               {deleteBale.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={repackConfirm !== null} onOpenChange={() => setRepackConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Repack Bale</DialogTitle>
+            <DialogDescription>
+              {repackConfirm && (
+                <>
+                  Repack bale <span className="font-mono font-semibold">{repackConfirm.bale.referenceNumber}</span> ({repackConfirm.product?.name || repackConfirm.bale.productName || "Unknown"})?
+                  This will mark the original bale as REPACKED and create a new bale with a new reference code. Labels will be printed for the new bale.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRepackConfirm(null)} data-testid="button-cancel-repack">Cancel</Button>
+            <Button
+              onClick={() => repackConfirm && repackBale.mutate(repackConfirm.bale.id)}
+              disabled={repackBale.isPending}
+              data-testid="button-confirm-repack"
+            >
+              {repackBale.isPending ? "Repacking..." : "Repack"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2755,6 +2755,120 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Name is required" });
+      }
+
+      const [bale] = await db
+        .select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+
+      if (!bale) return res.status(404).json({ message: "Bale not found" });
+
+      if (bale.productId) {
+        await db
+          .update(factoryBaleProducts)
+          .set({ name: name.trim(), updatedAt: new Date() })
+          .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
+      }
+
+      await db
+        .update(factoryBales)
+        .set({ productName: name.trim(), updatedAt: new Date() })
+        .where(eq(factoryBales.id, id));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error updating bale product name:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/bales/:id/repack", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      const result = await db.transaction(async (tx: any) => {
+        const [originalBale] = await tx
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+
+        if (!originalBale) throw new Error("Bale not found");
+        if (originalBale.status === "REPACKED") throw new Error("Bale has already been repacked");
+        if (originalBale.status === "SOLD") throw new Error("Cannot repack a sold bale");
+
+        const [seqRecord] = await tx
+          .select()
+          .from(factoryBaleSequences)
+          .where(eq(factoryBaleSequences.companyId, companyId))
+          .for("update");
+
+        let nextNumber: number;
+        if (seqRecord) {
+          nextNumber = seqRecord.nextNumber;
+          await tx
+            .update(factoryBaleSequences)
+            .set({ nextNumber: nextNumber + 1 })
+            .where(eq(factoryBaleSequences.id, seqRecord.id));
+        } else {
+          nextNumber = 100876;
+          await tx.insert(factoryBaleSequences).values({
+            companyId,
+            nextNumber: 100877,
+          });
+        }
+
+        const newRefNum = `REF${nextNumber}`;
+
+        const [newBale] = await tx
+          .insert(factoryBales)
+          .values({
+            companyId: originalBale.companyId,
+            mixBatchId: originalBale.mixBatchId,
+            productId: originalBale.productId,
+            pressingBatchId: originalBale.pressingBatchId,
+            erpLocationId: originalBale.erpLocationId,
+            baleCode: originalBale.baleCode,
+            referenceNumber: newRefNum,
+            articleCode: originalBale.articleCode,
+            productName: originalBale.productName,
+            category: originalBale.category,
+            grade: originalBale.grade,
+            quantity: originalBale.quantity,
+            weightKg: originalBale.weightKg,
+            costPerKg: originalBale.costPerKg,
+            totalCost: originalBale.totalCost,
+            status: "IN_STOCK",
+          })
+          .returning();
+
+        await tx
+          .update(factoryBales)
+          .set({ status: "REPACKED", updatedAt: new Date() })
+          .where(eq(factoryBales.id, id));
+
+        return { originalBale, newBale, newRefNum };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error repacking bale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/bales/lookup/:barcode", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
