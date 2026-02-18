@@ -54,7 +54,7 @@ export default function CustomerProformas() {
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/stats", selectedCompany?.id],
+    queryKey: ["/api/factory/customers", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 

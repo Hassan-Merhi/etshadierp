@@ -95,7 +95,7 @@ export default function CustomerInvoiceCreate() {
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/stats", selectedCompany?.id],
+    queryKey: ["/api/factory/customers", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 

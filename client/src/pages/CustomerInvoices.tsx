@@ -41,7 +41,7 @@ export default function CustomerInvoices() {
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/stats", selectedCompany?.id],
+    queryKey: ["/api/factory/customers", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 

@@ -37,6 +37,9 @@ import {
   customerInvoiceSequences,
   customerBalances,
   customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
   companies,
   locations,
   userCompanyRoles,
@@ -3880,6 +3883,145 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // FACTORY CUSTOMERS CRUD
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allCustomers = await db.select().from(customers)
+        .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`));
+
+      const customersWithBalances = await Promise.all(
+        allCustomers.map(async (customer) => {
+          if (customer.ledgerAccountId) {
+            const entries = await db.select().from(voucherEntries)
+              .where(eq(voucherEntries.ledgerAccountId, customer.ledgerAccountId));
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            const openingSide = customer.openingBalanceSide || "Dr";
+            const balance = entries.reduce((sum, entry) => {
+              const debit = parseFloat(entry.debitAmount || "0");
+              const credit = parseFloat(entry.creditAmount || "0");
+              if (debit > 0 && credit === 0) return sum + debit;
+              else if (credit > 0 && debit === 0) return sum - credit;
+              return sum;
+            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+            return { ...customer, balance: Math.abs(balance), balanceSide: balance >= 0 ? "Dr" : "Cr" };
+          }
+
+          const [balRow] = await db.select({ total: sql<string>`COALESCE(SUM(CASE WHEN side = 'Dr' THEN CAST(amount AS numeric) ELSE -CAST(amount AS numeric) END), 0)` })
+            .from(customerBalances)
+            .where(and(eq(customerBalances.customerId, customer.id), eq(customerBalances.companyId, companyId)));
+          const customerBal = parseFloat(balRow?.total || "0");
+          const openingBalance = parseFloat(customer.openingBalance || "0");
+          const openingSide = customer.openingBalanceSide || "Dr";
+          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBal;
+          return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
+        })
+      );
+
+      res.json(customersWithBalances);
+    } catch (error: any) {
+      console.error("Error fetching factory customers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const dataWithCompany = { ...req.body, companyId };
+      const parsed = insertCustomerSchema.parse(dataWithCompany);
+
+      let suffix = 1;
+      const allExisting = await db.select().from(customers)
+        .where(eq(customers.companyId, companyId));
+
+      const existingCodes = allExisting
+        .map((c) => c.code)
+        .filter((c) => c.startsWith("CUST"))
+        .map((c) => parseInt(c.replace("CUST", "")))
+        .filter((n) => !isNaN(n));
+
+      if (existingCodes.length > 0) {
+        suffix = Math.max(...existingCodes) + 1;
+      }
+      let code = `CUST${suffix.toString().padStart(3, "0")}`;
+
+      let codeExists = true;
+      while (codeExists) {
+        const [dup] = await db.select().from(customers)
+          .where(and(eq(customers.code, code), eq(customers.companyId, companyId)));
+        if (dup) {
+          suffix++;
+          code = `CUST${suffix.toString().padStart(3, "0")}`;
+        } else {
+          codeExists = false;
+        }
+      }
+
+      const [customer] = await db.insert(customers).values({ ...parsed, code }).returning();
+
+      const customerAccountCode = `CUST-${customer.code}`;
+      const [existingAccount] = await db.select().from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.code, customerAccountCode), eq(ledgerAccounts.companyId, companyId)));
+
+      if (!existingAccount) {
+        const [newAccount] = await db.insert(ledgerAccounts).values({
+          companyId,
+          code: customerAccountCode,
+          name: `${customer.legalName} - Customer Account`,
+          accountType: "Asset",
+          subType: "Accounts Receivable",
+          openingBalance: parsed.openingBalance || "0",
+          openingBalanceSide: parsed.openingBalanceSide || "Dr",
+          active: true,
+        }).returning();
+
+        await db.update(customers).set({ ledgerAccountId: newAccount.id })
+          .where(eq(customers.id, customer.id));
+      }
+
+      res.status(201).json(customer);
+    } catch (error: any) {
+      console.error("Error creating factory customer:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/factory/customers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (!existing) return res.status(404).json({ message: "Customer not found" });
+      if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+
+      if (req.body.code && req.body.code !== existing.code) {
+        const [dup] = await db.select().from(customers)
+          .where(and(eq(customers.code, req.body.code), eq(customers.companyId, companyId)));
+        if (dup) return res.status(400).json({ message: "Customer code already exists" });
+      }
+
+      const parsed = insertCustomerSchema.partial().parse(req.body);
+      const [updated] = await db.update(customers).set(parsed)
+        .where(eq(customers.id, customerId)).returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating factory customer:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // CUSTOMER PROFORMAS CRUD
   // ───────────────────────────────────────────────
 

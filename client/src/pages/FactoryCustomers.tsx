@@ -39,17 +39,17 @@ export default function FactoryCustomers() {
   });
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers/stats", selectedCompany?.id],
+    queryKey: ["/api/factory/customers", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: { legalName: string; phone?: string; openingBalance?: string; openingBalanceSide?: string }) => {
-      return await apiRequest("POST", "/api/customers", data);
+      return await apiRequest("POST", "/api/factory/customers", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer created" });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
       setIsCreateOpen(false);
       resetForm();
     },
@@ -60,11 +60,11 @@ export default function FactoryCustomers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest("PUT", `/api/customers/${id}`, data);
+      return await apiRequest("PUT", `/api/factory/customers/${id}`, data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
       setEditingCustomer(null);
       resetForm();
     },
