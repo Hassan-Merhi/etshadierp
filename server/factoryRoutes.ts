@@ -1195,6 +1195,152 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/bales/import-excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage() });
+
+      upload.single("file")(req, res, async (err: any) => {
+        try {
+          if (err) return res.status(400).json({ message: err.message });
+
+          const companyId = (req.session as any).currentCompanyId;
+          if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+          if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
+          const sheetName = workbook.SheetNames[0];
+          const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+          const allProducts = await db
+            .select()
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.companyId, companyId));
+          const productByArticle = new Map<string, any>();
+          for (const p of allProducts) {
+            if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
+          }
+
+          let totalBalesCreated = 0;
+          let skippedRows = 0;
+          const skippedDetails: string[] = [];
+
+          const rowGroups: { product: any; qty: number; weight: number; prodDate: Date }[] = [];
+          let totalBalesNeeded = 0;
+
+          for (const row of rows) {
+            const articleCode = String(
+              row["ITEM BARCODE"] || row["Item Barcode"] || row.articleCode || row.article_code ||
+              row.ArticleCode || row["Article Code"] || row.itemBarcode || ""
+            ).trim().toUpperCase();
+            if (!articleCode) { skippedRows++; skippedDetails.push("Row with empty article code"); continue; }
+
+            const product = productByArticle.get(articleCode);
+            if (!product) {
+              skippedRows++;
+              skippedDetails.push(`Article code "${articleCode}" not found in products`);
+              continue;
+            }
+
+            const rawQty = parseInt(String(row["QUANTITY"] || row.Quantity || row.quantity || row.qty || "1"));
+            if (isNaN(rawQty) || rawQty <= 0) {
+              skippedRows++;
+              skippedDetails.push(`Article "${articleCode}" has invalid quantity`);
+              continue;
+            }
+            const qty = rawQty;
+            const weight = parseFloat(String(product.weightPerBaleKg || "25"));
+
+            let prodDate: Date | null = null;
+            const rawDate = row["PRODUCTION DATE"] || row["Production Date"] || row.productionDate ||
+              row.production_date || row.date || row.Date;
+            if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+              prodDate = rawDate;
+            } else if (rawDate) {
+              const dateStr = String(rawDate).trim();
+              const parsed = new Date(dateStr);
+              if (!isNaN(parsed.getTime())) {
+                prodDate = parsed;
+              }
+            }
+            if (!prodDate) {
+              skippedRows++;
+              skippedDetails.push(`Article "${articleCode}" has no valid production date`);
+              continue;
+            }
+
+            rowGroups.push({ product, qty, weight, prodDate });
+            totalBalesNeeded += qty;
+          }
+
+          if (rowGroups.length === 0) {
+            return res.json({ totalBalesCreated: 0, skippedRows, skippedDetails: skippedDetails.slice(0, 20) });
+          }
+
+          await db.transaction(async (tx) => {
+            const [seqRecord] = await tx
+              .select()
+              .from(factoryBaleSequences)
+              .where(eq(factoryBaleSequences.companyId, companyId))
+              .for("update");
+
+            let nextNumber: number;
+            if (seqRecord) {
+              nextNumber = seqRecord.nextNumber;
+              await tx
+                .update(factoryBaleSequences)
+                .set({ nextNumber: nextNumber + totalBalesNeeded })
+                .where(eq(factoryBaleSequences.id, seqRecord.id));
+            } else {
+              nextNumber = 100876;
+              await tx.insert(factoryBaleSequences).values({
+                companyId,
+                nextNumber: 100876 + totalBalesNeeded,
+              });
+            }
+
+            let baleIndex = 0;
+            for (const group of rowGroups) {
+              for (let i = 0; i < group.qty; i++) {
+                const refNum = `REF${nextNumber + baleIndex}`;
+                await tx
+                  .insert(factoryBales)
+                  .values({
+                    companyId,
+                    mixBatchId: null,
+                    productId: group.product.id,
+                    erpLocationId: null,
+                    baleCode: group.product.code,
+                    referenceNumber: refNum,
+                    articleCode: group.product.articleCode,
+                    productName: group.product.name,
+                    weightKg: String(group.weight),
+                    costPerKg: "0",
+                    totalCost: "0",
+                    status: "IN_STOCK",
+                    finalizedAt: group.prodDate,
+                    createdAt: group.prodDate,
+                  });
+                baleIndex++;
+              }
+              totalBalesCreated += group.qty;
+            }
+          });
+
+          res.json({ totalBalesCreated, skippedRows, skippedDetails: skippedDetails.slice(0, 20) });
+        } catch (innerError: any) {
+          console.error("Error processing bale Excel import:", innerError);
+          res.status(500).json({ message: innerError.message });
+        }
+      });
+    } catch (error: any) {
+      console.error("Error in bale Excel import:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 4. Factory Containers CRUD
   // ───────────────────────────────────────────────

@@ -60,6 +60,9 @@ export default function FactorySettings() {
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [excelResult, setExcelResult] = useState<{ created: number; updated: number; categoriesCreated: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [baleImportFile, setBaleImportFile] = useState<File | null>(null);
+  const [baleImportResult, setBaleImportResult] = useState<{ totalBalesCreated: number; skippedRows: number; skippedDetails: string[] } | null>(null);
+  const baleFileInputRef = useRef<HTMLInputElement>(null);
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -119,6 +122,36 @@ export default function FactorySettings() {
       toast({
         title: "Excel import complete",
         description: `${data.updated} updated, ${data.created} created${data.categoriesCreated > 0 ? `, ${data.categoriesCreated} categories created` : ""}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const baleImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/factory/bales/import-excel", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: { totalBalesCreated: number; skippedRows: number; skippedDetails: string[] }) => {
+      setBaleImportResult(data);
+      setBaleImportFile(null);
+      if (baleFileInputRef.current) baleFileInputRef.current.value = "";
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      toast({
+        title: "Bale import complete",
+        description: `${data.totalBalesCreated} bale(s) created${data.skippedRows > 0 ? `, ${data.skippedRows} row(s) skipped` : ""}`,
       });
     },
     onError: (error: Error) => {
@@ -414,6 +447,64 @@ export default function FactorySettings() {
             <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-excel-result">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span>{excelResult.updated} product(s) updated, {excelResult.created} new product(s) created{excelResult.categoriesCreated > 0 ? `, ${excelResult.categoriesCreated} new category(ies)` : ""}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-muted-foreground" />
+            <CardTitle data-testid="text-section-bale-import">Import Historical Bales</CardTitle>
+          </div>
+          <CardDescription>Upload an Excel file to import old stock as bales. Each row creates bales with automatic REF codes and the specified production date.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>Your Excel file should have these column headers:</p>
+            <ul className="list-disc list-inside ml-2 space-y-0.5">
+              <li><span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing products</li>
+              <li><span className="font-mono text-xs">QUANTITY</span> - number of bales to create (default: 1)</li>
+              <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced</li>
+            </ul>
+            <p className="mt-2 text-xs">Products must already exist in the system. The weight will be taken from the product definition.</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              ref={baleFileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => {
+                setBaleImportFile(e.target.files?.[0] || null);
+                setBaleImportResult(null);
+              }}
+              className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+              data-testid="input-bale-import-file"
+            />
+            <Button
+              onClick={() => baleImportFile && baleImportMutation.mutate(baleImportFile)}
+              disabled={!baleImportFile || baleImportMutation.isPending}
+              data-testid="button-import-bales"
+            >
+              {baleImportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+              {baleImportMutation.isPending ? "Importing Bales..." : "Import Bales"}
+            </Button>
+          </div>
+          {baleImportResult && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-bale-import-result">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>{baleImportResult.totalBalesCreated} bale(s) created with automatic REF codes{baleImportResult.skippedRows > 0 ? ` | ${baleImportResult.skippedRows} row(s) skipped` : ""}</span>
+              </div>
+              {baleImportResult.skippedDetails.length > 0 && (
+                <div className="text-xs text-muted-foreground p-2 rounded-md border space-y-0.5">
+                  <p className="font-medium">Skipped rows:</p>
+                  {baleImportResult.skippedDetails.map((detail, i) => (
+                    <p key={i}>{detail}</p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
