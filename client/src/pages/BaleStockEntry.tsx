@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-  XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays
+  XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -978,6 +978,7 @@ function RemoveFromStockTab() {
   const [supervisorPassword, setSupervisorPassword] = useState("");
   const [removalReason, setRemovalReason] = useState("");
   const [authError, setAuthError] = useState("");
+  const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
   const { toast } = useToast();
 
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
@@ -1001,11 +1002,42 @@ function RemoveFromStockTab() {
     return baleDate === dateFilter;
   });
 
+  const condensedRows = (() => {
+    if (!filteredBales) return [];
+    const grouped: Record<string, { groupKey: string; articleCode: string; productName: string; qty: number; totalWeight: number; baleIds: number[] }> = {};
+    for (const bale of filteredBales) {
+      const key = bale.articleCode || bale.productName || `unknown-${bale.id}`;
+      if (!grouped[key]) {
+        grouped[key] = { groupKey: key, articleCode: bale.articleCode || "-", productName: bale.productName || "-", qty: 0, totalWeight: 0, baleIds: [] };
+      }
+      grouped[key].qty += 1;
+      grouped[key].totalWeight += parseFloat(bale.weightKg || "0");
+      grouped[key].baleIds.push(bale.id);
+    }
+    return Object.values(grouped).sort((a, b) => a.productName.localeCompare(b.productName));
+  })();
+
+  const totalQty = filteredBales?.length || 0;
+  const totalWeight = filteredBales?.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) || 0;
+
   const toggleBale = (baleId: number) => {
     setSelectedBaleIds((prev) => {
       const next = new Set(prev);
       if (next.has(baleId)) next.delete(baleId);
       else next.add(baleId);
+      return next;
+    });
+  };
+
+  const toggleCondensedRow = (baleIds: number[]) => {
+    setSelectedBaleIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = baleIds.every((id) => next.has(id));
+      if (allSelected) {
+        baleIds.forEach((id) => next.delete(id));
+      } else {
+        baleIds.forEach((id) => next.add(id));
+      }
       return next;
     });
   };
@@ -1098,6 +1130,26 @@ function RemoveFromStockTab() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-0.5 border rounded-md">
+            <Button
+              variant={viewMode === "condensed" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("condensed")}
+              data-testid="button-view-condensed"
+              title="Condensed view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "detailed" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("detailed")}
+              data-testid="button-view-detailed"
+              title="Detailed view"
+            >
+              <LayoutList className="h-4 w-4" />
+            </Button>
+          </div>
           {filteredBales && filteredBales.length > 0 && (
             <>
               <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">Select All</Button>
@@ -1128,6 +1180,58 @@ function RemoveFromStockTab() {
               <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">No bales in stock</p>
               <p className="text-sm mt-1">Enter bales using the Stock Entry tab first</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : viewMode === "condensed" ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Article</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-center">Qty</TableHead>
+                    <TableHead className="text-right">Total Weight (kg)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {condensedRows.map((row) => {
+                    const allSelected = row.baleIds.every((id) => selectedBaleIds.has(id));
+                    const someSelected = row.baleIds.some((id) => selectedBaleIds.has(id));
+                    return (
+                      <TableRow
+                        key={row.groupKey}
+                        className={`cursor-pointer ${allSelected ? "bg-destructive/5" : someSelected ? "bg-destructive/3" : ""}`}
+                        onClick={() => toggleCondensedRow(row.baleIds)}
+                        data-testid={`row-condensed-${row.groupKey}`}
+                      >
+                        <TableCell>
+                          <div className={`h-4 w-4 rounded border-2 flex items-center justify-center ${allSelected ? "border-destructive bg-destructive" : someSelected ? "border-destructive/50 bg-destructive/30" : "border-muted-foreground/30"}`}>
+                            {allSelected && <CheckCircle className="h-3 w-3 text-white" />}
+                            {someSelected && !allSelected && <Minus className="h-3 w-3 text-white" />}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">{row.articleCode}</TableCell>
+                        <TableCell>{row.productName}</TableCell>
+                        <TableCell className="text-center font-mono tabular-nums">{row.qty}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{formatNumber(row.totalWeight)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <tfoot>
+                  <tr className="border-t-2 font-semibold bg-muted/50">
+                    <td className="p-2"></td>
+                    <td className="p-2"></td>
+                    <td className="p-2 text-sm">Total</td>
+                    <td className="p-2 text-center font-mono tabular-nums text-sm">{totalQty}</td>
+                    <td className="p-2 text-right font-mono tabular-nums text-sm">{formatNumber(totalWeight)}</td>
+                  </tr>
+                </tfoot>
+              </Table>
             </div>
           </CardContent>
         </Card>
@@ -1176,6 +1280,17 @@ function RemoveFromStockTab() {
                     );
                   })}
                 </TableBody>
+                <tfoot>
+                  <tr className="border-t-2 font-semibold bg-muted/50">
+                    <td className="p-2"></td>
+                    <td className="p-2"></td>
+                    <td className="p-2"></td>
+                    <td className="p-2 text-sm">Total: {totalQty} bales</td>
+                    <td className="p-2 text-right font-mono tabular-nums text-sm">{formatNumber(totalWeight)}</td>
+                    <td className="p-2"></td>
+                    <td className="p-2"></td>
+                  </tr>
+                </tfoot>
               </Table>
             </div>
           </CardContent>
