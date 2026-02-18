@@ -99,6 +99,7 @@ import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
 import FactoryPayrollPage from "@/pages/FactoryPayroll";
 import FactorySupplierReport from "@/pages/FactorySupplierReport";
 import CustomerProformas from "@/pages/CustomerProformas";
+import FactoryCustomers from "@/pages/FactoryCustomers";
 import CustomerInvoiceCreate from "@/pages/CustomerInvoiceCreate";
 import CustomerInvoices from "@/pages/CustomerInvoices";
 import CustomerInvoiceDetail from "@/pages/CustomerInvoiceDetail";
@@ -548,6 +549,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/invoices/:id" component={CustomerInvoiceDetail} />
                     <Route path="/factory/sales/invoices" component={CustomerInvoices} />
                     <Route path="/factory/sales/proformas" component={CustomerProformas} />
+                    <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers" component={FactoryWorkers} />
                     <Route path="/factory/worker-payroll" component={FactoryPayrollPage} />
