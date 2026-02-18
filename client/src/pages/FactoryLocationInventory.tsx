@@ -117,6 +117,23 @@ export default function FactoryLocationInventory() {
     setProductSearch("");
   };
 
+  const handleViewAll = () => {
+    const allProducts = inventoryData.slice().sort((a, b) => a.productName.localeCompare(b.productName));
+    const totalBales = allProducts.reduce((s, p) => s + p.baleCount, 0);
+    const totalWeight = allProducts.reduce((s, p) => s + p.totalWeight, 0);
+    const totalCost = allProducts.reduce((s, p) => s + p.totalCost, 0);
+    setSelectedCategory({
+      categoryId: -1,
+      categoryName: "All Items",
+      baleCount: totalBales,
+      totalWeight,
+      totalCost,
+      productCount: allProducts.length,
+      products: allProducts,
+    });
+    setProductSearch("");
+  };
+
   const handleBackToLocations = () => {
     setSelectedLocation(null);
     setSelectedCategory(null);
@@ -215,6 +232,9 @@ export default function FactoryLocationInventory() {
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={handleBackToLocations} data-testid="button-back-locations">
               <ChevronLeft className="h-4 w-4 mr-1" /> Locations
+            </Button>
+            <Button variant="default" size="sm" onClick={handleViewAll} data-testid="button-view-all">
+              <Package className="h-4 w-4 mr-1" /> View All Items
             </Button>
             <Button variant="outline" size="sm" onClick={() => handlePrint()} data-testid="button-print">
               <Printer className="h-4 w-4 mr-1" /> Print
@@ -343,9 +363,12 @@ export default function FactoryLocationInventory() {
     );
   }
 
+  const isAllItems = selectedCategory.categoryId === -1;
   const totalBales = filteredProducts.reduce((s, p) => s + p.baleCount, 0);
   const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
+  const colSpanAll = isAllItems ? 8 : 7;
+  const colSpanLabel = isAllItems ? 3 : 2;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -392,7 +415,12 @@ export default function FactoryLocationInventory() {
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">{prod.productName}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground mb-2">{prod.articleCode}</div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                      <span>{prod.articleCode}</span>
+                      {isAllItems && prod.category && (
+                        <span className="text-xs text-muted-foreground">| {prod.category}</span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
@@ -417,6 +445,7 @@ export default function FactoryLocationInventory() {
         <div className="hidden md:block rounded-md border overflow-hidden w-full">
           <table className="w-full table-fixed text-sm">
             <colgroup>
+              {isAllItems && <col style={{ width: "130px" }} />}
               <col style={{ width: "120px" }} />
               <col />
               <col style={{ width: "90px" }} />
@@ -427,6 +456,7 @@ export default function FactoryLocationInventory() {
             </colgroup>
             <thead className="bg-muted/50">
               <tr className="h-12">
+                {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
                 <th className="text-left px-3 font-medium">Article Code</th>
                 <th className="text-left px-3 font-medium">Bale Name</th>
                 <th className="text-right px-3 font-medium">Bales</th>
@@ -439,7 +469,7 @@ export default function FactoryLocationInventory() {
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-muted-foreground">No products found matching your search</td>
+                  <td colSpan={colSpanAll} className="text-center py-8 text-muted-foreground">No products found matching your search</td>
                 </tr>
               ) : (
                 <>
@@ -448,6 +478,7 @@ export default function FactoryLocationInventory() {
                     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                     return (
                       <tr key={prod.productId} className="border-t h-12" data-testid={`row-product-${prod.productId}`}>
+                        {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
                         <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                         <td className="px-3 font-medium">{prod.productName}</td>
                         <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
@@ -459,7 +490,7 @@ export default function FactoryLocationInventory() {
                     );
                   })}
                   <tr className="border-t bg-muted/50 h-12 font-bold">
-                    <td className="px-3" colSpan={2}>Total ({filteredProducts.length} products)</td>
+                    <td className="px-3" colSpan={colSpanLabel}>Total ({filteredProducts.length} products)</td>
                     <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
                     <td className="text-right px-3 font-mono"></td>
                     <td className="text-right px-3 font-mono"></td>
