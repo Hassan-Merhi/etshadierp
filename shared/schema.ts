@@ -1736,34 +1736,41 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
 
-// Chat Messages - stores AI chatbot conversation history
+// AI Chatbot Messages (legacy)
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  userId: varchar("user_id").notNull(),
-  role: text("role").notNull(), // 'user' or 'assistant'
-  content: text("content").notNull(),
-  sessionId: varchar("session_id").notNull(), // Groups messages in a conversation
+  companyId: integer("company_id"),
+  userId: varchar("user_id"),
+  role: text("role"),
+  content: text("content"),
+  sessionId: varchar("session_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  sessionIdx: index("chat_messages_session_idx").on(t.sessionId),
-  userIdx: index("chat_messages_user_idx").on(t.userId),
-  companyIdx: index("chat_messages_company_idx").on(t.companyId),
-}));
-
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  userId: z.string().min(1, "User ID is required"),
-  role: z.enum(["user", "assistant"]),
-  content: z.string().min(1, "Content is required"),
-  sessionId: z.string().min(1, "Session ID is required"),
 });
 
-export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
-export type ChatMessage = typeof chatMessages.$inferSelect;
+// Direct Messages - user-to-user chat
+export const directMessages = pgTable("direct_messages", {
+  id: serial("id").primaryKey(),
+  senderId: varchar("sender_id").notNull(),
+  receiverId: varchar("receiver_id").notNull(),
+  message: text("message").notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  senderIdx: index("direct_messages_sender_idx").on(t.senderId),
+  receiverIdx: index("direct_messages_receiver_idx").on(t.receiverId),
+}));
+
+export const insertDirectMessageSchema = createInsertSchema(directMessages).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+}).extend({
+  receiverId: z.string().min(1, "Receiver is required"),
+  message: z.string().min(1, "Message is required"),
+});
+
+export type InsertDirectMessage = z.infer<typeof insertDirectMessageSchema>;
+export type DirectMessage = typeof directMessages.$inferSelect;
 
 // Dashboard Account Selections - stores user-selected accounts for dashboard widgets
 export const dashboardAccountSelections = pgTable("dashboard_account_selections", {

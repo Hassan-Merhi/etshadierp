@@ -58,6 +58,8 @@ import {
   factoryUserProfiles,
   factoryUserPageAccess,
   insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -5687,6 +5689,106 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       });
     } catch (error: any) {
       console.error("Error fetching my access:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ DIRECT MESSAGES / CHAT ============
+
+  app.get("/api/chat/users", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const allUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        active: users.active,
+      }).from(users).where(eq(users.active, true));
+
+      const filtered = allUsers.filter((u: any) => u.id !== currentUserId);
+
+      const usersWithUnread = await Promise.all(filtered.map(async (u: any) => {
+        const [unreadResult] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(directMessages)
+          .where(and(
+            eq(directMessages.senderId, u.id),
+            eq(directMessages.receiverId, currentUserId),
+            sql`${directMessages.readAt} IS NULL`
+          ));
+        return { ...u, unreadCount: unreadResult?.count || 0 };
+      }));
+
+      res.json(usersWithUnread);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/chat/conversations/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const otherUserId = req.params.userId;
+
+      const messages = await db.select()
+        .from(directMessages)
+        .where(or(
+          and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
+          and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
+        ))
+        .orderBy(directMessages.createdAt);
+
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/chat/messages", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const parsed = insertDirectMessageSchema.parse(req.body);
+
+      const [msg] = await db.insert(directMessages).values({
+        senderId: currentUserId,
+        receiverId: parsed.receiverId,
+        message: parsed.message,
+      }).returning();
+
+      res.json(msg);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/chat/mark-read/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const senderId = req.params.userId;
+
+      await db.update(directMessages)
+        .set({ readAt: new Date() })
+        .where(and(
+          eq(directMessages.senderId, senderId),
+          eq(directMessages.receiverId, currentUserId),
+          sql`${directMessages.readAt} IS NULL`
+        ));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/chat/unread-count", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const [result] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(directMessages)
+        .where(and(
+          eq(directMessages.receiverId, currentUserId),
+          sql`${directMessages.readAt} IS NULL`
+        ));
+      res.json({ count: result?.count || 0 });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

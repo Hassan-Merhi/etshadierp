@@ -115,6 +115,7 @@ import FactoryMixOptimizer from "@/pages/FactoryMixOptimizer";
 import FactoryCashflow from "@/pages/FactoryCashflow";
 import FactoryWaste from "@/pages/FactoryWaste";
 import FactoryIntelSettings from "@/pages/FactorySettings";
+import Chat from "@/pages/Chat";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -212,6 +213,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
       <Route path="/factory-production"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/barcode-manager" component={BarcodeManager} />
+      <Route path="/chat" component={Chat} />
       <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/mix-batches"><Redirect to="/factory/mix-batches" /></Route>
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
@@ -568,6 +570,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
+                    <Route path="/factory/chat" component={Chat} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>

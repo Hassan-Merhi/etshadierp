@@ -27,6 +27,7 @@ import {
   Store,
   TrendingUp,
   Upload,
+  MessageCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -128,6 +129,7 @@ const menuGroups: MenuGroup[] = [
 
 const standaloneItems: MenuItem[] = [
   { title: "Create", url: "/create", icon: FolderPlus },
+  { title: "Chat", url: "/chat", icon: MessageCircle },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
