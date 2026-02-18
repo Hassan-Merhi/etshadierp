@@ -38,6 +38,7 @@ import POImport from "@/pages/POImport";
 import POSImport from "@/pages/POSImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
+import FactoryLocationInventory from "@/pages/FactoryLocationInventory";
 import Settings from "@/pages/Settings";
 import VoucherEdit from "@/pages/VoucherEdit";
 import Payroll from "@/pages/Payroll";
@@ -522,7 +523,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bale-transfers" component={BaleTransfers} />
-                    <Route path="/factory/location-inventory">{() => <LocationInventory />}</Route>
+                    <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
                     <Route path="/factory/stock-otw" component={StockOTW} />
                     <Route path="/factory/stock-query/:id" component={StockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
