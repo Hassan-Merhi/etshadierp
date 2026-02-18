@@ -2507,6 +2507,7 @@ export const customerProformaLines = pgTable("customer_proforma_lines", {
   proformaId: integer("proforma_id").notNull(),
   articleCode: varchar("article_code", { length: 50 }).notNull(),
   productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull().default(0),
   pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2521,6 +2522,7 @@ export const insertCustomerProformaLineSchema = createInsertSchema(customerProfo
   proformaId: z.number().min(1, "Proforma is required"),
   articleCode: z.string().min(1, "Article code is required"),
   productName: z.string().min(1, "Product name is required"),
+  quantity: z.number().int().min(1, "Quantity must be at least 1"),
   pricePerBale: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Price must be non-negative"),
 });
 
