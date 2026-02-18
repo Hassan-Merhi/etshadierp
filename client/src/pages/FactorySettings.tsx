@@ -7,8 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface Location {
+  id: number;
+  name: string;
+}
 
 interface FactorySettingsData {
   dashboardEnabled: boolean;
@@ -63,6 +69,7 @@ export default function FactorySettings() {
   const [baleImportFile, setBaleImportFile] = useState<File | null>(null);
   const [baleImportResult, setBaleImportResult] = useState<{ totalBalesCreated: number; skippedRows: number; skippedDetails: string[] } | null>(null);
   const baleFileInputRef = useRef<HTMLInputElement>(null);
+  const [baleImportLocationId, setBaleImportLocationId] = useState<string>("");
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -133,6 +140,7 @@ export default function FactorySettings() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      if (baleImportLocationId) formData.append("locationId", baleImportLocationId);
       const res = await fetch("/api/factory/bales/import-excel", {
         method: "POST",
         body: formData,
@@ -158,6 +166,8 @@ export default function FactorySettings() {
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
   });
+
+  const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
 
   const { data, isLoading } = useQuery<FactorySettingsData>({
     queryKey: ['/api/factory/settings'],
@@ -469,6 +479,19 @@ export default function FactorySettings() {
               <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced</li>
             </ul>
             <p className="mt-2 text-xs">Products must already exist in the system. The weight will be taken from the product definition.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Location / Warehouse</Label>
+            <Select value={baleImportLocationId} onValueChange={setBaleImportLocationId}>
+              <SelectTrigger className="w-64" data-testid="select-bale-import-location">
+                <SelectValue placeholder="Select location..." />
+              </SelectTrigger>
+              <SelectContent>
+                {locations?.map((loc) => (
+                  <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <Button

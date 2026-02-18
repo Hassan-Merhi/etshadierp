@@ -1209,6 +1209,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
+          const locationId = req.body.locationId ? parseInt(req.body.locationId) : null;
+
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
           const sheetName = workbook.SheetNames[0];
@@ -1311,7 +1313,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                     companyId,
                     mixBatchId: null,
                     productId: group.product.id,
-                    erpLocationId: null,
+                    erpLocationId: locationId,
                     baleCode: group.product.code,
                     referenceNumber: refNum,
                     articleCode: group.product.articleCode,
