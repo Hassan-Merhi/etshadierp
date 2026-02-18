@@ -614,6 +614,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           )
         );
 
+      const productIds = [...new Set(bales.map(b => b.productId).filter((id): id is number => id != null && id > 0))];
+      const products = productIds.length > 0
+        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+        : [];
+      const categoryIds = [...new Set(products.map(p => p.categoryId).filter((id): id is number => id != null))];
+      const categories = categoryIds.length > 0
+        ? await db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), inArray(factoryCategories.id, categoryIds)))
+        : [];
+
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const productCategoryMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
+
       const grouped = new Map<number, {
         productId: number;
         articleCode: string;
@@ -641,7 +653,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             productId: pid,
             articleCode: b.articleCode || b.baleCode || "",
             productName: b.productName || "Unknown",
-            category: b.category,
+            category: productCategoryMap.get(pid) || b.category || null,
             quantity: qty,
             totalWeight: weight,
             totalCost: cost,
