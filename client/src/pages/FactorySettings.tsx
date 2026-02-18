@@ -70,6 +70,14 @@ export default function FactorySettings() {
   const [baleImportResult, setBaleImportResult] = useState<{ totalBalesCreated: number; skippedRows: number; skippedDetails: string[] } | null>(null);
   const baleFileInputRef = useRef<HTMLInputElement>(null);
   const [baleImportLocationId, setBaleImportLocationId] = useState<string>("");
+  const [baleValidationResult, setBaleValidationResult] = useState<{
+    totalRows: number;
+    validRows: { rowIndex: number; articleCode: string; productName: string; productId: number; quantity: number; weight: number; productionDate: string }[];
+    skippedRows: { rowIndex: number; articleCode: string; reason: string }[];
+    totalBales: number;
+    totalWeight: number;
+    totalProducts: number;
+  } | null>(null);
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -136,6 +144,35 @@ export default function FactorySettings() {
     },
   });
 
+  const baleValidateMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/factory/bales/validate-import", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Validation failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setBaleValidationResult(data);
+      setBaleImportResult(null);
+      if (data.validRows.length === 0) {
+        toast({ title: "No valid rows", description: `All ${data.totalRows} rows were skipped. Check the details below.`, variant: "destructive" });
+      } else {
+        toast({ title: "Validation complete", description: `${data.validRows.length} row(s) ready to import (${data.totalBales} bales, ${data.totalWeight.toFixed(1)} kg)` });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Validation error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const baleImportMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
@@ -154,6 +191,7 @@ export default function FactorySettings() {
     },
     onSuccess: (data: { totalBalesCreated: number; skippedRows: number; skippedDetails: string[] }) => {
       setBaleImportResult(data);
+      setBaleValidationResult(null);
       setBaleImportFile(null);
       if (baleFileInputRef.current) baleFileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
@@ -521,19 +559,100 @@ export default function FactorySettings() {
               onChange={(e) => {
                 setBaleImportFile(e.target.files?.[0] || null);
                 setBaleImportResult(null);
+                setBaleValidationResult(null);
               }}
               className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
               data-testid="input-bale-import-file"
             />
             <Button
-              onClick={() => baleImportFile && baleImportMutation.mutate(baleImportFile)}
-              disabled={!baleImportFile || baleImportMutation.isPending}
-              data-testid="button-import-bales"
+              onClick={() => baleImportFile && baleValidateMutation.mutate(baleImportFile)}
+              disabled={!baleImportFile || baleValidateMutation.isPending}
+              data-testid="button-validate-bales"
             >
-              {baleImportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-              {baleImportMutation.isPending ? "Importing Bales..." : "Import Bales"}
+              {baleValidateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              {baleValidateMutation.isPending ? "Validating..." : "Validate"}
             </Button>
           </div>
+
+          {baleValidationResult && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 flex-wrap p-3 rounded-md bg-muted text-sm">
+                <span>Total rows: <strong>{baleValidationResult.totalRows}</strong></span>
+                <span>Valid: <strong className="text-green-600">{baleValidationResult.validRows.length}</strong></span>
+                <span>Skipped: <strong className={baleValidationResult.skippedRows.length > 0 ? "text-destructive" : ""}>{baleValidationResult.skippedRows.length}</strong></span>
+                <span>Bales to create: <strong>{baleValidationResult.totalBales}</strong></span>
+                <span>Total weight: <strong>{baleValidationResult.totalWeight.toFixed(1)} kg</strong></span>
+              </div>
+
+              {baleValidationResult.validRows.length > 0 && (
+                <div className="border rounded-md overflow-auto max-h-64">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">Row</TableHead>
+                        <TableHead>Article Code</TableHead>
+                        <TableHead>Product Name</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead>Production Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {baleValidationResult.validRows.map((row, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-muted-foreground text-xs">{row.rowIndex}</TableCell>
+                          <TableCell className="font-mono text-xs">{row.articleCode}</TableCell>
+                          <TableCell>{row.productName}</TableCell>
+                          <TableCell className="text-right">{row.quantity}</TableCell>
+                          <TableCell className="text-right">{row.weight}</TableCell>
+                          <TableCell>{row.productionDate}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {baleValidationResult.skippedRows.length > 0 && (
+                <div className="text-xs p-3 rounded-md border border-destructive/30 space-y-1">
+                  <p className="font-medium text-destructive text-sm">Skipped rows:</p>
+                  {baleValidationResult.skippedRows.map((row, i) => (
+                    <p key={i} className="text-muted-foreground">
+                      Row {row.rowIndex}: {row.articleCode ? `"${row.articleCode}"` : "(empty)"} - {row.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {baleValidationResult.validRows.length > 0 && (
+                <div className="flex items-center gap-3 flex-wrap pt-2">
+                  <Button
+                    onClick={() => baleImportFile && baleImportMutation.mutate(baleImportFile)}
+                    disabled={!baleImportFile || baleImportMutation.isPending || !baleImportLocationId}
+                    data-testid="button-finalize-import-bales"
+                  >
+                    {baleImportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                    {baleImportMutation.isPending ? "Importing..." : `Finalize Import (${baleValidationResult.totalBales} bales)`}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setBaleValidationResult(null);
+                      setBaleImportFile(null);
+                      if (baleFileInputRef.current) baleFileInputRef.current.value = "";
+                    }}
+                    data-testid="button-cancel-import"
+                  >
+                    Cancel
+                  </Button>
+                  {!baleImportLocationId && (
+                    <span className="text-xs text-destructive">Please select a location above before finalizing</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {baleImportResult && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-bale-import-result">

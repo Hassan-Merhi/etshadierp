@@ -1195,6 +1195,114 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/bales/validate-import", requireAuth, async (req: any, res: any) => {
+    try {
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage() });
+
+      upload.single("file")(req, res, async (err: any) => {
+        try {
+          if (err) return res.status(400).json({ message: err.message });
+
+          const companyId = (req.session as any).currentCompanyId;
+          if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+          if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
+          const sheetName = workbook.SheetNames[0];
+          const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+          const getVal = (row: any, ...keys: string[]): any => {
+            const rowKeys = Object.keys(row);
+            for (const k of keys) {
+              const found = rowKeys.find(rk => rk.trim().toLowerCase() === k.toLowerCase());
+              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "") return row[found];
+            }
+            return undefined;
+          };
+
+          const allProducts = await db
+            .select()
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.companyId, companyId));
+          const productByArticle = new Map<string, any>();
+          for (const p of allProducts) {
+            if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
+          }
+
+          const validRows: { rowIndex: number; articleCode: string; productName: string; productId: number; quantity: number; weight: number; productionDate: string }[] = [];
+          const skippedRows: { rowIndex: number; articleCode: string; reason: string }[] = [];
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rawCode = getVal(row, "ITEM BARCODE", "Item Barcode", "itemBarcode", "articleCode", "article_code", "ArticleCode", "Article Code", "barcode", "Barcode", "ITEM NAME", "Item Name");
+            const articleCode = rawCode ? String(rawCode).trim().toUpperCase() : "";
+            if (!articleCode) { skippedRows.push({ rowIndex: i + 2, articleCode: "", reason: "Empty article code" }); continue; }
+
+            const product = productByArticle.get(articleCode);
+            if (!product) {
+              skippedRows.push({ rowIndex: i + 2, articleCode, reason: "Article code not found in products" });
+              continue;
+            }
+
+            const rawQty = parseInt(String(getVal(row, "QUANTITY", "Quantity", "quantity", "qty", "Qty") ?? "1"));
+            if (isNaN(rawQty) || rawQty <= 0) {
+              skippedRows.push({ rowIndex: i + 2, articleCode, reason: "Invalid quantity (must be > 0)" });
+              continue;
+            }
+            const weight = parseFloat(String(product.weightPerBaleKg || "25"));
+
+            let prodDate: Date | null = null;
+            const rawDate = getVal(row, "PRODUCTION DATE", "Production Date", "productionDate", "production_date", "date", "Date");
+            if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+              prodDate = rawDate;
+            } else if (rawDate) {
+              const dateStr = String(rawDate).trim();
+              const parsed = new Date(dateStr);
+              if (!isNaN(parsed.getTime())) {
+                prodDate = parsed;
+              }
+            }
+            if (!prodDate) {
+              skippedRows.push({ rowIndex: i + 2, articleCode, reason: "No valid production date" });
+              continue;
+            }
+
+            validRows.push({
+              rowIndex: i + 2,
+              articleCode,
+              productName: product.name,
+              productId: product.id,
+              quantity: rawQty,
+              weight,
+              productionDate: prodDate.toISOString().split("T")[0],
+            });
+          }
+
+          const totalBales = validRows.reduce((sum, r) => sum + r.quantity, 0);
+          const totalWeight = validRows.reduce((sum, r) => sum + r.quantity * r.weight, 0);
+
+          return res.json({
+            totalRows: rows.length,
+            validRows,
+            skippedRows,
+            totalBales,
+            totalWeight,
+            totalProducts: allProducts.length,
+          });
+        } catch (innerErr: any) {
+          console.error("Validate import error:", innerErr);
+          return res.status(500).json({ message: innerErr.message || "Validation failed" });
+        }
+      });
+    } catch (outerErr: any) {
+      console.error("Validate import outer error:", outerErr);
+      res.status(500).json({ message: outerErr.message || "Validation failed" });
+    }
+  });
+
   app.post("/api/factory/bales/import-excel", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;
