@@ -411,7 +411,8 @@ export function FactoryBaleProductMonthDetail() {
         { credentials: "include" }
       );
       if (!response.ok) throw new Error("Failed to fetch");
-      return response.json();
+      const json = await response.json();
+      return json.bales;
     },
     enabled:
       parseInt(productId) > 0 &&
