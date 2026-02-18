@@ -595,6 +595,69 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/location-inventory/:locationId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+
+      const bales = await db
+        .select()
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.erpLocationId, locationId),
+            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          )
+        );
+
+      const grouped = new Map<number, {
+        productId: number;
+        articleCode: string;
+        productName: string;
+        category: string | null;
+        quantity: number;
+        totalWeight: number;
+        totalCost: number;
+        baleCount: number;
+      }>();
+
+      for (const b of bales) {
+        const pid = b.productId || 0;
+        const existing = grouped.get(pid);
+        const qty = parseFloat(String(b.quantity || "1"));
+        const weight = parseFloat(String(b.weightKg || "0"));
+        const cost = parseFloat(String(b.totalCost || "0"));
+        if (existing) {
+          existing.quantity += qty;
+          existing.totalWeight += weight;
+          existing.totalCost += cost;
+          existing.baleCount += 1;
+        } else {
+          grouped.set(pid, {
+            productId: pid,
+            articleCode: b.articleCode || b.baleCode || "",
+            productName: b.productName || "Unknown",
+            category: b.category,
+            quantity: qty,
+            totalWeight: weight,
+            totalCost: cost,
+            baleCount: 1,
+          });
+        }
+      }
+
+      const result = Array.from(grouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching factory location inventory:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;

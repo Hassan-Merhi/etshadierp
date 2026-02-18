@@ -100,6 +100,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
 
+  const isFactoryMode = _route.startsWith("/factory/");
+
   // Debug logging
   console.log('[LocationInventory] posUser:', posUser);
   console.log('[LocationInventory] !posUser (query enabled):', !posUser);
@@ -159,8 +161,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     console.log('[LocationInventory] asOfDate changed to:', asOfDate);
   }, [asOfDate]);
 
-  // Fetch inventory for selected location (with optional historical date)
-  const { data: inventoryData = [], isLoading: inventoryLoading, isFetching } = useQuery<InventoryItem[]>({
+  // Fetch factory bale inventory when in factory mode
+  const { data: factoryBaleInventory = [], isLoading: factoryBaleLoading } = useQuery<any[]>({
+    queryKey: selectedLocationLocal
+      ? [`/api/factory/location-inventory/${selectedLocationLocal.id}`]
+      : [],
+    queryFn: async () => {
+      const response = await fetch(`/api/factory/location-inventory/${selectedLocationLocal!.id}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch factory inventory');
+      return response.json();
+    },
+    enabled: !!selectedLocationLocal && isFactoryMode,
+  });
+
+  // Fetch ERP inventory for selected location (with optional historical date)
+  const { data: erpInventoryData = [], isLoading: erpInventoryLoading, isFetching: erpFetching } = useQuery<InventoryItem[]>({
     queryKey: selectedLocationLocal 
       ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate }] 
       : [],
@@ -168,13 +183,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       const url = asOfDate 
         ? `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`
         : `/api/locations/${selectedLocationLocal!.id}/inventory`;
-      console.log('[LocationInventory] Fetching from URL:', url);
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch inventory');
       return response.json();
     },
-    enabled: !!selectedLocationLocal,
+    enabled: !!selectedLocationLocal && !isFactoryMode,
   });
+
+  // Map factory bale data to InventoryItem format when in factory mode
+  const inventoryData: InventoryItem[] = isFactoryMode
+    ? factoryBaleInventory.map((item: any, idx: number) => ({
+        inventoryId: idx,
+        locationId: selectedLocationLocal?.id || 0,
+        stockItemId: item.productId,
+        quantity: String(item.baleCount),
+        averageRate: item.baleCount > 0 ? String((item.totalWeight / item.baleCount).toFixed(2)) : "0",
+        totalValue: String(item.totalWeight.toFixed(2)),
+        stockItemCode: item.articleCode,
+        stockItemName: item.productName,
+        stockItemUom: "BALES",
+        stockGroupId: null,
+        stockGroupName: item.category || "Uncategorized",
+        stockGroupCode: null,
+      }))
+    : erpInventoryData;
+  const inventoryLoading = isFactoryMode ? factoryBaleLoading : erpInventoryLoading;
+  const isFetching = isFactoryMode ? false : erpFetching;
 
   const { data: negativeStockData = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: ["/api/inventory/negative", { search: negativeSearchTerm }],
