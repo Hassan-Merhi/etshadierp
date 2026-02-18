@@ -474,9 +474,9 @@ export default function FactorySettings() {
           <div className="text-sm text-muted-foreground space-y-1">
             <p>Your Excel file should have these column headers:</p>
             <ul className="list-disc list-inside ml-2 space-y-0.5">
-              <li><span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing products</li>
+              <li><span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing products (e.g. HMD11298)</li>
               <li><span className="font-mono text-xs">QUANTITY</span> - number of bales to create (default: 1)</li>
-              <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced</li>
+              <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced (required)</li>
             </ul>
             <p className="mt-2 text-xs">Products must already exist in the system. The weight will be taken from the product definition.</p>
           </div>
@@ -497,8 +497,8 @@ export default function FactorySettings() {
             <Button
               variant="outline"
               onClick={() => {
-                const header = "ITEM NAME\tITEM BARCODE\tQUANTITY\tPRODUCTION DATE\n";
-                const example = "WINTER HHR\tHMD11298\t1\t2/11/2026\n";
+                const header = "ITEM BARCODE\tQUANTITY\tPRODUCTION DATE\n";
+                const example = "HMD11298\t1\t2/11/2026\n";
                 const blob = new Blob([header + example], { type: "application/vnd.ms-excel" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");

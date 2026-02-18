@@ -1216,6 +1216,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const sheetName = workbook.SheetNames[0];
           const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
+          const getVal = (row: any, ...keys: string[]): any => {
+            const rowKeys = Object.keys(row);
+            for (const k of keys) {
+              const found = rowKeys.find(rk => rk.trim().toLowerCase() === k.toLowerCase());
+              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "") return row[found];
+            }
+            return undefined;
+          };
+
           const allProducts = await db
             .select()
             .from(factoryBaleProducts)
@@ -1232,11 +1241,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const rowGroups: { product: any; qty: number; weight: number; prodDate: Date }[] = [];
           let totalBalesNeeded = 0;
 
+          console.log("Bale import: processing", rows.length, "rows. First row keys:", rows.length > 0 ? Object.keys(rows[0]) : "none");
+
           for (const row of rows) {
-            const articleCode = String(
-              row["ITEM BARCODE"] || row["Item Barcode"] || row.articleCode || row.article_code ||
-              row.ArticleCode || row["Article Code"] || row.itemBarcode || ""
-            ).trim().toUpperCase();
+            const rawCode = getVal(row, "ITEM BARCODE", "Item Barcode", "itemBarcode", "articleCode", "article_code", "ArticleCode", "Article Code", "barcode", "Barcode");
+            const articleCode = rawCode ? String(rawCode).trim().toUpperCase() : "";
             if (!articleCode) { skippedRows++; skippedDetails.push("Row with empty article code"); continue; }
 
             const product = productByArticle.get(articleCode);
@@ -1246,7 +1255,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               continue;
             }
 
-            const rawQty = parseInt(String(row["QUANTITY"] || row.Quantity || row.quantity || row.qty || "1"));
+            const rawQty = parseInt(String(getVal(row, "QUANTITY", "Quantity", "quantity", "qty", "Qty") ?? "1"));
             if (isNaN(rawQty) || rawQty <= 0) {
               skippedRows++;
               skippedDetails.push(`Article "${articleCode}" has invalid quantity`);
@@ -1256,8 +1265,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             const weight = parseFloat(String(product.weightPerBaleKg || "25"));
 
             let prodDate: Date | null = null;
-            const rawDate = row["PRODUCTION DATE"] || row["Production Date"] || row.productionDate ||
-              row.production_date || row.date || row.Date;
+            const rawDate = getVal(row, "PRODUCTION DATE", "Production Date", "productionDate", "production_date", "date", "Date");
             if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
               prodDate = rawDate;
             } else if (rawDate) {
