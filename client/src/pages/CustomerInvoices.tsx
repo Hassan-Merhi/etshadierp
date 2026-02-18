@@ -59,6 +59,12 @@ export default function CustomerInvoices() {
     switch (status) {
       case "DRAFT":
         return <Badge variant="secondary" data-testid={`badge-status-draft`}>Draft</Badge>;
+      case "LOADING":
+        return <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400" data-testid={`badge-status-loading`}>Loading</Badge>;
+      case "PENDING_VERIFICATION":
+        return <Badge variant="outline" className="border-yellow-300 text-yellow-700 dark:border-yellow-600 dark:text-yellow-400" data-testid={`badge-status-pending`}>Pending Verification</Badge>;
+      case "VERIFIED":
+        return <Badge variant="outline" className="border-green-300 text-green-700 dark:border-green-600 dark:text-green-400" data-testid={`badge-status-verified`}>Verified</Badge>;
       case "FINALIZED":
         return <Badge variant="default" data-testid={`badge-status-finalized`}>Finalized</Badge>;
       case "CANCELLED":
@@ -89,6 +95,9 @@ export default function CustomerInvoices() {
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="LOADING">Loading</SelectItem>
+              <SelectItem value="PENDING_VERIFICATION">Pending Verification</SelectItem>
+              <SelectItem value="VERIFIED">Verified</SelectItem>
               <SelectItem value="FINALIZED">Finalized</SelectItem>
               <SelectItem value="CANCELLED">Cancelled</SelectItem>
             </SelectContent>

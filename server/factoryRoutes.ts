@@ -4054,6 +4054,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
+          containerNumber: customerOrders.containerNumber,
+          shippingCompany: customerOrders.shippingCompany,
+          locationId: customerOrders.locationId,
+          loadingStartedAt: customerOrders.loadingStartedAt,
+          loadingFinalizedAt: customerOrders.loadingFinalizedAt,
+          verifiedAt: customerOrders.verifiedAt,
           createdAt: customerOrders.createdAt,
           updatedAt: customerOrders.updatedAt,
           customerName: customers.legalName,
@@ -4090,6 +4096,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
+          containerNumber: customerOrders.containerNumber,
+          shippingCompany: customerOrders.shippingCompany,
+          containerNotes: customerOrders.containerNotes,
+          verifiedByUserId: customerOrders.verifiedByUserId,
+          verifiedAt: customerOrders.verifiedAt,
+          loadingStartedAt: customerOrders.loadingStartedAt,
+          loadingFinalizedAt: customerOrders.loadingFinalizedAt,
+          locationId: customerOrders.locationId,
           createdAt: customerOrders.createdAt,
           updatedAt: customerOrders.updatedAt,
           customerName: customers.legalName,
@@ -4138,7 +4152,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "DRAFT") return res.status(400).json({ message: "Can only add bales to DRAFT orders" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
 
       const [bale] = await db.select().from(factoryBales)
         .where(and(
@@ -4189,6 +4203,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         priceUsed,
       });
 
+      await db.update(factoryBales).set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() }).where(eq(factoryBales.id, bale.id));
+
       await recalculateOrderTotals(db, orderId);
 
       const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
@@ -4214,10 +4230,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "DRAFT") return res.status(400).json({ message: "Can only remove bales from DRAFT orders" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only remove bales from DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+
+      const [orderBale] = await db.select().from(customerOrderBales)
+        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
 
       await db.delete(customerOrderBales)
         .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.id, baleId)));
+
+      if (orderBale) {
+        await db.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, orderBale.baleId));
+      }
 
       await recalculateOrderTotals(db, orderId);
 
@@ -4303,15 +4326,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const [order] = await tx.select().from(customerOrders)
           .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
         if (!order) throw new Error("Order not found");
-        if (order.status !== "DRAFT") throw new Error("Only DRAFT orders can be finalized");
+        if (!["DRAFT", "VERIFIED"].includes(order.status)) throw new Error("Only DRAFT or VERIFIED orders can be finalized");
 
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales");
 
         for (const b of bales) {
           const [factoryBale] = await tx.select().from(factoryBales)
-            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "FINALIZED"), eq(factoryBales.erpLocationId, b.locationId)));
-          if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available at the specified location`);
+            .where(and(eq(factoryBales.id, b.baleId), or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "RESERVED_FOR_ORDER")), eq(factoryBales.erpLocationId, b.locationId)));
+          if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available`);
         }
 
         let seqRows = await tx.execute(sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`);
@@ -4410,7 +4433,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "DRAFT") return res.status(400).json({ message: "Only DRAFT orders can be cancelled" });
+      if (!["DRAFT", "LOADING"].includes(order.status)) return res.status(400).json({ message: "Only DRAFT or LOADING orders can be cancelled" });
+
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      for (const ob of orderBales) {
+        await db.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, ob.baleId));
+      }
 
       const [updated] = await db.update(customerOrders)
         .set({ status: "CANCELLED", updatedAt: new Date() })
@@ -4421,6 +4449,238 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error cancelling order:", error);
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // CONTAINER LOADING WORKFLOW
+  // ───────────────────────────────────────────────
+
+  app.post("/api/factory/customer-orders-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { customerId, proformaIdUsed, locationId, orderDate } = req.body;
+      if (!customerId) return res.status(400).json({ message: "Customer is required" });
+      if (!locationId) return res.status(400).json({ message: "Location is required" });
+
+      const [order] = await db.insert(customerOrders).values({
+        companyId,
+        customerId: parseInt(customerId),
+        proformaIdUsed: proformaIdUsed ? parseInt(proformaIdUsed) : null,
+        locationId: parseInt(locationId),
+        orderDate: orderDate || new Date().toISOString().split('T')[0],
+        status: "LOADING",
+        loadingStartedAt: new Date(),
+      }).returning();
+
+      res.json(order);
+    } catch (error: any) {
+      console.error("Error creating loading order:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/finalize-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "LOADING") return res.status(400).json({ message: "Only LOADING orders can be finalized for loading" });
+
+      const bales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      if (bales.length === 0) return res.status(400).json({ message: "Order has no bales scanned" });
+
+      const [updated] = await db.update(customerOrders).set({
+        status: "PENDING_VERIFICATION",
+        loadingFinalizedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(customerOrders.id, orderId)).returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error finalizing loading:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/customer-orders/:id/verification-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+
+      const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
+      for (const b of orderBales) {
+        const code = b.articleCode || "UNKNOWN";
+        if (!loadedByArticle[code]) {
+          loadedByArticle[code] = { articleCode: code, productName: b.baleName || code, qty: 0, totalWeight: 0, totalPrice: 0 };
+        }
+        loadedByArticle[code].qty += 1;
+        loadedByArticle[code].totalWeight += parseFloat(b.weight);
+        loadedByArticle[code].totalPrice += parseFloat(b.priceUsed);
+      }
+
+      let proformaLines: any[] = [];
+      const proformaByArticle: Record<string, { articleCode: string; productName: string; pricePerBale: string }> = {};
+
+      if (order.proformaIdUsed) {
+        proformaLines = await db.select().from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+
+        for (const pl of proformaLines) {
+          proformaByArticle[pl.articleCode] = {
+            articleCode: pl.articleCode,
+            productName: pl.productName,
+            pricePerBale: pl.pricePerBale,
+          };
+        }
+      }
+
+      const allArticles = new Set([...Object.keys(loadedByArticle), ...Object.keys(proformaByArticle)]);
+      const comparison: any[] = [];
+
+      for (const code of allArticles) {
+        const loaded = loadedByArticle[code] || null;
+        const proforma = proformaByArticle[code] || null;
+        const loadedQty = loaded?.qty || 0;
+
+        let status: string;
+        if (!proforma && loadedQty > 0) {
+          status = "LOADED_NOT_IN_PROFORMA";
+        } else if (proforma && loadedQty === 0) {
+          status = "NOT_LOADED";
+        } else {
+          status = "IN_PROFORMA";
+        }
+
+        comparison.push({
+          articleCode: code,
+          productName: loaded?.productName || proforma?.productName || code,
+          loadedQty,
+          totalWeight: loaded?.totalWeight || 0,
+          totalPrice: loaded?.totalPrice || 0,
+          pricePerBale: proforma?.pricePerBale || "0",
+          inProforma: !!proforma,
+          status,
+        });
+      }
+
+      res.json({
+        order,
+        loadedItems: Object.values(loadedByArticle),
+        proformaLines: Object.values(proformaByArticle),
+        comparison,
+        totalLoadedBales: orderBales.length,
+        totalLoadedWeight: orderBales.reduce((s: number, b: any) => s + parseFloat(b.weight), 0),
+      });
+    } catch (error: any) {
+      console.error("Error fetching verification summary:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/verify", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { approved, notes } = req.body;
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be verified" });
+
+      if (approved) {
+        const userId = (req.session as any).userId || null;
+        const [updated] = await db.update(customerOrders).set({
+          status: "VERIFIED",
+          verifiedByUserId: userId,
+          verifiedAt: new Date(),
+          containerNotes: notes || order.containerNotes,
+          updatedAt: new Date(),
+        }).where(eq(customerOrders.id, orderId)).returning();
+        res.json(updated);
+      } else {
+        const [updated] = await db.update(customerOrders).set({
+          containerNotes: notes || order.containerNotes,
+          updatedAt: new Date(),
+        }).where(eq(customerOrders.id, orderId)).returning();
+        res.json(updated);
+      }
+    } catch (error: any) {
+      console.error("Error verifying order:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/return-to-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be returned to loading" });
+
+      const [updated] = await db.update(customerOrders).set({
+        status: "LOADING",
+        loadingFinalizedAt: null,
+        updatedAt: new Date(),
+      }).where(eq(customerOrders.id, orderId)).returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error returning order to loading:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/assign-container", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { containerNumber, shippingCompany, containerNotes } = req.body;
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const updateData: any = { updatedAt: new Date() };
+      if (containerNumber !== undefined) updateData.containerNumber = containerNumber;
+      if (shippingCompany !== undefined) updateData.shippingCompany = shippingCompany;
+      if (containerNotes !== undefined) updateData.containerNotes = containerNotes;
+
+      const [updated] = await db.update(customerOrders).set(updateData)
+        .where(eq(customerOrders.id, orderId)).returning();
+
+      if (shippingCompany && order.customerId) {
+        await db.update(customers).set({
+          defaultShippingCompany: shippingCompany,
+        }).where(eq(customers.id, order.customerId)).catch(() => {});
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error assigning container:", error);
+      res.status(400).json({ message: error.message });
     }
   });
 
