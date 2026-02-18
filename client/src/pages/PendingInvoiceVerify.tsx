@@ -19,16 +19,19 @@ interface ComparisonItem {
   articleCode: string;
   productName: string;
   loadedQty: number;
+  expectedQty: number;
+  diff: number;
   totalWeight: number;
   totalPrice: number;
   pricePerBale: string;
   inProforma: boolean;
-  status: "LOADED_NOT_IN_PROFORMA" | "NOT_LOADED" | "IN_PROFORMA";
+  status: "LOADED_NOT_IN_PROFORMA" | "MISSING_FROM_LOADED" | "UNDER_LOADED" | "OVER_LOADED" | "MATCH";
 }
 
 interface ProformaLine {
   articleCode: string;
   productName: string;
+  expectedQty: number;
   pricePerBale: string;
 }
 
@@ -218,10 +221,13 @@ export default function PendingInvoiceVerify() {
   const getComparisonRowClass = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
+      case "MISSING_FROM_LOADED":
         return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
-      case "NOT_LOADED":
+      case "UNDER_LOADED":
         return "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800";
-      case "IN_PROFORMA":
+      case "OVER_LOADED":
+        return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+      case "MATCH":
       default:
         return "";
     }
@@ -231,10 +237,14 @@ export default function PendingInvoiceVerify() {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
         return <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">Not in Proforma</Badge>;
-      case "NOT_LOADED":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-not-loaded">In Proforma, Not Loaded</Badge>;
-      case "IN_PROFORMA":
-        return <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-in-proforma"><CheckCircle className="h-3 w-3 mr-1" />In Proforma</Badge>;
+      case "MISSING_FROM_LOADED":
+        return <Badge variant="destructive" data-testid="badge-missing-from-loaded">Missing</Badge>;
+      case "UNDER_LOADED":
+        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-under-loaded">Under Loaded</Badge>;
+      case "OVER_LOADED":
+        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-over-loaded">Over Loaded</Badge>;
+      case "MATCH":
+        return <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
       default:
         return null;
     }
@@ -322,13 +332,14 @@ export default function PendingInvoiceVerify() {
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Pricing</h3>
+              <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected</h3>
               {verification?.proformaLines && verification.proformaLines.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Article</TableHead>
                       <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Price/Bale</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -339,6 +350,7 @@ export default function PendingInvoiceVerify() {
                           {line.articleCode}
                         </TableCell>
                         <TableCell className="text-sm">{line.productName}</TableCell>
+                        <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
                         <TableCell className="text-right font-mono">{parseFloat(line.pricePerBale).toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
@@ -398,10 +410,11 @@ export default function PendingInvoiceVerify() {
                 <TableRow>
                   <TableHead>Article</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Expected</TableHead>
                   <TableHead className="text-right">Loaded</TableHead>
+                  <TableHead className="text-right">Diff</TableHead>
                   <TableHead className="text-right">Weight</TableHead>
                   <TableHead className="text-right">Price/Bale</TableHead>
-                  <TableHead className="text-right">Total Price</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -416,17 +429,20 @@ export default function PendingInvoiceVerify() {
                       {item.articleCode}
                     </TableCell>
                     <TableCell className="text-sm">{item.productName}</TableCell>
+                    <TableCell className="text-right font-mono" data-testid={`text-comparison-expected-${item.articleCode}`}>
+                      {item.expectedQty}
+                    </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-comparison-loaded-${item.articleCode}`}>
                       {item.loadedQty}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-comparison-diff-${item.articleCode}`}>
+                      {item.diff > 0 ? `+${item.diff}` : item.diff}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {item.totalWeight.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {parseFloat(item.pricePerBale).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {item.totalPrice.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(item.status)}

@@ -18,6 +18,7 @@ interface ProformaLine {
   proformaId: number;
   articleCode: string;
   productName: string;
+  quantity: number;
   pricePerBale: string;
 }
 
@@ -46,9 +47,9 @@ export default function CustomerProformas() {
   const [newProformaName, setNewProformaName] = useState("");
   const [isAddLineOpen, setIsAddLineOpen] = useState(false);
   const [addLineProformaId, setAddLineProformaId] = useState<number | null>(null);
-  const [newLine, setNewLine] = useState({ articleCode: "", productName: "", pricePerBale: "" });
+  const [newLine, setNewLine] = useState({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
-  const [editLineValues, setEditLineValues] = useState({ productName: "", pricePerBale: "" });
+  const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "" });
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -104,7 +105,7 @@ export default function CustomerProformas() {
   });
 
   const addLineMutation = useMutation({
-    mutationFn: async (data: { proformaId: number; articleCode: string; productName: string; pricePerBale: string }) => {
+    mutationFn: async (data: { proformaId: number; articleCode: string; productName: string; quantity: number; pricePerBale: string }) => {
       return await apiRequest("POST", "/api/factory/customer-proforma-lines", data);
     },
     onSuccess: () => {
@@ -112,7 +113,7 @@ export default function CustomerProformas() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
       setIsAddLineOpen(false);
       setAddLineProformaId(null);
-      setNewLine({ articleCode: "", productName: "", pricePerBale: "" });
+      setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -120,10 +121,11 @@ export default function CustomerProformas() {
   });
 
   const editLineMutation = useMutation({
-    mutationFn: async (data: { id: number; pricePerBale: string; productName: string }) => {
+    mutationFn: async (data: { id: number; pricePerBale: string; productName: string; quantity: string }) => {
       return await apiRequest("PUT", `/api/factory/customer-proforma-lines/${data.id}`, {
         pricePerBale: data.pricePerBale,
         productName: data.productName,
+        quantity: data.quantity,
       });
     },
     onSuccess: () => {
@@ -160,21 +162,23 @@ export default function CustomerProformas() {
   };
 
   const handleAddLine = () => {
-    if (!addLineProformaId || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.pricePerBale) return;
+    if (!addLineProformaId || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.quantity || !newLine.pricePerBale) return;
     addLineMutation.mutate({
       proformaId: addLineProformaId,
       articleCode: newLine.articleCode.trim(),
       productName: newLine.productName.trim(),
+      quantity: parseInt(newLine.quantity),
       pricePerBale: newLine.pricePerBale,
     });
   };
 
   const handleEditLine = () => {
-    if (!editingLine || !editLineValues.pricePerBale) return;
+    if (!editingLine || !editLineValues.pricePerBale || !editLineValues.quantity) return;
     editLineMutation.mutate({
       id: editingLine.id,
       pricePerBale: editLineValues.pricePerBale,
       productName: editLineValues.productName,
+      quantity: editLineValues.quantity,
     });
   };
 
@@ -305,7 +309,7 @@ export default function CustomerProformas() {
                           variant="outline"
                           onClick={() => {
                             setAddLineProformaId(proforma.id);
-                            setNewLine({ articleCode: "", productName: "", pricePerBale: "" });
+                            setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
                             setIsAddLineOpen(true);
                           }}
                           data-testid={`button-add-line-${proforma.id}`}
@@ -322,6 +326,7 @@ export default function CustomerProformas() {
                               <TableRow>
                                 <TableHead>Article Code</TableHead>
                                 <TableHead>Product Name</TableHead>
+                                <TableHead className="text-right">Qty</TableHead>
                                 <TableHead className="text-right">Price/Bale</TableHead>
                                 <TableHead className="w-[80px]"></TableHead>
                               </TableRow>
@@ -335,6 +340,9 @@ export default function CustomerProformas() {
                                   <TableCell data-testid={`text-product-name-${line.id}`}>
                                     {line.productName}
                                   </TableCell>
+                                  <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
+                                    {line.quantity}
+                                  </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
                                     {parseFloat(line.pricePerBale).toFixed(2)}
                                   </TableCell>
@@ -347,6 +355,7 @@ export default function CustomerProformas() {
                                           setEditingLine(line);
                                           setEditLineValues({
                                             productName: line.productName,
+                                            quantity: String(line.quantity),
                                             pricePerBale: line.pricePerBale,
                                           });
                                         }}
@@ -447,6 +456,18 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
+              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                value={newLine.quantity}
+                onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
+                placeholder="0"
+                data-testid="input-line-quantity"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">Price Per Bale</label>
               <Input
                 type="number"
@@ -463,7 +484,7 @@ export default function CustomerProformas() {
               </Button>
               <Button
                 onClick={handleAddLine}
-                disabled={addLineMutation.isPending || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.pricePerBale}
+                disabled={addLineMutation.isPending || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.quantity || !newLine.pricePerBale}
                 data-testid="button-submit-line"
               >
                 {addLineMutation.isPending ? "Adding..." : "Add Line"}
@@ -492,6 +513,17 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
+              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                value={editLineValues.quantity}
+                onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
+                data-testid="input-edit-quantity"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">Price Per Bale</label>
               <Input
                 type="number"
@@ -507,7 +539,7 @@ export default function CustomerProformas() {
               </Button>
               <Button
                 onClick={handleEditLine}
-                disabled={editLineMutation.isPending || !editLineValues.pricePerBale}
+                disabled={editLineMutation.isPending || !editLineValues.pricePerBale || !editLineValues.quantity}
                 data-testid="button-submit-edit-line"
               >
                 <Check className="mr-1 h-4 w-4" />

@@ -4002,6 +4002,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const id = parseInt(req.params.id);
       const updateData: any = {};
       if (req.body.productName !== undefined) updateData.productName = req.body.productName;
+      if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
       if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
 
       const [updated] = await db.update(customerProformaLines).set(updateData)
@@ -4533,7 +4534,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       let proformaLines: any[] = [];
-      const proformaByArticle: Record<string, { articleCode: string; productName: string; pricePerBale: string }> = {};
+      const proformaByArticle: Record<string, { articleCode: string; productName: string; expectedQty: number; pricePerBale: string }> = {};
 
       if (order.proformaIdUsed) {
         proformaLines = await db.select().from(customerProformaLines)
@@ -4543,6 +4544,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           proformaByArticle[pl.articleCode] = {
             articleCode: pl.articleCode,
             productName: pl.productName,
+            expectedQty: pl.quantity,
             pricePerBale: pl.pricePerBale,
           };
         }
@@ -4555,20 +4557,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const loaded = loadedByArticle[code] || null;
         const proforma = proformaByArticle[code] || null;
         const loadedQty = loaded?.qty || 0;
+        const expectedQty = proforma?.expectedQty || 0;
 
         let status: string;
         if (!proforma && loadedQty > 0) {
           status = "LOADED_NOT_IN_PROFORMA";
         } else if (proforma && loadedQty === 0) {
-          status = "NOT_LOADED";
+          status = "MISSING_FROM_LOADED";
+        } else if (expectedQty > 0 && loadedQty < expectedQty) {
+          status = "UNDER_LOADED";
+        } else if (expectedQty > 0 && loadedQty > expectedQty) {
+          status = "OVER_LOADED";
         } else {
-          status = "IN_PROFORMA";
+          status = "MATCH";
         }
 
         comparison.push({
           articleCode: code,
           productName: loaded?.productName || proforma?.productName || code,
           loadedQty,
+          expectedQty,
+          diff: loadedQty - expectedQty,
           totalWeight: loaded?.totalWeight || 0,
           totalPrice: loaded?.totalPrice || 0,
           pricePerBale: proforma?.pricePerBale || "0",
