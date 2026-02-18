@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FactorySettingsData {
@@ -469,6 +469,26 @@ export default function FactorySettings() {
               <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced</li>
             </ul>
             <p className="mt-2 text-xs">Products must already exist in the system. The weight will be taken from the product definition.</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const header = "ITEM NAME\tITEM BARCODE\tQUANTITY\tPRODUCTION DATE\n";
+                const example = "WINTER HHR\tHMD11298\t1\t2/11/2026\n";
+                const blob = new Blob([header + example], { type: "application/vnd.ms-excel" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "bale_import_template.xls";
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              data-testid="button-download-bale-template"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <input
