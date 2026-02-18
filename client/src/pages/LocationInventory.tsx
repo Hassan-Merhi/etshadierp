@@ -202,9 +202,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         stockItemCode: item.articleCode,
         stockItemName: item.productName,
         stockItemUom: "BALES",
-        stockGroupId: null,
+        stockGroupId: item.categoryId || null,
         stockGroupName: item.category || "Uncategorized",
-        stockGroupCode: null,
+        stockGroupCode: item.category || null,
       }))
     : erpInventoryData;
   const inventoryLoading = isFactoryMode ? factoryBaleLoading : erpInventoryLoading;

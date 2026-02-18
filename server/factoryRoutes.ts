@@ -624,13 +624,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         : [];
 
       const categoryMap = new Map(categories.map(c => [c.id, c.name]));
-      const productCategoryMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
+      const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
+      const productCategoryIdMap = new Map(products.map(p => [p.id, p.categoryId || null]));
 
       const grouped = new Map<number, {
         productId: number;
         articleCode: string;
         productName: string;
         category: string | null;
+        categoryId: number | null;
         quantity: number;
         totalWeight: number;
         totalCost: number;
@@ -653,7 +655,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             productId: pid,
             articleCode: b.articleCode || b.baleCode || "",
             productName: b.productName || "Unknown",
-            category: productCategoryMap.get(pid) || b.category || null,
+            category: productCategoryNameMap.get(pid) || b.category || null,
+            categoryId: productCategoryIdMap.get(pid) || null,
             quantity: qty,
             totalWeight: weight,
             totalCost: cost,
