@@ -7,6 +7,7 @@ import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface StockItem {
   id: number;
@@ -77,6 +78,8 @@ export default function StockItemDetail() {
   const handleBack = () => {
     navigate("/stock-query");
   };
+
+  useEscapeBack(handleBack);
 
   const handleSaleClick = (saleDate: string, voucherId?: number) => {
     if (!voucherId) return;

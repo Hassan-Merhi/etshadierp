@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactoryMixBatch } from "@shared/schema";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 const BatchDetail = lazy(() => import("./BatchDetail"));
 
@@ -31,6 +32,8 @@ export default function MixBatches() {
   const [statusFilter, setStatusFilter] = useState<string>("ACTIVE");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+
+  useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
 
   const { data: batches, isLoading } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],

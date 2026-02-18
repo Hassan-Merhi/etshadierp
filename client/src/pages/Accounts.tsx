@@ -77,6 +77,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface Account {
   id: string;
@@ -133,6 +134,8 @@ export default function Accounts() {
   const urlYear = urlParams.get("year") || "";
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  useEscapeBack(selectedAccount ? () => setSelectedAccount(null) : null);
 
   // Force refresh of account data when component mounts
   useEffect(() => {

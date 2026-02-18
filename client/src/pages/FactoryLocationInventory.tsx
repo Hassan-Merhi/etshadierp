@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, MapPin, Layers, Package, Search, Printer } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface Location {
   id: number;
@@ -145,6 +146,13 @@ export default function FactoryLocationInventory() {
     setSelectedCategory(null);
     setProductSearch("");
   };
+
+  const escapeBackHandler = selectedCategory
+    ? handleBackToCategories
+    : selectedLocation
+      ? handleBackToLocations
+      : null;
+  useEscapeBack(escapeBackHandler);
 
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

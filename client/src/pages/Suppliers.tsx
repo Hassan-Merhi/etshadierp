@@ -43,6 +43,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface SupplierWithStats {
   id: number;
@@ -63,6 +64,9 @@ export default function Suppliers() {
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
+
+  useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
+
   const { selectedCompany, selectCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const [_location, navigate] = useLocation();

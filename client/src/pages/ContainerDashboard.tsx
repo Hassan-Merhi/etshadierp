@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 type POLineItem = {
   stockItemCode: string;
@@ -116,6 +117,8 @@ export default function ContainerDashboard() {
   const [poDialogOpen, setPoDialogOpen] = useState(false);
   const [poData, setPoData] = useState<ContainerPOResponse | null>(null);
   const [loadingPO, setLoadingPO] = useState(false);
+
+  useEscapeBack(selectedAgent ? () => setSelectedAgent(null) : null);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard/container-tracking"],

@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface Location {
   id: number;
@@ -282,6 +283,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setViewAllItems(false);
     setSelectedRowIndex(0);
   };
+
+  const escapeBackHandler = selectedGroup
+    ? handleBackToGroups
+    : selectedLocationLocal
+      ? handleBackToLocations
+      : null;
+  useEscapeBack(escapeBackHandler);
 
   // Keyboard navigation for table
   useEffect(() => {

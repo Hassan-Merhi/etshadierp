@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -579,6 +580,8 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 export default function ProductionBales() {
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
 
   const { data: pressingBatches, isLoading: batchesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pressing-batches"],
