@@ -99,6 +99,53 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     });
   }
 
+  async function getOrFetchFxRateToUsd(companyId: number, currencyCode: string, dateISO: string): Promise<string> {
+    if (currencyCode === "USD") return "1";
+
+    const [existing] = await db
+      .select()
+      .from(factoryFxRates)
+      .where(and(
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
+        eq(factoryFxRates.effectiveDate, dateISO)
+      ))
+      .limit(1);
+
+    if (existing) return existing.rateToUsd;
+
+    try {
+      const response = await fetch(`https://api.frankfurter.app/${dateISO}?from=${currencyCode.toUpperCase()}&to=USD`);
+      if (!response.ok) throw new Error(`FX API returned ${response.status}`);
+      const data = await response.json();
+      const rate = data?.rates?.USD;
+      if (!rate || isNaN(rate)) throw new Error("Invalid rate from FX API");
+
+      const rateStr = String(rate);
+      await db.insert(factoryFxRates).values({
+        companyId,
+        currencyCode: currencyCode.toUpperCase(),
+        rateToUsd: rateStr,
+        effectiveDate: dateISO,
+      });
+
+      return rateStr;
+    } catch (err: any) {
+      const [fallback] = await db
+        .select()
+        .from(factoryFxRates)
+        .where(and(
+          eq(factoryFxRates.companyId, companyId),
+          eq(factoryFxRates.currencyCode, currencyCode.toUpperCase())
+        ))
+        .orderBy(desc(factoryFxRates.effectiveDate))
+        .limit(1);
+
+      if (fallback) return fallback.rateToUsd;
+      throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${err.message}`);
+    }
+  }
+
   function isLegacySHA256Hash(hash: string): boolean {
     return /^[a-f0-9]{64}$/i.test(hash);
   }
@@ -1726,6 +1773,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           origin: factoryContainers.origin,
           totalKg: factoryContainers.totalKg,
           ratePerKg: factoryContainers.ratePerKg,
+          currencyCode: factoryContainers.currencyCode,
+          fxRateToUsd: factoryContainers.fxRateToUsd,
+          fxRateToUsdImport: factoryContainers.fxRateToUsdImport,
+          fxRateToUsdOffload: factoryContainers.fxRateToUsdOffload,
+          fxRateSource: factoryContainers.fxRateSource,
+          fxRateDateImport: factoryContainers.fxRateDateImport,
+          fxRateDateOffload: factoryContainers.fxRateDateOffload,
+          ratePerKgUsd: factoryContainers.ratePerKgUsd,
+          finalPayableAmountUsd: factoryContainers.finalPayableAmountUsd,
+          declaredKg: factoryContainers.declaredKg,
+          actualReceivedKg: factoryContainers.actualReceivedKg,
+          finalPayableAmount: factoryContainers.finalPayableAmount,
+          differenceKg: factoryContainers.differenceKg,
           arrivalDate: factoryContainers.arrivalDate,
           notes: factoryContainers.notes,
           status: factoryContainers.status,
@@ -1752,17 +1812,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const parsed = insertFactoryContainerSchema.parse({ ...req.body, companyId });
       const currencyCode = parsed.currencyCode || "USD";
-      const fxRate = parseFloat(parsed.fxRateToUsd || "1");
+      const fxRateSource = parsed.fxRateSource || "auto";
+      const today = new Date().toISOString().split("T")[0];
+      const importDate = parsed.arrivalDate || today;
+
+      let fxRate: string;
+      if (fxRateSource === "manual" && parsed.fxRateToUsd) {
+        fxRate = parsed.fxRateToUsd;
+      } else {
+        fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
+      }
+
       const ratePerKg = parseFloat(parsed.ratePerKg || "0");
-      const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRate;
+      const fxRateNum = parseFloat(fxRate);
+      const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum;
+
       const values = {
         ...parsed,
         currencyCode,
-        fxRateToUsd: String(fxRate),
+        fxRateToUsd: fxRate,
+        fxRateToUsdImport: fxRate,
+        fxRateSource: fxRateSource === "manual" ? "manual" : "auto",
+        fxRateDateImport: importDate,
         ratePerKgUsd: String(ratePerKgUsd),
       };
       const [container] = await db.insert(factoryContainers).values(values).returning();
-      const today = new Date().toISOString().split('T')[0];
       await writeDaybookEntry(db, {
         companyId,
         txDate: container.arrivalDate || today,
@@ -1786,9 +1860,41 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
+      const updateData = { ...req.body, updatedAt: new Date() };
+
+      if (updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource) {
+        const [existing] = await db.select().from(factoryContainers)
+          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
+        if (!existing) return res.status(404).json({ message: "Container not found" });
+
+        const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
+        const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
+        const importDate = updateData.arrivalDate || existing.arrivalDate || new Date().toISOString().split("T")[0];
+
+        if (fxRateSource === "auto") {
+          try {
+            const fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
+            updateData.fxRateToUsd = fxRate;
+            updateData.fxRateToUsdImport = fxRate;
+            updateData.fxRateDateImport = importDate;
+            updateData.fxRateSource = "auto";
+            const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
+            const fxRateNum = parseFloat(fxRate);
+            updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
+          } catch {}
+        } else {
+          const fxRateNum = parseFloat(updateData.fxRateToUsd || existing.fxRateToUsd || "1");
+          const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
+          updateData.fxRateToUsdImport = String(fxRateNum);
+          updateData.fxRateDateImport = importDate;
+          updateData.fxRateSource = "manual";
+          updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
+        }
+      }
+
       const [updated] = await db
         .update(factoryContainers)
-        .set({ ...req.body, updatedAt: new Date() })
+        .set(updateData)
         .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)))
         .returning();
 
@@ -1868,7 +1974,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             continue;
           }
 
-          const fxRate = parseFloat(row.fxRateToUsd || "1") || 1;
           const ratePerKg = parseFloat(row.ratePerKg || "0") || 0;
           const totalKg = parseFloat(row.totalKg || "0") || 0;
 
@@ -1879,6 +1984,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (row.ratePerKg && isNaN(parseFloat(row.ratePerKg))) {
             errors.push(`Row ${rowNum} (${row.containerNumber}): Invalid Rate/Kg value`);
             continue;
+          }
+
+          const fxSource = (row.fxSource || "").toUpperCase() === "MANUAL" ? "manual" : "auto";
+          const today = new Date().toISOString().split("T")[0];
+          const importDate = row.arrivalDate || today;
+
+          let fxRate: number;
+          if (fxSource === "manual" && row.fxRateToUsd) {
+            fxRate = parseFloat(row.fxRateToUsd) || 1;
+          } else {
+            try {
+              fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, importDate));
+            } catch (fxErr: any) {
+              errors.push(`Row ${rowNum} (${row.containerNumber}): ${fxErr.message}`);
+              continue;
+            }
           }
 
           await db.transaction(async (tx: any) => {
@@ -1909,16 +2030,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               ratePerKg: ratePerKg ? String(ratePerKg) : null,
               currencyCode,
               fxRateToUsd: String(fxRate),
+              fxRateToUsdImport: String(fxRate),
+              fxRateSource: fxSource,
+              fxRateDateImport: importDate,
               ratePerKgUsd: String(ratePerKgUsd),
               arrivalDate: row.arrivalDate || null,
               notes: row.notes || null,
               status,
             }).returning();
 
-            const today = new Date().toISOString().split("T")[0];
             await writeDaybookEntry(tx, {
               companyId,
-              txDate: container.arrivalDate || today,
+              txDate: container.arrivalDate || importDate,
               txType: "CONTAINER_IMPORT",
               referenceId: container.id,
               description: `Container imported (Excel): ${container.containerNumber}`,
@@ -2128,7 +2251,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (existing) return res.status(400).json({ message: "This container has already been offloaded" });
 
       const currencyCode = reqCurrencyCode || container.currencyCode || "USD";
-      const fxRate = parseFloat(reqFxRate || container.fxRateToUsd || "1");
+      const today = new Date().toISOString().split("T")[0];
+      const offloadDate = today;
+
+      let fxRate: number;
+      try {
+        fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, offloadDate));
+      } catch {
+        fxRate = parseFloat(reqFxRate || container.fxRateToUsd || "1");
+      }
 
       const declaredKg = container.totalKg || "0";
       const actualKg = receivedKg || declaredKg;
@@ -2162,6 +2293,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           differenceKg,
           currencyCode,
           fxRateToUsd: String(fxRate),
+          fxRateToUsdOffload: String(fxRate),
+          fxRateDateOffload: offloadDate,
           ratePerKgUsd: String(costPerKgUsd),
           finalPayableAmountUsd,
           updatedAt: new Date(),
@@ -2196,10 +2329,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .returning();
       }
 
-      const today = new Date().toISOString().split('T')[0];
       await writeDaybookEntry(db, {
         companyId,
-        txDate: today,
+        txDate: offloadDate,
         txType: "OFFLOAD_RAW_STOCK",
         referenceId: rawStock.id,
         description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${finalCostPerKg}/kg`,
@@ -3827,11 +3959,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const [rate] = await db.select().from(factoryFxRates)
-        .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, req.params.currencyCode)))
-        .orderBy(desc(factoryFxRates.effectiveDate))
-        .limit(1);
-      res.json(rate || null);
+      const currency = req.params.currencyCode.toUpperCase();
+      const today = new Date().toISOString().split("T")[0];
+      try {
+        const rate = await getOrFetchFxRateToUsd(companyId, currency, today);
+        res.json({ rate, effectiveDate: today });
+      } catch (err: any) {
+        const [fallback] = await db.select().from(factoryFxRates)
+          .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, currency)))
+          .orderBy(desc(factoryFxRates.effectiveDate))
+          .limit(1);
+        if (fallback) {
+          res.json({ rate: fallback.rateToUsd, effectiveDate: fallback.effectiveDate });
+        } else {
+          res.status(404).json({ message: err.message });
+        }
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/fx-rates/:currencyCode/:date", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const currency = req.params.currencyCode.toUpperCase();
+      const dateISO = req.params.date;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) {
+        return res.status(400).json({ message: "Date must be YYYY-MM-DD format" });
+      }
+      const rate = await getOrFetchFxRateToUsd(companyId, currency, dateISO);
+      res.json({ rate, effectiveDate: dateISO });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

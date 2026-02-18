@@ -54,11 +54,14 @@ export default function FactoryContainers() {
   });
   const [currency, setCurrency] = useState("USD");
   const [fxRate, setFxRate] = useState("1");
+  const [fxRateSource, setFxRateSource] = useState<"auto" | "manual">("auto");
+  const [fxEffectiveDate, setFxEffectiveDate] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
     if (currency === "USD") {
       setFxRate("1");
+      setFxEffectiveDate("");
       return;
     }
     fetch(`/api/factory/fx-rates/latest/${currency}`)
@@ -67,7 +70,10 @@ export default function FactoryContainers() {
         throw new Error("No rate found");
       })
       .then((data) => {
-        if (data?.rate) setFxRate(String(data.rate));
+        if (data?.rate) {
+          setFxRate(String(data.rate));
+          setFxEffectiveDate(data.effectiveDate || "");
+        }
       })
       .catch(() => {});
   }, [currency]);
@@ -86,7 +92,8 @@ export default function FactoryContainers() {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
         currencyCode: currency,
-        fxRateToUsd: fxRate,
+        fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
+        fxRateSource,
       };
       const res = await apiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -112,7 +119,8 @@ export default function FactoryContainers() {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
         currencyCode: currency,
-        fxRateToUsd: fxRate,
+        fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
+        fxRateSource,
       };
       const res = await apiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -203,7 +211,8 @@ export default function FactoryContainers() {
         totalKg: get(["Total Kg", "TotalKg", "Weight", "total_kg", "KG", "Kg"]),
         ratePerKg: get(["Rate/Kg", "Rate Per Kg", "RatePerKg", "rate_per_kg", "Rate", "Price"]),
         currencyCode: get(["Currency", "CurrencyCode", "currency_code"]) || "USD",
-        fxRateToUsd: get(["FX Rate", "FxRate", "fx_rate_to_usd", "Exchange Rate"]) || "1",
+        fxRateToUsd: get(["FX Rate", "FxRate", "fx_rate_to_usd", "Exchange Rate"]) || "",
+        fxSource: get(["FX Source", "FxSource", "fx_source"]) || "",
         arrivalDate: get(["Arrival Date", "ArrivalDate", "arrival_date", "Date"]),
         notes: get(["Notes", "notes", "Remarks"]),
         status: get(["Status", "status"]) || "PENDING",
@@ -217,8 +226,8 @@ export default function FactoryContainers() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "Arrival Date", "Status", "Notes"];
-    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", 1, "2024-06-01", "PENDING", "Sample row"];
+    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes"];
+    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", "", "AUTO", "2024-06-01", "PENDING", "Sample row"];
     const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
@@ -238,6 +247,8 @@ export default function FactoryContainers() {
     });
     setCurrency("USD");
     setFxRate("1");
+    setFxRateSource("auto");
+    setFxEffectiveDate("");
   };
 
   const openEdit = (c: ContainerWithSupplier) => {
@@ -254,6 +265,8 @@ export default function FactoryContainers() {
     });
     setCurrency((c as any).currencyCode || "USD");
     setFxRate((c as any).fxRateToUsd || "1");
+    setFxRateSource((c as any).fxRateSource || "auto");
+    setFxEffectiveDate((c as any).fxRateDateImport || "");
   };
 
   const handleSubmit = () => {
@@ -468,12 +481,25 @@ export default function FactoryContainers() {
                 </Select>
               </div>
               <div>
-                <Label>FX Rate to USD</Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label>FX Rate to USD {currency !== "USD" ? (fxRateSource === "auto" ? `(Auto${fxEffectiveDate ? ` — ${fxEffectiveDate}` : ""})` : "(Manual)") : ""}</Label>
+                  {currency !== "USD" && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground underline"
+                      onClick={() => setFxRateSource(fxRateSource === "auto" ? "manual" : "auto")}
+                      data-testid="button-toggle-fx-source"
+                    >
+                      {fxRateSource === "auto" ? "Switch to Manual" : "Switch to Auto"}
+                    </button>
+                  )}
+                </div>
                 <Input
                   type="number"
                   value={fxRate}
                   onChange={(e) => setFxRate(e.target.value)}
-                  disabled={currency === "USD"}
+                  disabled={currency === "USD" || fxRateSource === "auto"}
+                  readOnly={currency !== "USD" && fxRateSource === "auto"}
                   placeholder="1"
                   data-testid="input-container-fx-rate"
                 />
@@ -556,7 +582,7 @@ export default function FactoryContainers() {
                 Download Template
               </Button>
               <div className="text-sm text-muted-foreground">
-                Expected columns: Container Number, Supplier, Origin, Total Kg, Rate/Kg, Currency, FX Rate, Arrival Date, Status, Notes
+                Expected columns: Container Number, Supplier, Origin, Total Kg, Rate/Kg, Currency, FX Rate (optional), FX Source (AUTO/MANUAL), Arrival Date, Status, Notes
               </div>
             </div>
 
