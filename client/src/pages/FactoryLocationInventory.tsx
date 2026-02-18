@@ -1,13 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, MapPin, Layers, Package, Search, Printer } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+
+type SortField = "name" | "bales" | "kg" | "value";
+type SortDir = "asc" | "desc";
 
 interface Location {
   id: number;
@@ -40,12 +44,42 @@ interface CategoryGroup {
   products: FactoryBaleProduct[];
 }
 
+function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: SortDir) {
+  return [...items].sort((a, b) => {
+    let cmp = 0;
+    switch (field) {
+      case "name": cmp = a.productName.localeCompare(b.productName); break;
+      case "bales": cmp = a.baleCount - b.baleCount; break;
+      case "kg": cmp = a.totalWeight - b.totalWeight; break;
+      case "value": cmp = a.totalCost - b.totalCost; break;
+    }
+    return dir === "desc" ? -cmp : cmp;
+  });
+}
+
+function applySortCategories(items: CategoryGroup[], field: SortField, dir: SortDir) {
+  return [...items].sort((a, b) => {
+    let cmp = 0;
+    switch (field) {
+      case "name": cmp = a.categoryName.localeCompare(b.categoryName); break;
+      case "bales": cmp = a.baleCount - b.baleCount; break;
+      case "kg": cmp = a.totalWeight - b.totalWeight; break;
+      case "value": cmp = a.totalCost - b.totalCost; break;
+    }
+    return dir === "desc" ? -cmp : cmp;
+  });
+}
+
 export default function FactoryLocationInventory() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryGroup | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [catSortField, setCatSortField] = useState<SortField>("name");
+  const [catSortDir, setCatSortDir] = useState<SortDir>("asc");
+  const [prodSortField, setProdSortField] = useState<SortField>("name");
+  const [prodSortDir, setProdSortDir] = useState<SortDir>("asc");
   const printRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
 
@@ -95,15 +129,32 @@ export default function FactoryLocationInventory() {
     l.name.toLowerCase().includes(locationSearch.toLowerCase())
   );
 
-  const sortedCategories = [...categoryGroups].sort((a, b) => a.categoryName.localeCompare(b.categoryName));
-  const filteredCategories = sortedCategories.filter((c) =>
-    c.categoryName.toLowerCase().includes(categorySearch.toLowerCase())
+  const globalSearchResults = useMemo(() => {
+    if (!categorySearch.trim() || !inventoryData.length) return null;
+    const q = categorySearch.toLowerCase();
+    const matched = inventoryData.filter(
+      (p) => p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q)
+    );
+    if (matched.length === 0) return null;
+    return matched;
+  }, [categorySearch, inventoryData]);
+
+  const filteredCategories = applySortCategories(
+    categoryGroups.filter((c) =>
+      c.categoryName.toLowerCase().includes(categorySearch.toLowerCase())
+    ),
+    catSortField,
+    catSortDir
   );
 
   const filteredProducts = selectedCategory
-    ? selectedCategory.products
-        .filter((p) => p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase()))
-        .sort((a, b) => a.productName.localeCompare(b.productName))
+    ? applySortProducts(
+        selectedCategory.products.filter(
+          (p) => p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase())
+        ),
+        prodSortField,
+        prodSortDir
+      )
     : [];
 
   const handleLocationClick = (location: Location) => {
@@ -251,15 +302,39 @@ export default function FactoryLocationInventory() {
         </div>
 
         <Card className="p-4 w-full" ref={printRef}>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search categories..."
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-categories"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search categories or items..."
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-categories"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={catSortField} onValueChange={(v) => setCatSortField(v as SortField)} data-testid="select-cat-sort-field">
+                <SelectTrigger className="w-[120px]" data-testid="select-cat-sort-trigger">
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="bales">Bales</SelectItem>
+                  <SelectItem value="kg">KG</SelectItem>
+                  <SelectItem value="value">Value</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCatSortDir((d) => d === "asc" ? "desc" : "asc")}
+                data-testid="button-cat-sort-dir"
+              >
+                {catSortDir === "asc" ? "\u2191" : "\u2193"}
+              </Button>
+            </div>
           </div>
 
           {inventoryLoading ? (
@@ -268,7 +343,87 @@ export default function FactoryLocationInventory() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : categoryGroups.length === 0 ? (
+          ) : globalSearchResults ? (() => {
+            const sorted = applySortProducts(globalSearchResults, catSortField, catSortDir);
+            const gTotalBales = sorted.reduce((s, p) => s + p.baleCount, 0);
+            const gTotalKg = sorted.reduce((s, p) => s + p.totalWeight, 0);
+            const gTotalCost = sorted.reduce((s, p) => s + p.totalCost, 0);
+            return (
+              <>
+                <div className="mb-3 text-sm text-muted-foreground">
+                  Found {sorted.length} items matching "{categorySearch}" across all categories
+                </div>
+
+                <div className="md:hidden space-y-3">
+                  {sorted.map((prod) => (
+                    <Card key={prod.productId} className="p-3" data-testid={`row-search-result-${prod.productId}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{prod.productName}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <span>{prod.articleCode}</span>
+                        <span>| {prod.category || "Uncategorized"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
+                        <div className="text-right"><span className="text-muted-foreground">KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
+                        <div className="col-span-2 text-right"><span className="text-muted-foreground">Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>
+                      </div>
+                    </Card>
+                  ))}
+                  <Card className="p-3 bg-muted/50" data-testid="text-search-totals">
+                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                      <span>Total ({sorted.length} items, {gTotalBales.toLocaleString()} bales)</span>
+                      <span className="font-mono">{fmt(gTotalKg)} KG</span>
+                    </div>
+                    <div className="text-right text-sm font-mono font-bold mt-1">{formatAmount(gTotalCost)}</div>
+                  </Card>
+                </div>
+
+                <div className="hidden md:block rounded-md border overflow-hidden w-full">
+                  <table className="w-full table-fixed text-sm">
+                    <colgroup>
+                      <col style={{ width: "130px" }} />
+                      <col style={{ width: "120px" }} />
+                      <col />
+                      <col style={{ width: "90px" }} />
+                      <col style={{ width: "110px" }} />
+                      <col style={{ width: "130px" }} />
+                    </colgroup>
+                    <thead className="bg-muted/50">
+                      <tr className="h-12">
+                        <th className="text-left px-3 font-medium">Category</th>
+                        <th className="text-left px-3 font-medium">Article Code</th>
+                        <th className="text-left px-3 font-medium">Bale Name</th>
+                        <th className="text-right px-3 font-medium">Bales</th>
+                        <th className="text-right px-3 font-medium">Total KG</th>
+                        <th className="text-right px-3 font-medium">Total Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sorted.map((prod) => (
+                        <tr key={prod.productId} className="border-t h-12" data-testid={`row-search-result-${prod.productId}`}>
+                          <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
+                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
+                          <td className="px-3 font-medium">{prod.productName}</td>
+                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+                          <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t bg-muted/50 h-12 font-bold">
+                        <td className="px-3" colSpan={3}>Total ({sorted.length} items)</td>
+                        <td className="text-right px-3 font-mono">{gTotalBales.toLocaleString()}</td>
+                        <td className="text-right px-3 font-mono">{fmt(gTotalKg)}</td>
+                        <td className="text-right px-3 font-mono">{formatAmount(gTotalCost)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })() : categoryGroups.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No bales found at this location.</div>
           ) : (
             <>
@@ -361,7 +516,7 @@ export default function FactoryLocationInventory() {
               </div>
             </>
           )}
-          {!inventoryLoading && filteredCategories.length > 0 && (
+          {!inventoryLoading && !globalSearchResults && filteredCategories.length > 0 && (
             <div className="mt-4 text-sm text-muted-foreground">
               Showing {filteredCategories.length} of {categoryGroups.length} categories
             </div>
@@ -398,15 +553,39 @@ export default function FactoryLocationInventory() {
       </div>
 
       <Card className="p-4 w-full" ref={printRef}>
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            placeholder="Search by bale name or article code..."
-            value={productSearch}
-            onChange={(e) => setProductSearch(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-products"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search by bale name or article code..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-products"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-prod-sort-field">
+              <SelectTrigger className="w-[120px]" data-testid="select-prod-sort-trigger">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="bales">Bales</SelectItem>
+                <SelectItem value="kg">KG</SelectItem>
+                <SelectItem value="value">Value</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setProdSortDir((d) => d === "asc" ? "desc" : "asc")}
+              data-testid="button-prod-sort-dir"
+            >
+              {prodSortDir === "asc" ? "\u2191" : "\u2193"}
+            </Button>
+          </div>
         </div>
 
         <div className="md:hidden space-y-3">
