@@ -215,17 +215,14 @@ export default function FactoryContainers() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
     const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "Arrival Date", "Status", "Notes"];
-    const sample = ["CNTR-2024-001", "ABC Trading", "China", "25000", "1.50", "USD", "1", "2024-06-01", "PENDING", "Sample row"];
-    const csvContent = [headers.join(","), sample.join(",")].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "factory_containers_template.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", 1, "2024-06-01", "PENDING", "Sample row"];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Containers");
+    XLSX.writeFile(wb, "factory_containers_template.xlsx");
   };
 
   const resetForm = () => {
@@ -548,7 +545,7 @@ export default function FactoryContainers() {
               Import Containers from Excel
             </DialogTitle>
             <DialogDescription>
-              Upload an Excel or CSV file to bulk-import containers. New suppliers will be created automatically.
+              Upload an Excel file (.xlsx) to bulk-import containers. New suppliers will be created automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -567,7 +564,7 @@ export default function FactoryContainers() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls"
                 onChange={handleFileSelect}
                 className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground cursor-pointer"
                 data-testid="input-import-file"
