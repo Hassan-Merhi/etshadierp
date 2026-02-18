@@ -1,0 +1,624 @@
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
+import { ArrowLeft, Calendar, Package } from "lucide-react";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useEscapeBack } from "@/hooks/use-escape-back";
+
+interface MonthlyBaleData {
+  month: number;
+  monthName: string;
+  baleCount: number;
+  totalWeight: number;
+  totalCost: number;
+}
+
+interface BaleProductHistoryResponse {
+  product: {
+    id: number;
+    name: string;
+    articleCode: string;
+    weightPerBaleKg: number;
+  };
+  location: {
+    id: number;
+    name: string;
+  };
+  year: number;
+  monthlyData: MonthlyBaleData[];
+  grandTotal: {
+    baleCount: number;
+    totalWeight: number;
+    totalCost: number;
+  };
+}
+
+interface BaleDetail {
+  id: number;
+  baleCode: string;
+  referenceNumber: string;
+  weightKg: number;
+  costPerKg: number;
+  totalCost: number;
+  status: string;
+  createdAt: string;
+}
+
+export default function FactoryBaleProductHistory() {
+  const params = useParams();
+  const productId = params.productId || "0";
+  const locationId = params.locationId || "0";
+  const [_location, navigate] = useLocation();
+  const { formatAmount } = useCurrencyContext();
+
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+
+  useEscapeBack(() => navigate("/factory/location-inventory"));
+
+  const { data, isLoading } = useQuery<BaleProductHistoryResponse>({
+    queryKey: ["/api/factory/bale-product-history", productId, locationId, { year: selectedYear }],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/factory/bale-product-history/${productId}/${locationId}?year=${selectedYear}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    enabled: parseInt(productId) > 0 && parseInt(locationId) > 0,
+  });
+
+  const years = [];
+  for (let y = currentYear; y >= currentYear - 5; y--) {
+    years.push(y);
+  }
+
+  const chartData =
+    data?.monthlyData.map((m) => ({
+      name: m.monthName.substring(0, 3),
+      Bales: m.baleCount,
+    })) || [];
+
+  const handleMonthClick = (month: number) => {
+    navigate(
+      `/factory/bale-product-history/${productId}/${locationId}/${selectedYear}/${month}`
+    );
+  };
+
+  const formatNumber = (num: number, decimals = 2) => {
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-3 sm:p-6 space-y-6">
+        <Skeleton className="h-8 w-64" data-testid="skeleton-title" />
+        <Skeleton className="h-[400px] w-full" data-testid="skeleton-table" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/factory/location-inventory")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1
+              className="text-lg sm:text-2xl font-bold"
+              data-testid="text-page-title"
+            >
+              Bale Production History
+            </h1>
+            {data?.product && data?.location && (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="text-product-info"
+              >
+                {data.product.name} ({data.product.articleCode}) —{" "}
+                {data.location.name}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger
+                className="w-[100px] sm:w-[120px]"
+                data-testid="select-year"
+              >
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg" data-testid="text-table-title">
+            Monthly Bale Production — {selectedYear}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Month</TableHead>
+                  <TableHead className="text-right">Bales</TableHead>
+                  <TableHead className="text-right">Total KG</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data?.monthlyData.map((month) => {
+                  const hasData = month.baleCount > 0;
+                  return (
+                    <TableRow
+                      key={month.month}
+                      className={
+                        hasData ? "cursor-pointer hover:bg-muted/50" : ""
+                      }
+                      onClick={() => hasData && handleMonthClick(month.month)}
+                      data-testid={`row-month-${month.month}`}
+                    >
+                      <TableCell className="font-medium">
+                        {month.monthName}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {month.baleCount > 0
+                          ? formatNumber(month.baleCount, 0)
+                          : ""}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {month.totalWeight > 0
+                          ? formatNumber(month.totalWeight)
+                          : ""}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {month.totalCost > 0
+                          ? formatAmount(month.totalCost)
+                          : ""}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                <TableRow
+                  className="bg-muted/50 font-bold"
+                  data-testid="row-grand-total"
+                >
+                  <TableCell>Grand Total</TableCell>
+                  <TableCell
+                    className="text-right font-mono"
+                    data-testid="text-total-bales"
+                  >
+                    {formatNumber(data?.grandTotal.baleCount || 0, 0)}
+                  </TableCell>
+                  <TableCell
+                    className="text-right font-mono"
+                    data-testid="text-total-weight"
+                  >
+                    {formatNumber(data?.grandTotal.totalWeight || 0)}
+                  </TableCell>
+                  <TableCell
+                    className="text-right font-mono"
+                    data-testid="text-total-cost"
+                  >
+                    {formatAmount(data?.grandTotal.totalCost || 0)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="md:hidden space-y-2">
+            {data?.monthlyData.map((month) => {
+              const hasData = month.baleCount > 0;
+              return (
+                <div
+                  key={month.month}
+                  className={`p-3 rounded-md border text-sm ${
+                    hasData ? "cursor-pointer hover-elevate" : "opacity-50"
+                  }`}
+                  onClick={() => hasData && handleMonthClick(month.month)}
+                  data-testid={`card-month-${month.month}`}
+                >
+                  <div className="font-medium text-base mb-2">
+                    {month.monthName}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <div className="text-muted-foreground">Bales</div>
+                      <div className="font-mono">
+                        {month.baleCount > 0
+                          ? formatNumber(month.baleCount, 0)
+                          : "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Total KG</div>
+                      <div className="font-mono">
+                        {month.totalWeight > 0
+                          ? formatNumber(month.totalWeight)
+                          : "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Total Cost</div>
+                      <div className="font-mono">
+                        {month.totalCost > 0
+                          ? formatAmount(month.totalCost)
+                          : "-"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {data && (
+              <div
+                className="p-3 rounded-md border bg-muted/50 text-sm font-bold"
+                data-testid="card-grand-total"
+              >
+                <div className="mb-2">Grand Total</div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground font-normal">
+                      Bales
+                    </div>
+                    <div className="font-mono">
+                      {formatNumber(data.grandTotal.baleCount, 0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">
+                      Total KG
+                    </div>
+                    <div className="font-mono">
+                      {formatNumber(data.grandTotal.totalWeight)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground font-normal">
+                      Total Cost
+                    </div>
+                    <div className="font-mono">
+                      {formatAmount(data.grandTotal.totalCost)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg" data-testid="text-chart-title">
+            Monthly Bale Count Chart
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[250px] sm:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  className="stroke-muted"
+                />
+                <XAxis dataKey="name" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    borderColor: "hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
+                />
+                <Legend />
+                <Bar
+                  dataKey="Bales"
+                  fill="hsl(var(--primary))"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export function FactoryBaleProductMonthDetail() {
+  const params = useParams();
+  const productId = params.productId || "0";
+  const locationId = params.locationId || "0";
+  const year = params.year || "0";
+  const month = params.month || "0";
+  const [_location, navigate] = useLocation();
+  const { formatAmount } = useCurrencyContext();
+
+  const backPath = `/factory/bale-product-history/${productId}/${locationId}`;
+
+  useEscapeBack(() => navigate(backPath));
+
+  const { data, isLoading } = useQuery<BaleDetail[]>({
+    queryKey: [
+      "/api/factory/bale-product-history",
+      productId,
+      locationId,
+      year,
+      month,
+    ],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/factory/bale-product-history/${productId}/${locationId}/${year}/${month}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    enabled:
+      parseInt(productId) > 0 &&
+      parseInt(locationId) > 0 &&
+      parseInt(year) > 0 &&
+      parseInt(month) > 0,
+  });
+
+  const monthNames = [
+    "",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const monthName = monthNames[parseInt(month)] || month;
+
+  const formatNumber = (num: number, decimals = 2) => {
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-3 sm:p-6 space-y-6">
+        <Skeleton className="h-8 w-64" data-testid="skeleton-title" />
+        <Skeleton className="h-[400px] w-full" data-testid="skeleton-table" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(backPath)}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1
+            className="text-lg sm:text-2xl font-bold"
+            data-testid="text-page-title"
+          >
+            Bale Details — {monthName} {year}
+          </h1>
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="text-bale-count"
+          >
+            <Package className="inline h-4 w-4 mr-1" />
+            {data?.length || 0} bale(s)
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg" data-testid="text-detail-title">
+            Bales for {monthName} {year}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bale Code</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Weight (KG)</TableHead>
+                  <TableHead className="text-right">Cost/KG</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date/Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data?.map((bale) => (
+                  <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                    <TableCell
+                      className="font-medium font-mono"
+                      data-testid={`text-bale-code-${bale.id}`}
+                    >
+                      {bale.baleCode}
+                    </TableCell>
+                    <TableCell data-testid={`text-reference-${bale.id}`}>
+                      {bale.referenceNumber}
+                    </TableCell>
+                    <TableCell
+                      className="text-right font-mono"
+                      data-testid={`text-weight-${bale.id}`}
+                    >
+                      {formatNumber(bale.weightKg)}
+                    </TableCell>
+                    <TableCell
+                      className="text-right font-mono"
+                      data-testid={`text-cost-per-kg-${bale.id}`}
+                    >
+                      {formatAmount(bale.costPerKg)}
+                    </TableCell>
+                    <TableCell
+                      className="text-right font-mono"
+                      data-testid={`text-total-cost-${bale.id}`}
+                    >
+                      {formatAmount(bale.totalCost)}
+                    </TableCell>
+                    <TableCell data-testid={`text-status-${bale.id}`}>
+                      <Badge variant="secondary">{bale.status}</Badge>
+                    </TableCell>
+                    <TableCell data-testid={`text-date-${bale.id}`}>
+                      {formatDateTime(bale.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!data || data.length === 0) && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground py-8"
+                      data-testid="text-no-data"
+                    >
+                      No bales found for this month
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="md:hidden space-y-2">
+            {data?.map((bale) => (
+              <div
+                key={bale.id}
+                className="p-3 rounded-md border text-sm"
+                data-testid={`card-bale-${bale.id}`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <span
+                    className="font-medium font-mono"
+                    data-testid={`text-mobile-bale-code-${bale.id}`}
+                  >
+                    {bale.baleCode}
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    data-testid={`text-mobile-status-${bale.id}`}
+                  >
+                    {bale.status}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Ref: {bale.referenceNumber}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Weight</div>
+                    <div className="font-mono">{formatNumber(bale.weightKg)} KG</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Cost/KG</div>
+                    <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Total</div>
+                    <div className="font-mono">{formatAmount(bale.totalCost)}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  {formatDateTime(bale.createdAt)}
+                </div>
+              </div>
+            ))}
+            {(!data || data.length === 0) && (
+              <div
+                className="text-center text-muted-foreground py-8"
+                data-testid="text-no-data-mobile"
+              >
+                No bales found for this month
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

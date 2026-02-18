@@ -79,6 +79,7 @@ import ProductionRawStock from "@/pages/ProductionRawStock";
 import PressingBales from "@/pages/PressingBales";
 import BaleStockEntry from "@/pages/BaleStockEntry";
 import BalesHistory from "@/pages/BalesHistory";
+import FactoryBaleProductHistory, { FactoryBaleProductMonthDetail } from "@/pages/FactoryBaleProductHistory";
 import BarcodeLookup from "@/pages/BarcodeLookup";
 import ProductionSummary from "@/pages/ProductionSummary";
 import BaleTransfers from "@/pages/BaleTransfers";
@@ -524,6 +525,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bale-transfers" component={BaleTransfers} />
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
+                    <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
+                    <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
                     <Route path="/factory/stock-otw" component={StockOTW} />
                     <Route path="/factory/stock-query/:id" component={StockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />

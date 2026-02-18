@@ -1086,6 +1086,172 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/bale-products/:id/cascade-update", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const { name, weightPerBaleKg, articleCode, description, categoryId } = req.body;
+
+      const [existing] = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)));
+
+      if (!existing) return res.status(404).json({ message: "Product not found" });
+
+      const productUpdate: any = { updatedAt: new Date() };
+      if (name !== undefined) productUpdate.name = name;
+      if (weightPerBaleKg !== undefined) productUpdate.weightPerBaleKg = weightPerBaleKg;
+      if (articleCode !== undefined) productUpdate.articleCode = articleCode;
+      if (description !== undefined) productUpdate.description = description;
+      if (categoryId !== undefined) productUpdate.categoryId = categoryId;
+
+      const [updatedProduct] = await db
+        .update(factoryBaleProducts)
+        .set(productUpdate)
+        .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)))
+        .returning();
+
+      const baleUpdate: any = {};
+      if (name !== undefined && name !== existing.name) baleUpdate.productName = name;
+      if (weightPerBaleKg !== undefined && weightPerBaleKg !== existing.weightPerBaleKg) baleUpdate.weightKg = weightPerBaleKg;
+      if (articleCode !== undefined && articleCode !== existing.articleCode) baleUpdate.articleCode = articleCode;
+
+      let balesUpdated = 0;
+      if (Object.keys(baleUpdate).length > 0) {
+        baleUpdate.updatedAt = new Date();
+        const result = await db
+          .update(factoryBales)
+          .set(baleUpdate)
+          .where(and(eq(factoryBales.productId, id), eq(factoryBales.companyId, companyId)));
+        balesUpdated = result.rowCount ?? 0;
+      }
+
+      res.json({ product: updatedProduct, balesUpdated });
+    } catch (error: any) {
+      console.error("Error cascade updating bale product:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/bale-product-history/:productId/:locationId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const productId = parseInt(req.params.productId);
+      const locationId = parseInt(req.params.locationId);
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+      const [product] = await db
+        .select({
+          id: factoryBaleProducts.id,
+          name: factoryBaleProducts.name,
+          articleCode: factoryBaleProducts.articleCode,
+          weightPerBaleKg: factoryBaleProducts.weightPerBaleKg,
+        })
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+
+      if (!product) return res.status(404).json({ message: "Product not found" });
+
+      const [location] = await db
+        .select({ id: locations.id, name: locations.name })
+        .from(locations)
+        .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)));
+
+      if (!location) return res.status(404).json({ message: "Location not found" });
+
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year + 1, 0, 1);
+
+      const rows = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
+          baleCount: sql<number>`COUNT(*)::int`.as("bale_count"),
+          totalWeight: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight"),
+          totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
+        })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.productId, productId),
+          eq(factoryBales.erpLocationId, locationId),
+          sql`${factoryBales.createdAt} >= ${startDate}`,
+          sql`${factoryBales.createdAt} < ${endDate}`,
+        ))
+        .groupBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`)
+        .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
+
+      const monthlyData = rows.map((r: any) => ({
+        month: Number(r.month),
+        monthName: monthNames[Number(r.month) - 1],
+        baleCount: Number(r.baleCount),
+        totalWeight: Number(r.totalWeight),
+        totalCost: Number(r.totalCost),
+      }));
+
+      const grandTotal = monthlyData.reduce(
+        (acc: { baleCount: number; totalWeight: number; totalCost: number }, m: { baleCount: number; totalWeight: number; totalCost: number }) => ({
+          baleCount: acc.baleCount + m.baleCount,
+          totalWeight: acc.totalWeight + m.totalWeight,
+          totalCost: acc.totalCost + m.totalCost,
+        }),
+        { baleCount: 0, totalWeight: 0, totalCost: 0 }
+      );
+
+      res.json({ product, location, year, monthlyData, grandTotal });
+    } catch (error: any) {
+      console.error("Error fetching bale product history:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/bale-product-history/:productId/:locationId/:year/:month", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const productId = parseInt(req.params.productId);
+      const locationId = parseInt(req.params.locationId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 1);
+
+      const bales = await db
+        .select({
+          id: factoryBales.id,
+          baleCode: factoryBales.baleCode,
+          referenceNumber: factoryBales.referenceNumber,
+          weightKg: factoryBales.weightKg,
+          costPerKg: factoryBales.costPerKg,
+          totalCost: factoryBales.totalCost,
+          status: factoryBales.status,
+          createdAt: factoryBales.createdAt,
+        })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.productId, productId),
+          eq(factoryBales.erpLocationId, locationId),
+          sql`${factoryBales.createdAt} >= ${startDate}`,
+          sql`${factoryBales.createdAt} < ${endDate}`,
+        ))
+        .orderBy(desc(factoryBales.createdAt));
+
+      res.json({ bales });
+    } catch (error: any) {
+      console.error("Error fetching monthly bale details:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;

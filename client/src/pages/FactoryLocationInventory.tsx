@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ export default function FactoryLocationInventory() {
   const [catSortDir, setCatSortDir] = useState<SortDir>("asc");
   const [prodSortField, setProdSortField] = useState<SortField>("name");
   const [prodSortDir, setProdSortDir] = useState<SortDir>("asc");
+  const [_loc, navigate] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
 
@@ -600,7 +602,13 @@ export default function FactoryLocationInventory() {
                   <Card key={prod.productId} className="p-3" data-testid={`row-product-${prod.productId}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{prod.productName}</span>
+                      <button
+                        onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
+                        className="text-left text-primary hover:underline cursor-pointer font-medium"
+                        data-testid={`link-product-mobile-${prod.productId}`}
+                      >
+                        {prod.productName}
+                      </button>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                       <span>{prod.articleCode}</span>
@@ -667,7 +675,15 @@ export default function FactoryLocationInventory() {
                       <tr key={prod.productId} className="border-t h-12" data-testid={`row-product-${prod.productId}`}>
                         {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
                         <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
-                        <td className="px-3 font-medium">{prod.productName}</td>
+                        <td className="px-3 font-medium">
+                          <button
+                            onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
+                            className="text-left text-primary hover:underline cursor-pointer"
+                            data-testid={`link-product-desktop-${prod.productId}`}
+                          >
+                            {prod.productName}
+                          </button>
+                        </td>
                         <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
                         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                         <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>

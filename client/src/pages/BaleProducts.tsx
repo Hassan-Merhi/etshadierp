@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
@@ -55,8 +63,22 @@ export default function BaleProducts() {
   const [showCategories, setShowCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
+  const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (editingProduct) {
+      setEditForm({
+        name: editingProduct.name || "",
+        articleCode: editingProduct.articleCode || "",
+        weightPerBaleKg: editingProduct.weightPerBaleKg ? String(editingProduct.weightPerBaleKg) : "",
+        categoryId: editingProduct.categoryId ? String(editingProduct.categoryId) : "",
+        description: editingProduct.description || "",
+      });
+    }
+  }, [editingProduct]);
 
   const { data: products, isLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -146,6 +168,36 @@ export default function BaleProducts() {
       toast({ title: "Import Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const editProductMutation = useMutation({
+    mutationFn: async (data: { name: string; weightPerBaleKg: number | null; articleCode: string; description: string; categoryId: number | null }) => {
+      const response = await apiRequest("POST", `/api/factory/bale-products/${editingProduct!.id}/cascade-update`, data);
+      return response.json();
+    },
+    onSuccess: (result: { product: FactoryBaleProduct; balesUpdated: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"], exact: false });
+      setEditingProduct(null);
+      toast({
+        title: "Product updated",
+        description: `${result.balesUpdated} bale(s) also updated`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEditSubmit = () => {
+    if (!editForm.name.trim()) return;
+    editProductMutation.mutate({
+      name: editForm.name.trim(),
+      articleCode: editForm.articleCode.trim(),
+      weightPerBaleKg: editForm.weightPerBaleKg ? parseFloat(editForm.weightPerBaleKg) : null,
+      categoryId: editForm.categoryId ? parseInt(editForm.categoryId) : null,
+      description: editForm.description.trim(),
+    });
+  };
 
   const handleDownloadTemplate = async () => {
     try {
@@ -454,6 +506,7 @@ export default function BaleProducts() {
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Count</TableHead>
+                    <TableHead className="w-[60px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,6 +548,16 @@ export default function BaleProducts() {
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {product.weightPerBaleKg ? `${product.weightPerBaleKg} kg` : "-"}
                             </TableCell>
+                            <TableCell>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
+                                data-testid={`button-edit-product-${product.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                     </>
@@ -514,6 +577,7 @@ export default function BaleProducts() {
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -531,6 +595,16 @@ export default function BaleProducts() {
                         {product.active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingProduct(product)}
+                        data-testid={`button-edit-product-${product.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -542,6 +616,91 @@ export default function BaleProducts() {
       </Card>
 
       <CreateBaleProductDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+
+      <Dialog open={!!editingProduct} onOpenChange={(open) => { if (!open) setEditingProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>
+              Update product details. Changes will cascade to related bales.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name *</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+                data-testid="input-edit-product-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-articleCode">Article Code</Label>
+              <Input
+                id="edit-articleCode"
+                value={editForm.articleCode}
+                onChange={(e) => setEditForm({ ...editForm, articleCode: e.target.value })}
+                data-testid="input-edit-product-articleCode"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-weight">Weight per Bale (KG)</Label>
+              <Input
+                id="edit-weight"
+                type="number"
+                value={editForm.weightPerBaleKg}
+                onChange={(e) => setEditForm({ ...editForm, weightPerBaleKg: e.target.value })}
+                data-testid="input-edit-product-weight"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={editForm.categoryId}
+                onValueChange={(val) => setEditForm({ ...editForm, categoryId: val })}
+              >
+                <SelectTrigger data-testid="select-edit-product-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={String(cat.id)}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                data-testid="input-edit-product-description"
+              />
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm text-muted-foreground">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Changes to name, weight, and article code will also update all existing bales using this product.</span>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingProduct(null)} data-testid="button-cancel-edit-product">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditSubmit}
+                disabled={!editForm.name.trim() || editProductMutation.isPending}
+                data-testid="button-save-edit-product"
+              >
+                {editProductMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
