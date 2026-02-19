@@ -32,6 +32,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
 // Type definitions
 interface Account {
@@ -298,6 +300,8 @@ function formatSmartNumber(num: number | string): string {
 }
 
 export default function Analytics() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();

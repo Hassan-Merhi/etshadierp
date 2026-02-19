@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 
 type LookupTab = "article" | "reference";
@@ -24,6 +25,8 @@ export default function BarcodeLookup() {
   const [activeTab, setActiveTab] = useState<LookupTab>("article");
   const [searchValue, setSearchValue] = useState("");
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const [articleResult, setArticleResult] = useState<{
     product: BaleProduct | null;
@@ -37,7 +40,7 @@ export default function BarcodeLookup() {
 
   const articleLookup = useMutation({
     mutationFn: async (code: string) => {
-      const response = await apiRequest("GET", `/api/lookup/article/${encodeURIComponent(code)}`);
+      const response = await modeApiRequest("GET", `/api/lookup/article/${encodeURIComponent(code)}`);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Lookup failed");
@@ -60,7 +63,7 @@ export default function BarcodeLookup() {
 
   const referenceLookup = useMutation({
     mutationFn: async (refNum: string) => {
-      const response = await apiRequest("GET", `/api/lookup/reference/${encodeURIComponent(refNum)}`);
+      const response = await modeApiRequest("GET", `/api/lookup/reference/${encodeURIComponent(refNum)}`);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Lookup failed");
@@ -83,7 +86,7 @@ export default function BarcodeLookup() {
 
   const markScanned = useMutation({
     mutationFn: async (refNum: string) => {
-      const response = await apiRequest("POST", `/api/lookup/reference/${encodeURIComponent(refNum)}/scan`, {});
+      const response = await modeApiRequest("POST", `/api/lookup/reference/${encodeURIComponent(refNum)}/scan`, {});
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Failed to mark as scanned");

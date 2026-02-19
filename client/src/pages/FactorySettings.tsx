@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ export default function FactorySettings() {
 
   const previewMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/factory/bale-products/bulk-rename-preview", {
+      const res = await factoryApiRequest("POST", "/api/factory/bale-products/bulk-rename-preview", {
         codePrefix,
         find: findStr,
         replace: replaceStr,
@@ -101,7 +102,7 @@ export default function FactorySettings() {
 
   const applyMutation = useMutation({
     mutationFn: async (items: RenamePreviewItem[]) => {
-      const res = await apiRequest("POST", "/api/factory/bale-products/bulk-rename-apply", { items });
+      const res = await factoryApiRequest("POST", "/api/factory/bale-products/bulk-rename-apply", { items });
       return res.json();
     },
     onSuccess: (data: { updated: number }) => {
@@ -219,7 +220,7 @@ export default function FactorySettings() {
 
   const mutation = useMutation({
     mutationFn: async (updated: FactorySettingsData) => {
-      const res = await apiRequest("PUT", "/api/factory/settings", updated);
+      const res = await factoryApiRequest("PUT", "/api/factory/settings", updated);
       return res.json();
     },
     onSuccess: () => {

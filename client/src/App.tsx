@@ -15,6 +15,7 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { AppModeProvider } from "@/contexts/AppModeContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
@@ -480,7 +481,7 @@ function AuthenticatedApp() {
 
   if (isFactoryRoute || isFactoryCompany) {
     return (
-      <>
+      <AppModeProvider mode="factory">
         <SidebarProvider style={style as React.CSSProperties}>
           <div className="flex h-screen w-full">
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
@@ -580,13 +581,13 @@ function AuthenticatedApp() {
           </div>
         </SidebarProvider>
         {leaveConfirmDialog}
-      </>
+      </AppModeProvider>
     );
   }
 
   // Full ERP interface for Admin, Owner, Manager
   return (
-    <>
+    <AppModeProvider mode="erp">
       <SidebarProvider style={style as React.CSSProperties}>
         <div className="flex h-screen w-full">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
@@ -613,7 +614,7 @@ function AuthenticatedApp() {
         </div>
       </SidebarProvider>
       {leaveConfirmDialog}
-    </>
+    </AppModeProvider>
   );
 }
 

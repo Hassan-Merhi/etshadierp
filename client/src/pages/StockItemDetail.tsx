@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +62,8 @@ const formatSmartNumber = (value: string | number) => {
 export default function StockItemDetail() {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [_match, params] = useRoute("/stock-query/:id");
   const [_location, navigate] = useLocation();
   const itemId = params?.id ? parseInt(params.id) : null;

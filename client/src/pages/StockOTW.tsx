@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +44,8 @@ interface GroupedStockItem {
 
 export default function StockOTW() {
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 

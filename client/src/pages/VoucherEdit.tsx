@@ -51,7 +51,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
@@ -511,6 +513,8 @@ export default function VoucherEdit() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { selectedCurrency, formatAmount, exchangeRate } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [formInitialized, setFormInitialized] = useState(false);
 
   // Reset form initialization when voucher ID changes
@@ -974,7 +978,7 @@ export default function VoucherEdit() {
   const updateMutation = useMutation({
     mutationFn: async (data: { voucherUpdates: any; entries: any[] }) => {
       // Use bulk update endpoint that replaces all entries atomically
-      return await apiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
+      return await modeApiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
         voucher: data.voucherUpdates,
         entries: data.entries,
       });
@@ -1008,7 +1012,7 @@ export default function VoucherEdit() {
   // Optional toggle mutation
   const toggleOptionalMutation = useMutation({
     mutationFn: async (optional: boolean) => {
-      return await apiRequest("PATCH", `/api/vouchers/${id}/optional`, { optional });
+      return await modeApiRequest("PATCH", `/api/vouchers/${id}/optional`, { optional });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -1042,7 +1046,7 @@ export default function VoucherEdit() {
           sellingPrice: item.sellingPrice,
         })),
       };
-      return await apiRequest("PATCH", `/api/vouchers/${id}/sales`, salesData);
+      return await modeApiRequest("PATCH", `/api/vouchers/${id}/sales`, salesData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -1078,7 +1082,7 @@ export default function VoucherEdit() {
           rate: item.rate,
         })),
       };
-      return await apiRequest("PATCH", `/api/vouchers/${id}/purchase`, purchaseData);
+      return await modeApiRequest("PATCH", `/api/vouchers/${id}/purchase`, purchaseData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -1114,7 +1118,7 @@ export default function VoucherEdit() {
           rate: item.rate,
         })),
       };
-      return await apiRequest("PATCH", `/api/vouchers/${id}/adjustment`, adjustmentData);
+      return await modeApiRequest("PATCH", `/api/vouchers/${id}/adjustment`, adjustmentData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -1150,7 +1154,7 @@ export default function VoucherEdit() {
           rate: item.rate,
         })),
       };
-      return await apiRequest("PATCH", `/api/vouchers/${id}/transfer`, transferData);
+      return await modeApiRequest("PATCH", `/api/vouchers/${id}/transfer`, transferData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });

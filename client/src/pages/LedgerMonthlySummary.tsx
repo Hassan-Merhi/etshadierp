@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { format, parseISO } from "date-fns";
@@ -79,6 +81,8 @@ function formatFullNumber(value: number): string {
 
 export default function LedgerMonthlySummary() {
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-monthly/:accountId");
   const accountId = params?.accountId ? parseInt(params.accountId) : null;

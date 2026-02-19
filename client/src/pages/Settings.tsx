@@ -55,7 +55,9 @@
   
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
-  import { apiRequest, queryClient } from "@/lib/queryClient";
+  import { queryClient } from "@/lib/queryClient";
+  import { useAppMode } from "@/contexts/AppModeContext";
+  import { getApiRequest } from "@/lib/factoryApi";
   import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
@@ -88,6 +90,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
   function ParentCreditAccountSelect({ company }: { company: any }) {
     const { toast } = useToast();
+    const appMode = useAppMode();
+    const modeApiRequest = getApiRequest(appMode);
     const [isCreating, setIsCreating] = useState(false);
     const [newAccountName, setNewAccountName] = useState("");
 
@@ -124,7 +128,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
     const updateSettingsMutation = useMutation({
       mutationFn: async (parentCreditAccountId: number | null) => {
-        const res = await apiRequest("POST", "/api/company-settings", {
+        const res = await modeApiRequest("POST", "/api/company-settings", {
           companyId: company.id,
           parentCreditAccountId,
         });
@@ -142,7 +146,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
     const createAccountMutation = useMutation({
       mutationFn: async (name: string) => {
-        const res = await apiRequest("POST", "/api/ledger-accounts", {
+        const res = await modeApiRequest("POST", "/api/ledger-accounts", {
           companyId: company.id,
           name,
           accountType: "Liability",
@@ -231,6 +235,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   function NetPositionAdjustmentCard() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
+    const appMode = useAppMode();
+    const modeApiRequest = getApiRequest(appMode);
     const [adjustmentValue, setAdjustmentValue] = useState<string>("");
     const [isEditing, setIsEditing] = useState(false);
 
@@ -259,7 +265,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
     const updateAdjustmentMutation = useMutation({
       mutationFn: async (value: string) => {
-        const res = await apiRequest("POST", "/api/company-settings", {
+        const res = await modeApiRequest("POST", "/api/company-settings", {
           companyId: selectedCompany?.id,
           netPositionAdjustment: value,
         });
@@ -510,6 +516,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 function DataToolsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   
   // Separate location selection for each import operation
   const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
@@ -540,7 +548,7 @@ function DataToolsTab() {
   // Convert Bale to BL mutation
   const updateUOMMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/stock-items/bulk-update-uom", {});
+      return await modeApiRequest("POST", "/api/stock-items/bulk-update-uom", {});
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
@@ -561,7 +569,7 @@ function DataToolsTab() {
   // Fix Cost Prices mutation
   const recalculateCostsMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/sales-report/recalculate-costs", {});
+      return modeApiRequest("POST", "/api/sales-report/recalculate-costs", {});
     },
     onSuccess: (data: any) => {
       toast({
@@ -665,7 +673,7 @@ function DataToolsTab() {
 
     setIsImportingCostPrice(true);
     try {
-      const res = await apiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
+      const res = await modeApiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
         updates: costPricePreview,
       });
       const response = await res.json();
@@ -785,7 +793,7 @@ function DataToolsTab() {
 
     setIsImportingStock(true);
     try {
-      const res = await apiRequest("POST", `/api/locations/${stockLocationId}/import-inventory`, {
+      const res = await modeApiRequest("POST", `/api/locations/${stockLocationId}/import-inventory`, {
         items: stockPreview,
       });
       const response = await res.json();
@@ -1171,6 +1179,8 @@ function EditLogTable({ companyId }: { companyId?: number }) {
 function PosSettingsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: companySettings } = useQuery<any>({
     queryKey: ["/api/company-settings", selectedCompany?.id],
@@ -1184,7 +1194,7 @@ function PosSettingsTab() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const res = await apiRequest("POST", "/api/company-settings", {
+      const res = await modeApiRequest("POST", "/api/company-settings", {
         companyId: selectedCompany?.id,
         posExcelImportEnabled: enabled,
       });
@@ -1246,6 +1256,8 @@ function PosSettingsTab() {
 
 function BulkRenameTab() {
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [findText, setFindText] = useState("");
   const [replaceWith, setReplaceWith] = useState("");
   const [wholeWordOnly, setWholeWordOnly] = useState(false);
@@ -1330,7 +1342,7 @@ function BulkRenameTab() {
     if (selectedIds.size === 0) return;
     setIsApplying(true);
     try {
-      const res = await apiRequest("POST", "/api/stock-items/bulk-rename", {
+      const res = await modeApiRequest("POST", "/api/stock-items/bulk-rename", {
         findText,
         replaceWith,
         itemIds: Array.from(selectedIds),
@@ -1601,6 +1613,8 @@ function LoginHistoryTab() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
     const { dateFormat, setDateFormat, isPending: isDateFormatPending } = useDateFormat();
+    const appMode = useAppMode();
+    const modeApiRequest = getApiRequest(appMode);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<any>(null);
     const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -1694,7 +1708,7 @@ function LoginHistoryTab() {
     const updateRolePermissionMutation = useMutation({
       mutationFn: async ({ role, featureKey, enabled }: { role: string; featureKey: string; enabled: boolean }) => {
         if (!selectedCompany?.id) throw new Error("No company selected");
-        const res = await apiRequest("PUT", "/api/settings/role-permissions", {
+        const res = await modeApiRequest("PUT", "/api/settings/role-permissions", {
           companyId: selectedCompany.id,
           permissions: [{ role, featureKey, enabled }],
         });
@@ -1726,7 +1740,7 @@ function LoginHistoryTab() {
 
     const setParentCompanyMutation = useMutation({
       mutationFn: async (companyId: number | null) => {
-        const res = await apiRequest("POST", "/api/system/parent-company", { parentCompanyId: companyId });
+        const res = await modeApiRequest("POST", "/api/system/parent-company", { parentCompanyId: companyId });
         return await res.json();
       },
       onSuccess: () => {
@@ -1844,10 +1858,10 @@ function LoginHistoryTab() {
     const createCompanyMutation = useMutation({
       mutationFn: async (data: CompanyFormData) => {
         if (editingCompany) {
-          const res = await apiRequest("PATCH", `/api/companies/${editingCompany.id}`, data);
+          const res = await modeApiRequest("PATCH", `/api/companies/${editingCompany.id}`, data);
           return await res.json();
         } else {
-          const res = await apiRequest("POST", "/api/companies", data);
+          const res = await modeApiRequest("POST", "/api/companies", data);
           return await res.json();
         }
       },
@@ -1879,7 +1893,7 @@ function LoginHistoryTab() {
   
     const deleteCompanyMutation = useMutation({
       mutationFn: async (companyId: number) => {
-        const res = await apiRequest("DELETE", `/api/companies/${companyId}`);
+        const res = await modeApiRequest("DELETE", `/api/companies/${companyId}`);
         return await res.json();
       },
       onSuccess: () => {
@@ -1903,10 +1917,10 @@ function LoginHistoryTab() {
     const createUserMutation = useMutation({
       mutationFn: async (data: UserFormData) => {
         if (editingUser) {
-          const res = await apiRequest("PATCH", `/api/users/${editingUser.id}`, data);
+          const res = await modeApiRequest("PATCH", `/api/users/${editingUser.id}`, data);
           return await res.json();
         } else {
-          const res = await apiRequest("POST", "/api/users", data);
+          const res = await modeApiRequest("POST", "/api/users", data);
           return await res.json();
         }
       },
@@ -1935,7 +1949,7 @@ function LoginHistoryTab() {
 
     const deleteUserMutation = useMutation({
       mutationFn: async (userId: string) => {
-        const res = await apiRequest("DELETE", `/api/users/${userId}`);
+        const res = await modeApiRequest("DELETE", `/api/users/${userId}`);
         return await res.json();
       },
       onSuccess: () => {
@@ -1957,7 +1971,7 @@ function LoginHistoryTab() {
 
     const resetPasswordMutation = useMutation({
       mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-        const res = await apiRequest("POST", `/api/admin/reset-password/${userId}`, { newPassword });
+        const res = await modeApiRequest("POST", `/api/admin/reset-password/${userId}`, { newPassword });
         return res.json();
       },
       onSuccess: (data) => {
@@ -1979,7 +1993,7 @@ function LoginHistoryTab() {
 
     const changePasswordMutation = useMutation({
       mutationFn: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
-        const res = await apiRequest("POST", "/api/user/change-password", { currentPassword, newPassword });
+        const res = await modeApiRequest("POST", "/api/user/change-password", { currentPassword, newPassword });
         return res.json();
       },
       onSuccess: () => {
@@ -2003,14 +2017,14 @@ function LoginHistoryTab() {
       mutationFn: async (data: RoleAssignmentData) => {
         let result;
         if (editingRole) {
-          const res = await apiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
+          const res = await modeApiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
           result = await res.json();
         } else {
-          const res = await apiRequest("POST", "/api/user-company-roles", data);
+          const res = await modeApiRequest("POST", "/api/user-company-roles", data);
           result = await res.json();
         }
         if (data.role?.startsWith("POS") && selectedLocationIds.length > 0) {
-          await apiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
+          await modeApiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
             locationIds: selectedLocationIds,
           });
         }
@@ -2045,7 +2059,7 @@ function LoginHistoryTab() {
   
     const deleteRoleMutation = useMutation({
       mutationFn: async (roleId: number) => {
-        await apiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
+        await modeApiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
       },
       onSuccess: () => {
         // Capture userId before it potentially changes
@@ -2068,7 +2082,7 @@ function LoginHistoryTab() {
 
     const zeroBalancesMutation = useMutation({
       mutationFn: async (accountIds: number[]) => {
-        const res = await apiRequest("POST", "/api/ledger-accounts/zero-balances", { accountIds });
+        const res = await modeApiRequest("POST", "/api/ledger-accounts/zero-balances", { accountIds });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2091,7 +2105,7 @@ function LoginHistoryTab() {
 
     const initializeBalancesMutation = useMutation({
       mutationFn: async () => {
-        const res = await apiRequest("POST", "/api/admin/initialize-accounting-balances", {});
+        const res = await modeApiRequest("POST", "/api/admin/initialize-accounting-balances", {});
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2117,7 +2131,7 @@ function LoginHistoryTab() {
 
     const fixPOCreditsMutation = useMutation({
       mutationFn: async ({ companyId, parentCompanyId }: { companyId: number; parentCompanyId: number }) => {
-        const res = await apiRequest("POST", "/api/fix-old-po-credits", { companyId, parentCompanyId });
+        const res = await modeApiRequest("POST", "/api/fix-old-po-credits", { companyId, parentCompanyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2142,7 +2156,7 @@ function LoginHistoryTab() {
 
     const fixParentPOSupplierMutation = useMutation({
       mutationFn: async () => {
-        const res = await apiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
+        const res = await modeApiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2166,7 +2180,7 @@ function LoginHistoryTab() {
 
     const resetCompanyDataMutation = useMutation({
       mutationFn: async (companyId: number) => {
-        const res = await apiRequest("POST", "/api/admin/reset-company-data", { companyId });
+        const res = await modeApiRequest("POST", "/api/admin/reset-company-data", { companyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2191,7 +2205,7 @@ function LoginHistoryTab() {
 
     const reversePOCreditsMutation = useMutation({
       mutationFn: async ({ companyId, parentCompanyId }: { companyId: number; parentCompanyId: number }) => {
-        const res = await apiRequest("POST", "/api/reverse-po-credits", { companyId, parentCompanyId });
+        const res = await modeApiRequest("POST", "/api/reverse-po-credits", { companyId, parentCompanyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -2216,7 +2230,7 @@ function LoginHistoryTab() {
   
     const updatePermissionMutation = useMutation({
       mutationFn: async ({ roleId, userId, companyId, data }: { roleId: number; userId: string; companyId: number; data: any }) => {
-        const res = await apiRequest("PATCH", `/api/user-company-roles/${roleId}`, data);
+        const res = await modeApiRequest("PATCH", `/api/user-company-roles/${roleId}`, data);
         return await res.json();
       },
       onSuccess: async (_, variables) => {
@@ -2242,7 +2256,7 @@ function LoginHistoryTab() {
               const currentCompany = userCompanies.find((uc: any) => uc.companyId === variables.companyId);
               if (currentCompany) {
                 // Refresh session by re-selecting the company
-                await apiRequest("POST", "/api/auth/set-company", { companyId: variables.companyId });
+                await modeApiRequest("POST", "/api/auth/set-company", { companyId: variables.companyId });
                 // Invalidate current user query to refresh UI
                 queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
               }

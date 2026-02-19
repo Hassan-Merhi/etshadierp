@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { ClipboardCheck, Eye, Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +29,8 @@ interface CustomerOrder {
 export default function PendingInvoices() {
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({

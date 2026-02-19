@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,7 @@ export default function FactoryMixOptimizer() {
 
   const optimizeMutation = useMutation<OptimizeSuggestion[], Error>({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/factory/mix/optimize", {
+      const res = await factoryApiRequest("POST", "/api/factory/mix/optimize", {
         targetProduct,
         desiredMargin,
         materials,

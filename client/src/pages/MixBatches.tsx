@@ -23,6 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
 import { formatNumber } from "@/lib/formatNumber";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { FactoryMixBatch } from "@shared/schema";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 
@@ -34,6 +36,8 @@ export default function MixBatches() {
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: batches, isLoading } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],

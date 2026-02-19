@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
@@ -63,6 +65,8 @@ export default function BalesHistory() {
   const [repackConfirm, setRepackConfirm] = useState<any>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: balesData, isLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/bales"],
@@ -74,7 +78,7 @@ export default function BalesHistory() {
 
   const deleteBale = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/factory/bales/${id}`, {});
+      return await modeApiRequest("DELETE", `/api/factory/bales/${id}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
@@ -89,7 +93,7 @@ export default function BalesHistory() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return await apiRequest("PATCH", `/api/factory/bales/${id}/status`, { status });
+      return await modeApiRequest("PATCH", `/api/factory/bales/${id}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
@@ -102,7 +106,7 @@ export default function BalesHistory() {
 
   const bulkUpdateStatus = useMutation({
     mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
-      return await apiRequest("PATCH", "/api/factory/bales/bulk-status", { ids, status });
+      return await modeApiRequest("PATCH", "/api/factory/bales/bulk-status", { ids, status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
@@ -117,7 +121,7 @@ export default function BalesHistory() {
 
   const updateProductName = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      return await apiRequest("PATCH", `/api/factory/bales/${id}/product-name`, { name });
+      return await modeApiRequest("PATCH", `/api/factory/bales/${id}/product-name`, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
@@ -132,7 +136,7 @@ export default function BalesHistory() {
 
   const repackBale = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("POST", `/api/factory/bales/${id}/repack`, {});
+      return await modeApiRequest("POST", `/api/factory/bales/${id}/repack`, {});
     },
     onSuccess: async (response: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });

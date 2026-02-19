@@ -33,7 +33,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
@@ -293,7 +294,7 @@ export function OffloadDialog({
         }
       }
 
-      const response = await apiRequest(
+      const response = await factoryApiRequest(
         "POST",
         `/api/containers/${containerId}/offload`,
         {

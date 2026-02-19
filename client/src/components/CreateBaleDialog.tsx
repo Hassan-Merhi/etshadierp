@@ -31,7 +31,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import type { FactoryMixBatch, FactoryBaleProduct, Location } from "@shared/schema";
@@ -364,7 +365,7 @@ export function CreateBaleDialog({
         weightPerBale: data.weightPerBale,
       };
 
-      const response = await apiRequest("POST", "/api/factory/bales/create-batch", baleData);
+      const response = await factoryApiRequest("POST", "/api/factory/bales/create-batch", baleData);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to create bales");
@@ -399,7 +400,7 @@ export function CreateBaleDialog({
     try {
       const articleCode = product.articleCode || product.code;
 
-      const labelPrintResponse = await apiRequest("POST", "/api/bale-label-prints", {
+      const labelPrintResponse = await factoryApiRequest("POST", "/api/bale-label-prints", {
         bales: bales.map((bale: any) => ({
           productionBaleId: bale.id,
           productId: product.id,

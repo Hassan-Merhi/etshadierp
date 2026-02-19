@@ -31,7 +31,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 
 interface RawStockRow {
@@ -77,6 +79,8 @@ export default function ProductionRawStock() {
   const [obFxRate, setObFxRate] = useState("1");
   const [obNotes, setObNotes] = useState("");
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
     queryKey: ["/api/factory/raw-stock"],
@@ -116,7 +120,7 @@ export default function ProductionRawStock() {
 
   const offloadMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/factory/raw-stock/offload", data);
+      const response = await modeApiRequest("POST", "/api/factory/raw-stock/offload", data);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Failed to offload container");
@@ -198,7 +202,7 @@ export default function ProductionRawStock() {
 
   const openingBalanceMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
+      const response = await modeApiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Failed to create opening balance");

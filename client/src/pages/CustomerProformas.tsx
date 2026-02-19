@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +43,8 @@ interface Customer {
 export default function CustomerProformas() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [expandedProformaId, setExpandedProformaId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -65,7 +69,7 @@ export default function CustomerProformas() {
 
   const createProformaMutation = useMutation({
     mutationFn: async (data: { customerId: number; companyId: number; name: string; isActive: boolean }) => {
-      return await apiRequest("POST", "/api/factory/customer-proformas", data);
+      return await modeApiRequest("POST", "/api/factory/customer-proformas", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma created successfully" });
@@ -80,7 +84,7 @@ export default function CustomerProformas() {
 
   const activateProformaMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("PUT", `/api/factory/customer-proformas/${id}`, { isActive: true });
+      return await modeApiRequest("PUT", `/api/factory/customer-proformas/${id}`, { isActive: true });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma set as active" });
@@ -93,7 +97,7 @@ export default function CustomerProformas() {
 
   const deleteProformaMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/factory/customer-proformas/${id}`);
+      return await modeApiRequest("DELETE", `/api/factory/customer-proformas/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma deleted" });
@@ -106,7 +110,7 @@ export default function CustomerProformas() {
 
   const addLineMutation = useMutation({
     mutationFn: async (data: { proformaId: number; articleCode: string; productName: string; quantity: number; pricePerBale: string }) => {
-      return await apiRequest("POST", "/api/factory/customer-proforma-lines", data);
+      return await modeApiRequest("POST", "/api/factory/customer-proforma-lines", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line added" });
@@ -122,7 +126,7 @@ export default function CustomerProformas() {
 
   const editLineMutation = useMutation({
     mutationFn: async (data: { id: number; pricePerBale: string; productName: string; quantity: string }) => {
-      return await apiRequest("PUT", `/api/factory/customer-proforma-lines/${data.id}`, {
+      return await modeApiRequest("PUT", `/api/factory/customer-proforma-lines/${data.id}`, {
         pricePerBale: data.pricePerBale,
         productName: data.productName,
         quantity: data.quantity,
@@ -140,7 +144,7 @@ export default function CustomerProformas() {
 
   const deleteLineMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/factory/customer-proforma-lines/${id}`);
+      return await modeApiRequest("DELETE", `/api/factory/customer-proforma-lines/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line deleted" });

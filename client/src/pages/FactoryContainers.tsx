@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactoryContainer, FactorySupplier } from "@shared/schema";
 
@@ -95,7 +96,7 @@ export default function FactoryContainers() {
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
       };
-      const res = await apiRequest("POST", "/api/factory/containers", payload);
+      const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to create container");
@@ -122,7 +123,7 @@ export default function FactoryContainers() {
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
       };
-      const res = await apiRequest("PATCH", `/api/factory/containers/${id}`, payload);
+      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update container");
@@ -142,7 +143,7 @@ export default function FactoryContainers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/factory/containers/${id}`);
+      const res = await factoryApiRequest("DELETE", `/api/factory/containers/${id}`);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to delete container");
@@ -165,7 +166,7 @@ export default function FactoryContainers() {
 
   const importMutation = useMutation({
     mutationFn: async (rows: any[]) => {
-      const res = await apiRequest("POST", "/api/factory/containers/import-excel", { rows });
+      const res = await factoryApiRequest("POST", "/api/factory/containers/import-excel", { rows });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Import failed");

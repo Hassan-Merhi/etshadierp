@@ -41,7 +41,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
 type ProfitData = {
   totalIncome: number;
@@ -135,6 +137,8 @@ export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
@@ -215,7 +219,7 @@ export default function Dashboard() {
   // Add dashboard cash account mutation
   const addAccountMutation = useMutation({
     mutationFn: async (data: { accountType: string; accountId: number }) => {
-      return await apiRequest("POST", "/api/dashboard-cash-accounts", data);
+      return await modeApiRequest("POST", "/api/dashboard-cash-accounts", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -240,7 +244,7 @@ export default function Dashboard() {
   // ✅ FIXED: Remove dashboard cash account mutation (removed duplicate onSuccess)
   const removeAccountMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/dashboard-cash-accounts/${id}`);
+      return await modeApiRequest("DELETE", `/api/dashboard-cash-accounts/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -263,7 +267,7 @@ export default function Dashboard() {
   // Add dashboard payable account mutation
   const addPayableAccountMutation = useMutation({
     mutationFn: async (data: { accountId: number }) => {
-      return await apiRequest("POST", "/api/dashboard-payable-accounts", data);
+      return await modeApiRequest("POST", "/api/dashboard-payable-accounts", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -288,7 +292,7 @@ export default function Dashboard() {
   // Remove dashboard payable account mutation
   const removePayableAccountMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(
+      return await modeApiRequest(
         "DELETE",
         `/api/dashboard-payable-accounts/${id}`,
       );

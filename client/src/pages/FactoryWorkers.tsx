@@ -22,7 +22,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker } from "@shared/schema";
 
 interface Company {
@@ -97,7 +98,7 @@ export default function FactoryWorkers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/factory/workers", { ...data, companyId });
+      const res = await factoryApiRequest("POST", "/api/factory/workers", { ...data, companyId });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to create worker");
@@ -117,7 +118,7 @@ export default function FactoryWorkers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      const res = await apiRequest("PATCH", `/api/factory/workers/${id}`, { ...data, companyId });
+      const res = await factoryApiRequest("PATCH", `/api/factory/workers/${id}`, { ...data, companyId });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update worker");
@@ -137,7 +138,7 @@ export default function FactoryWorkers() {
 
   const endContractMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/factory/workers/${id}/end-contract`, { companyId });
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${id}/end-contract`, { companyId });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to end contract");

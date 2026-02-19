@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
 type ImportTab = "suppliers" | "raw-stock" | "bales";
@@ -105,7 +105,7 @@ function SupplierImport() {
 
   const importMutation = useMutation({
     mutationFn: async (suppliers: SupplierRow[]) => {
-      const res = await apiRequest("POST", "/api/factory/import/suppliers", { suppliers });
+      const res = await factoryApiRequest("POST", "/api/factory/import/suppliers", { suppliers });
       return res.json();
     },
     onSuccess: (data) => {
@@ -257,7 +257,7 @@ function RawStockImport() {
 
   const importMutation = useMutation({
     mutationFn: async (items: RawStockRow[]) => {
-      const res = await apiRequest("POST", "/api/factory/import/raw-stock", { items });
+      const res = await factoryApiRequest("POST", "/api/factory/import/raw-stock", { items });
       return res.json();
     },
     onSuccess: (data) => {
@@ -413,7 +413,7 @@ function BaleImport() {
 
   const importMutation = useMutation({
     mutationFn: async (bales: BaleRow[]) => {
-      const res = await apiRequest("POST", "/api/factory/import/bales", { bales });
+      const res = await factoryApiRequest("POST", "/api/factory/import/bales", { bales });
       return res.json();
     },
     onSuccess: (data) => {

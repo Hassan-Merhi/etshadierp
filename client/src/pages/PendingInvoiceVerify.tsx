@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus } from "lucide-react";
@@ -82,6 +84,8 @@ export default function PendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const params = useParams<{ id: string }>();
   const orderId = params.id;
 
@@ -129,7 +133,7 @@ export default function PendingInvoiceVerify() {
 
   const verifyMutation = useMutation({
     mutationFn: async (data: { approved: boolean; notes?: string }) => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/verify`, data);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/verify`, data);
     },
     onSuccess: () => {
       toast({ title: "Order verified", description: "The order has been approved and verified" });
@@ -142,7 +146,7 @@ export default function PendingInvoiceVerify() {
 
   const returnToLoadingMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/return-to-loading`);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/return-to-loading`);
     },
     onSuccess: () => {
       toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
@@ -155,7 +159,7 @@ export default function PendingInvoiceVerify() {
 
   const assignContainerMutation = useMutation({
     mutationFn: async (data: { containerNumber: string; shippingCompany: string; containerNotes: string }) => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, data);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -168,7 +172,7 @@ export default function PendingInvoiceVerify() {
 
   const addChargeMutation = useMutation({
     mutationFn: async (data: { name: string; amount: number; chargeType: string }) => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -183,7 +187,7 @@ export default function PendingInvoiceVerify() {
 
   const removeChargeMutation = useMutation({
     mutationFn: async (chargeId: number) => {
-      await apiRequest("DELETE", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`);
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -196,7 +200,7 @@ export default function PendingInvoiceVerify() {
 
   const finalizeMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
     },
     onSuccess: () => {
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });

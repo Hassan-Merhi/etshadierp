@@ -19,7 +19,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactorySupplier } from "@shared/schema";
 
 interface SupplierWithBalance extends FactorySupplier {
@@ -83,7 +84,7 @@ export default function FactorySuppliers() {
   const { data: statementData, isLoading: statementLoading } = useQuery<StatementResponse>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/statement`);
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/statement`);
       return res.json();
     },
     enabled: !!statementSupplierId,
@@ -91,7 +92,7 @@ export default function FactorySuppliers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/factory/suppliers", data);
+      const res = await factoryApiRequest("POST", "/api/factory/suppliers", data);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to create supplier");
@@ -111,7 +112,7 @@ export default function FactorySuppliers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      const res = await apiRequest("PATCH", `/api/factory/suppliers/${id}`, data);
+      const res = await factoryApiRequest("PATCH", `/api/factory/suppliers/${id}`, data);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update supplier");
@@ -131,7 +132,7 @@ export default function FactorySuppliers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/factory/suppliers/${id}`);
+      const res = await factoryApiRequest("DELETE", `/api/factory/suppliers/${id}`);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to delete supplier");

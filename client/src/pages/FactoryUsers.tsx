@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 
 interface FactoryUser {
   id: string;
@@ -93,7 +94,7 @@ export default function FactoryUsers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean }) => {
-      const res = await apiRequest("POST", "/api/factory/users", data);
+      const res = await factoryApiRequest("POST", "/api/factory/users", data);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to create user");
@@ -113,7 +114,7 @@ export default function FactoryUsers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
-      const res = await apiRequest("PUT", `/api/factory/users/${userId}`, data);
+      const res = await factoryApiRequest("PUT", `/api/factory/users/${userId}`, data);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update user");
@@ -155,7 +156,7 @@ export default function FactoryUsers() {
 
   const toggleAccessMutation = useMutation({
     mutationFn: async ({ userId, data }: { userId: string; data: { hasErpAccess?: boolean; hasFactoryAccess?: boolean } }) => {
-      const res = await apiRequest("PUT", `/api/factory/users/${userId}`, data);
+      const res = await factoryApiRequest("PUT", `/api/factory/users/${userId}`, data);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update access");

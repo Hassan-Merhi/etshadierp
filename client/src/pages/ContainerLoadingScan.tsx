@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback } from "react";
@@ -55,6 +57,8 @@ export default function ContainerLoadingScan() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
@@ -97,7 +101,7 @@ export default function ContainerLoadingScan() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: { customerId: number; proformaIdUsed: number | null; locationId: number; orderDate: string }) => {
-      const res = await apiRequest("POST", "/api/factory/customer-orders-loading", data);
+      const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -112,7 +116,7 @@ export default function ContainerLoadingScan() {
 
   const addBaleMutation = useMutation({
     mutationFn: async (data: { scanCode: string; locationId: number }) => {
-      const res = await apiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
     onSuccess: () => {
@@ -133,7 +137,7 @@ export default function ContainerLoadingScan() {
 
   const removeBaleMutation = useMutation({
     mutationFn: async (baleId: number) => {
-      await apiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -146,7 +150,7 @@ export default function ContainerLoadingScan() {
 
   const finalizeMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`);
     },
     onSuccess: () => {
       toast({ title: "Loading finalized", description: "Loading has been sent for office verification" });

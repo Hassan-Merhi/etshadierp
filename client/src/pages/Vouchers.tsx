@@ -76,7 +76,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
@@ -530,6 +532,8 @@ interface VouchersProps {
 export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const isFactoryCompany = selectedCompany?.companyType === "factory";
   const [isAutoCreating, setIsAutoCreating] = useState(false);
   const { formatDisplayDate } = useDateFormat();
@@ -1055,10 +1059,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       // Use batch endpoint for both create and update
       if (isEditMode) {
-        const res = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/payment-receipt`, payload);
+        const res = await modeApiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/payment-receipt`, payload);
         return await res.json();
       } else {
-        const res = await apiRequest("POST", "/api/vouchers/payment-receipt", payload);
+        const res = await modeApiRequest("POST", "/api/vouchers/payment-receipt", payload);
         return await res.json();
       }
     },
@@ -1674,10 +1678,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       // Use batch endpoint for both create and update
       if (isEditMode) {
-        const res = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/journal`, payload);
+        const res = await modeApiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/journal`, payload);
         return await res.json();
       } else {
-        const res = await apiRequest("POST", "/api/vouchers/journal", payload);
+        const res = await modeApiRequest("POST", "/api/vouchers/journal", payload);
         return await res.json();
       }
     },
@@ -1935,7 +1939,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const importValidateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/stock-transfer-import/validate-multi-source", data);
+      const res = await modeApiRequest("POST", "/api/stock-transfer-import/validate-multi-source", data);
       return await res.json();
     },
     onSuccess: (data) => {
@@ -1965,7 +1969,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const importMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/stock-transfer-import/import-multi-source", data);
+      const res = await modeApiRequest("POST", "/api/stock-transfer-import/import-multi-source", data);
       return await res.json();
     },
     onSuccess: (data) => {
@@ -2294,7 +2298,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             : new Date(data.voucherDate);
           const editFormattedVoucherDate = format(editVoucherDateObj, "yyyy-MM-dd");
           
-          const voucherRes = await apiRequest("PATCH", `/api/vouchers/${_voucherIdToEdit}`, {
+          const voucherRes = await modeApiRequest("PATCH", `/api/vouchers/${_voucherIdToEdit}`, {
             voucherDate: editFormattedVoucherDate,
             description: `Stock transfer from ${sourceNames} to ${destName}`,
             totalAmount: _transferTotal.toString(),
@@ -2303,7 +2307,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           
           // Update stock transfer
           if (_stockTransferToEditId) {
-            await apiRequest("PUT", `/api/stock-transfers/${_stockTransferToEditId}`, {
+            await modeApiRequest("PUT", `/api/stock-transfers/${_stockTransferToEditId}`, {
               destinationLocationId: data.destinationLocationId,
               notes: data.notes || "",
               items: validEntries.map(entry => ({
@@ -2341,7 +2345,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           let voucherRes;
           try {
             console.log("[StockTransfer] MUTATION STEP D3: About to call apiRequest");
-            voucherRes = await apiRequest("POST", "/api/vouchers", voucherPayload);
+            voucherRes = await modeApiRequest("POST", "/api/vouchers", voucherPayload);
             console.log("[StockTransfer] MUTATION STEP D4: apiRequest completed, response:", voucherRes);
           } catch (apiError: any) {
             console.error("[StockTransfer] MUTATION STEP D-ERROR: apiRequest failed:", apiError);
@@ -2355,7 +2359,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
           // Create stock transfer with items (including per-item source locations)
           console.log("[StockTransfer] MUTATION STEP G: Creating stock transfer");
-          await apiRequest("POST", "/api/stock-transfers", {
+          await modeApiRequest("POST", "/api/stock-transfers", {
             voucherId: voucher.id,
             destinationLocationId: data.destinationLocationId,
             notes: data.notes || "",
@@ -2857,7 +2861,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       if (isEditMode) {
         // UPDATE MODE: Use PATCH to update existing voucher and stock adjustment
-        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+        const voucherRes = await modeApiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
           voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
           description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
           totalAmount: totalAmount.toString(),
@@ -2866,7 +2870,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         
         // Update stock adjustment (assuming stockAdjustmentToEdit has an id)
         if (stockAdjustmentToEdit?.id) {
-          await apiRequest("PUT", `/api/stock-adjustments/${stockAdjustmentToEdit.id}`, {
+          await modeApiRequest("PUT", `/api/stock-adjustments/${stockAdjustmentToEdit.id}`, {
             locationId: data.locationId,
             adjustmentType: adjustmentType,
             notes: data.notes || "",
@@ -2877,7 +2881,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await voucherRes.json();
       } else {
         // CREATE MODE: Create new voucher and stock adjustment
-        const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        const voucherRes = await modeApiRequest("POST", "/api/vouchers", {
           companyId: selectedCompany?.id,
           voucherType: adjustmentType,
           voucherNumber: `${adjustmentType.toUpperCase()}-${Date.now()}`,
@@ -2891,7 +2895,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         const voucher = await voucherRes.json();
 
         // Create stock adjustment
-        await apiRequest("POST", "/api/stock-adjustments", {
+        await modeApiRequest("POST", "/api/stock-adjustments", {
           voucherId: voucher.id,
           locationId: data.locationId,
           adjustmentType: adjustmentType,

@@ -20,7 +20,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
@@ -283,6 +285,8 @@ function StockEntryTab() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -303,7 +307,7 @@ function StockEntryTab() {
       const body: any = { name: quickCreateName };
       if (quickCreateCategoryId) body.categoryId = parseInt(quickCreateCategoryId);
       if (quickCreateWeight) body.weightPerBaleKg = quickCreateWeight;
-      const response = await apiRequest("POST", "/api/factory/bale-products", body);
+      const response = await modeApiRequest("POST", "/api/factory/bale-products", body);
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Failed to create product");
@@ -504,7 +508,7 @@ function StockEntryTab() {
         };
       });
 
-      const labelResponse = await apiRequest("POST", "/api/bale-label-prints", { bales: labelData });
+      const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", { bales: labelData });
 
       if (!labelResponse.ok) {
         const err = await labelResponse.json();
@@ -556,7 +560,7 @@ function StockEntryTab() {
       if (selectedMixBatchId && selectedMixBatchId !== "__none__") {
         body.mixBatchId = parseInt(selectedMixBatchId);
       }
-      const response = await apiRequest("POST", "/api/factory/stock-entry", body);
+      const response = await modeApiRequest("POST", "/api/factory/stock-entry", body);
 
       if (!response.ok) {
         const err = await response.json();
@@ -980,6 +984,8 @@ function RemoveFromStockTab() {
   const [authError, setAuthError] = useState("");
   const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const activeLocations = locations?.filter((l) => l.active);
@@ -1064,7 +1070,7 @@ function RemoveFromStockTab() {
 
   const removeMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/factory/stock-entry/remove", {
+      const response = await modeApiRequest("POST", "/api/factory/stock-entry/remove", {
         baleIds: Array.from(selectedBaleIds),
         supervisorUsername,
         supervisorPassword,
@@ -1377,6 +1383,8 @@ function ImportBalesTab() {
   const [fileName, setFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const activeLocations = locations?.filter((l) => l.active);
@@ -1452,7 +1460,7 @@ function ImportBalesTab() {
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/factory/bales/import", {
+      const response = await modeApiRequest("POST", "/api/factory/bales/import", {
         erpLocationId: parseInt(selectedLocationId),
         bales: importRows,
       });

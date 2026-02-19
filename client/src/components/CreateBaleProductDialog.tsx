@@ -29,7 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
@@ -78,7 +79,7 @@ export function CreateBaleProductDialog({
         }
       }
       const categoryId = data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : undefined;
-      const response = await apiRequest("POST", "/api/factory/bale-products", {
+      const response = await factoryApiRequest("POST", "/api/factory/bale-products", {
         articleCode,
         name: data.name,
         description: data.description,

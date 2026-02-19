@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -79,6 +81,8 @@ export default function CustomerInvoiceCreate() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderDate, setOrderDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -118,7 +122,7 @@ export default function CustomerInvoiceCreate() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: { companyId: number; customerId: number; orderDate: string; proformaIdUsed: number }) => {
-      const res = await apiRequest("POST", "/api/factory/customer-orders", data);
+      const res = await modeApiRequest("POST", "/api/factory/customer-orders", data);
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -133,7 +137,7 @@ export default function CustomerInvoiceCreate() {
 
   const addBaleMutation = useMutation({
     mutationFn: async (data: { scanCode: string; locationId: number }) => {
-      const res = await apiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
     onSuccess: () => {
@@ -154,7 +158,7 @@ export default function CustomerInvoiceCreate() {
 
   const removeBaleMutation = useMutation({
     mutationFn: async (baleId: number) => {
-      await apiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -167,7 +171,7 @@ export default function CustomerInvoiceCreate() {
 
   const addChargeMutation = useMutation({
     mutationFn: async (data: { name: string; amount: number; chargeType: string }) => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -182,7 +186,7 @@ export default function CustomerInvoiceCreate() {
 
   const removeChargeMutation = useMutation({
     mutationFn: async (chargeId: number) => {
-      await apiRequest("DELETE", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`);
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
@@ -195,7 +199,7 @@ export default function CustomerInvoiceCreate() {
 
   const finalizeMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
     },
     onSuccess: () => {
       toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });

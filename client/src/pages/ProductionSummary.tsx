@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { FactoryMixBatch } from "@shared/schema";
 
 interface RawStockRow {
@@ -51,6 +53,8 @@ function filterBalesByDate(bales: any[], startDate: Date): any[] {
 }
 
 export default function ProductionSummary() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/bales"],
   });

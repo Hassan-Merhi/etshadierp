@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +46,7 @@ export default function FactoryCustomers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { legalName: string; phone?: string; openingBalance?: string; openingBalanceSide?: string }) => {
-      return await apiRequest("POST", "/api/factory/customers", data);
+      return await factoryApiRequest("POST", "/api/factory/customers", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer created" });
@@ -60,7 +61,7 @@ export default function FactoryCustomers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest("PUT", `/api/factory/customers/${id}`, data);
+      return await factoryApiRequest("PUT", `/api/factory/customers/${id}`, data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer updated" });

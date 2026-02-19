@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { DirectMessage } from "@shared/schema";
 
 interface ChatUser {
@@ -22,6 +24,8 @@ export default function Chat() {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: chatUsers = [], isLoading: usersLoading } = useQuery<ChatUser[]>({
     queryKey: ["/api/chat/users"],
@@ -42,7 +46,7 @@ export default function Chat() {
 
   const sendMutation = useMutation({
     mutationFn: async (data: { receiverId: string; message: string }) => {
-      return await apiRequest("POST", "/api/chat/messages", data);
+      return await modeApiRequest("POST", "/api/chat/messages", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedUserId] });
@@ -54,7 +58,7 @@ export default function Chat() {
 
   const markReadMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest("POST", `/api/chat/mark-read/${userId}`, {});
+      return await modeApiRequest("POST", `/api/chat/mark-read/${userId}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/users"] });

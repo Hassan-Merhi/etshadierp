@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +19,8 @@ interface StockItem {
 }
 
 export default function StockQuery() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
   const [_location, navigate] = useLocation();
 

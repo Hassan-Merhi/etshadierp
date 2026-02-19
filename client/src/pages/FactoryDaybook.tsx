@@ -4,7 +4,8 @@ import { BookOpen, Filter, Download, Edit, History } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +146,7 @@ export default function FactoryDaybook() {
 
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
-      const res = await apiRequest("PUT", `/api/factory/daybook/${entryId}`, data);
+      const res = await factoryApiRequest("PUT", `/api/factory/daybook/${entryId}`, data);
       return res.json();
     },
     onSuccess: () => {

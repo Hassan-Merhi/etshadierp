@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
 interface VoucherItem {
   id: number;
@@ -82,6 +84,8 @@ export default function VoucherDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/voucher-detail/:voucherId");
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
 

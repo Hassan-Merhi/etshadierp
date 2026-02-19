@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import {
   ArrowLeft,
@@ -78,6 +80,8 @@ export default function LedgerVouchers() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-vouchers/:accountId/:year/:month");
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
   const year = params?.year ? parseInt(params.year) : null;

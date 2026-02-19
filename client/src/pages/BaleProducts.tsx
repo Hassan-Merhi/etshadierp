@@ -32,7 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
 
@@ -67,6 +69,8 @@ export default function BaleProducts() {
   const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   useEffect(() => {
     if (editingProduct) {
@@ -95,7 +99,7 @@ export default function BaleProducts() {
 
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", "/api/factory/categories", { name });
+      const response = await modeApiRequest("POST", "/api/factory/categories", { name });
       return response.json();
     },
     onSuccess: () => {
@@ -110,7 +114,7 @@ export default function BaleProducts() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      const response = await apiRequest("PATCH", `/api/factory/categories/${id}`, { name });
+      const response = await modeApiRequest("PATCH", `/api/factory/categories/${id}`, { name });
       return response.json();
     },
     onSuccess: () => {
@@ -126,7 +130,7 @@ export default function BaleProducts() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/factory/categories/${id}`);
+      const response = await modeApiRequest("DELETE", `/api/factory/categories/${id}`);
       return response.json();
     },
     onSuccess: () => {
@@ -171,7 +175,7 @@ export default function BaleProducts() {
 
   const editProductMutation = useMutation({
     mutationFn: async (data: { name: string; weightPerBaleKg: number | null; articleCode: string; description: string; categoryId: number | null }) => {
-      const response = await apiRequest("POST", `/api/factory/bale-products/${editingProduct!.id}/cascade-update`, data);
+      const response = await modeApiRequest("POST", `/api/factory/bale-products/${editingProduct!.id}/cascade-update`, data);
       return response.json();
     },
     onSuccess: (result: { product: FactoryBaleProduct; balesUpdated: number }) => {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ export default function FactoryWaste() {
       supplierId?: number;
       containerId?: number;
     }) => {
-      const res = await apiRequest("POST", "/api/factory/waste", data);
+      const res = await factoryApiRequest("POST", "/api/factory/waste", data);
       return res.json();
     },
     onSuccess: () => {
@@ -73,7 +74,7 @@ export default function FactoryWaste() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/factory/waste/${id}`);
+      await factoryApiRequest("DELETE", `/api/factory/waste/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/waste", from, to] });

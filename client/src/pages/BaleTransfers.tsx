@@ -33,7 +33,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
 interface TransferRow {
   id: number;
@@ -103,6 +105,8 @@ export default function BaleTransfers() {
   const [notes, setNotes] = useState("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<number[]>([]);
   const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const { data: transfers, isLoading } = useQuery<TransferRow[]>({
     queryKey: ["/api/bale-transfers"],
@@ -135,7 +139,7 @@ export default function BaleTransfers() {
       notes: string;
       baleIds: number[];
     }) => {
-      const res = await apiRequest("POST", "/api/bale-transfers", data);
+      const res = await modeApiRequest("POST", "/api/bale-transfers", data);
       return res.json();
     },
     onSuccess: () => {
@@ -151,7 +155,7 @@ export default function BaleTransfers() {
 
   const completeTransfer = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("PATCH", `/api/bale-transfers/${id}/complete`, {});
+      const res = await modeApiRequest("PATCH", `/api/bale-transfers/${id}/complete`, {});
       return res.json();
     },
     onSuccess: () => {
@@ -166,7 +170,7 @@ export default function BaleTransfers() {
 
   const deleteTransfer = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/bale-transfers/${id}`, {});
+      await modeApiRequest("DELETE", `/api/bale-transfers/${id}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-transfers"] });

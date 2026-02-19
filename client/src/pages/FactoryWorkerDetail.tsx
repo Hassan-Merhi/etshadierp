@@ -20,7 +20,8 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker, FactoryBale } from "@shared/schema";
 
 interface WorkerWithStats extends FactoryWorker {
@@ -93,7 +94,7 @@ export default function FactoryWorkerDetail() {
 
   const endContractMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/factory/workers/${workerId}/end-contract`, {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/end-contract`, {
         companyId: worker?.companyId,
       });
       return res.json();

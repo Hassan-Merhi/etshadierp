@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { Plus, MapPin, BookOpen, Users, Truck, FolderTree, Package, type LucideIcon } from "lucide-react";
 import {
   insertLocationSchema,
@@ -143,6 +145,8 @@ function EntityFormWrapper({
 }) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
 
   const defaultValues = getDefaultValues(entityType);
 
@@ -164,7 +168,7 @@ function EntityFormWrapper({
                 throw new Error("No company selected");
               })(),
           };
-      const res = await apiRequest("POST", config.endpoint, payload);
+      const res = await modeApiRequest("POST", config.endpoint, payload);
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -275,6 +279,8 @@ interface SidebarGroup {
 }
 
 export default function AccountingCreate() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [selectedEntity, setSelectedEntity] = useState<EntityType>("location");
   const config = entityConfig[selectedEntity];
 
@@ -454,6 +460,8 @@ function LedgerAccountForm({
 }) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   const [isParentDialogOpen, setIsParentDialogOpen] = useState(false);
@@ -510,7 +518,7 @@ function LedgerAccountForm({
       if (!selectedCompany?.id) {
         throw new Error("No company selected");
       }
-      const res = await apiRequest("POST", "/api/ledger-accounts", {
+      const res = await modeApiRequest("POST", "/api/ledger-accounts", {
         ...data,
         companyId: selectedCompany.id,
       });

@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Download, FileText, DollarSign, Users, Calendar, Loader2, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -127,7 +128,7 @@ export default function FactoryPayrollPage() {
 
   const generateMutation = useMutation({
     mutationFn: async (data: { companyId: number; startDate: string; endDate: string }) => {
-      const res = await apiRequest("POST", "/api/factory/payroll/generate", data);
+      const res = await factoryApiRequest("POST", "/api/factory/payroll/generate", data);
       return res.json();
     },
     onSuccess: (data) => {
@@ -142,7 +143,7 @@ export default function FactoryPayrollPage() {
 
   const adjustMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await apiRequest("PATCH", `/api/factory/payroll/${id}`, data);
+      const res = await factoryApiRequest("PATCH", `/api/factory/payroll/${id}`, data);
       return res.json();
     },
     onSuccess: () => {

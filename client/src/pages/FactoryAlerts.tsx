@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ export default function FactoryAlerts() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/factory/alerts/generate");
+      await factoryApiRequest("POST", "/api/factory/alerts/generate");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/alerts"] });
@@ -45,7 +46,7 @@ export default function FactoryAlerts() {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("POST", `/api/factory/alerts/${id}/read`);
+      await factoryApiRequest("POST", `/api/factory/alerts/${id}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/alerts"] });

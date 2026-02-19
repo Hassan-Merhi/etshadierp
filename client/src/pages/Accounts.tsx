@@ -72,7 +72,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -121,6 +123,8 @@ export default function Accounts() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const searchString = useSearch();
 
@@ -568,7 +572,7 @@ export default function Accounts() {
       if (!selectedCompany?.id) {
         throw new Error("No company selected");
       }
-      return await apiRequest("POST", "/api/ledger-accounts", {
+      return await modeApiRequest("POST", "/api/ledger-accounts", {
         ...data,
         companyId: selectedCompany.id,
       });
@@ -616,7 +620,7 @@ export default function Accounts() {
       if (!accountToEdit) {
         throw new Error("No account selected");
       }
-      return await apiRequest(
+      return await modeApiRequest(
         "PUT",
         `/api/ledger-accounts/${accountToEdit.id}`,
         data,
@@ -645,7 +649,7 @@ export default function Accounts() {
 
   const deleteLedgerMutation = useMutation({
     mutationFn: async (accountId: number) => {
-      return await apiRequest("DELETE", `/api/ledger-accounts/${accountId}`);
+      return await modeApiRequest("DELETE", `/api/ledger-accounts/${accountId}`);
     },
     onSuccess: () => {
       toast({
@@ -673,7 +677,7 @@ export default function Accounts() {
       if (!selectedCompany?.id) {
         throw new Error("No company selected");
       }
-      return await apiRequest("POST", "/api/bank-accounts", {
+      return await modeApiRequest("POST", "/api/bank-accounts", {
         ...data,
         companyId: selectedCompany.id,
       });
@@ -703,7 +707,7 @@ export default function Accounts() {
       if (!bankToEdit) {
         throw new Error("No bank account selected");
       }
-      return await apiRequest(
+      return await modeApiRequest(
         "PUT",
         `/api/bank-accounts/${bankToEdit.id}`,
         data,
@@ -732,7 +736,7 @@ export default function Accounts() {
 
   const deleteBankMutation = useMutation({
     mutationFn: async (accountId: number) => {
-      return await apiRequest("DELETE", `/api/bank-accounts/${accountId}`);
+      return await modeApiRequest("DELETE", `/api/bank-accounts/${accountId}`);
     },
     onSuccess: () => {
       toast({
@@ -757,7 +761,7 @@ export default function Accounts() {
 
   const bulkDeleteVouchersMutation = useMutation({
     mutationFn: async (voucherIds: number[]) => {
-      return await apiRequest("POST", "/api/vouchers/bulk-delete", {
+      return await modeApiRequest("POST", "/api/vouchers/bulk-delete", {
         voucherIds,
       });
     },

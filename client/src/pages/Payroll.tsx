@@ -63,7 +63,9 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
 import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote } from "lucide-react";
@@ -172,6 +174,8 @@ interface SalaryAdvance {
 }
 
 export default function Payroll() {
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [selectedTab, setSelectedTab] = useState("employees");
@@ -299,7 +303,7 @@ export default function Payroll() {
   // Employee Groups mutations
   const createGroupMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/employee-groups", {
+      const res = await modeApiRequest("POST", "/api/employee-groups", {
         name: newGroupName,
         description: newGroupDescription,
       });
@@ -326,7 +330,7 @@ export default function Payroll() {
 
   const addWorkerToGroupMutation = useMutation({
     mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await apiRequest("POST", `/api/employee-groups/${groupId}/members`, { employeeId: workerId });
+      await modeApiRequest("POST", `/api/employee-groups/${groupId}/members`, { employeeId: workerId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"] });
@@ -335,7 +339,7 @@ export default function Payroll() {
 
   const removeWorkerFromGroupMutation = useMutation({
     mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await apiRequest("DELETE", `/api/employee-groups/${groupId}/members/${workerId}`);
+      await modeApiRequest("DELETE", `/api/employee-groups/${groupId}/members/${workerId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"] });
@@ -344,7 +348,7 @@ export default function Payroll() {
 
   const deleteGroupMutation = useMutation({
     mutationFn: async (groupId: number) => {
-      await apiRequest("DELETE", `/api/employee-groups/${groupId}`);
+      await modeApiRequest("DELETE", `/api/employee-groups/${groupId}`);
     },
     onSuccess: () => {
       toast({
@@ -365,7 +369,7 @@ export default function Payroll() {
   // Worker Group mutations
   const createWorkerGroupMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/worker-groups", {
+      const res = await modeApiRequest("POST", "/api/worker-groups", {
         name: newWorkerGroupName,
         description: newWorkerGroupDescription,
       });
@@ -392,7 +396,7 @@ export default function Payroll() {
 
   const addWorkerToWorkerGroupMutation = useMutation({
     mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await apiRequest("POST", `/api/worker-groups/${groupId}/members/${workerId}`);
+      await modeApiRequest("POST", `/api/worker-groups/${groupId}/members/${workerId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
@@ -412,7 +416,7 @@ export default function Payroll() {
 
   const removeWorkerFromWorkerGroupMutation = useMutation({
     mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await apiRequest("DELETE", `/api/worker-groups/${groupId}/members/${workerId}`);
+      await modeApiRequest("DELETE", `/api/worker-groups/${groupId}/members/${workerId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
@@ -432,7 +436,7 @@ export default function Payroll() {
 
   const deleteWorkerGroupMutation = useMutation({
     mutationFn: async (groupId: number) => {
-      await apiRequest("DELETE", `/api/worker-groups/${groupId}`);
+      await modeApiRequest("DELETE", `/api/worker-groups/${groupId}`);
     },
     onSuccess: () => {
       toast({
@@ -680,7 +684,7 @@ export default function Payroll() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      return await apiRequest("POST", "/api/payroll/deposit-employee", {
+      return await modeApiRequest("POST", "/api/payroll/deposit-employee", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
@@ -706,7 +710,7 @@ export default function Payroll() {
 
   const bonusMutation = useMutation({
     mutationFn: async (data: BonusFormData) => {
-      return await apiRequest("POST", "/api/payroll/bonus-employee", {
+      return await modeApiRequest("POST", "/api/payroll/bonus-employee", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
@@ -732,7 +736,7 @@ export default function Payroll() {
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
-      return await apiRequest("POST", "/api/payroll/withdraw-employee", {
+      return await modeApiRequest("POST", "/api/payroll/withdraw-employee", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
@@ -759,7 +763,7 @@ export default function Payroll() {
   const bulkPaymentMutation = useMutation({
     mutationFn: async (data: BulkPaymentFormData) => {
       const selectedPayments = Object.values(workerPayments).filter(p => p.selected);
-      return await apiRequest("POST", "/api/payroll/bulk-pay-workers", {
+      return await modeApiRequest("POST", "/api/payroll/bulk-pay-workers", {
         payments: selectedPayments,
         ...data,
       });
@@ -799,7 +803,7 @@ export default function Payroll() {
         employeeId: emp.id,
         amount: emp.monthlySalary,
       }));
-      return await apiRequest("POST", "/api/payroll/bulk-deposit-employees", {
+      return await modeApiRequest("POST", "/api/payroll/bulk-deposit-employees", {
         deposits,
         date: bulkDepositDate,
         notes: bulkDepositNotes,
@@ -838,7 +842,7 @@ export default function Payroll() {
       if (bonuses.length === 0) {
         throw new Error("No valid bonus amounts entered");
       }
-      return await apiRequest("POST", "/api/payroll/bulk-bonus-employees", {
+      return await modeApiRequest("POST", "/api/payroll/bulk-bonus-employees", {
         bonuses,
         date: bulkBonusDate,
         notes: bulkBonusNotes,
@@ -880,7 +884,7 @@ export default function Payroll() {
       if (!bulkWithdrawalAccountId) {
         throw new Error("Please select a payment account");
       }
-      return await apiRequest("POST", "/api/payroll/bulk-withdraw-employees", {
+      return await modeApiRequest("POST", "/api/payroll/bulk-withdraw-employees", {
         withdrawals,
         date: bulkWithdrawalDate,
         notes: bulkWithdrawalNotes,
@@ -910,7 +914,7 @@ export default function Payroll() {
 
   const advanceMutation = useMutation({
     mutationFn: async (data: SalaryAdvanceFormData) => {
-      return await apiRequest("POST", "/api/salary-advances", {
+      return await modeApiRequest("POST", "/api/salary-advances", {
         employeeId: parseInt(data.employeeId),
         amount: data.amount,
         advanceDate: format(data.advanceDate, "yyyy-MM-dd"),
@@ -940,7 +944,7 @@ export default function Payroll() {
   const deductionMutation = useMutation({
     mutationFn: async (data: DeductionFormData) => {
       if (!selectedAdvance) throw new Error("No advance selected");
-      return await apiRequest("POST", `/api/salary-advances/${selectedAdvance.id}/deduction`, data);
+      return await modeApiRequest("POST", `/api/salary-advances/${selectedAdvance.id}/deduction`, data);
     },
     onSuccess: () => {
       toast({
@@ -963,7 +967,7 @@ export default function Payroll() {
 
   const createWorkerMutation = useMutation({
     mutationFn: async (data: WorkerFormData) => {
-      return await apiRequest("POST", "/api/employees", {
+      return await modeApiRequest("POST", "/api/employees", {
         ...data,
         employeeType: "Worker",
         companyId: selectedCompany?.id,
@@ -991,7 +995,7 @@ export default function Payroll() {
 
   const updateWorkerMutation = useMutation({
     mutationFn: async (data: WorkerFormData & { id: number }) => {
-      return await apiRequest("PUT", `/api/employees/${data.id}`, {
+      return await modeApiRequest("PUT", `/api/employees/${data.id}`, {
         ...data,
         employeeType: "Worker",
       });
@@ -1019,7 +1023,7 @@ export default function Payroll() {
   const deleteWorkerMutation = useMutation({
     mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
       const queryParam = forceDelete ? "?forceDelete=true" : "";
-      return await apiRequest("DELETE", `/api/employees/${id}${queryParam}`);
+      return await modeApiRequest("DELETE", `/api/employees/${id}${queryParam}`);
     },
     onSuccess: () => {
       toast({
@@ -1061,7 +1065,7 @@ export default function Payroll() {
         payload.employeeGroupId = parseInt(employeeGroupId, 10);
       }
       
-      return await apiRequest("POST", "/api/employees", payload);
+      return await modeApiRequest("POST", "/api/employees", payload);
     },
     onSuccess: () => {
       toast({
@@ -1086,7 +1090,7 @@ export default function Payroll() {
   const deleteEmployeeMutation = useMutation({
     mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
       const queryParam = forceDelete ? "?forceDelete=true" : "";
-      return await apiRequest("DELETE", `/api/employees/${id}${queryParam}`);
+      return await modeApiRequest("DELETE", `/api/employees/${id}${queryParam}`);
     },
     onSuccess: () => {
       toast({
