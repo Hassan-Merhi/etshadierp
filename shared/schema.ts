@@ -2261,9 +2261,12 @@ export const factoryContainers = pgTable("factory_containers", {
   notes: text("notes"),
   status: text("status").notNull().default("PENDING"),
   freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),
+  freightAccountId: integer("freight_account_id"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
+  otherChargesAccountId: integer("other_charges_account_id"),
   commissionAmount: decimal("commission_amount", { precision: 20, scale: 2 }).default("0"),
   dutyAmount: decimal("duty_amount", { precision: 20, scale: 2 }),
+  dutyAccountId: integer("duty_account_id"),
   dutyStatus: text("duty_status").notNull().default("NONE"),
   dutyNotes: text("duty_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -2294,15 +2297,32 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
   notes: z.string().optional().nullable(),
   status: z.string().optional(),
   freight: z.string().optional().nullable(),
+  freightAccountId: z.number().optional().nullable(),
   otherCharges: z.string().optional().nullable(),
+  otherChargesAccountId: z.number().optional().nullable(),
   commissionAmount: z.string().optional().nullable(),
   dutyAmount: z.string().optional().nullable(),
+  dutyAccountId: z.number().optional().nullable(),
   dutyStatus: z.enum(["NONE", "PENDING", "CONFIRMED"]).optional(),
   dutyNotes: z.string().optional().nullable(),
 });
 
 export type InsertFactoryContainer = z.infer<typeof insertFactoryContainerSchema>;
 export type FactoryContainer = typeof factoryContainers.$inferSelect;
+
+export const factoryOffloadAdditionalCharges = pgTable("factory_offload_additional_charges", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  ledgerAccountId: integer("ledger_account_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("factory_offload_addl_charges_container_idx").on(t.containerId),
+}));
+
+export type FactoryOffloadAdditionalCharge = typeof factoryOffloadAdditionalCharges.$inferSelect;
 
 export const factoryRawStock = pgTable("factory_raw_stock", {
   id: serial("id").primaryKey(),
