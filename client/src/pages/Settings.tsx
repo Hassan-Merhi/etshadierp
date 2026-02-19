@@ -398,9 +398,9 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       return company?.name || "Unknown";
     };
 
-    const getPageLabel = (route) => {
+    const getPageLabel = (route: string) => {
       if (!route || route === "/") return "Dashboard";
-      const routeLabels = {
+      const routeLabels: Record<string, string> = {
         "/": "Dashboard",
         "/dashboard": "Dashboard",
         "/locations": "Locations",
@@ -431,7 +431,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       };
       if (routeLabels[route]) return routeLabels[route];
       const cleanRoute = route.replace(/^\//, "").replace(/-/g, " ").replace(/\//g, " > ");
-      return cleanRoute.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      return cleanRoute.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     };
 
     // Group users by company
@@ -1781,6 +1781,7 @@ function LoginHistoryTab() {
       location_summary: "Location Summary",
       sales_report: "Sales Report",
       settings: "Settings",
+      optional_vouchers: "Optional Vouchers",
     };
   
     const companyForm = useForm<CompanyFormData>({

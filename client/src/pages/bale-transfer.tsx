@@ -22,16 +22,16 @@ export default function BaleTransferPage() {
   const [notes, setNotes] = useState("");
   const [selectedBales, setSelectedBales] = useState<Array<any>>([]);
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
   });
 
-  const { data: bales = [] } = useQuery({
+  const { data: bales = [] } = useQuery<any[]>({
     queryKey: ["/api/bales-by-location", selectedSourceLocation],
     enabled: selectedSourceLocation !== null && selectedSourceLocation !== undefined,
   });
 
-  const { data: transfers = [] } = useQuery({
+  const { data: transfers = [] } = useQuery<any[]>({
     queryKey: ["/api/bale-transfers"],
   });
 

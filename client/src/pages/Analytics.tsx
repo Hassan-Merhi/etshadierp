@@ -1840,7 +1840,7 @@ export default function Analytics() {
                     </div>
 
                     {/* Direct Incomes - Moved to Right Pane (Credit side) */}
-                    {netProfitData.rightPane?.directIncomes?.count > 0 && (
+                    {(netProfitData.rightPane?.directIncomes?.count ?? 0) > 0 && (
                       <div>
                         <div 
                           className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
@@ -1855,14 +1855,14 @@ export default function Analytics() {
                             )}
                             Direct Incomes
                             <span className="text-xs text-muted-foreground">
-                              ({netProfitData.rightPane.directIncomes.count})
+                              ({netProfitData.rightPane!.directIncomes.count})
                             </span>
                           </span>
-                          <span className="font-mono">{formatAmount(netProfitData.rightPane.directIncomes.total)}</span>
+                          <span className="font-mono">{formatAmount(netProfitData.rightPane!.directIncomes.total)}</span>
                         </div>
-                        {expandedNetProfitSections.has("directIncomes") && netProfitData.rightPane.directIncomes.accounts.length > 0 && (
+                        {expandedNetProfitSections.has("directIncomes") && netProfitData.rightPane!.directIncomes.accounts.length > 0 && (
                           <div className="bg-muted/30 divide-y">
-                            {netProfitData.rightPane.directIncomes.accounts.map((acc) => (
+                            {netProfitData.rightPane!.directIncomes.accounts.map((acc) => (
                               <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                                 <span>{acc.name}</span>
                                 <span className="font-mono">
