@@ -4894,7 +4894,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [bale] = await db.select().from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "FINALIZED"),
+          or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
           eq(factoryBales.erpLocationId, parseInt(locationId)),
           or(
             eq(factoryBales.referenceNumber, scanCode),
