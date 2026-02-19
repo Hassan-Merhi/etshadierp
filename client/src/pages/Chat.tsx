@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useToast } from "@/hooks/use-toast";
 import type { DirectMessage } from "@shared/schema";
 
 interface ChatUser {
@@ -26,6 +27,7 @@ export default function Chat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const { toast } = useToast();
 
   const { data: chatUsers = [], isLoading: usersLoading } = useQuery<ChatUser[]>({
     queryKey: ["/api/chat/users"],
@@ -53,6 +55,13 @@ export default function Chat() {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/users"] });
       setMessageText("");
       inputRef.current?.focus();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Message failed to send",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
     },
   });
 

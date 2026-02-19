@@ -58,7 +58,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect, useRef } from "react";
 
 interface MenuItem {
   title: string;
@@ -202,6 +204,26 @@ export function FactorySidebar({ user }: { user?: any }) {
   const [location] = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const isAdmin = user?.role === "Admin";
+  const { toast } = useToast();
+  const prevUnreadRef = useRef<number>(-1);
+
+  const { data: chatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-count"],
+    refetchInterval: 10000,
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    const count = chatUnread?.count || 0;
+    if (prevUnreadRef.current === -1) {
+      prevUnreadRef.current = count;
+      return;
+    }
+    if (count > prevUnreadRef.current) {
+      toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
+    }
+    prevUnreadRef.current = count;
+  }, [chatUnread?.count]);
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
@@ -317,12 +339,18 @@ export function FactorySidebar({ user }: { user?: any }) {
                         <SidebarMenuSub>
                           {group.items.map((item) => {
                             const isActive = location === item.url;
+                            const unreadCount = item.title === "Chat" ? (chatUnread?.count || 0) : 0;
                             return (
                               <SidebarMenuSubItem key={item.title}>
                                 <SidebarMenuSubButton asChild isActive={isActive}>
                                   <a href={item.url} data-testid={`link-factory-${item.url.split('/').pop()}`}>
                                     <item.icon className="h-4 w-4" />
-                                    <span>{item.title}</span>
+                                    <span className="flex-1">{item.title}</span>
+                                    {unreadCount > 0 && (
+                                      <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-factory-chat-unread">
+                                        {unreadCount}
+                                      </Badge>
+                                    )}
                                   </a>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>

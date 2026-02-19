@@ -48,8 +48,10 @@ import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface MenuItem {
   title: string;
@@ -137,6 +139,26 @@ export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+  const prevUnreadRef = useRef<number>(-1);
+
+  const { data: chatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-count"],
+    refetchInterval: 10000,
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    const count = chatUnread?.count || 0;
+    if (prevUnreadRef.current === -1) {
+      prevUnreadRef.current = count;
+      return;
+    }
+    if (count > prevUnreadRef.current) {
+      toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
+    }
+    prevUnreadRef.current = count;
+  }, [chatUnread?.count]);
 
   // Auto-collapse: only keep the group containing current route open
   useEffect(() => {
@@ -292,12 +314,18 @@ export function AppSidebar({ user }: { user?: any }) {
               {standaloneItems.map((item) => {
                 if (!isItemVisible(item)) return null;
                 const isActive = location === item.url;
+                const unreadCount = item.title === "Chat" ? (chatUnread?.count || 0) : 0;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
                       <a href={item.url} data-testid={`link-${item.url}`}>
                         <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <span className="flex-1">{item.title}</span>
+                        {unreadCount > 0 && (
+                          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
+                            {unreadCount}
+                          </Badge>
+                        )}
                       </a>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
