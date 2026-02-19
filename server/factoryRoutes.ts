@@ -6067,7 +6067,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   app.post("/api/chat/messages", requireAuth, async (req: any, res: any) => {
     try {
       const currentUserId = (req.session as any).userId;
-      const parsed = insertDirectMessageSchema.parse(req.body);
+      const parsed = insertDirectMessageSchema.parse({
+        ...req.body,
+        senderId: currentUserId,
+      });
 
       const [msg] = await db.insert(directMessages).values({
         senderId: currentUserId,
