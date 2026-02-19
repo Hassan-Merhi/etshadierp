@@ -61,6 +61,7 @@ import {
   directMessages,
   insertDirectMessageSchema,
   factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -2237,8 +2238,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const {
         containerId, receivedKg, costPerKg, commission,
         currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
-        freight: reqFreight, otherCharges: reqOtherCharges,
-        dutyAmount: reqDutyAmount, dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
+        freight: reqFreight, freightAccountId: reqFreightAccountId,
+        otherCharges: reqOtherCharges, otherChargesAccountId: reqOtherChargesAccountId,
+        dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
+        dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
+        additionalCharges: reqAdditionalCharges,
       } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
@@ -2275,6 +2279,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const freightVal = parseFloat(reqFreight || "0");
       const otherChargesVal = parseFloat(reqOtherCharges || "0");
+      const additionalChargesArr = Array.isArray(reqAdditionalCharges) ? reqAdditionalCharges : [];
+      const additionalChargesTotal = additionalChargesArr.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
       const dutyVal = reqDutyStatus === "CONFIRMED" ? parseFloat(reqDutyAmount || "0") : 0;
       const dutyStatus = reqDutyStatus || "NONE";
 
@@ -2308,7 +2314,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .returning();
       }
 
-      const totalCost = basePayable + freightVal + otherChargesVal + commTotalVal + dutyVal;
+      const totalCost = basePayable + freightVal + otherChargesVal + additionalChargesTotal + commTotalVal + dutyVal;
       const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
       const finalPayableAmount = String(totalCost);
 
@@ -2343,14 +2349,33 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           ratePerKgUsd: String(costPerKgUsd),
           finalPayableAmountUsd,
           freight: String(freightVal),
+          freightAccountId: reqFreightAccountId ? parseInt(reqFreightAccountId) : null,
           otherCharges: String(otherChargesVal),
+          otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
           commissionAmount: String(commTotalVal),
           dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
+          dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
           dutyStatus,
           dutyNotes: reqDutyNotes || null,
           updatedAt: new Date(),
         })
         .where(eq(factoryContainers.id, containerId));
+
+      if (additionalChargesArr.length > 0) {
+        for (const charge of additionalChargesArr) {
+          if (charge.description && parseFloat(charge.amount || "0") > 0) {
+            await db
+              .insert(factoryOffloadAdditionalCharges)
+              .values({
+                companyId,
+                containerId,
+                description: charge.description,
+                amount: String(charge.amount),
+                ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
+              });
+          }
+        }
+      }
 
       await writeDaybookEntry(db, {
         companyId,
@@ -2386,6 +2411,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           fxRateToUsd: fxRate,
         });
       }
+      if (otherChargesVal > 0) {
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "OTHER_CHARGE",
+          referenceId: containerId,
+          description: `Other charges on container ${container.containerNumber}`,
+          currencyCode,
+          amountCurrency: otherChargesVal,
+          fxRateToUsd: fxRate,
+        });
+      }
       if (dutyVal > 0) {
         await writeDaybookEntry(db, {
           companyId,
@@ -2397,6 +2434,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amountCurrency: dutyVal,
           fxRateToUsd: fxRate,
         });
+      }
+      for (const charge of additionalChargesArr) {
+        const chargeAmount = parseFloat(charge.amount || "0");
+        if (charge.description && chargeAmount > 0) {
+          await writeDaybookEntry(db, {
+            companyId,
+            txDate: today,
+            txType: "OTHER_CHARGE",
+            referenceId: containerId,
+            description: `${charge.description} on container ${container.containerNumber}`,
+            currencyCode,
+            amountCurrency: chargeAmount,
+            fxRateToUsd: fxRate,
+          });
+        }
       }
 
       res.json({ rawStock, commission: commissionRecord });
@@ -2450,7 +2502,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const otherChargesVal = parseFloat(container.otherCharges || "0");
       const commissionVal = parseFloat(container.commissionAmount || "0");
 
-      const totalCost = basePayable + freightVal + otherChargesVal + commissionVal + newDutyAmount;
+      const additionalChargesRows = await db
+        .select()
+        .from(factoryOffloadAdditionalCharges)
+        .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+      const additionalChargesTotal = additionalChargesRows.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
+
+      const totalCost = basePayable + freightVal + otherChargesVal + additionalChargesTotal + commissionVal + newDutyAmount;
       const newInclusiveCostPerKg = actualKg > 0 ? totalCost / actualKg : 0;
       const fxRate = parseFloat(container.fxRateToUsd || "1");
       const costPerKgUsd = (container.currencyCode || "USD") === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;

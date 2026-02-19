@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,11 +32,86 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+import { cn } from "@/lib/utils";
+
+interface AccountComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  accounts: { id: number; name: string; code?: string }[];
+  placeholder?: string;
+  disabled?: boolean;
+  testId?: string;
+}
+
+function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const selectedAccount = accounts.find((a) => a.id.toString() === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+          data-testid={testId}
+        >
+          <span className="truncate">{selectedAccount ? (selectedAccount.code ? `${selectedAccount.code} - ${selectedAccount.name}` : selectedAccount.name) : placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search accounts..." />
+          <CommandList>
+            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandGroup>
+              {accounts.map((account) => (
+                <CommandItem
+                  key={account.id}
+                  value={account.code ? `${account.code} ${account.name}` : account.name}
+                  onSelect={() => {
+                    onValueChange(account.id.toString());
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")} />
+                  {account.code ? `${account.code} - ${account.name}` : account.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface AdditionalChargeRow {
+  id: string;
+  description: string;
+  amount: string;
+  ledgerAccountId: string;
+}
 
 interface RawStockRow {
   supplierName: string;
@@ -75,10 +150,14 @@ export default function ProductionRawStock() {
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
   const [freight, setFreight] = useState("");
+  const [freightAccountId, setFreightAccountId] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
+  const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
   const [dutyAmount, setDutyAmount] = useState("");
+  const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
   const [dutyNotes, setDutyNotes] = useState("");
+  const [additionalCharges, setAdditionalCharges] = useState<AdditionalChargeRow[]>([]);
   const [confirmDutyDialogOpen, setConfirmDutyDialogOpen] = useState(false);
   const [confirmDutyContainerId, setConfirmDutyContainerId] = useState<number | null>(null);
   const [confirmDutyAmount, setConfirmDutyAmount] = useState("");
@@ -133,8 +212,9 @@ export default function ProductionRawStock() {
 
   const freightVal = parseFloat(freight || "0");
   const otherChargesVal = parseFloat(otherCharges || "0");
+  const additionalChargesTotal = additionalCharges.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
   const dutyVal = dutyPending ? 0 : parseFloat(dutyAmount || "0");
-  const totalCharges = freightVal + otherChargesVal + commissionTotal + dutyVal;
+  const totalCharges = freightVal + otherChargesVal + additionalChargesTotal + commissionTotal + dutyVal;
   const grandTotal = totalPayable + totalCharges;
   const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
 
@@ -196,10 +276,18 @@ export default function ProductionRawStock() {
       currencyCode,
       fxRateToUsd,
       freight: freight || "0",
+      freightAccountId: freightAccountId ? parseInt(freightAccountId) : null,
       otherCharges: otherCharges || "0",
+      otherChargesAccountId: otherChargesAccountId ? parseInt(otherChargesAccountId) : null,
       dutyAmount: dutyAmount || "0",
+      dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
       dutyNotes: dutyNotes || null,
+      additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => ({
+        description: c.description.trim(),
+        amount: c.amount,
+        ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
+      })),
     };
 
     if (commissionPersonName.trim() && commRateNum > 0) {
@@ -226,10 +314,14 @@ export default function ProductionRawStock() {
     setCurrencyCode("USD");
     setFxRateToUsd("1");
     setFreight("");
+    setFreightAccountId("");
     setOtherCharges("");
+    setOtherChargesAccountId("");
     setDutyAmount("");
+    setDutyAccountId("");
     setDutyPending(false);
     setDutyNotes("");
+    setAdditionalCharges([]);
   };
 
   const confirmDutyMutation = useMutation({
@@ -578,30 +670,116 @@ export default function ProductionRawStock() {
 
                 <div>
                   <Label className="text-sm font-semibold">Offload Charges</Label>
-                  <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">Freight ($)</Label>
-                      <Input
-                        type="number"
-                        value={freight}
-                        onChange={(e) => setFreight(e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
-                        data-testid="input-freight"
-                      />
+                  <div className="space-y-3 mt-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Freight ($)</Label>
+                        <Input
+                          type="number"
+                          value={freight}
+                          onChange={(e) => setFreight(e.target.value)}
+                          placeholder="0.00"
+                          step="0.01"
+                          data-testid="input-freight"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Freight Account</Label>
+                        <AccountCombobox
+                          value={freightAccountId}
+                          onValueChange={setFreightAccountId}
+                          accounts={ledgerAccounts || []}
+                          placeholder="Select account"
+                          testId="select-freight-account"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">Other Charges ($)</Label>
-                      <Input
-                        type="number"
-                        value={otherCharges}
-                        onChange={(e) => setOtherCharges(e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
-                        data-testid="input-other-charges"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Other Charges ($)</Label>
+                        <Input
+                          type="number"
+                          value={otherCharges}
+                          onChange={(e) => setOtherCharges(e.target.value)}
+                          placeholder="0.00"
+                          step="0.01"
+                          data-testid="input-other-charges"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Other Charges Account</Label>
+                        <AccountCombobox
+                          value={otherChargesAccountId}
+                          onValueChange={setOtherChargesAccountId}
+                          accounts={ledgerAccounts || []}
+                          placeholder="Select account"
+                          testId="select-other-charges-account"
+                        />
+                      </div>
                     </div>
                   </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <Label className="text-sm font-semibold">Additional Charges</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "" }])}
+                      data-testid="button-add-additional-charge"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add Row
+                    </Button>
+                  </div>
+                  {additionalCharges.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {additionalCharges.map((charge, idx) => (
+                        <div key={charge.id} className="grid grid-cols-[1fr_100px_1fr_auto] gap-2 items-end">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Description</Label>
+                            <Input
+                              value={charge.description}
+                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
+                              placeholder="e.g. Handling fee"
+                              data-testid={`input-addl-desc-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Amount</Label>
+                            <Input
+                              type="number"
+                              value={charge.amount}
+                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
+                              placeholder="0.00"
+                              step="0.01"
+                              data-testid={`input-addl-amount-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Account</Label>
+                            <AccountCombobox
+                              value={charge.ledgerAccountId}
+                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))}
+                              accounts={ledgerAccounts || []}
+                              placeholder="Select"
+                              testId={`select-addl-account-${idx}`}
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setAdditionalCharges(prev => prev.filter(c => c.id !== charge.id))}
+                            data-testid={`button-remove-addl-${idx}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
@@ -651,20 +829,14 @@ export default function ProductionRawStock() {
                           Commission Total: <span className="font-mono font-medium text-foreground">${formatNumber(commissionTotal)}</span>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Ledger Account (optional)</Label>
-                          <Select value={commissionLedgerAccountId} onValueChange={setCommissionLedgerAccountId}>
-                            <SelectTrigger data-testid="select-commission-ledger">
-                              <SelectValue placeholder="Select ledger account" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {ledgerAccounts?.map((acc) => (
-                                <SelectItem key={acc.id} value={String(acc.id)}>
-                                  {acc.code ? `${acc.code} - ${acc.name}` : acc.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label className="text-muted-foreground text-xs">Commission Account</Label>
+                          <AccountCombobox
+                            value={commissionLedgerAccountId}
+                            onValueChange={setCommissionLedgerAccountId}
+                            accounts={ledgerAccounts || []}
+                            placeholder="Select account"
+                            testId="select-commission-account"
+                          />
                         </div>
                       </>
                     )}
@@ -696,6 +868,16 @@ export default function ProductionRawStock() {
                         />
                         <Label className="text-xs text-muted-foreground">Pending (confirm later)</Label>
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Duty Account</Label>
+                      <AccountCombobox
+                        value={dutyAccountId}
+                        onValueChange={setDutyAccountId}
+                        accounts={ledgerAccounts || []}
+                        placeholder="Select account"
+                        testId="select-duty-account"
+                      />
                     </div>
                     {dutyPending && (
                       <div className="space-y-1">
@@ -756,6 +938,12 @@ export default function ProductionRawStock() {
                       <span className="font-mono">${formatNumber(otherChargesVal)}</span>
                     </div>
                   )}
+                  {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
+                    <div key={c.id} className="flex justify-between text-muted-foreground">
+                      <span>{c.description || `Additional #${i + 1}`}</span>
+                      <span className="font-mono">${formatNumber(parseFloat(c.amount))}</span>
+                    </div>
+                  ))}
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Commission ({commissionPersonName})</span>
