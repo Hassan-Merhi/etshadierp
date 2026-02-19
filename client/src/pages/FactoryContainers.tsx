@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +32,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { FactoryContainer, FactorySupplier } from "@shared/schema";
 
 interface ContainerWithSupplier extends FactoryContainer {
@@ -59,6 +65,7 @@ export default function FactoryContainers() {
   const [fxEffectiveDate, setFxEffectiveDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [, navigate] = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -407,6 +414,21 @@ export default function FactoryContainers() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => navigate("/factory/raw-stock")}
+                                data-testid={`button-offload-container-${c.id}`}
+                              >
+                                <ArrowDown className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Offload to Production</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
