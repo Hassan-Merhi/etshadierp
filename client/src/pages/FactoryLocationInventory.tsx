@@ -169,10 +169,10 @@ export default function FactoryLocationInventory() {
 
   const bulkCreateMutation = useMutation({
     mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
-      return await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
+      const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
+      return await res.json();
     },
     onSuccess: (result: any) => {
-      toast({ title: "Proforma saved successfully" });
       setSavedProformaId(result.id);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
     },
