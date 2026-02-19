@@ -680,6 +680,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const categoryMap = new Map(categories.map(c => [c.id, c.name]));
       const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
       const productCategoryIdMap = new Map(products.map(p => [p.id, p.categoryId || null]));
+      const productSellingPriceMap = new Map(products.map(p => [p.id, p.sellingPrice || "0"]));
 
       const grouped = new Map<number, {
         productId: number;
@@ -691,6 +692,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalWeight: number;
         totalCost: number;
         baleCount: number;
+        sellingPrice: string;
       }>();
 
       for (const b of bales) {
@@ -715,6 +717,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             totalWeight: weight,
             totalCost: cost,
             baleCount: 1,
+            sellingPrice: productSellingPriceMap.get(pid) || "0",
           });
         }
       }
@@ -4548,6 +4551,192 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json({ message: "Proforma line deleted" });
     } catch (error: any) {
       console.error("Error deleting proforma line:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { customerId, name, isActive, lines } = req.body;
+      if (!customerId || !name || !Array.isArray(lines) || lines.length === 0) {
+        return res.status(400).json({ message: "customerId, name, and at least one line are required" });
+      }
+
+      for (const l of lines) {
+        if (!l.articleCode || !l.productName || !l.quantity || parseFloat(l.pricePerBale) < 0) {
+          return res.status(400).json({ message: "Each line must have articleCode, productName, quantity > 0, and valid pricePerBale" });
+        }
+      }
+
+      const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
+
+      const result = await db.transaction(async (tx: any) => {
+        if (parsed.isActive) {
+          await tx.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
+            .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, parsed.customerId)));
+        }
+
+        const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
+
+        const lineValues = lines.map((l: any) => ({
+          proformaId: proforma.id,
+          articleCode: l.articleCode,
+          productName: l.productName,
+          quantity: parseInt(l.quantity),
+          pricePerBale: String(l.pricePerBale),
+        }));
+
+        const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
+
+        return { ...proforma, lines: insertedLines };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error bulk creating proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const lines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, id));
+
+      const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Proforma");
+
+      sheet.columns = [
+        { header: "#", key: "num", width: 6 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 30 },
+        { header: "Quantity", key: "quantity", width: 12 },
+        { header: "Price/Bale", key: "pricePerBale", width: 15 },
+        { header: "Total", key: "total", width: 18 },
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+
+      sheet.addRow([]);
+      sheet.addRow(["Customer:", customer?.legalName || "N/A"]);
+      sheet.addRow(["Proforma:", proforma.name]);
+      sheet.addRow(["Date:", new Date().toLocaleDateString()]);
+      sheet.addRow([]);
+
+      let grandTotal = 0;
+      lines.forEach((line, idx) => {
+        const lineTotal = parseInt(String(line.quantity)) * parseFloat(String(line.pricePerBale));
+        grandTotal += lineTotal;
+        sheet.addRow({
+          num: idx + 1,
+          articleCode: line.articleCode,
+          productName: line.productName,
+          quantity: line.quantity,
+          pricePerBale: parseFloat(String(line.pricePerBale)),
+          total: lineTotal,
+        });
+      });
+
+      sheet.addRow([]);
+      const totalRow = sheet.addRow(["", "", "GRAND TOTAL", lines.reduce((s, l) => s + l.quantity, 0), "", grandTotal]);
+      totalRow.font = { bold: true };
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting proforma to Excel:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const lines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, id));
+
+      const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.pdf`);
+      doc.pipe(res);
+
+      doc.fontSize(18).font("Helvetica-Bold").text("PROFORMA INVOICE", { align: "center" });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Customer: ${customer?.legalName || "N/A"}`);
+      doc.text(`Proforma: ${proforma.name}`);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`);
+      doc.moveDown(1);
+
+      const tableTop = doc.y;
+      const colX = [40, 80, 160, 360, 430, 500];
+      const colHeaders = ["#", "Article Code", "Product Name", "Qty", "Price/Bale", "Total"];
+
+      doc.font("Helvetica-Bold").fontSize(9);
+      colHeaders.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: (colX[i + 1] || 560) - colX[i] }));
+      doc.moveTo(40, tableTop + 14).lineTo(560, tableTop + 14).stroke();
+
+      doc.font("Helvetica").fontSize(9);
+      let y = tableTop + 20;
+      let grandTotal = 0;
+
+      lines.forEach((line, idx) => {
+        const lineTotal = line.quantity * parseFloat(String(line.pricePerBale));
+        grandTotal += lineTotal;
+
+        if (y > 750) {
+          doc.addPage();
+          y = 40;
+        }
+
+        doc.text(String(idx + 1), colX[0], y, { width: colX[1] - colX[0] });
+        doc.text(line.articleCode, colX[1], y, { width: colX[2] - colX[1] });
+        doc.text(line.productName, colX[2], y, { width: colX[3] - colX[2] });
+        doc.text(String(line.quantity), colX[3], y, { width: colX[4] - colX[3] });
+        doc.text(parseFloat(String(line.pricePerBale)).toFixed(2), colX[4], y, { width: colX[5] - colX[4] });
+        doc.text(lineTotal.toFixed(2), colX[5], y, { width: 560 - colX[5] });
+        y += 16;
+      });
+
+      y += 4;
+      doc.moveTo(40, y).lineTo(560, y).stroke();
+      y += 8;
+      doc.font("Helvetica-Bold");
+      doc.text("GRAND TOTAL", colX[2], y);
+      doc.text(String(lines.reduce((s, l) => s + l.quantity, 0)), colX[3], y, { width: colX[4] - colX[3] });
+      doc.text(grandTotal.toFixed(2), colX[5], y, { width: 560 - colX[5] });
+
+      doc.end();
+    } catch (error: any) {
+      console.error("Error exporting proforma to PDF:", error);
       res.status(500).json({ message: error.message });
     }
   });

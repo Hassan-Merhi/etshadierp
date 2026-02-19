@@ -1,13 +1,25 @@
-import { useState, useRef, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useMemo, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import {
+  ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check
+} from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 
@@ -33,6 +45,7 @@ interface FactoryBaleProduct {
   totalWeight: number;
   totalCost: number;
   baleCount: number;
+  sellingPrice: string;
 }
 
 interface CategoryGroup {
@@ -43,6 +56,22 @@ interface CategoryGroup {
   totalCost: number;
   productCount: number;
   products: FactoryBaleProduct[];
+}
+
+interface ProformaSelection {
+  productId: number;
+  articleCode: string;
+  productName: string;
+  availableBales: number;
+  selectedQty: number;
+  pricePerBale: string;
+}
+
+interface Customer {
+  id: number;
+  legalName: string;
+  balance: number;
+  balanceSide: string;
 }
 
 function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: SortDir) {
@@ -84,6 +113,20 @@ export default function FactoryLocationInventory() {
   const [_loc, navigate] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+
+  const [proformaMode, setProformaMode] = useState(false);
+  const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [proformaName, setProformaName] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [savedProformaId, setSavedProformaId] = useState<number | null>(null);
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
@@ -101,6 +144,41 @@ export default function FactoryLocationInventory() {
       return response.json();
     },
     enabled: !!selectedLocation,
+  });
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/factory/customers", selectedCompany?.id],
+    enabled: !!selectedCompany?.id && finalizeOpen,
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async (data: { legalName: string }) => {
+      return await modeApiRequest("POST", "/api/factory/customers", data);
+    },
+    onSuccess: (newCustomer: any) => {
+      toast({ title: "Customer created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      setSelectedCustomerId(String(newCustomer.id));
+      setShowCreateCustomer(false);
+      setNewCustomerName("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
+      return await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
+    },
+    onSuccess: (result: any) => {
+      toast({ title: "Proforma saved successfully" });
+      setSavedProformaId(result.id);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const categoryGroups: CategoryGroup[] = inventoryData.reduce((groups, item) => {
@@ -193,6 +271,8 @@ export default function FactoryLocationInventory() {
     setSelectedCategory(null);
     setLocationSearch("");
     setCategorySearch("");
+    setProformaMode(false);
+    setSelections(new Map());
   };
 
   const handleBackToCategories = () => {
@@ -207,7 +287,345 @@ export default function FactoryLocationInventory() {
       : null;
   useEscapeBack(escapeBackHandler);
 
+  const toggleProformaMode = useCallback(() => {
+    if (proformaMode) {
+      setProformaMode(false);
+      setSelections(new Map());
+    } else {
+      setProformaMode(true);
+    }
+  }, [proformaMode]);
+
+  const toggleSelection = useCallback((prod: FactoryBaleProduct) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      if (next.has(prod.productId)) {
+        next.delete(prod.productId);
+      } else {
+        next.set(prod.productId, {
+          productId: prod.productId,
+          articleCode: prod.articleCode,
+          productName: prod.productName,
+          availableBales: prod.baleCount,
+          selectedQty: prod.baleCount,
+          pricePerBale: prod.sellingPrice || "0",
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const updateSelectionQty = useCallback((productId: number, qty: string) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(productId);
+      if (existing) {
+        const parsed = parseInt(qty);
+        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, Math.min(parsed, existing.availableBales)) });
+      }
+      return next;
+    });
+  }, []);
+
+  const updateFinalizePrice = useCallback((productId: number, price: string) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(productId);
+      if (existing) {
+        next.set(productId, { ...existing, pricePerBale: price });
+      }
+      return next;
+    });
+  }, []);
+
+  const updateFinalizeQty = useCallback((productId: number, qty: string) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(productId);
+      if (existing) {
+        const parsed = parseInt(qty);
+        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, Math.min(parsed, existing.availableBales)) });
+      }
+      return next;
+    });
+  }, []);
+
+  const removeFromFinalize = useCallback((productId: number) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      next.delete(productId);
+      return next;
+    });
+  }, []);
+
+  const selectedItems = Array.from(selections.values()).filter((s) => s.selectedQty > 0);
+  const grandTotal = selectedItems.reduce((sum, item) => sum + item.selectedQty * parseFloat(item.pricePerBale || "0"), 0);
+  const totalSelectedBales = selectedItems.reduce((sum, item) => sum + item.selectedQty, 0);
+
+  const handleFinalize = () => {
+    if (selectedItems.length === 0) {
+      toast({ title: "No items selected", description: "Select at least one item with quantity > 0", variant: "destructive" });
+      return;
+    }
+    setSavedProformaId(null);
+    setFinalizeOpen(true);
+  };
+
+  const handleSaveProforma = () => {
+    if (!selectedCustomerId) {
+      toast({ title: "Select a customer", variant: "destructive" });
+      return;
+    }
+    if (!proformaName.trim()) {
+      toast({ title: "Enter a proforma name", variant: "destructive" });
+      return;
+    }
+    const lines = selectedItems.map((item) => ({
+      articleCode: item.articleCode,
+      productName: item.productName,
+      quantity: item.selectedQty,
+      pricePerBale: item.pricePerBale,
+    }));
+    bulkCreateMutation.mutate({
+      customerId: parseInt(selectedCustomerId),
+      name: proformaName.trim(),
+      isActive: false,
+      lines,
+    });
+  };
+
+  const handleExportExcel = () => {
+    if (!savedProformaId) return;
+    window.open(`/api/factory/customer-proformas/${savedProformaId}/export/excel`, "_blank");
+  };
+
+  const handleExportPdf = () => {
+    if (!savedProformaId) return;
+    window.open(`/api/factory/customer-proformas/${savedProformaId}/export/pdf`, "_blank");
+  };
+
+  const handleCloseFinalizeDialog = () => {
+    setFinalizeOpen(false);
+    if (savedProformaId) {
+      setProformaMode(false);
+      setSelections(new Map());
+      setSavedProformaId(null);
+      setProformaName("");
+      setSelectedCustomerId("");
+    }
+  };
+
+  const filteredCustomers = customers.filter((c) =>
+    c.legalName.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
   const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const renderFinalizeDialog = () => (
+    <Dialog open={finalizeOpen} onOpenChange={(open) => { if (!open) handleCloseFinalizeDialog(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle data-testid="text-finalize-title">
+            {savedProformaId ? "Proforma Saved" : "Finalize Proforma"}
+          </DialogTitle>
+        </DialogHeader>
+
+        {!savedProformaId ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Proforma Name</label>
+              <Input
+                placeholder="e.g. March 2026 Order"
+                value={proformaName}
+                onChange={(e) => setProformaName(e.target.value)}
+                data-testid="input-proforma-name"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">Customer</label>
+              {showCreateCustomer ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Customer name..."
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    className="flex-1"
+                    data-testid="input-new-customer-name"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (newCustomerName.trim()) createCustomerMutation.mutate({ legalName: newCustomerName.trim() });
+                    }}
+                    disabled={!newCustomerName.trim() || createCustomerMutation.isPending}
+                    data-testid="button-save-new-customer"
+                  >
+                    <Check className="h-4 w-4 mr-1" /> Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setShowCreateCustomer(false); setNewCustomerName(""); }}
+                    data-testid="button-cancel-new-customer"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search customers..."
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-search-customers"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCreateCustomer(true)}
+                      data-testid="button-create-customer"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> New
+                    </Button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto border rounded-md">
+                    {filteredCustomers.length === 0 ? (
+                      <div className="text-center text-muted-foreground text-sm py-3">No customers found</div>
+                    ) : (
+                      filteredCustomers.map((c) => (
+                        <div
+                          key={c.id}
+                          className={`px-3 py-2 cursor-pointer text-sm hover-elevate ${selectedCustomerId === String(c.id) ? "bg-primary/10 font-medium" : ""}`}
+                          onClick={() => setSelectedCustomerId(String(c.id))}
+                          data-testid={`row-customer-${c.id}`}
+                        >
+                          {c.legalName}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Items ({selectedItems.length} selected, {totalSelectedBales} bales)
+              </label>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Article</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right w-[100px]">Qty</TableHead>
+                      <TableHead className="text-right w-[120px]">Price/Bale</TableHead>
+                      <TableHead className="text-right w-[120px]">Total</TableHead>
+                      <TableHead className="w-[40px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedItems.map((item) => {
+                      const lineTotal = item.selectedQty * parseFloat(item.pricePerBale || "0");
+                      return (
+                        <TableRow key={item.productId} data-testid={`row-finalize-item-${item.productId}`}>
+                          <TableCell className="font-mono text-xs">{item.articleCode}</TableCell>
+                          <TableCell className="text-sm">{item.productName}</TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              value={item.selectedQty}
+                              onChange={(e) => updateFinalizeQty(item.productId, e.target.value)}
+                              className="w-[80px] text-right ml-auto"
+                              min={1}
+                              max={item.availableBales}
+                              data-testid={`input-finalize-qty-${item.productId}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              value={item.pricePerBale}
+                              onChange={(e) => updateFinalizePrice(item.productId, e.target.value)}
+                              className="w-[100px] text-right ml-auto"
+                              step="0.01"
+                              data-testid={`input-finalize-price-${item.productId}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmt(lineTotal)}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeFromFinalize(item.productId)}
+                              data-testid={`button-remove-finalize-${item.productId}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={2}>Grand Total</TableCell>
+                      <TableCell className="text-right font-mono">{totalSelectedBales}</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={handleCloseFinalizeDialog} data-testid="button-cancel-finalize">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveProforma}
+                disabled={!selectedCustomerId || !proformaName.trim() || selectedItems.length === 0 || bulkCreateMutation.isPending}
+                data-testid="button-save-proforma"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {bulkCreateMutation.isPending ? "Saving..." : "Save Proforma"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 mb-3">
+                <Check className="h-6 w-6 text-green-600 dark:text-green-300" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Proforma "{proformaName}" saved with {selectedItems.length} items, {totalSelectedBales} bales.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="outline" onClick={handleExportExcel} data-testid="button-export-excel">
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
+              </Button>
+              <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
+                <Download className="h-4 w-4 mr-1" /> Export PDF
+              </Button>
+            </div>
+            <div className="flex justify-center pt-2">
+              <Button onClick={handleCloseFinalizeDialog} data-testid="button-done-proforma">
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 
   if (!selectedLocation) {
     return (
@@ -532,8 +950,8 @@ export default function FactoryLocationInventory() {
   const totalBales = filteredProducts.reduce((s, p) => s + p.baleCount, 0);
   const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
-  const colSpanAll = isAllItems ? 8 : 7;
-  const colSpanLabel = isAllItems ? 3 : 2;
+  const colSpanAll = isAllItems ? (proformaMode ? 10 : 8) : (proformaMode ? 9 : 7);
+  const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -551,8 +969,28 @@ export default function FactoryLocationInventory() {
           <Button variant="outline" size="sm" onClick={() => handlePrint()} data-testid="button-print">
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
+          <Button
+            variant={proformaMode ? "destructive" : "default"}
+            size="sm"
+            onClick={toggleProformaMode}
+            data-testid="button-toggle-proforma-mode"
+          >
+            <ClipboardList className="h-4 w-4 mr-1" />
+            {proformaMode ? "Exit Proforma Mode" : "Enter Proforma Mode"}
+          </Button>
         </div>
       </div>
+
+      {proformaMode && selections.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 flex-wrap">
+          <Badge variant="secondary" className="text-sm">
+            {selections.size} items selected ({Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales)
+          </Badge>
+          <Button size="sm" onClick={handleFinalize} data-testid="button-finalize-proforma">
+            <FileText className="h-4 w-4 mr-1" /> Finalize Proforma
+          </Button>
+        </div>
+      )}
 
       <Card className="p-4 w-full" ref={printRef}>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
@@ -598,13 +1036,22 @@ export default function FactoryLocationInventory() {
               {filteredProducts.map((prod) => {
                 const avgRate = prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0;
                 const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+                const isSelected = selections.has(prod.productId);
+                const selection = selections.get(prod.productId);
                 return (
-                  <Card key={prod.productId} className="p-3" data-testid={`row-product-${prod.productId}`}>
+                  <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`row-product-${prod.productId}`}>
                     <div className="flex items-center gap-2 mb-2">
+                      {proformaMode && (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(prod)}
+                          data-testid={`checkbox-product-mobile-${prod.productId}`}
+                        />
+                      )}
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <button
-                        onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                        className="text-left text-primary hover:underline cursor-pointer font-medium"
+                        onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
+                        className={`text-left font-medium ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
                         data-testid={`link-product-mobile-${prod.productId}`}
                       >
                         {prod.productName}
@@ -623,6 +1070,21 @@ export default function FactoryLocationInventory() {
                       <div className="text-right"><span className="text-muted-foreground">Avg Rate: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>
                       <div className="col-span-2 text-right"><span className="text-muted-foreground">Total Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>
                     </div>
+                    {proformaMode && isSelected && selection && (
+                      <div className="mt-2 pt-2 border-t flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Qty:</span>
+                        <Input
+                          type="number"
+                          value={selection.selectedQty}
+                          onChange={(e) => updateSelectionQty(prod.productId, e.target.value)}
+                          className="w-20 text-right"
+                          min={1}
+                          max={prod.baleCount}
+                          data-testid={`input-qty-mobile-${prod.productId}`}
+                        />
+                        <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+                      </div>
+                    )}
                   </Card>
                 );
               })}
@@ -640,10 +1102,12 @@ export default function FactoryLocationInventory() {
         <div className="hidden md:block rounded-md border overflow-hidden w-full">
           <table className="w-full table-fixed text-sm">
             <colgroup>
+              {proformaMode && <col style={{ width: "40px" }} />}
               {isAllItems && <col style={{ width: "130px" }} />}
               <col style={{ width: "120px" }} />
               <col />
               <col style={{ width: "90px" }} />
+              {proformaMode && <col style={{ width: "100px" }} />}
               <col style={{ width: "110px" }} />
               <col style={{ width: "120px" }} />
               <col style={{ width: "130px" }} />
@@ -651,10 +1115,12 @@ export default function FactoryLocationInventory() {
             </colgroup>
             <thead className="bg-muted/50">
               <tr className="h-12">
+                {proformaMode && <th className="px-2"></th>}
                 {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
                 <th className="text-left px-3 font-medium">Article Code</th>
                 <th className="text-left px-3 font-medium">Bale Name</th>
                 <th className="text-right px-3 font-medium">Bales</th>
+                {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                 <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
                 <th className="text-right px-3 font-medium">Avg Rate</th>
                 <th className="text-right px-3 font-medium">Total Value</th>
@@ -671,20 +1137,48 @@ export default function FactoryLocationInventory() {
                   {filteredProducts.map((prod) => {
                     const avgRate = prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0;
                     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+                    const isSelected = selections.has(prod.productId);
+                    const selection = selections.get(prod.productId);
                     return (
-                      <tr key={prod.productId} className="border-t h-12" data-testid={`row-product-${prod.productId}`}>
+                      <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-${prod.productId}`}>
+                        {proformaMode && (
+                          <td className="px-2 text-center">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelection(prod)}
+                              data-testid={`checkbox-product-${prod.productId}`}
+                            />
+                          </td>
+                        )}
                         {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
                         <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                         <td className="px-3 font-medium">
                           <button
-                            onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                            className="text-left text-primary hover:underline cursor-pointer"
+                            onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
+                            className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
                             data-testid={`link-product-desktop-${prod.productId}`}
                           >
                             {prod.productName}
                           </button>
                         </td>
                         <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                        {proformaMode && (
+                          <td className="text-right px-3">
+                            {isSelected && selection ? (
+                              <Input
+                                type="number"
+                                value={selection.selectedQty}
+                                onChange={(e) => updateSelectionQty(prod.productId, e.target.value)}
+                                className="w-[70px] text-right ml-auto"
+                                min={1}
+                                max={prod.baleCount}
+                                data-testid={`input-qty-${prod.productId}`}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                         <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>
                         <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>
@@ -693,8 +1187,10 @@ export default function FactoryLocationInventory() {
                     );
                   })}
                   <tr className="border-t bg-muted/50 h-12 font-bold">
+                    {proformaMode && <td></td>}
                     <td className="px-3" colSpan={colSpanLabel}>Total ({filteredProducts.length} products)</td>
                     <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
+                    {proformaMode && <td></td>}
                     <td className="text-right px-3 font-mono"></td>
                     <td className="text-right px-3 font-mono"></td>
                     <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>
@@ -712,6 +1208,8 @@ export default function FactoryLocationInventory() {
           </div>
         )}
       </Card>
+
+      {renderFinalizeDialog()}
     </div>
   );
 }
