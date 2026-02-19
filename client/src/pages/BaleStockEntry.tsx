@@ -1134,6 +1134,12 @@ function RemoveFromStockTab() {
               Clear date
             </Button>
           )}
+          {totalQty > 0 && (
+            <div className="flex items-center gap-3 ml-2 text-sm" data-testid="text-remove-totals-top">
+              <Badge variant="secondary">{totalQty} bales</Badge>
+              <Badge variant="secondary">{formatNumber(totalWeight)} kg</Badge>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-0.5 border rounded-md">

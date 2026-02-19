@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,8 @@ export default function FactoryContainers() {
   const [fxRate, setFxRate] = useState("1");
   const [fxRateSource, setFxRateSource] = useState<"auto" | "manual">("auto");
   const [fxEffectiveDate, setFxEffectiveDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -280,6 +282,18 @@ export default function FactoryContainers() {
 
   const activeSuppliers = suppliers?.filter((s) => s.isActive);
 
+  const filteredContainers = containers?.filter((c) => {
+    if (statusFilter !== "all" && c.status !== statusFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesNumber = c.containerNumber?.toLowerCase().includes(q);
+      const matchesSupplier = c.supplierName?.toLowerCase().includes(q);
+      const matchesOrigin = c.origin?.toLowerCase().includes(q);
+      if (!matchesNumber && !matchesSupplier && !matchesOrigin) return false;
+    }
+    return true;
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -319,15 +333,41 @@ export default function FactoryContainers() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Container className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">
-              Containers ({containers?.length || 0})
-            </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Container className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-lg">
+                Containers ({filteredContainers?.length || 0}{filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
+              </CardTitle>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative w-56">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search containers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-containers"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40" data-testid="select-filter-status">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
+                  <SelectItem value="AVAILABLE">Available</SelectItem>
+                  <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {containers && containers.length > 0 ? (
+          {filteredContainers && filteredContainers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -343,7 +383,7 @@ export default function FactoryContainers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {containers.map((c) => (
+                {filteredContainers.map((c) => (
                   <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
                     <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
                     <TableCell className="text-muted-foreground">{c.supplierName || "-"}</TableCell>
@@ -392,8 +432,17 @@ export default function FactoryContainers() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Container className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No factory containers yet</p>
-              <p className="text-sm mt-1">Add your first container to start tracking arrivals</p>
+              {containers && containers.length > 0 ? (
+                <>
+                  <p className="text-lg font-medium">No matching containers</p>
+                  <p className="text-sm mt-1">Try adjusting your search or filter</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-medium">No factory containers yet</p>
+                  <p className="text-sm mt-1">Add your first container to start tracking arrivals</p>
+                </>
+              )}
             </div>
           )}
         </CardContent>
