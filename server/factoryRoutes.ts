@@ -60,6 +60,7 @@ import {
   insertUserSchema,
   directMessages,
   insertDirectMessageSchema,
+  factoryDutyAuditLog,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -2233,7 +2234,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { containerId, receivedKg, costPerKg, commission, currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate } = req.body;
+      const {
+        containerId, receivedKg, costPerKg, commission,
+        currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
+        freight: reqFreight, otherCharges: reqOtherCharges,
+        dutyAmount: reqDutyAmount, dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
+      } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
       const [container] = await db
@@ -2263,11 +2269,50 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const declaredKg = container.totalKg || "0";
       const actualKg = receivedKg || declaredKg;
-      const finalCostPerKg = costPerKg || container.ratePerKg || "0";
+      const baseCostPerKg = costPerKg || container.ratePerKg || "0";
       const differenceKg = String(parseFloat(declaredKg) - parseFloat(actualKg));
-      const finalPayableAmount = String(parseFloat(actualKg) * parseFloat(finalCostPerKg));
+      const basePayable = parseFloat(actualKg) * parseFloat(baseCostPerKg);
 
-      const costPerKgUsd = currencyCode === "USD" ? parseFloat(finalCostPerKg) : parseFloat(finalCostPerKg) * fxRate;
+      const freightVal = parseFloat(reqFreight || "0");
+      const otherChargesVal = parseFloat(reqOtherCharges || "0");
+      const dutyVal = reqDutyStatus === "CONFIRMED" ? parseFloat(reqDutyAmount || "0") : 0;
+      const dutyStatus = reqDutyStatus || "NONE";
+
+      let commissionRecord = null;
+      let commTotalVal = 0;
+      if (commission && commission.personName && commission.commissionRate) {
+        const commType = commission.commissionType || "PER_KG";
+        const commRate = parseFloat(commission.commissionRate) || 0;
+        commTotalVal = commType === "PER_KG"
+          ? commRate * parseFloat(actualKg)
+          : commRate;
+
+        const commCurrency = commission.currencyCode || currencyCode;
+        const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
+        const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * commFxRate;
+
+        [commissionRecord] = await db
+          .insert(factoryContainerCommissions)
+          .values({
+            companyId,
+            containerId,
+            personName: commission.personName,
+            commissionType: commType,
+            commissionRate: String(commRate),
+            commissionTotal: String(commTotalVal),
+            currencyCode: commCurrency,
+            fxRateToUsd: String(commFxRate),
+            commissionTotalUsd: String(commTotalUsd),
+            ledgerAccountId: commission.ledgerAccountId ? parseInt(commission.ledgerAccountId) : null,
+          })
+          .returning();
+      }
+
+      const totalCost = basePayable + freightVal + otherChargesVal + commTotalVal + dutyVal;
+      const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
+      const finalPayableAmount = String(totalCost);
+
+      const costPerKgUsd = currencyCode === "USD" ? inclusiveCostPerKg : inclusiveCostPerKg * fxRate;
       const finalPayableAmountUsd = String(parseFloat(actualKg) * costPerKgUsd);
 
       const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
@@ -2278,7 +2323,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           companyId,
           containerId,
           receivedKg: String(actualKg),
-          costPerKg: String(finalCostPerKg),
+          costPerKg: String(inclusiveCostPerKg),
           costPerKgUsd: String(costPerKgUsd),
         })
         .returning();
@@ -2297,46 +2342,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           fxRateDateOffload: offloadDate,
           ratePerKgUsd: String(costPerKgUsd),
           finalPayableAmountUsd,
+          freight: String(freightVal),
+          otherCharges: String(otherChargesVal),
+          commissionAmount: String(commTotalVal),
+          dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
+          dutyStatus,
+          dutyNotes: reqDutyNotes || null,
           updatedAt: new Date(),
         })
         .where(eq(factoryContainers.id, containerId));
-
-      let commissionRecord = null;
-      if (commission && commission.personName && commission.commissionRate) {
-        const commType = commission.commissionType || "PER_KG";
-        const commRate = parseFloat(commission.commissionRate) || 0;
-        const commTotal = commType === "PER_KG"
-          ? commRate * parseFloat(actualKg)
-          : commRate;
-
-        const commCurrency = commission.currencyCode || currencyCode;
-        const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
-        const commTotalUsd = commCurrency === "USD" ? commTotal : commTotal * commFxRate;
-
-        [commissionRecord] = await db
-          .insert(factoryContainerCommissions)
-          .values({
-            companyId,
-            containerId,
-            personName: commission.personName,
-            commissionType: commType,
-            commissionRate: String(commRate),
-            commissionTotal: String(commTotal),
-            currencyCode: commCurrency,
-            fxRateToUsd: String(commFxRate),
-            commissionTotalUsd: String(commTotalUsd),
-          })
-          .returning();
-      }
 
       await writeDaybookEntry(db, {
         companyId,
         txDate: offloadDate,
         txType: "OFFLOAD_RAW_STOCK",
         referenceId: rawStock.id,
-        description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${finalCostPerKg}/kg`,
+        description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${inclusiveCostPerKg.toFixed(4)}/kg (inclusive)`,
         currencyCode,
-        amountCurrency: parseFloat(finalPayableAmount),
+        amountCurrency: totalCost,
         fxRateToUsd: fxRate,
       });
       if (commissionRecord) {
@@ -2351,11 +2374,151 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           fxRateToUsd: parseFloat(commissionRecord.fxRateToUsd || "1"),
         });
       }
+      if (freightVal > 0) {
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "FREIGHT",
+          referenceId: containerId,
+          description: `Freight on container ${container.containerNumber}`,
+          currencyCode,
+          amountCurrency: freightVal,
+          fxRateToUsd: fxRate,
+        });
+      }
+      if (dutyVal > 0) {
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "DUTY",
+          referenceId: containerId,
+          description: `Duty on container ${container.containerNumber}`,
+          currencyCode,
+          amountCurrency: dutyVal,
+          fxRateToUsd: fxRate,
+        });
+      }
 
       res.json({ rawStock, commission: commissionRecord });
     } catch (error: any) {
       console.error("Error offloading container:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const containerId = parseInt(req.params.id);
+      const { dutyAmount, dutyNotes } = req.body;
+      const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+
+      if (!dutyAmount || parseFloat(dutyAmount) <= 0) {
+        return res.status(400).json({ message: "Valid duty amount is required" });
+      }
+
+      const [container] = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+
+      if (!container) return res.status(404).json({ message: "Container not found" });
+      if (container.dutyStatus !== "PENDING") {
+        return res.status(400).json({ message: "Only containers with PENDING duty can be confirmed" });
+      }
+
+      const oldDutyAmount = container.dutyAmount;
+      const newDutyAmount = parseFloat(dutyAmount);
+
+      await db.insert(factoryDutyAuditLog).values({
+        companyId,
+        containerId,
+        oldDutyAmount: oldDutyAmount || "0",
+        newDutyAmount: String(newDutyAmount),
+        oldDutyStatus: container.dutyStatus,
+        newDutyStatus: "CONFIRMED",
+        notes: dutyNotes || null,
+        updatedByUserId: userId,
+      });
+
+      const actualKg = parseFloat(container.actualReceivedKg || "0");
+      const baseRate = parseFloat(container.ratePerKg || "0");
+      const basePayable = actualKg * baseRate;
+      const freightVal = parseFloat(container.freight || "0");
+      const otherChargesVal = parseFloat(container.otherCharges || "0");
+      const commissionVal = parseFloat(container.commissionAmount || "0");
+
+      const totalCost = basePayable + freightVal + otherChargesVal + commissionVal + newDutyAmount;
+      const newInclusiveCostPerKg = actualKg > 0 ? totalCost / actualKg : 0;
+      const fxRate = parseFloat(container.fxRateToUsd || "1");
+      const costPerKgUsd = (container.currencyCode || "USD") === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;
+      const finalPayableAmountUsd = String(actualKg * costPerKgUsd);
+
+      await db
+        .update(factoryContainers)
+        .set({
+          dutyAmount: String(newDutyAmount),
+          dutyStatus: "CONFIRMED",
+          dutyNotes: dutyNotes || container.dutyNotes,
+          finalPayableAmount: String(totalCost),
+          ratePerKgUsd: String(costPerKgUsd),
+          finalPayableAmountUsd,
+          updatedAt: new Date(),
+        })
+        .where(eq(factoryContainers.id, containerId));
+
+      const [rawStock] = await db
+        .select()
+        .from(factoryRawStock)
+        .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+
+      if (rawStock) {
+        await db
+          .update(factoryRawStock)
+          .set({
+            costPerKg: String(newInclusiveCostPerKg),
+            costPerKgUsd: String(costPerKgUsd),
+          })
+          .where(eq(factoryRawStock.id, rawStock.id));
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "DUTY",
+        referenceId: containerId,
+        description: `Duty confirmed for container ${container.containerNumber}: $${newDutyAmount.toFixed(2)}`,
+        currencyCode: container.currencyCode || "USD",
+        amountCurrency: newDutyAmount,
+        fxRateToUsd: fxRate,
+      });
+
+      res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: newInclusiveCostPerKg });
+    } catch (error: any) {
+      console.error("Error confirming duty:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const containerId = parseInt(req.params.id);
+      const logs = await db
+        .select()
+        .from(factoryDutyAuditLog)
+        .where(and(eq(factoryDutyAuditLog.companyId, companyId), eq(factoryDutyAuditLog.containerId, containerId)))
+        .orderBy(desc(factoryDutyAuditLog.createdAt));
+
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Error fetching duty audit log:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

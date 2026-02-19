@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -69,8 +71,18 @@ export default function ProductionRawStock() {
   const [commissionPersonName, setCommissionPersonName] = useState("");
   const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
   const [commissionRate, setCommissionRate] = useState("");
+  const [commissionLedgerAccountId, setCommissionLedgerAccountId] = useState("");
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
+  const [freight, setFreight] = useState("");
+  const [otherCharges, setOtherCharges] = useState("");
+  const [dutyAmount, setDutyAmount] = useState("");
+  const [dutyPending, setDutyPending] = useState(false);
+  const [dutyNotes, setDutyNotes] = useState("");
+  const [confirmDutyDialogOpen, setConfirmDutyDialogOpen] = useState(false);
+  const [confirmDutyContainerId, setConfirmDutyContainerId] = useState<number | null>(null);
+  const [confirmDutyAmount, setConfirmDutyAmount] = useState("");
+  const [confirmDutyNotes, setConfirmDutyNotes] = useState("");
   const [obDialogOpen, setObDialogOpen] = useState(false);
   const [obSupplierId, setObSupplierId] = useState("");
   const [obReceivedKg, setObReceivedKg] = useState("");
@@ -88,6 +100,11 @@ export default function ProductionRawStock() {
 
   const { data: availableContainers } = useQuery<ContainerOption[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
+    enabled: offloadDialogOpen,
+  });
+
+  const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/ledger-accounts"],
     enabled: offloadDialogOpen,
   });
 
@@ -114,9 +131,17 @@ export default function ProductionRawStock() {
     ? commRateNum * actualKg
     : commRateNum;
 
+  const freightVal = parseFloat(freight || "0");
+  const otherChargesVal = parseFloat(otherCharges || "0");
+  const dutyVal = dutyPending ? 0 : parseFloat(dutyAmount || "0");
+  const totalCharges = freightVal + otherChargesVal + commissionTotal + dutyVal;
+  const grandTotal = totalPayable + totalCharges;
+  const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
+
   const fxRate = parseFloat(fxRateToUsd || "1");
   const rateUsd = currencyCode === "USD" ? rate : rate * fxRate;
   const totalPayableUsd = actualKg * rateUsd;
+  const grandTotalUsd = currencyCode === "USD" ? grandTotal : grandTotal * fxRate;
 
   const offloadMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -162,12 +187,19 @@ export default function ProductionRawStock() {
       return;
     }
 
+    const dutyStatus = dutyPending ? "PENDING" : (parseFloat(dutyAmount || "0") > 0 ? "CONFIRMED" : "NONE");
+
     const payload: any = {
       containerId: selectedContainerId,
       receivedKg: actualReceivedKg,
       costPerKg,
       currencyCode,
       fxRateToUsd,
+      freight: freight || "0",
+      otherCharges: otherCharges || "0",
+      dutyAmount: dutyAmount || "0",
+      dutyStatus,
+      dutyNotes: dutyNotes || null,
     };
 
     if (commissionPersonName.trim() && commRateNum > 0) {
@@ -175,6 +207,7 @@ export default function ProductionRawStock() {
         personName: commissionPersonName.trim(),
         commissionType,
         commissionRate: commissionRate,
+        ledgerAccountId: commissionLedgerAccountId || null,
       };
     }
 
@@ -189,9 +222,41 @@ export default function ProductionRawStock() {
     setCommissionPersonName("");
     setCommissionType("PER_KG");
     setCommissionRate("");
+    setCommissionLedgerAccountId("");
     setCurrencyCode("USD");
     setFxRateToUsd("1");
+    setFreight("");
+    setOtherCharges("");
+    setDutyAmount("");
+    setDutyPending(false);
+    setDutyNotes("");
   };
+
+  const confirmDutyMutation = useMutation({
+    mutationFn: async (data: { containerId: number; dutyAmount: string; dutyNotes: string }) => {
+      const response = await modeApiRequest("PATCH", `/api/factory/containers/${data.containerId}/confirm-duty`, {
+        dutyAmount: data.dutyAmount,
+        dutyNotes: data.dutyNotes,
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to confirm duty");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      toast({ title: "Duty Confirmed", description: "Duty has been confirmed and costs recalculated" });
+      setConfirmDutyDialogOpen(false);
+      setConfirmDutyContainerId(null);
+      setConfirmDutyAmount("");
+      setConfirmDutyNotes("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const obKg = parseFloat(obReceivedKg || "0");
   const obRate = parseFloat(obCostPerKg || "0");
@@ -512,6 +577,36 @@ export default function ProductionRawStock() {
                 <Separator />
 
                 <div>
+                  <Label className="text-sm font-semibold">Offload Charges</Label>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Freight ($)</Label>
+                      <Input
+                        type="number"
+                        value={freight}
+                        onChange={(e) => setFreight(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        data-testid="input-freight"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Other Charges ($)</Label>
+                      <Input
+                        type="number"
+                        value={otherCharges}
+                        onChange={(e) => setOtherCharges(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        data-testid="input-other-charges"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
                   <Label className="text-sm font-semibold">Commission (optional)</Label>
                   <div className="space-y-3 mt-2">
                     <div className="space-y-1">
@@ -551,8 +646,68 @@ export default function ProductionRawStock() {
                       </div>
                     </div>
                     {commissionPersonName && commRateNum > 0 && (
-                      <div className="text-sm text-muted-foreground">
-                        Commission Total: <span className="font-mono font-medium text-foreground">${formatNumber(commissionTotal)}</span>
+                      <>
+                        <div className="text-sm text-muted-foreground">
+                          Commission Total: <span className="font-mono font-medium text-foreground">${formatNumber(commissionTotal)}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Ledger Account (optional)</Label>
+                          <Select value={commissionLedgerAccountId} onValueChange={setCommissionLedgerAccountId}>
+                            <SelectTrigger data-testid="select-commission-ledger">
+                              <SelectValue placeholder="Select ledger account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {ledgerAccounts?.map((acc) => (
+                                <SelectItem key={acc.id} value={String(acc.id)}>
+                                  {acc.code ? `${acc.code} - ${acc.name}` : acc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <Label className="text-sm font-semibold">Duty</Label>
+                  <div className="space-y-3 mt-2">
+                    <div className="grid grid-cols-2 gap-4 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Duty Amount ($)</Label>
+                        <Input
+                          type="number"
+                          value={dutyAmount}
+                          onChange={(e) => setDutyAmount(e.target.value)}
+                          placeholder="0.00"
+                          step="0.01"
+                          data-testid="input-duty-amount"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 pb-1">
+                        <Switch
+                          checked={dutyPending}
+                          onCheckedChange={setDutyPending}
+                          data-testid="switch-duty-pending"
+                        />
+                        <Label className="text-xs text-muted-foreground">Pending (confirm later)</Label>
+                      </div>
+                    </div>
+                    {dutyPending && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Duty Notes</Label>
+                        <Textarea
+                          value={dutyNotes}
+                          onChange={(e) => setDutyNotes(e.target.value)}
+                          placeholder="Notes about pending duty..."
+                          className="text-sm"
+                          data-testid="input-duty-notes"
+                        />
+                        <p className="text-xs text-amber-600">Duty will not be included in cost until confirmed</p>
                       </div>
                     )}
                   </div>
@@ -581,26 +736,57 @@ export default function ProductionRawStock() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Rate</span>
+                    <span className="text-muted-foreground">Base Rate</span>
                     <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{rate.toFixed(4)}/kg</span>
                   </div>
                   <Separator className="my-1" />
-                  <div className="flex justify-between font-medium">
-                    <span>Total Payable</span>
-                    <span className="font-mono text-base">
-                      {currencyCode !== "USD" ? `${currencyCode} ${formatNumber(totalPayable)}` : `$${formatNumber(totalPayable)}`}
-                    </span>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base Payable ({actualKg} kg x {rate.toFixed(4)})</span>
+                    <span className="font-mono">${formatNumber(totalPayable)}</span>
                   </div>
-                  {currencyCode !== "USD" && (
+                  {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Total Payable (USD)</span>
-                      <span className="font-mono">${formatNumber(totalPayableUsd)}</span>
+                      <span>Freight</span>
+                      <span className="font-mono">${formatNumber(freightVal)}</span>
+                    </div>
+                  )}
+                  {otherChargesVal > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Other Charges</span>
+                      <span className="font-mono">${formatNumber(otherChargesVal)}</span>
                     </div>
                   )}
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Commission ({commissionPersonName})</span>
                       <span className="font-mono">${formatNumber(commissionTotal)}</span>
+                    </div>
+                  )}
+                  {dutyVal > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Duty</span>
+                      <span className="font-mono">${formatNumber(dutyVal)}</span>
+                    </div>
+                  )}
+                  {dutyPending && parseFloat(dutyAmount || "0") > 0 && (
+                    <div className="flex justify-between text-amber-600">
+                      <span>Duty (Pending)</span>
+                      <span className="font-mono">${formatNumber(parseFloat(dutyAmount))}</span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-medium">
+                    <span>Grand Total (Inclusive)</span>
+                    <span className="font-mono text-base">${formatNumber(grandTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Inclusive Cost/KG</span>
+                    <span className="font-mono">${inclusiveCostPerKg.toFixed(4)}/kg</span>
+                  </div>
+                  {currencyCode !== "USD" && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Grand Total (USD)</span>
+                      <span className="font-mono">${formatNumber(grandTotalUsd)}</span>
                     </div>
                   )}
                 </div>
@@ -759,6 +945,70 @@ export default function ProductionRawStock() {
                 data-testid="button-confirm-ob"
               >
                 {openingBalanceMutation.isPending ? "Adding..." : "Add Opening Balance"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDutyDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setConfirmDutyDialogOpen(false);
+          setConfirmDutyContainerId(null);
+          setConfirmDutyAmount("");
+          setConfirmDutyNotes("");
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gavel className="h-5 w-5" />
+              Confirm Duty
+            </DialogTitle>
+            <DialogDescription>
+              Enter the confirmed duty amount. Bale costs will be recalculated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Duty Amount ($)</Label>
+              <Input
+                type="number"
+                value={confirmDutyAmount}
+                onChange={(e) => setConfirmDutyAmount(e.target.value)}
+                placeholder="e.g. 1500"
+                step="0.01"
+                data-testid="input-confirm-duty-amount"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={confirmDutyNotes}
+                onChange={(e) => setConfirmDutyNotes(e.target.value)}
+                placeholder="Duty confirmation notes..."
+                className="text-sm"
+                data-testid="input-confirm-duty-notes"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmDutyDialogOpen(false)} data-testid="button-cancel-confirm-duty">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (confirmDutyContainerId && confirmDutyAmount) {
+                    confirmDutyMutation.mutate({
+                      containerId: confirmDutyContainerId,
+                      dutyAmount: confirmDutyAmount,
+                      dutyNotes: confirmDutyNotes,
+                    });
+                  }
+                }}
+                disabled={confirmDutyMutation.isPending || !confirmDutyAmount}
+                data-testid="button-submit-confirm-duty"
+              >
+                {confirmDutyMutation.isPending ? "Confirming..." : "Confirm Duty"}
               </Button>
             </div>
           </div>
