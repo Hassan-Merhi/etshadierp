@@ -1094,8 +1094,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let code = req.body.code;
       let articleCode = req.body.articleCode;
+      const grade = req.body.grade;
 
-      if (!articleCode) {
+      const gradeToPrefix: Record<string, string> = {
+        "CREAM": "HMD10",
+        "#1": "HMD11",
+        "#2": "HMD12",
+        "#3": "HMD13",
+        "#4": "HMD14",
+      };
+
+      if (!articleCode && grade && gradeToPrefix[grade]) {
+        const prefix = gradeToPrefix[grade];
+        const prefixLen = prefix.length;
+        const [maxResult] = await db
+          .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
+            sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+          ));
+        const nextNum = (maxResult?.maxNum || 0) + 1;
+        const numStr = String(nextNum).padStart(3, "0");
+        articleCode = `${prefix}${numStr}`;
+      } else if (!articleCode) {
         const name = req.body.name || "";
         const baseArticle = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 40);
         const timestamp = Date.now().toString(36).toUpperCase();

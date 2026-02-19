@@ -299,6 +299,7 @@ function StockEntryTab() {
   const [quickCreateName, setQuickCreateName] = useState("");
   const [quickCreateCategoryId, setQuickCreateCategoryId] = useState("");
   const [quickCreateWeight, setQuickCreateWeight] = useState("");
+  const [quickCreateGrade, setQuickCreateGrade] = useState("");
 
   const activeCategories = categories?.filter((c) => c.isActive);
 
@@ -307,6 +308,7 @@ function StockEntryTab() {
       const body: any = { name: quickCreateName };
       if (quickCreateCategoryId) body.categoryId = parseInt(quickCreateCategoryId);
       if (quickCreateWeight) body.weightPerBaleKg = quickCreateWeight;
+      if (quickCreateGrade) body.grade = quickCreateGrade;
       const response = await modeApiRequest("POST", "/api/factory/bale-products", body);
       if (!response.ok) {
         const err = await response.json();
@@ -316,11 +318,12 @@ function StockEntryTab() {
     },
     onSuccess: (newProduct: FactoryBaleProduct) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-      toast({ title: "Product Created", description: `"${newProduct.name}" created successfully` });
+      toast({ title: "Product Created", description: `"${newProduct.name}" created with article code ${newProduct.articleCode}` });
       setQuickCreateOpen(false);
       setQuickCreateName("");
       setQuickCreateCategoryId("");
       setQuickCreateWeight("");
+      setQuickCreateGrade("");
       setScanInput("");
       setShowDropdown(false);
       const defaultWeight = newProduct.weightPerBaleKg ? parseFloat(newProduct.weightPerBaleKg) : 25;
@@ -915,9 +918,24 @@ function StockEntryTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Quick Create Product</DialogTitle>
-            <DialogDescription>Create a new bale product. Article code will be auto-generated.</DialogDescription>
+            <DialogDescription>Select the grade to auto-generate the article code.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="quick-create-grade">Grade</Label>
+              <Select value={quickCreateGrade} onValueChange={setQuickCreateGrade}>
+                <SelectTrigger data-testid="select-quick-create-grade">
+                  <SelectValue placeholder="Select grade..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="#1">#1 (HMD11...)</SelectItem>
+                  <SelectItem value="#2">#2 (HMD12...)</SelectItem>
+                  <SelectItem value="#3">#3 (HMD13...)</SelectItem>
+                  <SelectItem value="#4">#4 (HMD14...)</SelectItem>
+                  <SelectItem value="CREAM">CREAM (HMD10...)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="quick-create-name">Name</Label>
               <Input
@@ -961,7 +979,7 @@ function StockEntryTab() {
             <Button variant="outline" onClick={() => setQuickCreateOpen(false)}>Cancel</Button>
             <Button
               onClick={() => quickCreateMutation.mutate()}
-              disabled={!quickCreateName.trim() || quickCreateMutation.isPending}
+              disabled={!quickCreateName.trim() || !quickCreateGrade || quickCreateMutation.isPending}
               data-testid="button-quick-create-submit"
             >
               {quickCreateMutation.isPending ? "Creating..." : "Create & Add to Cart"}
