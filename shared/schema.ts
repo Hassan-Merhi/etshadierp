@@ -2260,6 +2260,12 @@ export const factoryContainers = pgTable("factory_containers", {
   arrivalDate: date("arrival_date"),
   notes: text("notes"),
   status: text("status").notNull().default("PENDING"),
+  freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),
+  otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
+  commissionAmount: decimal("commission_amount", { precision: 20, scale: 2 }).default("0"),
+  dutyAmount: decimal("duty_amount", { precision: 20, scale: 2 }),
+  dutyStatus: text("duty_status").notNull().default("NONE"),
+  dutyNotes: text("duty_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -2287,6 +2293,12 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
   arrivalDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.string().optional(),
+  freight: z.string().optional().nullable(),
+  otherCharges: z.string().optional().nullable(),
+  commissionAmount: z.string().optional().nullable(),
+  dutyAmount: z.string().optional().nullable(),
+  dutyStatus: z.enum(["NONE", "PENDING", "CONFIRMED"]).optional(),
+  dutyNotes: z.string().optional().nullable(),
 });
 
 export type InsertFactoryContainer = z.infer<typeof insertFactoryContainerSchema>;
@@ -2485,6 +2497,7 @@ export const factoryContainerCommissions = pgTable("factory_container_commission
   currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
   commissionTotalUsd: decimal("commission_total_usd", { precision: 20, scale: 4 }),
+  ledgerAccountId: integer("ledger_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   containerIdx: index("factory_container_commissions_container_idx").on(t.containerId),
@@ -2492,6 +2505,21 @@ export const factoryContainerCommissions = pgTable("factory_container_commission
 }));
 
 export type FactoryContainerCommission = typeof factoryContainerCommissions.$inferSelect;
+
+export const factoryDutyAuditLog = pgTable("factory_duty_audit_log", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  oldDutyAmount: decimal("old_duty_amount", { precision: 20, scale: 2 }),
+  newDutyAmount: decimal("new_duty_amount", { precision: 20, scale: 2 }).notNull(),
+  oldDutyStatus: text("old_duty_status"),
+  newDutyStatus: text("new_duty_status").notNull(),
+  notes: text("notes"),
+  updatedByUserId: text("updated_by_user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type FactoryDutyAuditLog = typeof factoryDutyAuditLog.$inferSelect;
 
 export const customerProformas = pgTable("customer_proformas", {
   id: serial("id").primaryKey(),
