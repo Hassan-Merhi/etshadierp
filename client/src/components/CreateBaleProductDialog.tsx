@@ -17,7 +17,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,12 +33,11 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
-  articleCode: z.string().min(1, "Article code is required"),
+  grade: z.string().min(1, "Grade is required"),
   name: z.string().min(1, "Product name is required"),
-  description: z.string().optional(),
-  itemNumber: z.string().optional(),
   categoryId: z.string().optional(),
   weightPerBaleKg: z.string().optional(),
+  description: z.string().optional(),
 });
 
 interface CreateBaleProductDialogProps {
@@ -60,39 +58,32 @@ export function CreateBaleProductDialog({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      articleCode: "",
+      grade: "",
       name: "",
-      description: "",
-      itemNumber: "",
       categoryId: "",
       weightPerBaleKg: "",
+      description: "",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      let articleCode = data.articleCode;
-      if (!articleCode && data.itemNumber) {
-        const num = parseInt(data.itemNumber);
-        if (!isNaN(num) && num >= 1 && num <= 99) {
-          articleCode = `HMD${String(num).padStart(2, "0")}000`;
-        }
+      const body: any = { name: data.name.trim(), grade: data.grade };
+      if (data.categoryId && data.categoryId !== "none") body.categoryId = parseInt(data.categoryId);
+      if (data.weightPerBaleKg) body.weightPerBaleKg = data.weightPerBaleKg;
+      if (data.description) body.description = data.description;
+      const response = await factoryApiRequest("POST", "/api/factory/bale-products", body);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to create product");
       }
-      const categoryId = data.categoryId && data.categoryId !== "none" ? parseInt(data.categoryId) : undefined;
-      const response = await factoryApiRequest("POST", "/api/factory/bale-products", {
-        articleCode,
-        name: data.name,
-        description: data.description,
-        categoryId: categoryId || undefined,
-        weightPerBaleKg: data.weightPerBaleKg || undefined,
-      });
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (product: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       toast({
-        title: "Success",
-        description: "Product created successfully",
+        title: "Product Created",
+        description: `"${product.name}" created with article code ${product.articleCode}`,
       });
       form.reset();
       onOpenChange(false);
@@ -116,7 +107,7 @@ export function CreateBaleProductDialog({
         <DialogHeader>
           <DialogTitle>Create Bale Product</DialogTitle>
           <DialogDescription>
-            Add a new product type that can be assigned to bales
+            Select a grade to auto-generate the article code.
           </DialogDescription>
         </DialogHeader>
 
@@ -124,21 +115,25 @@ export function CreateBaleProductDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="articleCode"
+              name="grade"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Article Code *</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., HMD01000"
-                      className="font-mono"
-                      data-testid="input-article-code"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Unique identifier for this product type
-                  </FormDescription>
+                  <FormLabel>Grade *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-create-grade">
+                        <SelectValue placeholder="Select grade..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="#1">#1 (HMD11...)</SelectItem>
+                      <SelectItem value="#2">#2 (HMD12...)</SelectItem>
+                      <SelectItem value="#3">#3 (HMD13...)</SelectItem>
+                      <SelectItem value="#4">#4 (HMD14...)</SelectItem>
+                      <SelectItem value="CREAM">CREAM (HMD10...)</SelectItem>
+                      <SelectItem value="Garbage">Garbage (HMD19...)</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

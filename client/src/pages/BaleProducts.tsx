@@ -645,7 +645,8 @@ export default function BaleProducts() {
               <Input
                 id="edit-articleCode"
                 value={editForm.articleCode}
-                onChange={(e) => setEditForm({ ...editForm, articleCode: e.target.value })}
+                readOnly
+                className="font-mono bg-muted"
                 data-testid="input-edit-product-articleCode"
               />
             </div>

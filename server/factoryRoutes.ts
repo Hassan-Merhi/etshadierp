@@ -233,8 +233,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `REF${nextNumber + baleIndex}`;
-            const baleTotalCost = weight * costPerKg;
+            const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
+            const isGarbage = product.articleCode?.startsWith("HMD19");
+            const effectiveCostPerKg = isGarbage ? 0 : costPerKg;
+            const baleTotalCost = weight * effectiveCostPerKg;
 
             const [bale] = await tx
               .insert(factoryBales)
@@ -248,7 +250,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 articleCode: product.articleCode,
                 productName: product.name,
                 weightKg: String(weight),
-                costPerKg: String(costPerKg),
+                costPerKg: String(effectiveCostPerKg),
                 totalCost: String(baleTotalCost),
                 status: "IN_STOCK",
                 finalizedAt: now,
@@ -1102,6 +1104,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         "#2": "HMD12",
         "#3": "HMD13",
         "#4": "HMD14",
+        "Garbage": "HMD19",
       };
 
       if (!articleCode && grade && gradeToPrefix[grade]) {
@@ -1746,7 +1749,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             let baleIndex = 0;
             for (const group of rowGroups) {
               for (let i = 0; i < group.qty; i++) {
-                const refNum = `REF${nextNumber + baleIndex}`;
+                const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
                 await tx
                   .insert(factoryBales)
                   .values({
@@ -3078,7 +3081,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${nextNumber + i}`;
+          const refNum = `REF${String(nextNumber + i).padStart(5, '0')}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -3174,7 +3177,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `REF${nextNumber + baleIndex}`;
+            const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
             const [bale] = await tx
               .insert(factoryBales)
               .values({
@@ -3264,7 +3267,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${nextNumber + i}`;
+          const refNum = `REF${String(nextNumber + i).padStart(5, '0')}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -3722,7 +3725,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           });
         }
 
-        const newRefNum = `REF${nextNumber}`;
+        const newRefNum = `REF${String(nextNumber).padStart(5, '0')}`;
 
         const [newBale] = await tx
           .insert(factoryBales)
