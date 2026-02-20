@@ -26487,6 +26487,48 @@ if (asOfDate) {
     }
   });
 
+  app.post("/api/bale-label-prints/reprint", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { baleId } = req.body;
+      if (!baleId) return res.status(400).json({ message: "baleId required" });
+      const { baleLabelPrints, referenceSequences } = await import("@shared/schema");
+      const [existing] = await db
+        .select()
+        .from(baleLabelPrints)
+        .where(and(eq(baleLabelPrints.companyId, companyId), eq(baleLabelPrints.productionBaleId, baleId)));
+      if (existing) {
+        await db
+          .update(baleLabelPrints)
+          .set({ printedAt: new Date(), printedByUserId: req.session.userId || null })
+          .where(eq(baleLabelPrints.id, existing.id));
+      } else {
+        const [bale] = await db.select().from(factoryBales).where(eq(factoryBales.id, baleId));
+        if (bale) {
+          const product = bale.productId
+            ? (await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId)))[0]
+            : null;
+          const refNum = bale.referenceNumber || `REPRINT-${baleId}`;
+          await db.insert(baleLabelPrints).values({
+            companyId,
+            productionBaleId: baleId,
+            productId: bale.productId || null,
+            articleCode: product?.articleCode || bale.category || "UNKNOWN",
+            referenceNumber: refNum,
+            pieces: bale.quantity || 1,
+            approxWeightKg: String(bale.weightKg || 0),
+            printedByUserId: req.session.userId || null,
+            printedAt: new Date(),
+          });
+        }
+      }
+      res.json({ success: true, printedAt: new Date().toISOString() });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Lookup by ARTICLE code
   app.get("/api/lookup/article/:articleCode", requireAuth, async (req, res) => {
     try {

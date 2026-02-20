@@ -201,6 +201,11 @@ export default function BalesHistory() {
       productName: baleRow.bale.productName || baleRow.product?.name || baleRow.bale.category || "",
     };
 
+    try {
+      await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: baleRow.bale.id });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+    } catch {}
+
     if (isZebraMode()) {
       try {
         const zpl = buildZplBatch([label], true);
@@ -428,6 +433,7 @@ export default function BalesHistory() {
                     <TableHead className="text-right">Cost/kg</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Last Printed</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -502,6 +508,9 @@ export default function BalesHistory() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {new Date(bale.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground" data-testid={`text-last-printed-${bale.id}`}>
+                          {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

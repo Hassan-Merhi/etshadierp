@@ -3637,10 +3637,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const productMap = new Map(products.map((p: any) => [p.id, p]));
       const batchMap = new Map(batches.map((b: any) => [b.id, b]));
 
+      const baleIds = bales.map((b: any) => b.id).filter(Boolean);
+      const lastPrintMap = new Map<number, string>();
+      if (baleIds.length > 0) {
+        const printRows = await db
+          .select({
+            productionBaleId: baleLabelPrints.productionBaleId,
+            lastPrintedAt: sql<string>`MAX(${baleLabelPrints.printedAt})`.as("last_printed_at"),
+          })
+          .from(baleLabelPrints)
+          .where(inArray(baleLabelPrints.productionBaleId, baleIds))
+          .groupBy(baleLabelPrints.productionBaleId);
+        for (const row of printRows) {
+          if (row.productionBaleId) lastPrintMap.set(row.productionBaleId, row.lastPrintedAt);
+        }
+      }
+
       const results = bales.map((bale: any) => ({
         bale,
         product: bale.productId ? productMap.get(bale.productId) || null : null,
         mixBatch: bale.mixBatchId ? batchMap.get(bale.mixBatchId) || null : null,
+        lastPrintedAt: lastPrintMap.get(bale.id) || null,
       }));
 
       res.json(results);
