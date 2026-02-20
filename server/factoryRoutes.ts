@@ -4616,13 +4616,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const { customerId, name, isActive, lines } = req.body;
       if (!customerId || !name || !Array.isArray(lines) || lines.length === 0) {
-        return res.status(400).json({ message: "customerId, name, and at least one line are required" });
+        return res.status(400).json({ message: `customerId, name, and at least one line are required. Got: customerId=${customerId}, name=${name}, lines=${Array.isArray(lines) ? lines.length : 'not array'}` });
       }
 
-      for (const l of lines) {
-        if (!l.articleCode || !l.productName || !l.quantity || parseFloat(l.pricePerBale) < 0) {
-          return res.status(400).json({ message: "Each line must have articleCode, productName, quantity > 0, and valid pricePerBale" });
-        }
+      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      if (validLines.length === 0) {
+        return res.status(400).json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
       }
 
       const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
@@ -4635,12 +4634,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
 
-        const lineValues = lines.map((l: any) => ({
+        const lineValues = validLines.map((l: any) => ({
           proformaId: proforma.id,
           articleCode: l.articleCode,
           productName: l.productName,
           quantity: parseInt(l.quantity),
-          pricePerBale: String(l.pricePerBale),
+          pricePerBale: String(l.pricePerBale || "0"),
         }));
 
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();

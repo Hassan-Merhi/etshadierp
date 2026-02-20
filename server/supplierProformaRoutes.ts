@@ -349,7 +349,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         containerId,
         barcode: item.stockItemCode.trim(),
         itemName: item.itemName || null,
-        qty: parseFloat(item.quantity || "0"),
+        qty: Math.round(parseFloat(item.quantity || "0")),
         weightPerBale: null as string | null,
         pricePerBale: item.rate || null,
       }));
