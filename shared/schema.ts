@@ -3294,3 +3294,75 @@ export const insertFactoryUserPageAccessSchema = createInsertSchema(factoryUserP
 
 export type InsertFactoryUserPageAccess = z.infer<typeof insertFactoryUserPageAccessSchema>;
 export type FactoryUserPageAccess = typeof factoryUserPageAccess.$inferSelect;
+
+export const supplierProformas = pgTable("supplier_proformas", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  supplierId: integer("supplier_id").notNull(),
+  reference: varchar("reference", { length: 200 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSupplierProformaSchema = createInsertSchema(supplierProformas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  supplierId: z.number().min(1),
+  reference: z.string().min(1, "Reference is required"),
+  notes: z.string().optional(),
+});
+
+export type InsertSupplierProforma = z.infer<typeof insertSupplierProformaSchema>;
+export type SupplierProforma = typeof supplierProformas.$inferSelect;
+
+export const supplierProformaLines = pgTable("supplier_proforma_lines", {
+  id: serial("id").primaryKey(),
+  proformaId: integer("proforma_id").notNull(),
+  barcode: varchar("barcode", { length: 200 }).notNull(),
+  itemName: text("item_name").notNull(),
+  qty: integer("qty").notNull().default(0),
+  weightPerBale: decimal("weight_per_bale", { precision: 15, scale: 3 }).default("0"),
+  pricePerBale: decimal("price_per_bale", { precision: 15, scale: 2 }).default("0"),
+});
+
+export const insertSupplierProformaLineSchema = createInsertSchema(supplierProformaLines).omit({
+  id: true,
+}).extend({
+  proformaId: z.number().min(1),
+  barcode: z.string().min(1, "Barcode is required"),
+  itemName: z.string().min(1, "Item name is required"),
+  qty: z.number().min(0),
+  weightPerBale: z.string().optional(),
+  pricePerBale: z.string().optional(),
+});
+
+export type InsertSupplierProformaLine = z.infer<typeof insertSupplierProformaLineSchema>;
+export type SupplierProformaLine = typeof supplierProformaLines.$inferSelect;
+
+export const supplierContainerLoadedItems = pgTable("supplier_container_loaded_items", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  barcode: varchar("barcode", { length: 200 }).notNull(),
+  itemName: text("item_name"),
+  qty: integer("qty").notNull().default(0),
+  weightPerBale: decimal("weight_per_bale", { precision: 15, scale: 3 }),
+  pricePerBale: decimal("price_per_bale", { precision: 15, scale: 2 }),
+});
+
+export const insertSupplierContainerLoadedItemSchema = createInsertSchema(supplierContainerLoadedItems).omit({
+  id: true,
+}).extend({
+  containerId: z.number().min(1),
+  barcode: z.string().min(1, "Barcode is required"),
+  itemName: z.string().optional(),
+  qty: z.number().min(0),
+  weightPerBale: z.string().optional(),
+  pricePerBale: z.string().optional(),
+});
+
+export type InsertSupplierContainerLoadedItem = z.infer<typeof insertSupplierContainerLoadedItemSchema>;
+export type SupplierContainerLoadedItem = typeof supplierContainerLoadedItems.$inferSelect;

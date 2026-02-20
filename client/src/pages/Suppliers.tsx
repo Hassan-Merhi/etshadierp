@@ -320,14 +320,24 @@ export default function Suppliers() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
-                          data-testid={`button-edit-supplier-${supplier.id}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
+                            data-testid={`button-proformas-supplier-${supplier.id}`}
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
+                            data-testid={`button-edit-supplier-${supplier.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

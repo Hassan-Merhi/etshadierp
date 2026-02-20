@@ -51,6 +51,8 @@ import POSDaybook from "@/pages/POSDaybook";
 import POSDashboard from "@/pages/POSDashboard";
 import POSCustomers from "@/pages/POSCustomers";
 import EditSupplier from "@/pages/EditSupplier";
+import SupplierProformas from "@/pages/SupplierProformas";
+import ContainerVerification from "@/pages/ContainerVerification";
 import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
 import SoldContainers from "@/pages/SoldContainers";
@@ -204,6 +206,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/pos-daybook" component={POSDaybook} />
+      <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
+      <Route path="/containers/:containerId/verification" component={ContainerVerification} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/opening-stock" component={OpeningStockSummary} />
       <Route path="/opening-stock/:groupId" component={OpeningStockDetail} />

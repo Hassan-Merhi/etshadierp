@@ -446,6 +446,15 @@ export default function ContainerDetail() {
         </Badge>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant="outline"
+          onClick={() => setLocation(`/containers/${containerId}/verification`)}
+          className="gap-2"
+          data-testid="button-verify-container"
+        >
+          <FileText className="w-4 h-4" />
+          <span className="hidden sm:inline">Verify</span>
+        </Button>
         {!containerSale && (
           <Button
             onClick={() => setShowSellDialog(true)}
