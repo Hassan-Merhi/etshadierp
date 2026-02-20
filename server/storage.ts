@@ -728,7 +728,10 @@ export class DbStorage implements IStorage {
   }
 
   async createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
-    const [created] = await db.insert(schema.ledgerAccounts).values(account).returning();
+    const [created] = await db.insert(schema.ledgerAccounts).values({
+      ...account,
+      code: account.code || `LA-${Date.now()}`,
+    }).returning();
     return created;
   }
 
@@ -3272,7 +3275,7 @@ export class DbStorage implements IStorage {
             } else {
               await tx.insert(schema.inventory).values({
                 companyId: voucher.companyId,
-                locationId: sourceLocationId,
+                locationId: sourceLocationId || 0,
                 stockItemId: item.stockItemId,
                 quantity: quantity.toFixed(3),
                 averageRate: rate.toFixed(2),
@@ -4261,15 +4264,16 @@ export class DbStorage implements IStorage {
             .where(eq(schema.inventory.id, sourceInventory.id));
         } else {
           // Create new inventory record at source (it may have been deleted if quantity reached 0)
+          const srcLocId = sourceLocationId || 0;
           const [sourceLocation] = await tx
             .select()
             .from(schema.locations)
-            .where(eq(schema.locations.id, sourceLocationId));
+            .where(eq(schema.locations.id, srcLocId));
           
           if (sourceLocation) {
             await tx.insert(schema.inventory).values({
               companyId: sourceLocation.companyId,
-              locationId: sourceLocationId,
+              locationId: srcLocId,
               stockItemId: oldItem.stockItemId,
               quantity: quantity.toFixed(3),
               averageRate: rate.toFixed(2),
@@ -5313,10 +5317,9 @@ export class DbStorage implements IStorage {
     return await db
       .select()
       .from(schema.bales)
-      .where(and(
-        eq(schema.bales.companyId, companyId),
-        eq(schema.bales.active, true)
-      ))
+      .where(
+        eq(schema.bales.companyId, companyId)
+      )
       .orderBy(desc(schema.bales.createdAt));
   }
 
@@ -5350,7 +5353,7 @@ export class DbStorage implements IStorage {
   async updateBale(id: number, updates: Partial<schema.InsertBale>): Promise<schema.Bale> {
     const [updated] = await db
       .update(schema.bales)
-      .set({ ...updates, updatedAt: sql`now()` })
+      .set({ ...updates })
       .where(eq(schema.bales.id, id))
       .returning();
     return updated;
@@ -5358,8 +5361,7 @@ export class DbStorage implements IStorage {
 
   async deleteBale(id: number): Promise<void> {
     await db
-      .update(schema.bales)
-      .set({ active: false })
+      .delete(schema.bales)
       .where(eq(schema.bales.id, id));
   }
 
@@ -5705,7 +5707,10 @@ export class DbStorage implements IStorage {
   async createMixBatch(batch: schema.InsertMixBatch): Promise<schema.MixBatch> {
     const [created] = await db
       .insert(schema.mixBatches)
-      .values(batch)
+      .values({
+        ...batch,
+        batchCode: batch.batchCode || `MB-${Date.now()}`,
+      })
       .returning();
     return created;
   }

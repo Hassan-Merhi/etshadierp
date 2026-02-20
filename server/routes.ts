@@ -19,7 +19,7 @@ import {
   requireRole,
   canDelete,
   checkPOSLocation,
-  requireNonPOS, transporter, 
+  requireNonPOS,
 } from "./auth";
 import {
   insertLocationSchema,
@@ -169,7 +169,7 @@ async function calculateHistoricalLocationInventory(
     .where(
       and(
         eq(vouchers.companyId, companyId),
-        eq(salesItems.locationId, locationId)
+        eq(vouchers.locationId, locationId)
       )
     )
     .execute();
@@ -266,7 +266,7 @@ async function calculateHistoricalLocationInventory(
   // STEP 2: Initialize inventoryMap with all seeded items at zero
   const inventoryMap = new Map<number, { quantity: number; totalValue: number; rate: number }>();
   
-  for (const stockItemId of seedStockItemIds) {
+  for (const stockItemId of Array.from(seedStockItemIds)) {
     inventoryMap.set(stockItemId, { quantity: 0, totalValue: 0, rate: 0 });
   }
 
@@ -289,7 +289,7 @@ async function calculateHistoricalLocationInventory(
     .where(
       and(
         eq(vouchers.companyId, companyId),
-        eq(salesItems.locationId, locationId),
+        eq(vouchers.locationId, locationId),
         eq(vouchers.optional, false),
         sql`${vouchers.voucherDate} > ${cutoffDateStr}`
       )
@@ -418,7 +418,7 @@ async function calculateHistoricalLocationInventory(
     .select({
       stockItemId: containerOffloadItems.stockItemId,
       quantity: containerOffloadItems.quantity,
-      costPrice: containerOffloadItems.costPrice,
+      rate: containerOffloadItems.rate,
     })
     .from(containerOffloadItems)
     .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
@@ -436,7 +436,7 @@ async function calculateHistoricalLocationInventory(
 
   for (const offload of offloadsAfterDate) {
     const qty = parseFloat(offload.quantity) || 0;
-    const cost = parseFloat(offload.costPrice) || 0;
+    const cost = parseFloat(offload.rate) || 0;
     const existing = inventoryMap.get(offload.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
     existing.quantity -= qty;
     existing.totalValue -= qty * cost;
@@ -446,7 +446,7 @@ async function calculateHistoricalLocationInventory(
 
   // Count nonzero items
   let nonzeroCount = 0;
-  for (const [, data] of inventoryMap) {
+  for (const [, data] of Array.from(inventoryMap)) {
     if (data.quantity !== 0) nonzeroCount++;
   }
   console.log(`[HIST-INV] Items with qty != 0: ${nonzeroCount}`);
@@ -470,7 +470,7 @@ async function calculateHistoricalLocationInventory(
   const stockItemMap = new Map(stockItemDetails.map(item => [item.id, item]));
 
   const result: any[] = [];
-  for (const [stockItemId, data] of inventoryMap) {
+  for (const [stockItemId, data] of Array.from(inventoryMap)) {
     const itemDetails = stockItemMap.get(stockItemId);
     if (itemDetails) {
       result.push({
@@ -775,7 +775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
       const userAgentStr = req.headers['user-agent'] || 'unknown';
       const loginCompanyId = userCompanies.length > 0 ? userCompanies[0].companyId : null;
-      const loginCompanyName = userCompanies.length > 0 ? userCompanies[0].companyName : null;
+      const loginCompanyName = userCompanies.length > 0 ? (userCompanies[0] as any).companyName : null;
       
       (async () => {
         try {
@@ -883,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user!.id;
         const username = req.user!.username;
         const companyId = req.session.currentCompanyId || null;
-        const companyName = req.session.currentCompanyName || null;
+        const companyName = (req.session as any).currentCompanyName || null;
         const role = req.session.currentRole || null;
 
         // Upsert presence record
@@ -1563,7 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const latestRate = await storage.getLatestExchangeRate(
         companyId, 
-        company.baseCurrency, 
+        company.baseCurrency || "", 
         company.displayCurrency
       );
       
@@ -2103,15 +2103,15 @@ if (asOfDate) {
         }
       }
 
-      const locationIds = [...new Set(allInventory.map(i => i.locationId))];
-      const stockItemIds = [...new Set(allInventory.map(i => i.stockItemId))];
+      const locationIds = Array.from(new Set(allInventory.map(i => i.locationId)));
+      const stockItemIds = Array.from(new Set(allInventory.map(i => i.stockItemId)));
 
       const duplicateCheck = new Map<string, number>();
       for (const inv of allInventory) {
         const key = `${inv.locationId}-${inv.stockItemId}`;
         duplicateCheck.set(key, (duplicateCheck.get(key) || 0) + 1);
       }
-      for (const [key, count] of duplicateCheck.entries()) {
+      for (const [key, count] of Array.from(duplicateCheck.entries())) {
         if (count > 1) {
           const [locId, itemId] = key.split("-").map(Number);
           issues.push({
@@ -2524,7 +2524,7 @@ if (asOfDate) {
           parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
         const hasSide =
           parsed.openingBalanceSide &&
-          parsed.openingBalanceSide !== "";
+          (parsed.openingBalanceSide as string) !== "";
 
         if (hasBalance && !hasSide) {
           return res
@@ -2621,7 +2621,7 @@ if (asOfDate) {
           parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
         const hasSide =
           parsed.openingBalanceSide &&
-          parsed.openingBalanceSide !== "";
+          (parsed.openingBalanceSide as string) !== "";
 
         if (hasBalance && !hasSide) {
           return res
@@ -5405,7 +5405,7 @@ if (asOfDate) {
             ledgerUpdate.openingBalanceSide = updatedCustomer.openingBalanceSide ?? "Dr";
           }
           if (Object.keys(ledgerUpdate).length > 0) {
-            await storage.updateLedgerAccount(updatedCustomer.ledgerAccountId, ledgerUpdate);
+            await storage.updateLedgerAccount({ id: updatedCustomer.ledgerAccountId!, ...ledgerUpdate });
           }
         }
 
@@ -8013,12 +8013,14 @@ if (asOfDate) {
         // Otherwise: entries created at container offload time per Tally conventions
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
+          currency: "USD",
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: importDate,
-          description: `${containerNumber} ${supplier.legalName}`,
+          description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
           totalAmount: poGrandTotal.toString(),
-          optional: false, // Creates real voucher entries immediately at import
+          optional: false,
+          sourceModule: "ERP",
         });
 
         // === INTER-COMPANY CREDIT SYSTEM ===
@@ -8138,11 +8140,14 @@ if (asOfDate) {
             // Create matching voucher in PARENT: DR Subsidiary Credit, CR Supplier
             const parentVoucher = await storage.createVoucher({
               companyId: parentCompanyId,
+              currency: "USD",
               voucherNumber: `IC-${poNumber}-${Date.now()}`,
               voucherType: "Journal",
               voucherDate: importDate,
-              description: `${containerNumber} ${supplier.legalName}`,
+              description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
               totalAmount: poGrandTotal.toString(),
+              optional: false,
+              sourceModule: "ERP",
             });
             
             // DR: Subsidiary receivable (Asset increases - they owe us)
@@ -9509,7 +9514,7 @@ if (asOfDate) {
           });
 
           // Reduce source inventory
-          await adjustInventory(tx, item.sourceLocationId || sourceLocationId, item.stockItemId, -parseFloat(item.quantity), req.session.currentCompanyId!);
+          await adjustInventory(tx, (item as any).sourceLocationId || sourceLocationId, item.stockItemId, -parseFloat(item.quantity), req.session.currentCompanyId!);
 
           // Add to destination inventory
           await adjustInventory(tx, destinationLocationId, item.stockItemId, parseFloat(item.quantity), req.session.currentCompanyId!, parseFloat(item.rate));
@@ -10421,7 +10426,7 @@ if (asOfDate) {
         exportDate: new Date().toISOString(),
         container: {
           containerNumber: container.containerNumber,
-          supplierName: supplier?.name || "",
+          supplierName: supplier?.legalName || "",
           status: container.status,
           importDate: container.importDate,
           itemsTotal: container.itemsTotal,
@@ -10460,7 +10465,7 @@ if (asOfDate) {
         
         sheetData.push(["CONTAINER DETAILS"]);
         sheetData.push(["Container Number", container.containerNumber]);
-        sheetData.push(["Supplier", supplier?.name || ""]);
+        sheetData.push(["Supplier", supplier?.legalName || ""]);
         sheetData.push(["Status", container.status]);
         sheetData.push(["Import Date", container.importDate]);
         sheetData.push(["Items Total", container.itemsTotal]);
@@ -10612,11 +10617,14 @@ if (asOfDate) {
           // Create purchase voucher
           const voucher = await storage.createVoucher({
             companyId: req.session.currentCompanyId,
+            currency: "USD",
             voucherNumber: `CONT-${container.containerNumber}-${Date.now()}`,
             voucherType: "Purchase",
             voucherDate: voucherDate,
             description: `Container ${container.containerNumber} - ${itemName}`,
             totalAmount: totalAmount.toFixed(2),
+            optional: false,
+            sourceModule: "ERP",
           });
 
           // Debit: Purchases account (Expense increases)
@@ -10745,7 +10753,7 @@ if (asOfDate) {
           if (existingOffload) {
             // Reverse inventory changes + delete old records atomically
             const pos = await storage.getPurchaseOrdersByContainer(containerId);
-            const allLineItems = [];
+            const allLineItems: any[] = [];
             for (const po of pos) {
               const lineItems = await storage.getLineItemsByPO(po.id);
               allLineItems.push(...lineItems);
@@ -11866,12 +11874,14 @@ if (asOfDate) {
         // Create voucher for this PO with double-entry bookkeeping
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
+          currency: "USD",
           voucherNumber: `PO-${po.poNumber}-BACKFILL-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: container.importDate,
           description: `${container.containerNumber} ${backfillSupplier?.legalName || 'Unknown Supplier'}`,
           totalAmount: po.itemsTotal || "0",
           optional: false,
+          sourceModule: "ERP",
         });
 
         // Debit: Purchases account (Expense increases)
@@ -12335,7 +12345,7 @@ if (asOfDate) {
             accountId: employee.id,
             type: "employee",
             code: employee.code,
-            name: employee.name,
+            name: `${employee.firstName} ${employee.lastName}`,
             balance: Math.abs(netBalance).toFixed(2),
             balanceSide,
             openingBalance: openingBalance,
@@ -12570,7 +12580,7 @@ if (asOfDate) {
             accountId: employee.id,
             type: "employee",
             code: employee.code,
-            name: employee.name,
+            name: `${employee.firstName} ${employee.lastName}`,
             balance: Math.abs(netBalance).toFixed(2),
             balanceSide,
             openingBalance: openingBalance,
@@ -13133,7 +13143,7 @@ if (asOfDate) {
         // Log the creation to audit log
         await logAudit({
           userId: req.session.userId!,
-          username: req.session.username || "unknown",
+          username: (req.session as any).username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "vouchers",
@@ -13983,10 +13993,10 @@ if (asOfDate) {
           );
 
           const sourceLocation = await storage.getLocationById(
-            transfer[0].sourceLocationId,
+            transfer[0].sourceLocationId!,
           );
           const destLocation = await storage.getLocationById(
-            transfer[0].destinationLocationId,
+            transfer[0].destinationLocationId!,
           );
 
           transferData = {
@@ -14416,12 +14426,12 @@ if (asOfDate) {
         // Log the optional status change to audit log
         await logAudit({
           userId: req.session.userId!,
-          username: req.session.username || "unknown",
+          username: (req.session as any).username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "vouchers",
           recordId: id,
-          recordIdentifier: voucher.voucherNumber,
+          recordIdentifier: existingVoucher.voucherNumber,
           changes: { optional: { old: wasOptional, new: willBeOptional } },
         });
 
@@ -14938,13 +14948,6 @@ if (asOfDate) {
         // Calculate totals and prepare items data
         let totalAmount = 0;
 
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
         const poItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -15132,13 +15135,6 @@ if (asOfDate) {
         // Calculate totals and prepare items data
         let totalAmount = 0;
 
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
         const adjustmentItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -15336,13 +15332,6 @@ if (asOfDate) {
           // Calculate totals and prepare items data
           let totalAmount = 0;
 
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
           const transferItemsData = items.map((item: any) => {
             const quantity = parseFloat(item.quantity);
             const rate = parseFloat(item.rate);
@@ -15374,10 +15363,10 @@ if (asOfDate) {
             const rate = parseFloat(oldItem.rate);
 
             // Add back to source location (reverse the subtraction)
-            await adjustInventory(tx, oldSourceLocationId, oldItem.stockItemId, quantity, existingVoucher.companyId, rate);
+            await adjustInventory(tx, oldSourceLocationId, oldItem.stockItemId, quantity, existingVoucher.companyId!, rate);
 
             // Subtract from destination location (reverse the addition)
-            await adjustInventory(tx, oldDestinationLocationId, oldItem.stockItemId, -quantity, existingVoucher.companyId);
+            await adjustInventory(tx, oldDestinationLocationId, oldItem.stockItemId, -quantity, existingVoucher.companyId!);
           }
 
           // STEP 2: Delete existing transfer items
@@ -15655,7 +15644,7 @@ if (asOfDate) {
       // Log the update to audit log
       await logAudit({
         userId: req.session.userId!,
-        username: req.session.username || "unknown",
+        username: (req.session as any).username || "unknown",
         companyId: req.session.currentCompanyId!,
         action: "update",
         tableName: "vouchers",
@@ -16332,10 +16321,10 @@ if (asOfDate) {
                 const transferRate = parseFloat(item.rate);
 
                 // Add back to source location (reverse the deduction)
-                await adjustInventory(tx, transferVoucher.sourceLocationId, item.stockItemId, qty, req.session.currentCompanyId!, transferRate);
+                await adjustInventory(tx, transferVoucher.sourceLocationId!, item.stockItemId, qty, req.session.currentCompanyId!, transferRate);
 
                 // Remove from destination location (reverse the addition)
-                await adjustInventory(tx, transferVoucher.destinationLocationId, item.stockItemId, -qty, req.session.currentCompanyId!);
+                await adjustInventory(tx, transferVoucher.destinationLocationId!, item.stockItemId, -qty, req.session.currentCompanyId!);
               }
 
               // Delete stock transfer items
@@ -16507,7 +16496,7 @@ if (asOfDate) {
         // Log the deletion to audit log
         await logAudit({
           userId: req.session.userId!,
-          username: req.session.username || "unknown",
+          username: (req.session as any).username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "vouchers",
@@ -16588,10 +16577,10 @@ if (asOfDate) {
                   const transferRate = parseFloat(item.rate);
 
                   // Add back to source location (reverse the deduction)
-                  await adjustInventory(tx, transferVoucher.sourceLocationId, item.stockItemId, qty, currentCompanyId, transferRate);
+                  await adjustInventory(tx, transferVoucher.sourceLocationId!, item.stockItemId, qty, currentCompanyId, transferRate);
 
                   // Remove from destination location (reverse the addition)
-                  await adjustInventory(tx, transferVoucher.destinationLocationId, item.stockItemId, -qty, currentCompanyId);
+                  await adjustInventory(tx, transferVoucher.destinationLocationId!, item.stockItemId, -qty, currentCompanyId);
                 }
 
                 await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferVoucher.id));
@@ -16714,7 +16703,7 @@ if (asOfDate) {
         // Log the deletion to audit log
         await logAudit({
           userId: req.session.userId!,
-          username: req.session.username || "unknown",
+          username: (req.session as any).username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "vouchers",
@@ -16960,14 +16949,6 @@ if (asOfDate) {
         // We need to sum up quantities sold across all sales
         let totalQuantity = 0;
         let totalAmount = 0;
-
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
 
         for (const voucher of salesVouchers) {
           totalAmount += parseFloat(voucher.totalAmount || "0");
@@ -18326,7 +18307,7 @@ if (asOfDate) {
 
           // Compute multi-source detection
           const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
-          const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? [...uniqueSourceIds][0] : null;
+          const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? Array.from(uniqueSourceIds)[0] : null;
 
           // Validate source/dest not the same (only for single-source mode)
           if (resolvedHeaderSourceId && resolvedHeaderSourceId === destinationLocationId) {
@@ -22238,10 +22219,13 @@ if (asOfDate) {
         id: string;
         type: string;
         severity: "critical" | "warning" | "info";
+        title?: string;
         description: string;
         impact: number;
         details: any;
         fixGuidance?: string;
+        howToFix?: string;
+        category?: string;
       }
 
       const issues: DiagnosticIssue[] = [];
@@ -22725,9 +22709,9 @@ if (asOfDate) {
           id: ledgerAccounts.id,
           name: ledgerAccounts.name,
           code: ledgerAccounts.code,
-          parentType: ledgerAccounts.parentType,
-          currentBalance: ledgerAccounts.currentBalance,
-          currentBalanceSide: ledgerAccounts.currentBalanceSide,
+          parentType: sql<string>`${ledgerAccounts.accountType}`.as("parentType"),
+          currentBalance: sql<string>`COALESCE(${ledgerAccounts.openingBalance}, '0')`.as("currentBalance"),
+          currentBalanceSide: sql<string>`COALESCE(${ledgerAccounts.openingBalanceSide}, 'Dr')`.as("currentBalanceSide"),
         })
         .from(ledgerAccounts)
         .where(
@@ -22998,7 +22982,7 @@ if (asOfDate) {
       for (const container of offloadedContainers) {
         // Get supplier name
         const supplier = await db
-          .select({ name: suppliers.name })
+          .select({ name: suppliers.legalName })
           .from(suppliers)
           .where(eq(suppliers.id, container.supplierId))
           .limit(1);
@@ -23135,7 +23119,7 @@ if (asOfDate) {
       // Get all OTW containers for this company that do NOT have an active offload record
       // This ensures we're only looking at containers that were reversed (orphaned)
       const otwContainers = await db
-        .select({ id: containers.id, containerNumber: containers.containerNumber })
+        .select({ id: containers.id, containerNumber: containers.containerNumber, numberPlate: containers.numberPlate })
         .from(containers)
         .leftJoin(containerOffloads, eq(containers.id, containerOffloads.containerId))
         .where(
@@ -23232,7 +23216,7 @@ if (asOfDate) {
 
       // Get all OTW containers that do NOT have an active offload record
       const otwContainers = await db
-        .select({ id: containers.id, containerNumber: containers.containerNumber })
+        .select({ id: containers.id, containerNumber: containers.containerNumber, numberPlate: containers.numberPlate })
         .from(containers)
         .leftJoin(containerOffloads, eq(containers.id, containerOffloads.containerId))
         .where(
@@ -24046,13 +24030,13 @@ if (asOfDate) {
 
       // Calculate total value for the opening balance voucher
       let totalTransferValue = 0;
-      for (const [, data] of aggregatedInventory) {
+      for (const [, data] of Array.from(aggregatedInventory)) {
         totalTransferValue += data.totalValue;
       }
 
       // Create opening inventory records in target company
       await db.transaction(async (tx) => {
-        for (const [sourceStockItemId, data] of aggregatedInventory) {
+        for (const [sourceStockItemId, data] of Array.from(aggregatedInventory)) {
           const targetStockItemId = stockItemMapping.get(sourceStockItemId);
           if (!targetStockItemId) continue;
 
@@ -24234,7 +24218,7 @@ if (asOfDate) {
       }
 
       // Filter out items with zero or negative quantities
-      for (const [stockItemId, data] of aggregatedInventory) {
+      for (const [stockItemId, data] of Array.from(aggregatedInventory)) {
         if (data.quantity <= 0) {
           aggregatedInventory.delete(stockItemId);
         }
@@ -24276,7 +24260,7 @@ if (asOfDate) {
         }
 
         // Then update items that have historical inventory
-        for (const [stockItemId, data] of aggregatedInventory) {
+        for (const [stockItemId, data] of Array.from(aggregatedInventory)) {
           const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
           
           await tx.update(stockItems)
@@ -25285,7 +25269,7 @@ if (asOfDate) {
       // For each company, get ledger accounts and calculate balances for agents
       for (const companyId of companyIds) {
         const ledgerAccounts = await storage.getAllLedgerAccounts(companyId);
-        for (const agent of uniqueAgents) {
+        for (const agent of Array.from(uniqueAgents)) {
           // Match agent name to ledger account (case-insensitive, partial match)
           const agentAccount = ledgerAccounts.find(acc => 
             (acc.name || '').toLowerCase().includes((agent || '').toLowerCase()) ||
@@ -26661,7 +26645,7 @@ if (asOfDate) {
           offloadedAt: productionRawStock.offloadedAt,
           containerNumber: containers.containerNumber,
           supplierId: containers.supplierId,
-          supplierName: suppliers.name,
+          supplierName: suppliers.legalName,
         })
         .from(productionRawStock)
         .leftJoin(containers, eq(productionRawStock.containerId, containers.id))
@@ -27190,8 +27174,8 @@ if (asOfDate) {
             barcodeValue: barcode,
             quantity: 1,
             weightKg: weight.toString(),
-            costPerKg: costPerKg > 0 ? costPerKg.toString() : null,
-            totalCost: costPerKg > 0 ? totalCostPerBale : null,
+            costPerKg: costPerKg > 0 ? costPerKg.toString() : "0",
+            totalCost: costPerKg > 0 ? totalCostPerBale : "0",
             status: isPressing ? "PENDING" : "IN_STOCK",
             pressedAt: new Date(),
           };
@@ -27914,7 +27898,7 @@ if (asOfDate) {
       }
 
       const { baleTransfers, baleTransferItems, productionBales } = await import("@shared/schema");
-      const createdBy = req.session.username || "system";
+      const createdBy = (req.session as any).username || "system";
 
       const result = await db.transaction(async (tx) => {
         const [transfer] = await tx
@@ -28036,7 +28020,7 @@ if (asOfDate) {
         .update(baleTransfers)
         .set({
           status: "COMPLETED",
-          updatedBy: req.session.username || "system",
+          updatedBy: (req.session as any).username || "system",
           updatedAt: sql`now()`,
         })
         .where(eq(baleTransfers.id, transferId))
@@ -28102,7 +28086,7 @@ if (asOfDate) {
       await storage.updateBaleTransfer(transferId, {
         status,
         notes,
-        updatedBy: req.session.username || "system"
+        updatedBy: (req.session as any).username || "system"
       });
 
       if (items) {
@@ -30397,7 +30381,7 @@ if (asOfDate) {
             id: vouchers.id,
             voucherNumber: vouchers.voucherNumber,
             voucherType: vouchers.voucherType,
-            date: vouchers.date,
+            date: vouchers.voucherDate,
             totalAmount: vouchers.totalAmount,
             locationId: vouchers.locationId,
             locationName: locations.name,
@@ -30416,7 +30400,7 @@ if (asOfDate) {
               )
             )
           )
-          .orderBy(desc(vouchers.date));
+          .orderBy(desc(vouchers.voucherDate));
       } catch (err) {
         console.error("Error fetching orphaned POS sales:", err);
         orphanedPosSales = [];
@@ -30729,8 +30713,7 @@ if (asOfDate) {
         await db.insert(systemSettings).values({
           key: "ai_provider",
           value: normalizedProvider,
-          description: "AI provider for chatbot: gemini, chatgpt, or grok",
-        });
+        } as any);
       }
 
       res.json({ success: true, provider: normalizedProvider });
@@ -31397,7 +31380,7 @@ if (asOfDate) {
           voucherType: vouchers.voucherType,
           voucherDate: vouchers.voucherDate,
           locationId: vouchers.locationId,
-          notes: vouchers.notes,
+          notes: vouchers.description,
         })
         .from(vouchers)
         .leftJoin(locations, eq(vouchers.locationId, locations.id))
