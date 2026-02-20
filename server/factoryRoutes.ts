@@ -1118,9 +1118,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
             sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
           ));
-        const nextNum = (maxResult?.maxNum || 0) + 1;
-        const numStr = String(nextNum).padStart(3, "0");
-        articleCode = `${prefix}${numStr}`;
+        let nextNum = (maxResult?.maxNum || 0) + 1;
+        let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+        let attempts = 0;
+        while (attempts < 100) {
+          const [dup] = await db
+            .select({ id: factoryBaleProducts.id })
+            .from(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
+          if (!dup) break;
+          nextNum++;
+          candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+          attempts++;
+        }
+        articleCode = candidateCode;
       } else if (!articleCode) {
         const name = req.body.name || "";
         const baseArticle = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 40);
