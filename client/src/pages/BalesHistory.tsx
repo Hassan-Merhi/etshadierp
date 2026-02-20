@@ -194,11 +194,11 @@ export default function BalesHistory() {
 
   const handleReprint = async (baleRow: any) => {
     const label: LabelData = {
-      referenceNumber: baleRow.bale.baleCode,
-      articleCode: baleRow.product?.articleCode || baleRow.bale.category || "",
+      referenceNumber: baleRow.bale.referenceNumber || baleRow.bale.baleCode,
+      articleCode: baleRow.product?.articleCode || baleRow.bale.articleCode || baleRow.bale.category || "",
       pieces: baleRow.bale.quantity || 1,
       approxWeightKg: baleRow.bale.weightKg || "0",
-      productName: baleRow.product?.name || baleRow.bale.category || "",
+      productName: baleRow.bale.productName || baleRow.product?.name || baleRow.bale.category || "",
     };
 
     if (isZebraMode()) {
@@ -246,6 +246,7 @@ export default function BalesHistory() {
       const term = searchTerm.toLowerCase();
       const searchFields = [
         bale.baleCode,
+        bale.referenceNumber,
         bale.barcodeValue,
         bale.category,
         product?.name,
@@ -311,7 +312,7 @@ export default function BalesHistory() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by code, product, batch..."
+                placeholder="Search by ref #, code, product, batch..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -419,6 +420,7 @@ export default function BalesHistory() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
+                    <TableHead>Ref #</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Article</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
@@ -443,6 +445,7 @@ export default function BalesHistory() {
                             data-testid={`checkbox-bale-${bale.id}`}
                           />
                         </TableCell>
+                        <TableCell className="font-mono text-xs">{bale.referenceNumber || bale.baleCode || "-"}</TableCell>
                         <TableCell>
                           {editingNameId === bale.id ? (
                             <div className="flex items-center gap-1">
