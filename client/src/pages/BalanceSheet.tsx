@@ -60,16 +60,16 @@ export default function BalanceSheet() {
     (acc) => acc.type === "ledger" && acc.accountType === "Equity"
   );
 
-  const calculateTotal = (accountList: Account[]) => {
+  const calculateTotal = (accountList: Account[], naturalSide: "Dr" | "Cr" = "Dr") => {
     return accountList.reduce((sum, acc) => {
-      const amount = acc.balanceSide === "Cr" ? -acc.balance : acc.balance;
+      const amount = acc.balanceSide === naturalSide ? acc.balance : -acc.balance;
       return sum + amount;
     }, 0);
   };
 
-  const totalAssets = calculateTotal(assetAccounts);
-  const totalLiabilities = calculateTotal(liabilityAccounts);
-  const totalEquity = calculateTotal(equityAccounts);
+  const totalAssets = calculateTotal(assetAccounts, "Dr");
+  const totalLiabilities = calculateTotal(liabilityAccounts, "Cr");
+  const totalEquity = calculateTotal(equityAccounts, "Cr");
 
   const sidebarGroups: SidebarGroup[] = [
     {

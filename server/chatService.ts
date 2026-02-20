@@ -422,6 +422,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
         .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
         .where(and(
           eq(schema.voucherEntries.supplierId, supplier.id),
+          eq(schema.vouchers.companyId, companyId),
           eq(schema.vouchers.optional, false),
           isNull(schema.vouchers.deletedAt)
         ));
@@ -431,13 +432,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       const balance = entries.reduce((sum, entry) => {
         const credit = parseFloat(entry.creditAmount || "0");
         const debit = parseFloat(entry.debitAmount || "0");
-        // Only count pure credit or pure debit entries (same as supplier page)
-        if (credit > 0 && debit === 0) {
-          return sum + credit;
-        } else if (debit > 0 && credit === 0) {
-          return sum - debit;
-        }
-        return sum;
+        return sum + (credit - debit);
       }, openingBalance);
 
       return {
