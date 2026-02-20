@@ -7,6 +7,9 @@ import {
   supplierContainerLoadedItems,
   containers,
   suppliers,
+  purchaseOrders,
+  poLineItems,
+  stockItems,
 } from "@shared/schema";
 
 export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
@@ -298,6 +301,68 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  app.post("/api/containers/:containerId/auto-populate-loaded-items", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const containerId = parseInt(req.params.containerId);
+      if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
+
+      const existingItems = await db.select().from(supplierContainerLoadedItems)
+        .where(eq(supplierContainerLoadedItems.containerId, containerId));
+      if (existingItems.length > 0) {
+        return res.status(400).json({ message: "Container already has loaded items. Clear them first to re-populate." });
+      }
+
+      const pos = await db.select().from(purchaseOrders)
+        .where(eq(purchaseOrders.containerId, containerId));
+
+      if (pos.length === 0) {
+        return res.status(400).json({ message: "No purchase orders found for this container" });
+      }
+
+      const poIds = pos.map(po => po.id);
+      const lineItems = await db
+        .select({
+          stockItemCode: stockItems.code,
+          itemName: poLineItems.itemName,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          stockItemId: poLineItems.stockItemId,
+        })
+        .from(poLineItems)
+        .leftJoin(stockItems, eq(poLineItems.stockItemId, stockItems.id))
+        .where(inArray(poLineItems.poId, poIds));
+
+      if (lineItems.length === 0) {
+        return res.status(400).json({ message: "No line items found in purchase orders" });
+      }
+
+      const itemsWithBarcode = lineItems.filter((item: any) => item.stockItemCode && item.stockItemCode.trim() !== "");
+      const skippedCount = lineItems.length - itemsWithBarcode.length;
+
+      if (itemsWithBarcode.length === 0) {
+        return res.status(400).json({ message: `All ${lineItems.length} PO items are missing barcodes (stock item codes). Cannot auto-populate.` });
+      }
+
+      const values = itemsWithBarcode.map((item: any) => ({
+        containerId,
+        barcode: item.stockItemCode.trim(),
+        itemName: item.itemName || null,
+        qty: parseFloat(item.quantity || "0"),
+        weightPerBale: null as string | null,
+        pricePerBale: item.rate || null,
+      }));
+
+      await db.insert(supplierContainerLoadedItems).values(values);
+      const allItems = await db.select().from(supplierContainerLoadedItems)
+        .where(eq(supplierContainerLoadedItems.containerId, containerId));
+      res.json({ imported: values.length, skipped: skippedCount, items: allItems });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/suppliers/:supplierId/containers/:containerId/verification-summary", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -428,6 +493,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const proformaId = parseInt(req.query.proformaId as string);
       if (!proformaId) return res.status(400).json({ message: "proformaId required" });
 
+      if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
+
       const [proforma] = await db.select().from(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
@@ -458,6 +525,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const lessLoaded: any[] = [];
       const notRequested: any[] = [];
       const priceDiffs: any[] = [];
+      const fullComparison: any[] = [];
 
       for (const barcode of allBarcodes) {
         const exp = proformaByBarcode.get(barcode);
@@ -470,69 +538,248 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const loadWeight = loaded?.weightPerBale || expWeight;
         const itemName = exp?.itemName || loaded?.itemName || barcode;
         const loadedWeightTotal = loadedQty * loadWeight;
+        const expectedWeightTotal = expectedQty * expWeight;
         const loadedValueTotal = loadedQty * (loadPrice || expPrice);
+        const expectedValueTotal = expectedQty * expPrice;
+        const qtyDiff = loadedQty - expectedQty;
+
+        let status = "OK";
+        if (expectedQty === 0 && loadedQty > 0) status = "NOT REQUESTED";
+        else if (expectedQty > 0 && loadedQty === 0) status = "MISSING";
+        else if (loadedQty > expectedQty) status = "OVERLOADED";
+        else if (loadedQty < expectedQty) status = "SHORT";
+
+        fullComparison.push({ barcode, itemName, expectedQty, loadedQty, qtyDiff, expPrice, loadPrice, priceDiff: loadPrice - expPrice, expWeight, loadWeight, expectedWeightTotal, loadedWeightTotal, expectedValueTotal, loadedValueTotal, status });
 
         if (expectedQty === 0 && loadedQty > 0) {
           notRequested.push({ barcode, itemName, qty: loadedQty, totalWeight: loadedWeightTotal, totalValue: loadedValueTotal });
         } else if (loadedQty > expectedQty) {
-          overloaded.push({ barcode, itemName, qty: loadedQty, expectedQty, totalWeight: loadedWeightTotal, totalValue: loadedValueTotal });
+          overloaded.push({ barcode, itemName, qty: loadedQty, expectedQty, excess: loadedQty - expectedQty, totalWeight: loadedWeightTotal, totalValue: loadedValueTotal });
         } else if (loadedQty < expectedQty) {
-          lessLoaded.push({ barcode, itemName, qty: loadedQty, expectedQty, totalWeight: loadedWeightTotal, totalValue: loadedValueTotal });
+          lessLoaded.push({ barcode, itemName, qty: loadedQty, expectedQty, short: expectedQty - loadedQty, totalWeight: loadedWeightTotal, totalValue: loadedValueTotal });
         }
         if (expPrice && loadPrice && Math.abs(loadPrice - expPrice) >= 0.01) {
-          priceDiffs.push({ barcode, itemName, proformaPrice: expPrice, loadedPrice: loadPrice, qty: loadedQty, totalDiff: (loadPrice - expPrice) * loadedQty });
+          priceDiffs.push({ barcode, itemName, proformaPrice: expPrice, loadedPrice: loadPrice, diff: loadPrice - expPrice, qty: loadedQty, totalDiff: (loadPrice - expPrice) * loadedQty });
         }
       }
 
       const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Verification");
+      workbook.creator = "ERP POS System";
+      workbook.created = new Date();
 
-      const boldFont = { bold: true, size: 12 };
-      const headerFont = { bold: true, size: 10 };
-
-      sheet.addRow(["Supplier:", supplier?.legalName || `ID ${supplierId}`]).font = boldFont;
-      sheet.addRow(["Container:", container?.containerNumber || `ID ${containerId}`]).font = boldFont;
-      sheet.addRow(["Proforma:", proforma.reference]).font = boldFont;
-      sheet.addRow(["Generated:", new Date().toLocaleString()]).font = boldFont;
-      sheet.addRow([]);
-
-      const addSection = (title: string, items: any[], columns: string[], dataFn: (item: any) => any[]) => {
-        const titleRow = sheet.addRow([title]);
-        titleRow.font = { bold: true, size: 11 };
-        const headerRow = sheet.addRow(columns);
-        headerRow.font = headerFont;
-        if (items.length === 0) {
-          sheet.addRow(["None"]);
-        } else {
-          for (const item of items) {
-            sheet.addRow(dataFn(item));
-          }
-        }
-        sheet.addRow([]);
+      const colors = {
+        headerBg: "1F4E79",
+        headerFont: "FFFFFF",
+        overloadedBg: "FCE4EC",
+        overloadedBorder: "C62828",
+        shortBg: "FFF3E0",
+        shortBorder: "E65100",
+        notRequestedBg: "FFF9C4",
+        notRequestedBorder: "F57F17",
+        priceDiffBg: "E3F2FD",
+        priceDiffBorder: "1565C0",
+        okBg: "E8F5E9",
+        summaryBg: "F5F5F5",
+        titleBg: "263238",
+        titleFont: "FFFFFF",
       };
 
-      addSection("A) Overloaded", overloaded,
-        ["Item", "Barcode", "Loaded Qty", "Expected Qty", "Total Weight", "Total Value"],
-        (i) => [i.itemName, i.barcode, i.qty, i.expectedQty, parseFloat(i.totalWeight.toFixed(3)), parseFloat(i.totalValue.toFixed(2))]
-      );
-      addSection("B) Less Loaded", lessLoaded,
-        ["Item", "Barcode", "Loaded Qty", "Expected Qty", "Total Weight", "Total Value"],
-        (i) => [i.itemName, i.barcode, i.qty, i.expectedQty, parseFloat(i.totalWeight.toFixed(3)), parseFloat(i.totalValue.toFixed(2))]
-      );
-      addSection("C) Loaded Not Requested", notRequested,
-        ["Item", "Barcode", "Qty", "Total Weight", "Total Value"],
-        (i) => [i.itemName, i.barcode, i.qty, parseFloat(i.totalWeight.toFixed(3)), parseFloat(i.totalValue.toFixed(2))]
-      );
-      addSection("D) Different Pricing per Bale", priceDiffs,
-        ["Item", "Barcode", "Proforma Price", "Loaded Price", "Qty", "Total Difference"],
-        (i) => [i.itemName, i.barcode, parseFloat(i.proformaPrice.toFixed(2)), parseFloat(i.loadedPrice.toFixed(2)), i.qty, parseFloat(i.totalDiff.toFixed(2))]
-      );
+      const thinBorder: any = {
+        top: { style: "thin", color: { argb: "BDBDBD" } },
+        left: { style: "thin", color: { argb: "BDBDBD" } },
+        bottom: { style: "thin", color: { argb: "BDBDBD" } },
+        right: { style: "thin", color: { argb: "BDBDBD" } },
+      };
 
-      sheet.columns.forEach((col: any) => { col.width = 18; });
+      const addStyledSheet = (name: string, sectionTitle: string, sectionColor: string, columns: { header: string; key: string; width: number; numFmt?: string }[], data: any[], statusColorFn?: (row: any) => string | null) => {
+        const sheet = workbook.addWorksheet(name);
+
+        const titleRow = sheet.addRow([`${sectionTitle}`]);
+        titleRow.font = { bold: true, size: 14, color: { argb: colors.titleFont } };
+        titleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.titleBg } };
+        titleRow.height = 30;
+        titleRow.alignment = { vertical: "middle", horizontal: "left" };
+        sheet.mergeCells(1, 1, 1, columns.length);
+
+        const infoData = [
+          ["Supplier", supplier?.legalName || `ID ${supplierId}`],
+          ["Container", container?.containerNumber || `ID ${containerId}`],
+          ["Proforma", proforma.reference],
+          ["Date", new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })],
+          ["Total Items", String(data.length)],
+        ];
+        for (const [label, value] of infoData) {
+          const r = sheet.addRow([label, value]);
+          r.getCell(1).font = { bold: true, size: 10, color: { argb: "616161" } };
+          r.getCell(2).font = { size: 10 };
+        }
+        sheet.addRow([]);
+
+        const headerRowNum = sheet.rowCount + 1;
+        const headerRow = sheet.addRow(columns.map(c => c.header));
+        headerRow.height = 24;
+        headerRow.eachCell((cell: any) => {
+          cell.font = { bold: true, size: 10, color: { argb: colors.headerFont } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+          cell.border = thinBorder;
+        });
+
+        columns.forEach((col, i) => { sheet.getColumn(i + 1).width = col.width; if (col.numFmt) sheet.getColumn(i + 1).numFmt = col.numFmt; });
+
+        if (data.length === 0) {
+          const emptyRow = sheet.addRow(["No items"]);
+          sheet.mergeCells(sheet.rowCount, 1, sheet.rowCount, columns.length);
+          emptyRow.getCell(1).alignment = { horizontal: "center" };
+          emptyRow.getCell(1).font = { italic: true, color: { argb: "9E9E9E" } };
+        } else {
+          for (let i = 0; i < data.length; i++) {
+            const item = data[i];
+            const values = columns.map(c => item[c.key]);
+            const dataRow = sheet.addRow(values);
+            const rowBg = statusColorFn ? statusColorFn(item) : (i % 2 === 0 ? null : "F5F5F5");
+            dataRow.eachCell((cell: any) => {
+              cell.border = thinBorder;
+              cell.alignment = { vertical: "middle" };
+              if (rowBg) {
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+              }
+            });
+          }
+
+          sheet.addRow([]);
+          const totalRow = sheet.addRow(["TOTAL", "", ...columns.slice(2).map(c => {
+            const sum = data.reduce((s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0), 0);
+            return sum;
+          })]);
+          totalRow.font = { bold: true, size: 10 };
+          totalRow.eachCell((cell: any) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.summaryBg } };
+            cell.border = { top: { style: "double", color: { argb: "424242" } }, bottom: { style: "double", color: { argb: "424242" } }, left: thinBorder.left, right: thinBorder.right };
+          });
+        }
+
+        sheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: columns.length } };
+        return sheet;
+      };
+
+      addStyledSheet("Full Comparison", "Container Verification - Full Comparison", colors.headerBg, [
+        { header: "Barcode", key: "barcode", width: 18 },
+        { header: "Item Name", key: "itemName", width: 28 },
+        { header: "Expected Qty", key: "expectedQty", width: 14, numFmt: "#,##0" },
+        { header: "Loaded Qty", key: "loadedQty", width: 14, numFmt: "#,##0" },
+        { header: "Qty Diff", key: "qtyDiff", width: 12, numFmt: "+#,##0;-#,##0;0" },
+        { header: "Proforma Price", key: "expPrice", width: 14, numFmt: "#,##0.00" },
+        { header: "Loaded Price", key: "loadPrice", width: 14, numFmt: "#,##0.00" },
+        { header: "Price Diff", key: "priceDiff", width: 12, numFmt: "+#,##0.00;-#,##0.00;0" },
+        { header: "Status", key: "status", width: 16 },
+      ], fullComparison, (item: any) => {
+        if (item.status === "OVERLOADED") return colors.overloadedBg;
+        if (item.status === "SHORT" || item.status === "MISSING") return colors.shortBg;
+        if (item.status === "NOT REQUESTED") return colors.notRequestedBg;
+        return null;
+      });
+
+      addStyledSheet("Overloaded", `Overloaded Items (${overloaded.length})`, colors.overloadedBorder, [
+        { header: "Barcode", key: "barcode", width: 18 },
+        { header: "Item Name", key: "itemName", width: 28 },
+        { header: "Expected Qty", key: "expectedQty", width: 14, numFmt: "#,##0" },
+        { header: "Loaded Qty", key: "qty", width: 14, numFmt: "#,##0" },
+        { header: "Excess", key: "excess", width: 12, numFmt: "#,##0" },
+        { header: "Total Weight", key: "totalWeight", width: 14, numFmt: "#,##0.000" },
+        { header: "Total Value", key: "totalValue", width: 14, numFmt: "#,##0.00" },
+      ], overloaded);
+
+      addStyledSheet("Less Loaded", `Less Loaded / Missing (${lessLoaded.length})`, colors.shortBorder, [
+        { header: "Barcode", key: "barcode", width: 18 },
+        { header: "Item Name", key: "itemName", width: 28 },
+        { header: "Expected Qty", key: "expectedQty", width: 14, numFmt: "#,##0" },
+        { header: "Loaded Qty", key: "qty", width: 14, numFmt: "#,##0" },
+        { header: "Short", key: "short", width: 12, numFmt: "#,##0" },
+        { header: "Total Weight", key: "totalWeight", width: 14, numFmt: "#,##0.000" },
+        { header: "Total Value", key: "totalValue", width: 14, numFmt: "#,##0.00" },
+      ], lessLoaded);
+
+      addStyledSheet("Not Requested", `Loaded But Not Requested (${notRequested.length})`, colors.notRequestedBorder, [
+        { header: "Barcode", key: "barcode", width: 18 },
+        { header: "Item Name", key: "itemName", width: 28 },
+        { header: "Qty", key: "qty", width: 14, numFmt: "#,##0" },
+        { header: "Total Weight", key: "totalWeight", width: 14, numFmt: "#,##0.000" },
+        { header: "Total Value", key: "totalValue", width: 14, numFmt: "#,##0.00" },
+      ], notRequested);
+
+      addStyledSheet("Price Differences", `Price Differences (${priceDiffs.length})`, colors.priceDiffBorder, [
+        { header: "Barcode", key: "barcode", width: 18 },
+        { header: "Item Name", key: "itemName", width: 28 },
+        { header: "Proforma Price", key: "proformaPrice", width: 14, numFmt: "#,##0.00" },
+        { header: "Loaded Price", key: "loadedPrice", width: 14, numFmt: "#,##0.00" },
+        { header: "Diff/Bale", key: "diff", width: 12, numFmt: "+#,##0.00;-#,##0.00;0" },
+        { header: "Qty", key: "qty", width: 10, numFmt: "#,##0" },
+        { header: "Total Diff", key: "totalDiff", width: 14, numFmt: "+#,##0.00;-#,##0.00;0" },
+      ], priceDiffs);
+
+      const summarySheet = workbook.addWorksheet("Summary");
+      const sumTitleRow = summarySheet.addRow(["Verification Summary"]);
+      sumTitleRow.font = { bold: true, size: 16, color: { argb: colors.titleFont } };
+      sumTitleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.titleBg } };
+      sumTitleRow.height = 36;
+      sumTitleRow.alignment = { vertical: "middle", horizontal: "center" };
+      summarySheet.mergeCells(1, 1, 1, 3);
+
+      summarySheet.addRow([]);
+      const infoRows = [
+        ["Supplier", supplier?.legalName || ""],
+        ["Container", container?.containerNumber || ""],
+        ["Proforma", proforma.reference],
+        ["Date", new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })],
+      ];
+      for (const [label, value] of infoRows) {
+        const r = summarySheet.addRow([label, value]);
+        r.getCell(1).font = { bold: true, size: 11 };
+        r.getCell(2).font = { size: 11 };
+      }
+      summarySheet.addRow([]);
+
+      const summaryData = [
+        ["Category", "Count", "Color"],
+        ["Total Items Compared", fullComparison.length, colors.headerBg],
+        ["Overloaded", overloaded.length, colors.overloadedBorder],
+        ["Less Loaded / Missing", lessLoaded.length, colors.shortBorder],
+        ["Not Requested", notRequested.length, colors.notRequestedBorder],
+        ["Price Differences", priceDiffs.length, colors.priceDiffBorder],
+        ["OK (Matched)", fullComparison.filter(c => c.status === "OK").length, "2E7D32"],
+      ];
+
+      const sumHeaderRow = summarySheet.addRow([summaryData[0][0], summaryData[0][1]]);
+      sumHeaderRow.eachCell((cell: any) => {
+        cell.font = { bold: true, size: 11, color: { argb: colors.headerFont } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerBg } };
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: "center" };
+      });
+
+      for (let i = 1; i < summaryData.length; i++) {
+        const [label, count, color] = summaryData[i];
+        const r = summarySheet.addRow([label, count]);
+        r.getCell(1).font = { bold: true, size: 11 };
+        r.getCell(1).border = thinBorder;
+        r.getCell(2).font = { bold: true, size: 14, color: { argb: color as string } };
+        r.getCell(2).alignment = { horizontal: "center" };
+        r.getCell(2).border = thinBorder;
+        r.height = 22;
+      }
+
+      summarySheet.getColumn(1).width = 28;
+      summarySheet.getColumn(2).width = 18;
+
+      workbook.worksheets.forEach((ws: any, idx: number) => {
+        if (idx > 0) return;
+      });
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename=verification_${containerId}_${proformaId}.xlsx`);
+      const fileName = `Verification_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {

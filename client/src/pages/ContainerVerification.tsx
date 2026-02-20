@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface LoadedItem {
@@ -130,6 +130,19 @@ export default function ContainerVerification() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const autoPopulateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/containers/${containerId}/auto-populate-loaded-items`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
+      const skippedMsg = data.skipped > 0 ? ` (${data.skipped} skipped - missing barcodes)` : "";
+      toast({ title: "Items loaded", description: `${data.imported} items imported from purchase orders${skippedMsg}` });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const importMutation = useMutation({
     mutationFn: async (items: any[]) => {
       const res = await apiRequest("POST", `/api/containers/${containerId}/import-loaded-items`, { items });
@@ -203,6 +216,22 @@ export default function ContainerVerification() {
     });
   };
 
+  useEffect(() => {
+    const container = containerData?.container;
+    if (container?.supplierId && suppliers.length > 0 && !selectedSupplierId) {
+      const supplierMatch = suppliers.find((s: any) => s.id === container.supplierId);
+      if (supplierMatch) {
+        setSelectedSupplierId(String(supplierMatch.id));
+      }
+    }
+  }, [containerData, suppliers, selectedSupplierId]);
+
+  useEffect(() => {
+    if (loadedItems.length === 0 && !loadingItems && containerData?.container && !autoPopulateMutation.isPending && !autoPopulateMutation.isSuccess) {
+      autoPopulateMutation.mutate();
+    }
+  }, [loadedItems, loadingItems, containerData]);
+
   const container = containerData?.container;
   const overloaded = verificationResult?.comparison.filter((c) => c.statusQty === "OVER_LOADED") || [];
   const lessLoaded = verificationResult?.comparison.filter((c) => c.statusQty === "UNDER_LOADED" || c.statusQty === "MISSING_FROM_LOADED") || [];
@@ -232,6 +261,12 @@ export default function ContainerVerification() {
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-sm">Loaded Items ({loadedItems.length})</CardTitle>
             <div className="flex items-center gap-2">
+              {loadedItems.length === 0 && (
+                <Button variant="outline" size="sm" onClick={() => autoPopulateMutation.mutate()} disabled={autoPopulateMutation.isPending} data-testid="button-load-from-pos">
+                  <RefreshCw className={`mr-1 h-3 w-3 ${autoPopulateMutation.isPending ? "animate-spin" : ""}`} />
+                  Load from POs
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} data-testid="button-import-loaded">
                 <Upload className="mr-1 h-3 w-3" />
                 Import
