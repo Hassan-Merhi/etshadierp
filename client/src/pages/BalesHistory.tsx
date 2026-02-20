@@ -432,7 +432,6 @@ export default function BalesHistory() {
                     <TableHead className="text-right">Weight (kg)</TableHead>
                     <TableHead className="text-right">Cost/kg</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
                     <TableHead>Last Printed</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -505,9 +504,6 @@ export default function BalesHistory() {
                               <SelectItem value="REPACKED">Repacked</SelectItem>
                             </SelectContent>
                           </Select>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {new Date(bale.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground" data-testid={`text-last-printed-${bale.id}`}>
                           {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
