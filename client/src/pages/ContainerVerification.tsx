@@ -432,6 +432,12 @@ export default function ContainerVerification() {
                         <TableCell className="text-right font-mono text-xs text-red-600 dark:text-red-400">+{c.loadedQty - c.expectedQty}</TableCell>
                       </TableRow>
                     ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell className="text-xs font-bold">Total ({overloaded.length} items)</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold">{overloaded.reduce((s, c) => s + c.expectedQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">{overloaded.reduce((s, c) => s + c.loadedQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">+{overloaded.reduce((s, c) => s + (c.loadedQty - c.expectedQty), 0)}</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}
@@ -471,6 +477,12 @@ export default function ContainerVerification() {
                         <TableCell className="text-right font-mono text-xs text-amber-600 dark:text-amber-400">-{c.expectedQty - c.loadedQty}</TableCell>
                       </TableRow>
                     ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell className="text-xs font-bold">Total ({lessLoaded.length} items)</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold">{lessLoaded.reduce((s, c) => s + c.expectedQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-amber-600 dark:text-amber-400">{lessLoaded.reduce((s, c) => s + c.loadedQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-amber-600 dark:text-amber-400">-{lessLoaded.reduce((s, c) => s + (c.expectedQty - c.loadedQty), 0)}</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}
@@ -510,6 +522,12 @@ export default function ContainerVerification() {
                         <TableCell className="text-right font-mono text-xs">{c.loadedTotalValue.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell className="text-xs font-bold">Total ({notRequested.length} items)</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-orange-600 dark:text-orange-400">{notRequested.reduce((s, c) => s + c.loadedQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold">{notRequested.reduce((s, c) => s + c.loadedWeightTotal, 0).toFixed(3)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold">{notRequested.reduce((s, c) => s + c.loadedTotalValue, 0).toFixed(2)}</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}
@@ -555,6 +573,20 @@ export default function ContainerVerification() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {(() => {
+                      const totalDiff = priceDiffs.reduce((s, c) => s + c.totalPriceDiff, 0);
+                      return (
+                        <TableRow className="bg-muted/50 font-bold">
+                          <TableCell className="text-xs font-bold">Total ({priceDiffs.length} items)</TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className={`text-right font-mono text-xs font-bold ${totalDiff > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                            {totalDiff > 0 ? "+" : ""}{totalDiff.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               )}

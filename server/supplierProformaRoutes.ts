@@ -1,6 +1,7 @@
 import { Express } from "express";
 import { db } from "./db";
 import { eq, and, inArray } from "drizzle-orm";
+import ExcelJS from "exceljs";
 import {
   supplierProformas,
   supplierProformaLines,
@@ -563,7 +564,6 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         }
       }
 
-      const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "ERP POS System";
       workbook.created = new Date();
