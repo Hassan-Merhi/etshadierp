@@ -120,6 +120,7 @@ export default function FactoryLocationInventory() {
 
   const [proformaMode, setProformaMode] = useState(false);
   const [selections, setSelections] = useState<Map<number, ProformaSelection>>(new Map());
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [proformaName, setProformaName] = useState("");
@@ -230,7 +231,11 @@ export default function FactoryLocationInventory() {
   const filteredProducts = selectedCategory
     ? applySortProducts(
         selectedCategory.products.filter(
-          (p) => p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase())
+          (p) => {
+            const matchesSearch = p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase());
+            if (proformaMode && showSelectedOnly) return matchesSearch && selections.has(p.productId);
+            return matchesSearch;
+          }
         ),
         prodSortField,
         prodSortDir
@@ -291,10 +296,39 @@ export default function FactoryLocationInventory() {
     if (proformaMode) {
       setProformaMode(false);
       setSelections(new Map());
+      setShowSelectedOnly(false);
     } else {
       setProformaMode(true);
     }
   }, [proformaMode]);
+
+  const selectAllVisible = useCallback(() => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      filteredProducts.forEach((prod) => {
+        if (!next.has(prod.productId)) {
+          next.set(prod.productId, {
+            productId: prod.productId,
+            articleCode: prod.articleCode,
+            productName: prod.productName,
+            availableBales: prod.baleCount,
+            selectedQty: prod.baleCount,
+            pricePerBale: prod.sellingPrice || "0",
+          });
+        }
+      });
+      return next;
+    });
+  }, [filteredProducts]);
+
+  const deselectAllVisible = useCallback(() => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      filteredProducts.forEach((prod) => next.delete(prod.productId));
+      return next;
+    });
+    setShowSelectedOnly(false);
+  }, [filteredProducts]);
 
   const toggleSelection = useCallback((prod: FactoryBaleProduct) => {
     setSelections((prev) => {
@@ -322,6 +356,17 @@ export default function FactoryLocationInventory() {
       if (existing) {
         const parsed = parseInt(qty);
         next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, Math.min(parsed, existing.availableBales)) });
+      }
+      return next;
+    });
+  }, []);
+
+  const updateSelectionPrice = useCallback((productId: number, price: string) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(productId);
+      if (existing) {
+        next.set(productId, { ...existing, pricePerBale: price });
       }
       return next;
     });
@@ -950,11 +995,11 @@ export default function FactoryLocationInventory() {
   const totalBales = filteredProducts.reduce((s, p) => s + p.baleCount, 0);
   const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
-  const colSpanAll = isAllItems ? (proformaMode ? 10 : 8) : (proformaMode ? 9 : 7);
+  const colSpanAll = isAllItems ? (proformaMode ? 11 : 8) : (proformaMode ? 10 : 7);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className={`p-4 md:p-6 max-w-6xl mx-auto ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
         <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
           {selectedLocation.name} — {selectedCategory.categoryName}
@@ -981,14 +1026,30 @@ export default function FactoryLocationInventory() {
         </div>
       </div>
 
-      {proformaMode && selections.size > 0 && (
-        <div className="mb-4 flex items-center gap-3 flex-wrap">
-          <Badge variant="secondary" className="text-sm">
-            {selections.size} items selected ({Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales)
-          </Badge>
-          <Button size="sm" onClick={handleFinalize} data-testid="button-finalize-proforma">
-            <FileText className="h-4 w-4 mr-1" /> Finalize Proforma
+      {proformaMode && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={selectAllVisible} data-testid="button-select-all">
+            <Check className="h-4 w-4 mr-1" /> Select All
           </Button>
+          <Button variant="outline" size="sm" onClick={deselectAllVisible} data-testid="button-deselect-all">
+            <X className="h-4 w-4 mr-1" /> Deselect All
+          </Button>
+          <div className="flex items-center gap-1.5 ml-2">
+            <Checkbox
+              checked={showSelectedOnly}
+              onCheckedChange={(v) => setShowSelectedOnly(!!v)}
+              id="show-selected-only"
+              data-testid="checkbox-show-selected-only"
+            />
+            <label htmlFor="show-selected-only" className="text-sm cursor-pointer select-none">
+              Selected only
+            </label>
+          </div>
+          {selections.size > 0 && (
+            <Badge variant="secondary" className="text-sm ml-auto">
+              {selections.size} items, {Array.from(selections.values()).reduce((s, v) => s + v.selectedQty, 0)} bales
+            </Badge>
+          )}
         </div>
       )}
 
@@ -1071,7 +1132,7 @@ export default function FactoryLocationInventory() {
                       <div className="col-span-2 text-right"><span className="text-muted-foreground">Total Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>
                     </div>
                     {proformaMode && isSelected && selection && (
-                      <div className="mt-2 pt-2 border-t flex items-center gap-2">
+                      <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-muted-foreground">Qty:</span>
                         <Input
                           type="number"
@@ -1083,6 +1144,15 @@ export default function FactoryLocationInventory() {
                           data-testid={`input-qty-mobile-${prod.productId}`}
                         />
                         <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+                        <span className="text-xs text-muted-foreground ml-2">Price:</span>
+                        <Input
+                          type="number"
+                          value={selection.pricePerBale}
+                          onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)}
+                          className="w-24 text-right"
+                          step="0.01"
+                          data-testid={`input-price-mobile-${prod.productId}`}
+                        />
                       </div>
                     )}
                   </Card>
@@ -1107,7 +1177,8 @@ export default function FactoryLocationInventory() {
               <col style={{ width: "120px" }} />
               <col />
               <col style={{ width: "90px" }} />
-              {proformaMode && <col style={{ width: "100px" }} />}
+              {proformaMode && <col style={{ width: "90px" }} />}
+              {proformaMode && <col style={{ width: "110px" }} />}
               <col style={{ width: "110px" }} />
               <col style={{ width: "120px" }} />
               <col style={{ width: "130px" }} />
@@ -1121,6 +1192,7 @@ export default function FactoryLocationInventory() {
                 <th className="text-left px-3 font-medium">Bale Name</th>
                 <th className="text-right px-3 font-medium">Bales</th>
                 {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
+                {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                 <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
                 <th className="text-right px-3 font-medium">Avg Rate</th>
                 <th className="text-right px-3 font-medium">Total Value</th>
@@ -1179,6 +1251,22 @@ export default function FactoryLocationInventory() {
                             )}
                           </td>
                         )}
+                        {proformaMode && (
+                          <td className="text-right px-3">
+                            {isSelected && selection ? (
+                              <Input
+                                type="number"
+                                value={selection.pricePerBale}
+                                onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)}
+                                className="w-[90px] text-right ml-auto"
+                                step="0.01"
+                                data-testid={`input-price-${prod.productId}`}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                         <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>
                         <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>
@@ -1190,6 +1278,7 @@ export default function FactoryLocationInventory() {
                     {proformaMode && <td></td>}
                     <td className="px-3" colSpan={colSpanLabel}>Total ({filteredProducts.length} products)</td>
                     <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
+                    {proformaMode && <td></td>}
                     {proformaMode && <td></td>}
                     <td className="text-right px-3 font-mono"></td>
                     <td className="text-right px-3 font-mono"></td>
@@ -1208,6 +1297,27 @@ export default function FactoryLocationInventory() {
           </div>
         )}
       </Card>
+
+      {proformaMode && selections.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 shadow-lg">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant="secondary" className="text-sm">
+                {selections.size} items
+              </Badge>
+              <span className="text-sm font-mono font-medium">
+                {totalSelectedBales} bales
+              </span>
+              <span className="text-sm font-mono text-muted-foreground">
+                {formatAmount(grandTotal)} total
+              </span>
+            </div>
+            <Button onClick={handleFinalize} data-testid="button-finalize-proforma-bar">
+              <FileText className="h-4 w-4 mr-1" /> Finalize Proforma
+            </Button>
+          </div>
+        </div>
+      )}
 
       {renderFinalizeDialog()}
     </div>
