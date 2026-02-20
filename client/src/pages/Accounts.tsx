@@ -1315,40 +1315,27 @@ export default function Accounts() {
                           Current Balance
                         </p>
                         <div className="flex items-center gap-2">
-                          {transactionsLoading ? (
-                            <Skeleton className="h-5 w-32" />
-                          ) : (
-                            <>
-                              {/* For suppliers, positive balance = we owe them (Cr/red) 
-                              For other accounts, positive balance = they owe us (Dr/green) */}
-                              {selectedAccount?.type === "supplier" ? (
-                                // Supplier: positive = Cr (payable, red), negative = Dr (prepaid, green)
-                                closingBalance > 0 ? (
+                          {(() => {
+                            const bal = selectedAccount?.balance ?? 0;
+                            const side = selectedAccount?.balanceSide ?? "Dr";
+                            const isSupplier = selectedAccount?.type === "supplier";
+                            const isNegative = isSupplier ? side === "Cr" : side === "Cr";
+                            return (
+                              <>
+                                {isNegative ? (
                                   <TrendingDown className="w-4 h-4 text-red-600" />
                                 ) : (
                                   <TrendingUp className="w-4 h-4 text-green-600" />
-                                )
-                              ) : // Other accounts: positive = Dr (green), negative = Cr (red)
-                              closingBalance >= 0 ? (
-                                <TrendingUp className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <TrendingDown className="w-4 h-4 text-red-600" />
-                              )}
-                              <span
-                                className="font-mono font-semibold"
-                                data-testid="text-account-balance"
-                              >
-                                {formatAmount(Math.abs(closingBalance))}{" "}
-                                {selectedAccount?.type === "supplier"
-                                  ? closingBalance > 0
-                                    ? "Cr"
-                                    : "Dr"
-                                  : closingBalance >= 0
-                                    ? "Dr"
-                                    : "Cr"}
-                              </span>
-                            </>
-                          )}
+                                )}
+                                <span
+                                  className="font-mono font-semibold"
+                                  data-testid="text-account-balance"
+                                >
+                                  {formatAmount(Math.abs(bal))} {side}
+                                </span>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="md:col-span-2 flex justify-end">
@@ -1747,7 +1734,7 @@ export default function Accounts() {
                                 colSpan={3}
                                 className="text-right font-bold py-2"
                               >
-                                Closing Balance:
+                                Period Closing Balance:
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
@@ -1802,7 +1789,7 @@ export default function Accounts() {
                             <span className="font-mono font-semibold">{formatAmount(transactionTotals.totalCredit)}</span>
                           </div>
                           <div className="flex justify-between bg-accent/50 p-2 rounded border-t-2">
-                            <span className="font-bold">Closing Balance:</span>
+                            <span className="font-bold">Period Closing Balance:</span>
                             <span className="font-mono font-bold">
                               {formatAmount(Math.abs(closingBalance))}{" "}
                               {selectedAccount?.type === "supplier"
