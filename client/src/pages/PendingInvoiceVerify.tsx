@@ -334,130 +334,163 @@ export default function PendingInvoiceVerify() {
           <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected</h3>
-              {verification?.proformaLines && verification.proformaLines.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Price/Bale</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {verification.proformaLines.map((line, i) => (
-                      <TableRow key={i} data-testid={`row-proforma-${line.articleCode}`}>
-                        <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
-                          {line.articleCode}
-                        </TableCell>
-                        <TableCell className="text-sm">{line.productName}</TableCell>
-                        <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
-                        <TableCell className="text-right font-mono">{parseFloat(line.pricePerBale).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-sm text-muted-foreground" data-testid="text-no-proforma">No proforma lines available</p>
-              )}
-            </div>
+          {(() => {
+            const comparisonMap = new Map<string, ComparisonItem>();
+            (verification?.comparison || []).forEach((c) => comparisonMap.set(c.articleCode, c));
+            const filteredProformaLines = (verification?.proformaLines || []).filter((line) => {
+              const cmp = comparisonMap.get(line.articleCode);
+              return !cmp || cmp.status !== "MATCH";
+            });
+            const getProformaRowClass = (articleCode: string) => {
+              const cmp = comparisonMap.get(articleCode);
+              if (!cmp) return "";
+              if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
+                return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+              if (cmp.status === "OVER_LOADED")
+                return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+              return "";
+            };
 
-            <div>
-              <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
-              {verification?.loadedItems && verification.loadedItems.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Weight</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {verification.loadedItems.map((group, i) => (
-                      <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
-                        <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
-                          {group.articleCode}
-                        </TableCell>
-                        <TableCell className="text-sm">{group.productName}</TableCell>
-                        <TableCell className="text-right font-mono">{group.qty}</TableCell>
-                        <TableCell className="text-right font-mono">{group.totalWeight.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono">{group.totalPrice.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">No loaded bales</p>
-              )}
-            </div>
-          </div>
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
+                  {filteredProformaLines.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Article</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Expected</TableHead>
+                          <TableHead className="text-right">Loaded</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProformaLines.map((line, i) => {
+                          const cmp = comparisonMap.get(line.articleCode);
+                          return (
+                            <TableRow key={i} className={getProformaRowClass(line.articleCode)} data-testid={`row-proforma-${line.articleCode}`}>
+                              <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
+                                {line.articleCode}
+                              </TableCell>
+                              <TableCell className="text-sm">{line.productName}</TableCell>
+                              <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
+                              <TableCell className="text-right font-mono">{cmp?.loadedQty ?? 0}</TableCell>
+                              <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">All proforma items matched - no mismatches</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
+                  {verification?.loadedItems && verification.loadedItems.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Article</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Weight</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {verification.loadedItems.map((group, i) => (
+                          <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
+                            <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
+                              {group.articleCode}
+                            </TableCell>
+                            <TableCell className="text-sm">{group.productName}</TableCell>
+                            <TableCell className="text-right font-mono">{group.qty}</TableCell>
+                            <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">No loaded bales</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
-      {verification?.comparison && verification.comparison.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+      {(() => {
+        const comparison = verification?.comparison || [];
+        const overloadedItems = comparison.filter((c) => c.status === "OVER_LOADED");
+        const lessLoadedItems = comparison.filter((c) => c.status === "UNDER_LOADED" || c.status === "MISSING_FROM_LOADED");
+        const loadedNotRequestedItems = comparison.filter((c) => c.status === "LOADED_NOT_IN_PROFORMA");
+        const formatTotal = (item: ComparisonItem) => {
+          const w = Number(item.totalWeight) || 0;
+          const p = Number(item.totalPrice) || 0;
+          if (w > 0 && p > 0) return <><div>{w.toFixed(2)} kg</div><div className="text-muted-foreground text-xs">${p.toFixed(2)}</div></>;
+          if (w > 0) return <>{w.toFixed(2)} kg</>;
+          if (p > 0) return <>${p.toFixed(2)}</>;
+          return <>-</>;
+        };
+
+        const renderSummaryTable = (title: string, items: ComparisonItem[], colorClass: string, testId: string) => (
+          <Card className="mb-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">{title} ({items.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {items.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item, i) => (
+                      <TableRow key={i} className={colorClass} data-testid={`row-${testId}-${item.articleCode}`}>
+                        <TableCell>
+                          <div className="text-sm font-medium">{item.productName}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{item.articleCode}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          <div>{item.loadedQty}</div>
+                          {item.expectedQty > 0 && (
+                            <div className="text-xs text-muted-foreground">(exp: {item.expectedQty})</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatTotal(item)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid={`text-none-${testId}`}>None</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+        return (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              Comparison & Mismatches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Article</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Expected</TableHead>
-                  <TableHead className="text-right">Loaded</TableHead>
-                  <TableHead className="text-right">Diff</TableHead>
-                  <TableHead className="text-right">Weight</TableHead>
-                  <TableHead className="text-right">Price/Bale</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {verification.comparison.map((item, i) => (
-                  <TableRow
-                    key={i}
-                    className={getComparisonRowClass(item.status)}
-                    data-testid={`row-comparison-${item.articleCode}`}
-                  >
-                    <TableCell className="font-mono text-sm" data-testid={`text-comparison-article-${item.articleCode}`}>
-                      {item.articleCode}
-                    </TableCell>
-                    <TableCell className="text-sm">{item.productName}</TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-comparison-expected-${item.articleCode}`}>
-                      {item.expectedQty}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-comparison-loaded-${item.articleCode}`}>
-                      {item.loadedQty}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-comparison-diff-${item.articleCode}`}>
-                      {item.diff > 0 ? `+${item.diff}` : item.diff}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {item.totalWeight.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {parseFloat(item.pricePerBale).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(item.status)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+              Summary
+            </h2>
+            {renderSummaryTable("Overloaded", overloadedItems, "bg-green-50 dark:bg-green-950", "overloaded")}
+            {renderSummaryTable("Less Loaded", lessLoadedItems, "bg-red-50 dark:bg-red-950", "less-loaded")}
+            {renderSummaryTable("Loaded Not Requested", loadedNotRequestedItems, "bg-red-50 dark:bg-red-950", "not-requested")}
+          </div>
+        );
+      })()}
 
       <Card className="mb-6">
         <CardHeader>
