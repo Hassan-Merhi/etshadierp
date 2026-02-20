@@ -3643,7 +3643,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const printRows = await db
           .select({
             productionBaleId: baleLabelPrints.productionBaleId,
-            lastPrintedAt: sql<string>`MAX(${baleLabelPrints.printedAt})`.as("last_printed_at"),
+            lastPrintedAt: sql<string>`MAX(${baleLabelPrints.printedAt})::timestamptz`.as("last_printed_at"),
           })
           .from(baleLabelPrints)
           .where(inArray(baleLabelPrints.productionBaleId, baleIds))
