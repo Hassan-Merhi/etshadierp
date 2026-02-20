@@ -849,12 +849,12 @@ export default function FactoryLocationInventory() {
                 <div className="hidden md:block rounded-md border overflow-hidden w-full">
                   <table className="w-full table-fixed text-sm">
                     <colgroup>
-                      <col style={{ width: "130px" }} />
-                      <col style={{ width: "120px" }} />
-                      <col />
-                      <col style={{ width: "90px" }} />
                       <col style={{ width: "110px" }} />
-                      <col style={{ width: "130px" }} />
+                      <col style={{ width: "100px" }} />
+                      <col />
+                      <col style={{ width: "70px" }} />
+                      <col style={{ width: "100px" }} />
+                      <col style={{ width: "100px" }} />
                     </colgroup>
                     <thead className="bg-muted/50">
                       <tr className="h-12">
@@ -1172,17 +1172,17 @@ export default function FactoryLocationInventory() {
         <div className="hidden md:block rounded-md border overflow-hidden w-full">
           <table className="w-full table-fixed text-sm">
             <colgroup>
-              {proformaMode && <col style={{ width: "40px" }} />}
-              {isAllItems && <col style={{ width: "130px" }} />}
-              <col style={{ width: "120px" }} />
+              {proformaMode && <col style={{ width: "36px" }} />}
+              {isAllItems && <col style={{ width: "110px" }} />}
+              <col style={{ width: "100px" }} />
               <col />
+              <col style={{ width: "70px" }} />
+              {proformaMode && <col style={{ width: "80px" }} />}
+              {proformaMode && <col style={{ width: "100px" }} />}
               <col style={{ width: "90px" }} />
-              {proformaMode && <col style={{ width: "90px" }} />}
-              {proformaMode && <col style={{ width: "110px" }} />}
-              <col style={{ width: "110px" }} />
-              <col style={{ width: "120px" }} />
-              <col style={{ width: "130px" }} />
-              <col style={{ width: "130px" }} />
+              <col style={{ width: "90px" }} />
+              <col style={{ width: "100px" }} />
+              <col style={{ width: "100px" }} />
             </colgroup>
             <thead className="bg-muted/50">
               <tr className="h-12">
