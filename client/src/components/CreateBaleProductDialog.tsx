@@ -131,7 +131,7 @@ export function CreateBaleProductDialog({
                       <SelectItem value="#3">#3 (HMD13...)</SelectItem>
                       <SelectItem value="#4">#4 (HMD14...)</SelectItem>
                       <SelectItem value="CREAM">CREAM (HMD10...)</SelectItem>
-                      <SelectItem value="Garbage">Garbage (HMD19...)</SelectItem>
+                      <SelectItem value="Garbage">Garbage (HMD16...)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

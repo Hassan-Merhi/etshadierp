@@ -234,7 +234,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           for (let i = 0; i < qty; i++) {
             const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
-            const isGarbage = product.articleCode?.startsWith("HMD19");
+            const isGarbage = product.articleCode?.startsWith("HMD16");
             const effectiveCostPerKg = isGarbage ? 0 : costPerKg;
             const baleTotalCost = weight * effectiveCostPerKg;
 
@@ -1104,7 +1104,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         "#2": "HMD12",
         "#3": "HMD13",
         "#4": "HMD14",
-        "Garbage": "HMD19",
+        "Garbage": "HMD16",
       };
 
       if (!articleCode && grade && gradeToPrefix[grade]) {
