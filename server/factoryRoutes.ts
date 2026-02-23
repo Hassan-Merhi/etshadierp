@@ -196,18 +196,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .where(eq(factoryBaleSequences.companyId, companyId))
           .for("update");
 
+        // Always derive safe floor from actual DB max to handle stale sequences
+        const [maxRow] = await tx
+          .select({ m: sql<number>`COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 100875)` })
+          .from(factoryBales)
+          .where(and(eq(factoryBales.companyId, companyId), sql`reference_number ~ '^REF[0-9]+'`));
+        const dbMax = (Number(maxRow?.m) || 100875) + 1;
+
         let nextNumber: number;
         if (seqRecord) {
-          nextNumber = seqRecord.nextNumber;
+          nextNumber = Math.max(seqRecord.nextNumber, dbMax);
           await tx
             .update(factoryBaleSequences)
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100876;
+          nextNumber = dbMax;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100876 + totalExpected,
+            nextNumber: nextNumber + totalExpected,
           });
         }
 
@@ -4123,9 +4130,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             finalizedAt: status === "FINALIZED" ? new Date() : null,
           });
           imported++;
+          nextRef++;
         } catch (err: any) {
           errors.push(`Row ${i + 1}: ${err.message}`);
         }
+      }
+
+      // Sync the sequence table so future stock entries don't collide with imported refs
+      const [existingSeq] = await db
+        .select()
+        .from(factoryBaleSequences)
+        .where(eq(factoryBaleSequences.companyId, companyId));
+
+      if (existingSeq) {
+        if (nextRef > existingSeq.nextNumber) {
+          await db
+            .update(factoryBaleSequences)
+            .set({ nextNumber: nextRef })
+            .where(eq(factoryBaleSequences.id, existingSeq.id));
+        }
+      } else {
+        await db.insert(factoryBaleSequences).values({
+          companyId,
+          nextNumber: nextRef,
+        });
       }
 
       res.json({ imported, errors });
