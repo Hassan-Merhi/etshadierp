@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useState, useEffect, useRef, useMemo } from "react";
 
@@ -65,6 +66,7 @@ interface LocationVouchersData {
 export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const { registerCursorNav, clearCursorNav } = useCursorNav();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
@@ -234,7 +236,22 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
       rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, [selectedRowIndex]);
-  
+
+  useEffect(() => {
+    const rows = navigableRows;
+    registerCursorNav({
+      canNavigateUp: selectedRowIndex > -1,
+      canNavigateDown: rows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < rows.length - 1),
+      onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
+      onDown: () => setSelectedRowIndex(prev => {
+        if (prev === -1) return 0;
+        if (prev < rows.length - 1) return prev + 1;
+        return prev;
+      }),
+    });
+    return () => clearCursorNav();
+  }, [selectedRowIndex, navigableRows]);
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">

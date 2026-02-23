@@ -1,12 +1,14 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft, Home, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
+import { useCursorNav } from "@/contexts/CursorNavContext";
 
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
   showBackButton?: boolean;
   showHomeButton?: boolean;
+  showCursorNavButtons?: boolean;
   children?: React.ReactNode;
 }
 
@@ -15,8 +17,11 @@ export function PageHeader({
   subtitle, 
   showBackButton = true, 
   showHomeButton = true,
+  showCursorNavButtons = true,
   children 
 }: PageHeaderProps) {
+  const { config } = useCursorNav();
+
   const handleBack = () => {
     window.history.back();
   };
@@ -48,6 +53,28 @@ export function PageHeader({
               <span className="hidden sm:inline">Dashboard</span>
             </Button>
           </Link>
+        )}
+        {showCursorNavButtons && config && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={config.onUp}
+              disabled={!config.canNavigateUp}
+              data-testid="button-cursor-up"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={config.onDown}
+              disabled={!config.canNavigateDown}
+              data-testid="button-cursor-down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </>
         )}
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">

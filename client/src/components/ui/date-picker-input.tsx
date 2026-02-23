@@ -19,11 +19,12 @@ interface DatePickerInputProps {
 export function DatePickerInput({
   value,
   onChange,
-  placeholder = "DD/MM/YYYY",
+  placeholder,
   className,
   "data-testid": testId,
 }: DatePickerInputProps) {
   const { dateFormat, formatDisplayDate } = useDateFormat();
+  const resolvedPlaceholder = placeholder ?? (dateFormat === "MM/DD/YYYY" ? "MM/DD/YYYY" : "DD/MM/YYYY");
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
@@ -71,7 +72,7 @@ export function DatePickerInput({
         value={displayValue}
         onChange={handleInputChange}
         onBlur={handleInputBlur}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className="flex-1"
         data-testid={testId}
       />

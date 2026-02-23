@@ -904,6 +904,20 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         titleRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
         if (numCols > 1) sheet.mergeCells(sheet.rowCount, 1, sheet.rowCount, numCols);
 
+        const infoData: [string, string][] = [
+          ["Supplier", supplier?.legalName || `ID ${supplierId}`],
+          ["Container", container?.containerNumber || `ID ${containerId}`],
+          ["Proforma", proforma.reference],
+          ["Date", new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })],
+          ["Total Items", String(data.length)],
+        ];
+        for (const [label, value] of infoData) {
+          const r = sheet.addRow([label, value]);
+          r.getCell(1).font = { bold: true, size: 10, color: { argb: "616161" } };
+          r.getCell(2).font = { size: 10 };
+        }
+        sheet.addRow([]);
+
         const headerRowNum = sheet.rowCount + 1;
         const headerRow = sheet.addRow(columns.map(c => c.header));
         headerRow.height = 24;

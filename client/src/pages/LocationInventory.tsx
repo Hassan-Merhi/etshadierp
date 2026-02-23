@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -87,6 +88,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+  const { registerCursorNav, clearCursorNav } = useCursorNav();
   const [viewAllItems, setViewAllItems] = useState<boolean>(false);
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
@@ -316,6 +318,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   useEffect(() => {
     setSelectedRowIndex(0);
   }, [selectedGroup]);
+
+  useEffect(() => {
+    if (!selectedGroup || selectedGroup.items.length === 0) {
+      clearCursorNav();
+      return;
+    }
+    const itemCount = selectedGroup.items.length;
+    registerCursorNav({
+      canNavigateUp: itemCount > 0,
+      canNavigateDown: itemCount > 0,
+      onUp: () => setSelectedRowIndex(prev => (prev - 1 + itemCount) % itemCount),
+      onDown: () => setSelectedRowIndex(prev => (prev + 1) % itemCount),
+    });
+    return () => clearCursorNav();
+  }, [selectedGroup, selectedRowIndex]);
 
   // Import handlers
   const downloadImportTemplate = () => {

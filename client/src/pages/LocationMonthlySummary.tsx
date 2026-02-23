@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useCursorNav } from "@/contexts/CursorNavContext";
 import {
   BarChart,
   Bar,
@@ -55,6 +56,7 @@ interface LocationMonthlySummaryData {
 
 export default function LocationMonthlySummary({ posUser }: { posUser?: any } = {}) {
   const { formatAmount } = useCurrencyContext();
+  const { registerCursorNav, clearCursorNav } = useCursorNav();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
@@ -178,7 +180,27 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
       rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, [selectedRowIndex]);
-  
+
+  const navigableMonthRows = useMemo(() => {
+    if (!data?.monthlyData) return [];
+    return data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
+  }, [data?.monthlyData]);
+
+  useEffect(() => {
+    const rows = navigableMonthRows;
+    registerCursorNav({
+      canNavigateUp: selectedRowIndex > -1,
+      canNavigateDown: rows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < rows.length - 1),
+      onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
+      onDown: () => setSelectedRowIndex(prev => {
+        if (prev === -1) return 0;
+        if (prev < rows.length - 1) return prev + 1;
+        return prev;
+      }),
+    });
+    return () => clearCursorNav();
+  }, [selectedRowIndex, navigableMonthRows]);
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
