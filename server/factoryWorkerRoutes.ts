@@ -108,7 +108,45 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
         cell.font = { bold: true, color: { argb: "FFFFFF" } };
       });
-      headers.forEach((_, i) => { sheet.getColumn(i + 1).width = 18; });
+
+      // Hint row: valid values for key columns
+      const hintValues = [
+        "", "", "", "", "YYYY-MM-DD", "",
+        "Male / Female", "Single / Married / Divorced", "", "", "", "",
+        "", "", "", "", "", "YYYY-MM-DD", "YYYY-MM-DD",
+        "Monthly / Daily / Per Bale / Per KG", "number", "number", "number",
+        "Monthly / Hourly / Weekly / Bi-Weekly", "number", "number", "number",
+        "", "YYYY-MM-DD", "", "YYYY-MM-DD",
+        "", "YYYY-MM-DD", "", "",
+        "Cash / Bank / Transfer", "",
+      ];
+      const hintRow = sheet.addRow(hintValues);
+      hintRow.eachCell((cell: any) => {
+        if (cell.value) {
+          cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
+        }
+      });
+
+      // Example data row
+      const exampleRow = sheet.addRow([
+        "Ahmed Hassan", "FW-001", "A12345678", "P9876543", "1990-05-15", "Moroccan",
+        "Male", "Married", "+212-600-123456", "+212-600-000000", "Fatima Hassan", "+212-600-654321",
+        "123 Rue Mohammed V", "Casablanca", "Morocco", "Sorter", "Production", "2024-01-15", "2024-01-15",
+        "Monthly", "3000", "2.50", "0.15",
+        "Monthly", "0", "0", "0",
+        "V2024-001", "2026-01-14", "WP2024-001", "2026-01-14",
+        "RP2024-001", "2026-01-14", "Attijariwafa Bank", "007-123456789",
+        "Bank", "Example row — delete before importing",
+      ]);
+      exampleRow.eachCell((cell: any) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
+        cell.font = { italic: true, color: { argb: "5D4037" } };
+      });
+      // Label in the first cell to make it obvious
+      exampleRow.getCell(1).font = { bold: true, italic: true, color: { argb: "5D4037" } };
+
+      headers.forEach((_, i) => { sheet.getColumn(i + 1).width = 22; });
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
       await wb.xlsx.write(res);
