@@ -109,6 +109,7 @@ export interface IStorage {
   getSupplierById(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier>;
+  deleteSupplier(id: number): Promise<void>;
 
   // Stock Groups
   getAllStockGroups(companyId: number): Promise<StockGroup[]>;
@@ -272,6 +273,7 @@ export interface IStorage {
   getCustomerByCode(code: string, companyId: number): Promise<schema.Customer | undefined>;
   createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer>;
   updateCustomer(id: number, updates: Partial<schema.InsertCustomer>): Promise<schema.Customer>;
+  deleteCustomer(id: number): Promise<void>;
 
   // Container Sales
   createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale>;
@@ -1021,6 +1023,12 @@ export class DbStorage implements IStorage {
       .where(eq(schema.suppliers.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteSupplier(id: number): Promise<void> {
+    await db.update(schema.suppliers)
+      .set({ deletedAt: new Date(), active: false })
+      .where(eq(schema.suppliers.id, id));
   }
 
   // Stock Groups
@@ -5112,6 +5120,11 @@ export class DbStorage implements IStorage {
     return customer;
   }
 
+  async deleteCustomer(id: number): Promise<void> {
+    await db.update(schema.customers)
+      .set({ deletedAt: new Date(), active: false })
+      .where(eq(schema.customers.id, id));
+  }
 
   // Inter-Company Transfer Methods
   async getAllInterCompanyTransfers(companyId?: number): Promise<schema.InterCompanyTransfer[]> {

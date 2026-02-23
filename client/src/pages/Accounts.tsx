@@ -164,6 +164,8 @@ export default function Accounts() {
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(
     null,
   );
+  const [supplierToEdit, setSupplierToEdit] = useState<Account | null>(null);
+  const [customerToEdit, setCustomerToEdit] = useState<Account | null>(null);
 
   // Helper to update URL params without full page reload
   // Reads current params from window.location.search to avoid stale state
@@ -672,6 +674,83 @@ export default function Accounts() {
     },
   });
 
+  const updateSupplierMutation = useMutation({
+    mutationFn: async (data: UpdateLedgerAccount) => {
+      if (!supplierToEdit) throw new Error("No supplier selected");
+      return await modeApiRequest("PATCH", `/api/suppliers/${supplierToEdit.accountId}`, {
+        legalName: data.name,
+        openingBalance: data.openingBalance,
+        active: data.active,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Supplier updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      setSupplierToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update supplier", variant: "destructive" });
+    },
+  });
+
+  const deleteSupplierMutation = useMutation({
+    mutationFn: async () => {
+      if (!supplierToEdit) throw new Error("No supplier selected");
+      return await modeApiRequest("DELETE", `/api/suppliers/${supplierToEdit.accountId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Supplier deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      setSupplierToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete supplier", variant: "destructive" });
+    },
+  });
+
+  const updateCustomerMutation = useMutation({
+    mutationFn: async (data: UpdateLedgerAccount) => {
+      if (!customerToEdit) throw new Error("No customer selected");
+      return await modeApiRequest("PUT", `/api/customers/${customerToEdit.accountId}`, {
+        legalName: data.name,
+        openingBalance: data.openingBalance,
+        openingBalanceSide: data.openingBalanceSide,
+        active: data.active,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Customer updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      setCustomerToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update customer", variant: "destructive" });
+    },
+  });
+
+  const deleteCustomerMutation = useMutation({
+    mutationFn: async () => {
+      if (!customerToEdit) throw new Error("No customer selected");
+      return await modeApiRequest("DELETE", `/api/customers/${customerToEdit.accountId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Customer deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      setCustomerToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete customer", variant: "destructive" });
+    },
+  });
+
   const createBankMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompany?.id) {
@@ -826,8 +905,19 @@ export default function Accounts() {
   };
 
   const handleDeleteAccount = () => {
+    if (supplierToEdit) {
+      if (window.confirm(`Are you sure you want to delete "${supplierToEdit.name}"? This action cannot be undone.`)) {
+        deleteSupplierMutation.mutate();
+      }
+      return;
+    }
+    if (customerToEdit) {
+      if (window.confirm(`Are you sure you want to delete "${customerToEdit.name}"? This action cannot be undone.`)) {
+        deleteCustomerMutation.mutate();
+      }
+      return;
+    }
     if (!accountToEdit) return;
-
     if (
       window.confirm(
         `Are you sure you want to delete "${accountToEdit.name}"? This action cannot be undone.`,
@@ -838,6 +928,14 @@ export default function Accounts() {
   };
 
   const onEditSubmit = (data: UpdateLedgerAccount) => {
+    if (supplierToEdit) {
+      updateSupplierMutation.mutate(data);
+      return;
+    }
+    if (customerToEdit) {
+      updateCustomerMutation.mutate(data);
+      return;
+    }
     updateLedgerMutation.mutate(data);
   };
 
@@ -1850,12 +1948,18 @@ export default function Accounts() {
                       filteredAccountsForEdit.map((account) => {
                         const isLedger = account.type === "ledger";
                         const isBank = account.type === "bank";
-                        const isEditable = isLedger || isBank;
+                        const isSupplier = account.type === "supplier";
+                        const isCustomer = account.type === "customer";
+                        const isEditable = isLedger || isBank || isSupplier || isCustomer;
                         const isLedgerSelected =
                           accountToEdit?.id === account.accountId && isLedger;
                         const isBankSelected =
                           bankToEdit?.id === account.accountId && isBank;
-                        const isSelected = isLedgerSelected || isBankSelected;
+                        const isSupplierSelected =
+                          supplierToEdit?.accountId === account.accountId && isSupplier;
+                        const isCustomerSelected =
+                          customerToEdit?.accountId === account.accountId && isCustomer;
+                        const isSelected = isLedgerSelected || isBankSelected || isSupplierSelected || isCustomerSelected;
 
                         return (
                           <button
@@ -1873,6 +1977,8 @@ export default function Accounts() {
                                 );
                                 if (ledgerAccount) {
                                   setBankToEdit(null);
+                                  setSupplierToEdit(null);
+                                  setCustomerToEdit(null);
                                   handleSelectAccountForEdit(ledgerAccount);
                                 } else {
                                   toast({
@@ -1887,6 +1993,8 @@ export default function Accounts() {
                                 );
                                 if (bankAccount) {
                                   setAccountToEdit(null);
+                                  setSupplierToEdit(null);
+                                  setCustomerToEdit(null);
                                   handleSelectBankForEdit(bankAccount);
                                 } else {
                                   toast({
@@ -1895,11 +2003,35 @@ export default function Accounts() {
                                     variant: "destructive",
                                   });
                                 }
+                              } else if (isSupplier) {
+                                setAccountToEdit(null);
+                                setBankToEdit(null);
+                                setCustomerToEdit(null);
+                                setSupplierToEdit(account);
+                                editForm.reset({
+                                  code: account.code,
+                                  name: account.name,
+                                  openingBalance: String(account.openingBalance ?? 0),
+                                  openingBalanceSide: "Cr",
+                                  active: account.active,
+                                });
+                              } else if (isCustomer) {
+                                setAccountToEdit(null);
+                                setBankToEdit(null);
+                                setSupplierToEdit(null);
+                                setCustomerToEdit(account);
+                                editForm.reset({
+                                  code: account.code,
+                                  name: account.name,
+                                  openingBalance: String(account.openingBalance ?? 0),
+                                  openingBalanceSide: account.openingBalanceSide ?? "Dr",
+                                  active: account.active,
+                                });
                               } else {
                                 toast({
                                   title: "Not Editable",
                                   description:
-                                    "Only ledger and bank accounts can be edited",
+                                    "Only ledger, bank, supplier, and customer accounts can be edited",
                                 });
                               }
                             }}
@@ -1927,11 +2059,11 @@ export default function Accounts() {
                 )}
               </div>
 
-              {accountToEdit && (
+              {(accountToEdit || supplierToEdit || customerToEdit) && (
                 <Card className="bg-muted/50">
                   <CardHeader>
                     <CardTitle className="text-sm">
-                      Edit Account Details
+                      {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : "Edit Account Details"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1974,78 +2106,66 @@ export default function Accounts() {
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          control={editForm.control}
-                          name="accountType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Type</FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger data-testid="select-edit-type">
-                                    <SelectValue placeholder="Select type" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Asset">Asset</SelectItem>
-                                  <SelectItem value="Liability">
-                                    Liability
-                                  </SelectItem>
-                                  <SelectItem value="Equity">Equity</SelectItem>
-                                  <SelectItem value="Income">Income</SelectItem>
-                                  <SelectItem value="Expense">
-                                    Expense
-                                  </SelectItem>
-                                  <SelectItem value="Bank">Bank</SelectItem>
-                                  <SelectItem value="Cash">Cash</SelectItem>
-                                  <SelectItem value="Indirect Expense">
-                                    Indirect Expense
-                                  </SelectItem>
-                                  <SelectItem value="Direct Expense">
-                                    Direct Expense
-                                  </SelectItem>
-                                  <SelectItem value="Government Taxes">
-                                    Government Taxes
-                                  </SelectItem>
-                                  <SelectItem value="Loans">Loans</SelectItem>
-                                  <SelectItem value="Duty Agent">
-                                    Duty Agent
-                                  </SelectItem>
-                                  <SelectItem value="Transporter Agent">
-                                    Transporter Agent
-                                  </SelectItem>
-                                  <SelectItem value="Accounts Payable">
-                                    Accounts Payable
-                                  </SelectItem>
-                                  <SelectItem value="Profit">Profit</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={editForm.control}
-                          name="subType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Sub Type (Optional)</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  value={field.value || ""}
-                                  placeholder="Leave blank or enter sub type"
-                                  data-testid="input-edit-subtype"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="grid grid-cols-2 gap-4">
+                        {!supplierToEdit && !customerToEdit && (
+                          <>
+                            <FormField
+                              control={editForm.control}
+                              name="accountType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Account Type</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-edit-type">
+                                        <SelectValue placeholder="Select type" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Asset">Asset</SelectItem>
+                                      <SelectItem value="Liability">Liability</SelectItem>
+                                      <SelectItem value="Equity">Equity</SelectItem>
+                                      <SelectItem value="Income">Income</SelectItem>
+                                      <SelectItem value="Expense">Expense</SelectItem>
+                                      <SelectItem value="Bank">Bank</SelectItem>
+                                      <SelectItem value="Cash">Cash</SelectItem>
+                                      <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                      <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                      <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                      <SelectItem value="Loans">Loans</SelectItem>
+                                      <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                      <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                      <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                                      <SelectItem value="Profit">Profit</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={editForm.control}
+                              name="subType"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Sub Type (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      value={field.value || ""}
+                                      placeholder="Leave blank or enter sub type"
+                                      data-testid="input-edit-subtype"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+                        <div className={`grid gap-4 ${supplierToEdit ? "grid-cols-1" : "grid-cols-2"}`}>
                           <FormField
                             control={editForm.control}
                             name="openingBalance"
@@ -2064,45 +2184,43 @@ export default function Accounts() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={editForm.control}
-                            name="openingBalanceSide"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Balance Side</FormLabel>
-                                <Select
-                                  onValueChange={field.onChange}
-                                  value={field.value}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-edit-balance-side">
-                                      <SelectValue placeholder="Dr/Cr" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="Dr">
-                                      Dr (Debit)
-                                    </SelectItem>
-                                    <SelectItem value="Cr">
-                                      Cr (Credit)
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                          {!supplierToEdit && (
+                            <FormField
+                              control={editForm.control}
+                              name="openingBalanceSide"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Balance Side</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-edit-balance-side">
+                                        <SelectValue placeholder="Dr/Cr" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                      <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
                         </div>
                         <div className="flex gap-2 justify-between">
                           <Button
                             type="button"
                             variant="destructive"
                             onClick={handleDeleteAccount}
-                            disabled={deleteLedgerMutation.isPending}
+                            disabled={deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending}
                             data-testid="button-delete-account"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            {deleteLedgerMutation.isPending
+                            {(deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending)
                               ? "Deleting..."
                               : "Delete"}
                           </Button>
@@ -2112,6 +2230,8 @@ export default function Accounts() {
                               variant="outline"
                               onClick={() => {
                                 setAccountToEdit(null);
+                                setSupplierToEdit(null);
+                                setCustomerToEdit(null);
                                 editForm.reset();
                               }}
                               data-testid="button-cancel-edit"
@@ -2120,7 +2240,7 @@ export default function Accounts() {
                             </Button>
                             <Button
                               type="submit"
-                              disabled={updateLedgerMutation.isPending}
+                              disabled={updateLedgerMutation.isPending || updateSupplierMutation.isPending || updateCustomerMutation.isPending}
                               data-testid="button-save-edit"
                             >
                               <Edit className="w-4 h-4 mr-2" />

@@ -5159,6 +5159,28 @@ if (asOfDate) {
     },
   );
 
+  app.delete(
+    "/api/suppliers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const supplierId = parseInt(req.params.id);
+        if (isNaN(supplierId)) {
+          return res.status(400).json({ message: "Invalid supplier ID" });
+        }
+        const existing = await storage.getSupplierById(supplierId);
+        if (!existing) {
+          return res.status(404).json({ message: "Supplier not found" });
+        }
+        await storage.deleteSupplier(supplierId);
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Customers
   app.get("/api/customers", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -5414,6 +5436,34 @@ if (asOfDate) {
         res.json(updatedCustomer);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/customers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.id);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const existing = await storage.getCustomerById(customerId);
+        if (!existing) {
+          return res.status(404).json({ message: "Customer not found" });
+        }
+        if (existing.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        await storage.deleteCustomer(customerId);
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
       }
     },
   );
