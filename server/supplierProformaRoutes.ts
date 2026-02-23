@@ -873,24 +873,27 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       wb.created = new Date();
       const sheet = wb.addWorksheet("Comparison");
 
-      const thinBorder: any = {
-        top: { style: "thin", color: { argb: "BDBDBD" } },
-        left: { style: "thin", color: { argb: "BDBDBD" } },
-        bottom: { style: "thin", color: { argb: "BDBDBD" } },
-        right: { style: "thin", color: { argb: "BDBDBD" } },
+      const sumColors = {
+        headerBg: "1F4E79", headerFont: "FFFFFF",
+        overloadedBg: "FCE4EC", shortBg: "FFF3E0", notRequestedBg: "FFF9C4",
+        overloadedBorder: "C62828", shortBorder: "E65100", notRequestedBorder: "F57F17",
+        priceDiffBorder: "1565C0", titleBg: "263238", titleFont: "FFFFFF", grayFill: "E0E0E0",
       };
-      const grayFill: any = { type: "pattern", pattern: "solid", fgColor: { argb: "E0E0E0" } };
-
-      const autoWidth = (vals: (string | number | null | undefined)[]): number =>
-        Math.min(50, Math.max(...vals.map(v => String(v ?? "").length)) + 2);
+      const sThinBorder: any = {
+        top: { style: "thin", color: { argb: "BDBDBD" } }, left: { style: "thin", color: { argb: "BDBDBD" } },
+        bottom: { style: "thin", color: { argb: "BDBDBD" } }, right: { style: "thin", color: { argb: "BDBDBD" } },
+      };
+      const autoW = (vals: (string | number | null | undefined)[]): number =>
+        Math.min(50, Math.max(2, ...vals.map(v => String(v ?? "").length)) + 2);
 
       const fullHeaders = ["Item Name", "Barcode", "Expected Qty", "Loaded Qty", "Qty Diff", "Proforma Price", "Loaded Price", "Price Diff/Bale", "Exp Weight", "Load Weight", "Exp Weight Total", "Load Weight Total", "Status"];
       const fullHeaderRow = sheet.addRow(fullHeaders);
+      fullHeaderRow.height = 22;
       fullHeaderRow.eachCell((cell: any) => {
-        cell.font = { bold: true };
-        cell.fill = grayFill;
-        cell.border = thinBorder;
-        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.font = { bold: true, size: 10, color: { argb: sumColors.headerFont } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sumColors.headerBg } };
+        cell.border = sThinBorder;
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       });
 
       for (const row of fullComparison) {
@@ -900,30 +903,31 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           row.expWeight, row.loadWeight, row.expectedWeightTotal, row.loadedWeightTotal,
           row.status,
         ]);
-        dataRow.eachCell((cell: any) => { cell.border = thinBorder; });
-        for (let c = 3; c <= 12; c++) {
-          dataRow.getCell(c).numFmt = "#,##0.00";
-          dataRow.getCell(c).alignment = { horizontal: "right" };
-        }
+        dataRow.eachCell((cell: any) => { cell.border = sThinBorder; cell.alignment = { vertical: "middle" }; });
+        [3,4,5].forEach(c => { dataRow.getCell(c).numFmt = "#,##0"; dataRow.getCell(c).alignment = { horizontal: "right" }; });
+        [6,7,8,9,10,11,12].forEach(c => { dataRow.getCell(c).numFmt = "#,##0.00"; dataRow.getCell(c).alignment = { horizontal: "right" }; });
+        const rowBg = row.status === "OVERLOADED" ? sumColors.overloadedBg : row.status === "SHORT" || row.status === "MISSING" ? sumColors.shortBg : row.status === "NOT REQUESTED" ? sumColors.notRequestedBg : null;
+        if (rowBg) dataRow.eachCell((cell: any) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } }; });
       }
 
       const fullColData = [fullHeaders, ...fullComparison.map(r => [r.itemName, r.barcode, r.expectedQty, r.loadedQty, r.qtyDiff, r.expPrice, r.loadPrice, r.priceDiff, r.expWeight, r.loadWeight, r.expectedWeightTotal, r.loadedWeightTotal, r.status])];
-      fullHeaders.forEach((_h, i) => {
-        sheet.getColumn(i + 1).width = autoWidth(fullColData.map(r => r[i]));
-      });
+      fullHeaders.forEach((_h, i) => { sheet.getColumn(i + 1).width = autoW(fullColData.map(r => r[i])); });
 
       sheet.addRow([]);
 
-      const addSection = (title: string, headers: string[], rows: (string | number | null)[][]) => {
+      const addSection = (title: string, headerColor: string, headers: string[], rows: any[][], numFmts: Record<number, string>) => {
         const titleRow = sheet.addRow([title]);
-        titleRow.getCell(1).font = { bold: true, size: 14 };
+        titleRow.height = 28;
+        titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: sumColors.titleFont } };
+        titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sumColors.titleBg } };
         titleRow.getCell(1).alignment = { vertical: "middle" };
 
         const headerRow = sheet.addRow(headers);
+        headerRow.height = 20;
         headerRow.eachCell((cell: any) => {
-          cell.font = { bold: true };
-          cell.fill = grayFill;
-          cell.border = thinBorder;
+          cell.font = { bold: true, size: 10, color: { argb: sumColors.headerFont } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerColor } };
+          cell.border = sThinBorder;
           cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
@@ -933,51 +937,40 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         } else {
           for (const row of rows) {
             const dataRow = sheet.addRow(row);
-            dataRow.eachCell((cell: any) => {
-              cell.border = thinBorder;
-              if (typeof cell.value === "number") {
-                cell.numFmt = "#,##0.00";
-                cell.alignment = { horizontal: "right" };
-              }
+            dataRow.eachCell((cell: any, colN: number) => {
+              cell.border = sThinBorder;
+              cell.alignment = { vertical: "middle" };
+              if (numFmts[colN]) { cell.numFmt = numFmts[colN]; cell.alignment = { horizontal: "right" }; }
             });
           }
         }
 
         const allVals = [headers, ...rows];
         headers.forEach((_h, i) => {
-          const colIdx = i + 1;
-          const w = autoWidth(allVals.map(r => r[i]));
-          const existingCol = sheet.getColumn(colIdx);
-          if (!existingCol.width || existingCol.width < w) existingCol.width = w;
+          const w = autoW(allVals.map(r => r[i]));
+          const col = sheet.getColumn(i + 1);
+          if (!col.width || col.width < w) col.width = w;
         });
-
         sheet.addRow([]);
       };
 
-      addSection(
-        "Less Loaded",
-        ["Item Name", "Qty", "Total Bar"],
-        lessLoaded.map(r => [r.itemName, -Math.abs(r.qty), r.totalBar])
-      );
+      addSection("Less Loaded", sumColors.shortBorder, ["Item Name", "Qty"],
+        lessLoaded.map(r => [r.itemName, -Math.abs(r.qty)]),
+        { 2: "#,##0" });
 
-      addSection(
-        "Over Loaded",
-        ["Item Name", "Qty", "Total Bar"],
-        overloaded.map(r => [r.itemName, r.qty, r.totalBar])
-      );
+      addSection("Over Loaded", sumColors.overloadedBorder, ["Item Name", "Qty"],
+        overloaded.map(r => [r.itemName, r.qty]),
+        { 2: "#,##0" });
 
-      addSection(
-        "Loaded Not Requested",
-        ["Item Name", "Qty", "Total Bar"],
-        notRequested.map(r => [r.itemName, r.qty, r.totalBar])
-      );
+      addSection("Loaded Not Requested", sumColors.notRequestedBorder, ["Item Name", "Qty"],
+        notRequested.map(r => [r.itemName, r.qty]),
+        { 2: "#,##0" });
 
       const hasKgDiff = priceDiffs.some(r => r.kgDiff != null);
-      addSection(
-        "Price Diff",
+      addSection("Price Diff", sumColors.priceDiffBorder,
         hasKgDiff ? ["Item Name", "KG Diff", "Item Price Diff"] : ["Item Name", "Item Price Diff"],
-        priceDiffs.map(r => hasKgDiff ? [r.itemName, r.kgDiff, r.itemPriceDiff] : [r.itemName, r.itemPriceDiff])
-      );
+        priceDiffs.map(r => hasKgDiff ? [r.itemName, r.kgDiff, r.itemPriceDiff] : [r.itemName, r.itemPriceDiff]),
+        hasKgDiff ? { 2: "#,##0.00", 3: "#,##0.00" } : { 2: "#,##0.00" });
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       const summaryFileName = `Verification_Summary_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
