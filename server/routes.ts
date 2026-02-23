@@ -26535,6 +26535,50 @@ if (asOfDate) {
     }
   });
 
+  // Helper: generate a reference number that is guaranteed not to clash with any
+  // existing factory_bales ref for this company, by taking the max across both
+  // sequence tables and the actual data.
+  async function generateSafeRef(tx: any, companyId: number): Promise<string> {
+    const { referenceSequences } = await import("@shared/schema");
+    const { factoryBaleSequences } = await import("@shared/schema");
+
+    // Find the true max numeric ref already in use for this company
+    const [maxRow] = await tx
+      .select({
+        m: sql<number>`COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 0)`,
+      })
+      .from(factoryBales)
+      .where(and(eq(factoryBales.companyId, companyId), sql`reference_number ~ '^REF[0-9]+'`));
+    const dbMax = Number(maxRow?.m) || 0;
+
+    // Also check both sequence tables
+    const [refSeq] = await tx
+      .select()
+      .from(referenceSequences)
+      .where(eq(referenceSequences.companyId, companyId))
+      .for('update');
+    const [baleSeq] = await tx
+      .select()
+      .from(factoryBaleSequences)
+      .where(eq(factoryBaleSequences.companyId, companyId));
+
+    const seqMax = Math.max(refSeq?.nextNumber ?? 0, baleSeq?.nextNumber ?? 0);
+    const safeNext = Math.max(dbMax + 1, seqMax);
+    const referenceNumber = `REF${String(safeNext).padStart(5, '0')}`;
+
+    // Update (or insert) referenceSequences so next call gets safeNext+1
+    if (refSeq) {
+      await tx
+        .update(referenceSequences)
+        .set({ nextNumber: safeNext + 1 })
+        .where(eq(referenceSequences.id, refSeq.id));
+    } else {
+      await tx.insert(referenceSequences).values({ companyId, nextNumber: safeNext + 1 });
+    }
+
+    return referenceNumber;
+  }
+
   // Bale Label Prints - create label print records with unique reference numbers
   app.post("/api/bale-label-prints", requireAuth, async (req, res) => {
     try {
@@ -26553,27 +26597,31 @@ if (asOfDate) {
       const labelPrints = await db.transaction(async (tx) => {
         const results = [];
         for (const bale of bales) {
-          const [sequence] = await tx
-            .select()
-            .from(referenceSequences)
-            .where(eq(referenceSequences.companyId, companyId))
-            .for('update');
+          let referenceNumber: string;
 
-          let refNum: number;
-          if (!sequence) {
-            await tx
-              .insert(referenceSequences)
-              .values({ companyId, nextNumber: 2 });
-            refNum = 1;
+          // If the bale already has a reference number (assigned by stock-entry),
+          // reuse it — do NOT generate a new one or we'll collide with factory_bales unique constraint.
+          if (bale.productionBaleId) {
+            const [existingBale] = await tx
+              .select({ referenceNumber: factoryBales.referenceNumber })
+              .from(factoryBales)
+              .where(eq(factoryBales.id, bale.productionBaleId));
+
+            if (existingBale?.referenceNumber) {
+              // Bale already has a reference (e.g. assigned by stock-entry) — reuse it
+              referenceNumber = existingBale.referenceNumber;
+            } else {
+              // Bale has no ref yet (e.g. pressing batch bale) — generate one safely
+              referenceNumber = await generateSafeRef(tx, companyId);
+              await tx
+                .update(factoryBales)
+                .set({ referenceNumber })
+                .where(eq(factoryBales.id, bale.productionBaleId));
+            }
           } else {
-            refNum = sequence.nextNumber;
-            await tx
-              .update(referenceSequences)
-              .set({ nextNumber: sequence.nextNumber + 1 })
-              .where(eq(referenceSequences.id, sequence.id));
+            // No productionBaleId — standalone label print, generate from sequence
+            referenceNumber = await generateSafeRef(tx, companyId);
           }
-
-          const referenceNumber = `REF${String(refNum).padStart(5, '0')}`;
 
           const [labelPrint] = await tx
             .insert(baleLabelPrints)
@@ -26589,13 +26637,6 @@ if (asOfDate) {
               printedAt: new Date(),
             })
             .returning();
-
-          if (bale.productionBaleId) {
-            await tx
-              .update(factoryBales)
-              .set({ referenceNumber })
-              .where(eq(factoryBales.id, bale.productionBaleId));
-          }
 
           results.push(labelPrint);
         }
