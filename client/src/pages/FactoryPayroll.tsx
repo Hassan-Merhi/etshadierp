@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Download, FileText, DollarSign, Users, Calendar, Loader2, Edit } from "lucide-react";
+import { useLocation } from "wouter";
+import { Download, FileText, DollarSign, Users, Calendar, Loader2, Edit, Upload, Table2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -31,6 +32,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface PayrollRecord {
   id: number;
@@ -102,6 +105,11 @@ export default function FactoryPayrollPage() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
+  const [workerSearch, setWorkerSearch] = useState("");
+  const [workerImporting, setWorkerImporting] = useState(false);
+  const workerFileInput = useRef<HTMLInputElement>(null);
+  const [, navigate] = useLocation();
+
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ["/api/user/companies"],
   });
@@ -115,6 +123,51 @@ export default function FactoryPayrollPage() {
   if (filterEndDate) payrollQueryParams.set("endDate", filterEndDate);
   if (statusFilter !== "ALL") payrollQueryParams.set("status", statusFilter);
   const payrollUrl = `/api/factory/payroll?${payrollQueryParams.toString()}`;
+
+  const { formatDisplayDate } = useDateFormat();
+
+  const { data: allWorkers = [], isLoading: workersLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/workers", selectedCompanyId],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/workers?companyId=${selectedCompanyId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedCompanyId,
+  });
+
+  const filteredWorkers = useMemo(() => {
+    if (!workerSearch.trim()) return allWorkers;
+    const q = workerSearch.toLowerCase();
+    return allWorkers.filter((w: any) =>
+      (w.fullName || "").toLowerCase().includes(q) ||
+      (w.employeeCode || "").toLowerCase().includes(q) ||
+      (w.phone1 || "").toLowerCase().includes(q) ||
+      (w.position || "").toLowerCase().includes(q)
+    );
+  }, [allWorkers, workerSearch]);
+
+  const handleWorkerImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompanyId) return;
+    setWorkerImporting(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("companyId", String(selectedCompanyId));
+    try {
+      const res = await fetch("/api/factory/workers/import-excel", { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Import failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", selectedCompanyId] });
+      toast({ title: "Import complete", description: `Created: ${data.created}, Updated: ${data.updated}, Skipped: ${data.skipped}` });
+      if (data.errors?.length) console.warn("Import errors:", data.errors);
+    } catch (e: any) {
+      toast({ title: "Import failed", description: e.message, variant: "destructive" });
+    } finally {
+      setWorkerImporting(false);
+      if (workerFileInput.current) workerFileInput.current.value = "";
+    }
+  };
 
   const { data: payrollRecords = [], isLoading, isError } = useQuery<PayrollRecord[]>({
     queryKey: ["/api/factory/payroll", selectedCompanyId, filterStartDate, filterEndDate, statusFilter],
@@ -289,6 +342,20 @@ export default function FactoryPayrollPage() {
           </div>
         </div>
       </div>
+
+      <Tabs defaultValue="payroll" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="payroll" data-testid="tab-payroll-records">
+            <FileText className="h-4 w-4 mr-1" />
+            Payroll Records
+          </TabsTrigger>
+          <TabsTrigger value="workers" data-testid="tab-worker-master">
+            <Table2 className="h-4 w-4 mr-1" />
+            Worker Master Sheet
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="payroll" className="space-y-4">
 
       <Card>
         <CardContent className="pt-4">
@@ -604,6 +671,121 @@ export default function FactoryPayrollPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="workers" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Input
+                placeholder="Search by name, code or phone..."
+                value={workerSearch}
+                onChange={(e) => setWorkerSearch(e.target.value)}
+                className="max-w-sm"
+                data-testid="input-worker-search"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                ref={workerFileInput}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleWorkerImport}
+                data-testid="input-worker-import-file"
+              />
+              <Button
+                variant="outline"
+                onClick={() => workerFileInput.current?.click()}
+                disabled={workerImporting || !selectedCompanyId}
+                data-testid="button-import-workers"
+              >
+                {workerImporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                Import Workers Excel
+              </Button>
+              <a
+                href={selectedCompanyId ? "/api/factory/workers/template.xlsx" : "#"}
+                download
+                onClick={(e) => { if (!selectedCompanyId) e.preventDefault(); }}
+              >
+                <Button variant="outline" disabled={!selectedCompanyId} data-testid="button-download-template">
+                  <Download className="h-4 w-4 mr-1" />
+                  Download Template
+                </Button>
+              </a>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="pt-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Code</TableHead>
+                    <TableHead className="whitespace-nowrap">Full Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Position</TableHead>
+                    <TableHead className="whitespace-nowrap">Department</TableHead>
+                    <TableHead className="whitespace-nowrap">Phone 1</TableHead>
+                    <TableHead className="whitespace-nowrap">Phone 2</TableHead>
+                    <TableHead className="whitespace-nowrap">Emergency Contact</TableHead>
+                    <TableHead className="whitespace-nowrap">Date Joined</TableHead>
+                    <TableHead className="whitespace-nowrap">Contract Start</TableHead>
+                    <TableHead className="whitespace-nowrap">Salary Type</TableHead>
+                    <TableHead className="whitespace-nowrap">Pay Frequency</TableHead>
+                    <TableHead className="whitespace-nowrap text-right">Base Salary</TableHead>
+                    <TableHead className="whitespace-nowrap">Visa No.</TableHead>
+                    <TableHead className="whitespace-nowrap">Work Permit</TableHead>
+                    <TableHead className="whitespace-nowrap">Residential Permit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {workersLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={16} className="text-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredWorkers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                        {workerSearch ? "No workers match your search" : "No workers found. Import or add workers."}
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredWorkers.map((w: any) => (
+                    <TableRow
+                      key={w.id}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => navigate(`/factory/workers/${w.id}`)}
+                      data-testid={`row-worker-${w.id}`}
+                    >
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{w.employeeCode || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap font-medium">{w.fullName}</TableCell>
+                      <TableCell>
+                        <Badge variant={w.active ? "secondary" : "outline"} className={w.active ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}>
+                          {w.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{w.position || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.department || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.phone1 || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.phone2 || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.emergencyContactName || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.dateJoined ? formatDisplayDate(new Date(w.dateJoined)) : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.contractStartDate ? formatDisplayDate(new Date(w.contractStartDate)) : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.salaryType || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.payFrequency || "Monthly"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right">{w.baseSalary ? parseFloat(w.baseSalary).toFixed(2) : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.visaNumber || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.workPermitNumber || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{w.residentialPermit || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

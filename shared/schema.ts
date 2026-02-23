@@ -2970,6 +2970,16 @@ export const factoryWorkers = pgTable("factory_workers", {
   paymentMethod: varchar("payment_method", { length: 30 }).default("Cash"),
   photoUrl: text("photo_url"),
   notes: text("notes"),
+  payFrequency: varchar("pay_frequency", { length: 20 }).default("Monthly"),
+  hourlyRate: decimal("hourly_rate", { precision: 20, scale: 4 }).default("0"),
+  weeklySalary: decimal("weekly_salary", { precision: 20, scale: 2 }).default("0"),
+  biWeeklySalary: decimal("bi_weekly_salary", { precision: 20, scale: 2 }).default("0"),
+  visaNumber: varchar("visa_number", { length: 100 }),
+  visaExpiry: date("visa_expiry"),
+  workPermitNumber: varchar("work_permit_number", { length: 100 }),
+  workPermitExpiry: date("work_permit_expiry"),
+  residentialPermit: varchar("residential_permit", { length: 100 }),
+  residentialPermitExpiry: date("residential_permit_expiry"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -3019,6 +3029,16 @@ export const insertFactoryWorkerSchema = createInsertSchema(factoryWorkers).omit
   paymentMethod: z.enum(["Cash", "Bank", "Transfer"]).optional(),
   photoUrl: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  payFrequency: z.enum(["Monthly", "Hourly", "Weekly", "Bi-Weekly"]).optional(),
+  hourlyRate: z.string().optional().nullable(),
+  weeklySalary: z.string().optional().nullable(),
+  biWeeklySalary: z.string().optional().nullable(),
+  visaNumber: z.string().optional().nullable(),
+  visaExpiry: z.string().optional().nullable(),
+  workPermitNumber: z.string().optional().nullable(),
+  workPermitExpiry: z.string().optional().nullable(),
+  residentialPermit: z.string().optional().nullable(),
+  residentialPermitExpiry: z.string().optional().nullable(),
 });
 
 export type InsertFactoryWorker = z.infer<typeof insertFactoryWorkerSchema>;

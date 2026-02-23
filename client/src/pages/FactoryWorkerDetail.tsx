@@ -1,10 +1,11 @@
 import { useState, useRef } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Upload, User, Phone, MapPin, Briefcase, Calendar,
   Package, Weight, DollarSign, FileText, Shield, Heart, Users,
-  Building, CreditCard, Clock, AlertTriangle
+  Building, CreditCard, Clock, AlertTriangle, CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,6 +54,10 @@ export default function FactoryWorkerDetail() {
   const [endContractOpen, setEndContractOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [settlementStart, setSettlementStart] = useState("");
+  const [settlementEnd, setSettlementEnd] = useState(new Date().toISOString().split("T")[0]);
+  const [settleHours, setSettleHours] = useState("");
+  const [settlementResult, setSettlementResult] = useState<{ earned: string; paid: string; balance: string; settlementPayrollId: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -92,21 +97,24 @@ export default function FactoryWorkerDetail() {
     enabled: !!workerId,
   });
 
-  const endContractMutation = useMutation({
+  const settleMutation = useMutation({
     mutationFn: async () => {
-      const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/end-contract`, {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/settle-and-end`, {
         companyId: worker?.companyId,
+        startDate: settlementStart || worker?.contractStartDate || worker?.dateJoined || new Date().toISOString().split("T")[0],
+        endDate: settlementEnd,
+        hoursWorked: settleHours ? parseFloat(settleHours) : undefined,
       });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed"); }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "stats"] });
-      toast({ title: "Contract Ended", description: "Worker contract has been ended successfully" });
-      setEndContractOpen(false);
+      setSettlementResult(data);
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Settlement Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -136,9 +144,10 @@ export default function FactoryWorkerDetail() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const { formatDisplayDate } = useDateFormat();
   const formatDate = (val: string | null | undefined) => {
     if (!val) return "-";
-    return new Date(val).toLocaleDateString();
+    try { return formatDisplayDate(new Date(val)); } catch { return "-"; }
   };
 
   const formatCurrency = (val: string | number | null | undefined) => {
@@ -525,31 +534,93 @@ export default function FactoryWorkerDetail() {
         </Card>
       )}
 
-      <Dialog open={endContractOpen} onOpenChange={setEndContractOpen}>
-        <DialogContent>
+      <Dialog open={endContractOpen} onOpenChange={(open) => { setEndContractOpen(open); if (!open) setSettlementResult(null); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>End Contract</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to end the contract for <strong>{worker.fullName}</strong>? This action will mark the worker as inactive.
-            </DialogDescription>
+            <DialogTitle>End Contract &amp; Settlement</DialogTitle>
           </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setEndContractOpen(false)}
-              data-testid="button-cancel-end-contract"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => endContractMutation.mutate()}
-              disabled={endContractMutation.isPending}
-              data-testid="button-confirm-end-contract"
-            >
-              {endContractMutation.isPending ? "Ending..." : "Confirm End Contract"}
-            </Button>
-          </DialogFooter>
+          {settlementResult ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-semibold">Settlement calculated successfully</span>
+              </div>
+              <div className="rounded-md border p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Earned</span>
+                  <span className="font-semibold">${parseFloat(settlementResult.earned).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Already Paid</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">-${parseFloat(settlementResult.paid).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center border-t pt-3">
+                  <span className="text-sm font-semibold">Balance Owed</span>
+                  <span className={`font-bold text-lg ${parseFloat(settlementResult.balance) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    ${parseFloat(settlementResult.balance).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Settlement payroll record #{settlementResult.settlementPayrollId} has been created. Worker is now inactive.</p>
+              <DialogFooter>
+                <Button onClick={() => { setEndContractOpen(false); setSettlementResult(null); navigate("/factory/workers"); }} data-testid="button-close-settlement">
+                  Close
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Calculate final settlement for <strong>{worker.fullName}</strong> and end their contract.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Settlement Start</Label>
+                  <Input
+                    type="date"
+                    value={settlementStart || worker.contractStartDate || worker.dateJoined || ""}
+                    onChange={(e) => setSettlementStart(e.target.value)}
+                    data-testid="input-settlement-start"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Settlement End</Label>
+                  <Input
+                    type="date"
+                    value={settlementEnd}
+                    onChange={(e) => setSettlementEnd(e.target.value)}
+                    data-testid="input-settlement-end"
+                  />
+                </div>
+              </div>
+              {((worker as any).payFrequency === "Hourly") && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Hours Worked</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={settleHours}
+                    onChange={(e) => setSettleHours(e.target.value)}
+                    placeholder="Total hours in period"
+                    data-testid="input-settle-hours"
+                  />
+                </div>
+              )}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setEndContractOpen(false)} data-testid="button-cancel-end-contract">
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => settleMutation.mutate()}
+                  disabled={settleMutation.isPending}
+                  data-testid="button-confirm-end-contract"
+                >
+                  {settleMutation.isPending ? "Calculating..." : "Confirm End Contract"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

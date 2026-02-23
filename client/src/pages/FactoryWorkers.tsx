@@ -61,6 +61,16 @@ const emptyForm = {
   perKgRate: "",
   overtimeRate: "",
   shiftType: "",
+  payFrequency: "Monthly",
+  hourlyRate: "",
+  weeklySalary: "",
+  biWeeklySalary: "",
+  visaNumber: "",
+  visaExpiry: "",
+  workPermitNumber: "",
+  workPermitExpiry: "",
+  residentialPermit: "",
+  residentialPermitExpiry: "",
   bankName: "",
   bankAccountNumber: "",
   paymentMethod: "Cash",
@@ -190,6 +200,16 @@ export default function FactoryWorkers() {
       perKgRate: w.perKgRate || "",
       overtimeRate: w.overtimeRate || "",
       shiftType: w.shiftType || "",
+      payFrequency: (w as any).payFrequency || "Monthly",
+      hourlyRate: (w as any).hourlyRate || "",
+      weeklySalary: (w as any).weeklySalary || "",
+      biWeeklySalary: (w as any).biWeeklySalary || "",
+      visaNumber: (w as any).visaNumber || "",
+      visaExpiry: (w as any).visaExpiry || "",
+      workPermitNumber: (w as any).workPermitNumber || "",
+      workPermitExpiry: (w as any).workPermitExpiry || "",
+      residentialPermit: (w as any).residentialPermit || "",
+      residentialPermitExpiry: (w as any).residentialPermitExpiry || "",
       bankName: w.bankName || "",
       bankAccountNumber: w.bankAccountNumber || "",
       paymentMethod: w.paymentMethod || "Cash",
@@ -397,6 +417,72 @@ export default function FactoryWorkers() {
           <div className="space-y-1">
             <Label className="text-xs">Shift Type</Label>
             <Input value={formData.shiftType} onChange={(e) => updateField("shiftType", e.target.value)} data-testid="input-shiftType" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Pay Frequency</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Pay Frequency</Label>
+            <Select value={formData.payFrequency} onValueChange={(v) => updateField("payFrequency", v)}>
+              <SelectTrigger data-testid="select-payFrequency"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Monthly">Monthly</SelectItem>
+                <SelectItem value="Hourly">Hourly</SelectItem>
+                <SelectItem value="Weekly">Weekly</SelectItem>
+                <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {formData.payFrequency === "Hourly" && (
+            <div className="space-y-1">
+              <Label className="text-xs">Hourly Rate</Label>
+              <Input type="number" step="0.0001" value={formData.hourlyRate} onChange={(e) => updateField("hourlyRate", e.target.value)} data-testid="input-hourlyRate" />
+            </div>
+          )}
+          {formData.payFrequency === "Weekly" && (
+            <div className="space-y-1">
+              <Label className="text-xs">Weekly Salary</Label>
+              <Input type="number" step="0.01" value={formData.weeklySalary} onChange={(e) => updateField("weeklySalary", e.target.value)} data-testid="input-weeklySalary" />
+            </div>
+          )}
+          {formData.payFrequency === "Bi-Weekly" && (
+            <div className="space-y-1">
+              <Label className="text-xs">Bi-Weekly Salary</Label>
+              <Input type="number" step="0.01" value={formData.biWeeklySalary} onChange={(e) => updateField("biWeeklySalary", e.target.value)} data-testid="input-biWeeklySalary" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Documents</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Visa Number</Label>
+            <Input value={formData.visaNumber} onChange={(e) => updateField("visaNumber", e.target.value)} data-testid="input-visaNumber" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Visa Expiry</Label>
+            <Input type="date" value={formData.visaExpiry} onChange={(e) => updateField("visaExpiry", e.target.value)} data-testid="input-visaExpiry" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Work Permit Number</Label>
+            <Input value={formData.workPermitNumber} onChange={(e) => updateField("workPermitNumber", e.target.value)} data-testid="input-workPermitNumber" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Work Permit Expiry</Label>
+            <Input type="date" value={formData.workPermitExpiry} onChange={(e) => updateField("workPermitExpiry", e.target.value)} data-testid="input-workPermitExpiry" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Residential Permit</Label>
+            <Input value={formData.residentialPermit} onChange={(e) => updateField("residentialPermit", e.target.value)} data-testid="input-residentialPermit" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Residential Permit Expiry</Label>
+            <Input type="date" value={formData.residentialPermitExpiry} onChange={(e) => updateField("residentialPermitExpiry", e.target.value)} data-testid="input-residentialPermitExpiry" />
           </div>
         </div>
       </div>

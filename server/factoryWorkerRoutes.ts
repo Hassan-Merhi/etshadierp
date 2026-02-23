@@ -1,8 +1,10 @@
 import type { Express } from "express";
-import { eq, and, desc, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, gte, lte, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
   factoryWorkers,
   insertFactoryWorkerSchema,
@@ -81,6 +83,144 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.json(results);
     } catch (error: any) {
       console.error("Error fetching factory workers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/workers/template.xlsx - Download Excel import template
+  app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: any, res: any) => {
+    try {
+      const wb = new ExcelJS.Workbook();
+      const sheet = wb.addWorksheet("Workers");
+      const headers = [
+        "Full Name", "Employee Code", "National ID", "Passport Number", "Date of Birth", "Nationality",
+        "Gender", "Marital Status", "Phone 1", "Phone 2", "Emergency Contact Name", "Emergency Contact Phone",
+        "Address", "City", "Country", "Position", "Department", "Date Joined", "Contract Start",
+        "Salary Type", "Base Salary", "Per Bale Rate", "Per KG Rate",
+        "Pay Frequency", "Hourly Rate", "Weekly Salary", "Bi-Weekly Salary",
+        "Visa Number", "Visa Expiry", "Work Permit Number", "Work Permit Expiry",
+        "Residential Permit", "Residential Permit Expiry", "Bank Name", "Bank Account Number",
+        "Payment Method", "Notes",
+      ];
+      const headerRow = sheet.addRow(headers);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell: any) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
+        cell.font = { bold: true, color: { argb: "FFFFFF" } };
+      });
+      headers.forEach((_, i) => { sheet.getColumn(i + 1).width = 18; });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error generating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/workers/import-excel - Bulk import/update workers from Excel
+  app.post("/api/factory/workers/import-excel", requireAuth, workerUpload.single("file"), async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId ? parseInt(req.body.companyId) : (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "companyId required" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      // Parse xlsx
+      const workbook = XLSX.readFile(req.file.path);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      fs.unlinkSync(req.file.path);
+
+      // Case-insensitive column mapping
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const colMap: Record<string, string> = {
+        fullname: "fullName", employeecode: "employeeCode", nationalid: "nationalId",
+        passportnumber: "passportNumber", dateofbirth: "dateOfBirth", nationality: "nationality",
+        gender: "gender", maritalstatus: "maritalStatus", phone1: "phone1", phone2: "phone2",
+        emergencycontactname: "emergencyContactName", emergencycontactphone: "emergencyContactPhone",
+        address: "address", city: "city", country: "country", position: "position",
+        department: "department", datejoined: "dateJoined", contractstart: "contractStartDate",
+        salarytype: "salaryType", basesalary: "baseSalary", perbalerate: "perBaleRate",
+        perkgrate: "perKgRate", payfrequency: "payFrequency", hourlyrate: "hourlyRate",
+        weeklysalary: "weeklySalary", biweeklysalary: "biWeeklySalary",
+        visanumber: "visaNumber", visaexpiry: "visaExpiry",
+        workpermitnumber: "workPermitNumber", workpermitexpiry: "workPermitExpiry",
+        residentialpermit: "residentialPermit", residentialpermitexpiry: "residentialPermitExpiry",
+        bankname: "bankName", bankaccountnumber: "bankAccountNumber",
+        paymentmethod: "paymentMethod", notes: "notes",
+      };
+
+      let created = 0, updated = 0, skipped = 0;
+      const errors: string[] = [];
+
+      // Load existing workers for fast lookup
+      const existingWorkers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
+      const byCode = new Map(existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w]));
+      const byPassport = new Map(existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w]));
+      const byNationalId = new Map(existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w]));
+
+      const parseDate = (v: any): string | null => {
+        if (!v) return null;
+        if (typeof v === "number") {
+          // Excel serial date
+          const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+          return d.toISOString().split("T")[0];
+        }
+        const s = String(v).trim();
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+      };
+
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i];
+        try {
+          // Map raw keys to field names
+          const mapped: any = {};
+          for (const [rawKey, rawVal] of Object.entries(raw)) {
+            const key = colMap[normalize(rawKey)];
+            if (key) mapped[key] = rawVal;
+          }
+          if (!mapped.fullName) { skipped++; errors.push(`Row ${i + 2}: missing Full Name`); continue; }
+
+          // Date fields
+          for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
+            if (mapped[f] !== undefined) mapped[f] = parseDate(mapped[f]);
+          }
+          // Numeric fields
+          for (const f of ["baseSalary", "perBaleRate", "perKgRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
+            if (mapped[f] !== undefined && mapped[f] !== "") mapped[f] = String(parseFloat(mapped[f]) || 0);
+          }
+
+          // Find existing worker
+          const existing = byCode.get(mapped.employeeCode) || byPassport.get(mapped.passportNumber) || byNationalId.get(mapped.nationalId);
+          if (existing) {
+            await db.update(factoryWorkers).set({ ...mapped, updatedAt: new Date() }).where(and(eq(factoryWorkers.id, existing.id), eq(factoryWorkers.companyId, companyId)));
+            updated++;
+          } else {
+            const [newWorker] = await db.insert(factoryWorkers).values({ ...mapped, companyId }).returning();
+            if (!newWorker.employeeCode) {
+              await db.update(factoryWorkers).set({ employeeCode: `FW-${companyId}-${newWorker.id}` }).where(eq(factoryWorkers.id, newWorker.id));
+            }
+            created++;
+          }
+        } catch (e: any) {
+          skipped++;
+          errors.push(`Row ${i + 2}: ${e.message}`);
+        }
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId, txDate: today, txType: "WORKER_IMPORT",
+        description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json({ created, updated, skipped, errors });
+    } catch (error: any) {
+      console.error("Error importing workers:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -313,6 +453,115 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.json(bales);
     } catch (error: any) {
       console.error("Error fetching worker bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/workers/:id/settle-and-end - Settlement calculation + end contract
+  app.post("/api/factory/workers/:id/settle-and-end", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const { startDate, endDate, hoursWorked } = req.body;
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
+
+      const [worker] = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));
+      if (!worker) return res.status(404).json({ message: "Worker not found" });
+      if (!worker.active) return res.status(400).json({ message: "Worker contract already ended" });
+
+      // Helper functions
+      const daysInPeriod = (s: string, e: string) => Math.floor((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const countWeekdays = (s: string, e: string) => {
+        let count = 0; const cur = new Date(s); const end = new Date(e);
+        while (cur <= end) { const d = cur.getDay(); if (d !== 0 && d !== 6) count++; cur.setDate(cur.getDate() + 1); }
+        return count;
+      };
+      const daysInMonth = (dateStr: string) => { const d = new Date(dateStr); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
+
+      const days = daysInPeriod(startDate, endDate);
+      const weekdays = countWeekdays(startDate, endDate);
+      const baseSal = parseFloat(worker.baseSalary || "0");
+      const payFreq = worker.payFrequency || "Monthly";
+      const salType = worker.salaryType || "Monthly";
+
+      let earned = 0;
+
+      // Time-based frequencies use payFrequency field; production-based fall back to salaryType
+      if (payFreq === "Hourly") {
+        earned = (parseFloat(hoursWorked) || 0) * parseFloat(worker.hourlyRate || "0");
+      } else if (payFreq === "Weekly") {
+        earned = (days / 7) * parseFloat(worker.weeklySalary || "0");
+      } else if (payFreq === "Bi-Weekly") {
+        earned = (days / 14) * parseFloat(worker.biWeeklySalary || "0");
+      } else if (salType === "Daily") {
+        earned = weekdays * baseSal;
+      } else if (salType === "Per Bale" || salType === "Per KG") {
+        const bales = await db.select().from(factoryBales).where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.finalizedBy, id),
+          gte(factoryBales.finalizedAt, new Date(startDate)),
+          lte(factoryBales.finalizedAt, new Date(endDate + "T23:59:59.999Z")),
+        ));
+        if (salType === "Per Bale") {
+          earned = bales.length * parseFloat(worker.perBaleRate || "0");
+        } else {
+          const totalKg = bales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+          earned = totalKg * parseFloat(worker.perKgRate || "0");
+        }
+      } else {
+        // Monthly (default)
+        earned = baseSal * (days / daysInMonth(startDate));
+      }
+
+      // Compute already paid in period (APPROVED or PAID payrolls)
+      const paidPayrolls = await db.select().from(factoryPayrolls).where(and(
+        eq(factoryPayrolls.workerId, id),
+        eq(factoryPayrolls.companyId, companyId),
+        gte(factoryPayrolls.periodStart, startDate),
+        lte(factoryPayrolls.periodEnd, endDate),
+        inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
+      ));
+      const totalPaid = paidPayrolls.reduce((s: number, p: any) => s + parseFloat(p.netSalary || "0"), 0);
+      const balance = earned - totalPaid;
+
+      // Insert settlement payroll record
+      const [settlement] = await db.insert(factoryPayrolls).values({
+        companyId,
+        workerId: id,
+        periodStart: startDate,
+        periodEnd: endDate,
+        baseSalary: String(earned.toFixed(2)),
+        baleEarnings: "0",
+        kgEarnings: "0",
+        overtimePay: "0",
+        bonuses: "0",
+        deductions: String(totalPaid.toFixed(2)),
+        advances: "0",
+        netSalary: String(balance.toFixed(2)),
+        balesCount: 0,
+        kgProcessed: "0",
+        overtimeHours: "0",
+        status: "APPROVED",
+        notes: "Settlement - contract ended",
+      }).returning();
+
+      // Deactivate worker
+      const today = new Date().toISOString().split("T")[0];
+      await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
+
+      await writeDaybookEntry(db, {
+        companyId, txDate: today, txType: "CONTRACT_SETTLED",
+        referenceId: id, referenceTable: "factory_workers",
+        description: `Settlement for ${worker.fullName}: earned $${earned.toFixed(2)}, paid $${totalPaid.toFixed(2)}, balance $${balance.toFixed(2)}`,
+        amountCurrency: Math.abs(balance), amountUsd: Math.abs(balance),
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), settlementPayrollId: settlement.id, workerUpdated: true });
+    } catch (error: any) {
+      console.error("Error settling worker contract:", error);
       res.status(500).json({ message: error.message });
     }
   });
