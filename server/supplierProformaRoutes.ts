@@ -787,4 +787,206 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.get("/api/suppliers/:supplierId/containers/:containerId/verification-summary-export.xlsx", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = parseInt(req.params.supplierId);
+      const containerId = parseInt(req.params.containerId);
+      const proformaId = parseInt(req.query.proformaId as string);
+      if (!proformaId) return res.status(400).json({ message: "proformaId required" });
+
+      if (!await verifyContainerOwnership(containerId, companyId)) return res.status(403).json({ message: "Access denied" });
+
+      const [proforma] = await db.select().from(supplierProformas)
+        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const [container] = await db.select().from(containers).where(eq(containers.id, containerId));
+      const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, supplierId));
+
+      const proformaLinesList = await db.select().from(supplierProformaLines)
+        .where(eq(supplierProformaLines.proformaId, proformaId));
+      const loadedItemsList = await db.select().from(supplierContainerLoadedItems)
+        .where(eq(supplierContainerLoadedItems.containerId, containerId));
+
+      const proformaByBarcode = new Map<string, any>();
+      for (const line of proformaLinesList) {
+        const bc = (line.barcode || "").trim();
+        if (proformaByBarcode.has(bc)) { proformaByBarcode.get(bc).qty += line.qty; }
+        else { proformaByBarcode.set(bc, { ...line, qty: line.qty, weightPerBale: parseFloat(line.weightPerBale || "0"), pricePerBale: parseFloat(line.pricePerBale || "0") }); }
+      }
+      const loadedByBarcode = new Map<string, any>();
+      for (const item of loadedItemsList) {
+        const bc = (item.barcode || "").trim();
+        if (loadedByBarcode.has(bc)) { loadedByBarcode.get(bc).qty += item.qty; }
+        else { loadedByBarcode.set(bc, { ...item, qty: item.qty, weightPerBale: parseFloat(item.weightPerBale || "0"), pricePerBale: parseFloat(item.pricePerBale || "0") }); }
+      }
+
+      const allBarcodes = new Set([...proformaByBarcode.keys(), ...loadedByBarcode.keys()]);
+      const overloaded: any[] = [];
+      const lessLoaded: any[] = [];
+      const notRequested: any[] = [];
+      const priceDiffs: any[] = [];
+      const fullComparison: any[] = [];
+
+      for (const barcode of allBarcodes) {
+        const exp = proformaByBarcode.get(barcode);
+        const loaded = loadedByBarcode.get(barcode);
+        const expectedQty = exp?.qty || 0;
+        const loadedQty = loaded?.qty || 0;
+        const expPrice = exp?.pricePerBale || 0;
+        const loadPrice = loaded?.pricePerBale || 0;
+        const expWeight = exp?.weightPerBale || 0;
+        const loadWeight = loaded?.weightPerBale || expWeight;
+        const itemName = exp?.itemName || loaded?.itemName || barcode;
+        const loadedWeightTotal = loadedQty * loadWeight;
+        const expectedWeightTotal = expectedQty * expWeight;
+        const loadedValueTotal = loadedQty * (loadPrice || expPrice);
+        const expectedValueTotal = expectedQty * expPrice;
+        const qtyDiff = loadedQty - expectedQty;
+
+        let status = "OK";
+        if (expectedQty === 0 && loadedQty > 0) status = "NOT REQUESTED";
+        else if (expectedQty > 0 && loadedQty === 0) status = "MISSING";
+        else if (loadedQty > expectedQty) status = "OVERLOADED";
+        else if (loadedQty < expectedQty) status = "SHORT";
+
+        fullComparison.push({ barcode, itemName, expectedQty, loadedQty, qtyDiff, expPrice, loadPrice, priceDiff: loadPrice - expPrice, expWeight, loadWeight, expectedWeightTotal, loadedWeightTotal, expectedValueTotal, loadedValueTotal, status });
+
+        if (expectedQty === 0 && loadedQty > 0) {
+          notRequested.push({ itemName, qty: loadedQty, totalBar: loadedWeightTotal });
+        } else if (loadedQty > expectedQty) {
+          overloaded.push({ itemName, qty: loadedQty, totalBar: loadedWeightTotal });
+        } else if (loadedQty < expectedQty) {
+          lessLoaded.push({ itemName, qty: -(expectedQty - loadedQty), totalBar: loadedWeightTotal });
+        }
+        if (expPrice && loadPrice && Math.abs(loadPrice - expPrice) >= 0.01) {
+          const kgDiff = (expWeight && loadWeight && Math.abs(loadWeight - expWeight) >= 0.001) ? (loadWeight - expWeight) : null;
+          priceDiffs.push({ itemName, kgDiff, itemPriceDiff: loadPrice - expPrice });
+        }
+      }
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "ERP POS System";
+      wb.created = new Date();
+      const sheet = wb.addWorksheet("Comparison");
+
+      const thinBorder: any = {
+        top: { style: "thin", color: { argb: "BDBDBD" } },
+        left: { style: "thin", color: { argb: "BDBDBD" } },
+        bottom: { style: "thin", color: { argb: "BDBDBD" } },
+        right: { style: "thin", color: { argb: "BDBDBD" } },
+      };
+      const grayFill: any = { type: "pattern", pattern: "solid", fgColor: { argb: "E0E0E0" } };
+
+      const autoWidth = (vals: (string | number | null | undefined)[]): number =>
+        Math.min(50, Math.max(...vals.map(v => String(v ?? "").length)) + 2);
+
+      const fullHeaders = ["Item Name", "Barcode", "Expected Qty", "Loaded Qty", "Qty Diff", "Proforma Price", "Loaded Price", "Price Diff/Bale", "Exp Weight", "Load Weight", "Exp Weight Total", "Load Weight Total", "Status"];
+      const fullHeaderRow = sheet.addRow(fullHeaders);
+      fullHeaderRow.eachCell((cell: any) => {
+        cell.font = { bold: true };
+        cell.fill = grayFill;
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      for (const row of fullComparison) {
+        const dataRow = sheet.addRow([
+          row.itemName, row.barcode, row.expectedQty, row.loadedQty, row.qtyDiff,
+          row.expPrice, row.loadPrice, row.priceDiff,
+          row.expWeight, row.loadWeight, row.expectedWeightTotal, row.loadedWeightTotal,
+          row.status,
+        ]);
+        dataRow.eachCell((cell: any) => { cell.border = thinBorder; });
+        for (let c = 3; c <= 12; c++) {
+          dataRow.getCell(c).numFmt = "#,##0.00";
+          dataRow.getCell(c).alignment = { horizontal: "right" };
+        }
+      }
+
+      const fullColData = [fullHeaders, ...fullComparison.map(r => [r.itemName, r.barcode, r.expectedQty, r.loadedQty, r.qtyDiff, r.expPrice, r.loadPrice, r.priceDiff, r.expWeight, r.loadWeight, r.expectedWeightTotal, r.loadedWeightTotal, r.status])];
+      fullHeaders.forEach((_h, i) => {
+        sheet.getColumn(i + 1).width = autoWidth(fullColData.map(r => r[i]));
+      });
+
+      sheet.addRow([]);
+
+      const addSection = (title: string, headers: string[], rows: (string | number | null)[][]) => {
+        const titleRow = sheet.addRow([title]);
+        titleRow.getCell(1).font = { bold: true, size: 14 };
+        titleRow.getCell(1).alignment = { vertical: "middle" };
+
+        const headerRow = sheet.addRow(headers);
+        headerRow.eachCell((cell: any) => {
+          cell.font = { bold: true };
+          cell.fill = grayFill;
+          cell.border = thinBorder;
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        });
+
+        if (rows.length === 0) {
+          const emptyRow = sheet.addRow(["No items"]);
+          emptyRow.getCell(1).font = { italic: true, color: { argb: "9E9E9E" } };
+        } else {
+          for (const row of rows) {
+            const dataRow = sheet.addRow(row);
+            dataRow.eachCell((cell: any) => {
+              cell.border = thinBorder;
+              if (typeof cell.value === "number") {
+                cell.numFmt = "#,##0.00";
+                cell.alignment = { horizontal: "right" };
+              }
+            });
+          }
+        }
+
+        const allVals = [headers, ...rows];
+        headers.forEach((_h, i) => {
+          const colIdx = i + 1;
+          const w = autoWidth(allVals.map(r => r[i]));
+          const existingCol = sheet.getColumn(colIdx);
+          if (!existingCol.width || existingCol.width < w) existingCol.width = w;
+        });
+
+        sheet.addRow([]);
+      };
+
+      addSection(
+        "Less Loaded",
+        ["Item Name", "Qty", "Total Bar"],
+        lessLoaded.map(r => [r.itemName, -Math.abs(r.qty), r.totalBar])
+      );
+
+      addSection(
+        "Over Loaded",
+        ["Item Name", "Qty", "Total Bar"],
+        overloaded.map(r => [r.itemName, r.qty, r.totalBar])
+      );
+
+      addSection(
+        "Loaded Not Requested",
+        ["Item Name", "Qty", "Total Bar"],
+        notRequested.map(r => [r.itemName, r.qty, r.totalBar])
+      );
+
+      const hasKgDiff = priceDiffs.some(r => r.kgDiff != null);
+      addSection(
+        "Price Diff",
+        hasKgDiff ? ["Item Name", "KG Diff", "Item Price Diff"] : ["Item Name", "Item Price Diff"],
+        priceDiffs.map(r => hasKgDiff ? [r.itemName, r.kgDiff, r.itemPriceDiff] : [r.itemName, r.itemPriceDiff])
+      );
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      const summaryFileName = `Verification_Summary_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+      res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Summary export error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

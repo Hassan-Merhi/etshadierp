@@ -206,6 +206,11 @@ export default function ContainerVerification() {
     window.open(`/api/suppliers/${selectedSupplierId}/containers/${containerId}/verification-export.xlsx?proformaId=${selectedProformaId}`, "_blank");
   };
 
+  const exportSummaryExcel = () => {
+    if (!selectedSupplierId || !selectedProformaId) return;
+    window.open(`/api/suppliers/${selectedSupplierId}/containers/${containerId}/verification-summary-export.xlsx?proformaId=${selectedProformaId}`, "_blank");
+  };
+
   const startEdit = (item: LoadedItem) => {
     setEditingItemId(item.id);
     setEditItemData({
@@ -388,10 +393,16 @@ export default function ContainerVerification() {
                 Generate Comparison
               </Button>
               {verificationResult && (
-                <Button variant="outline" onClick={exportToExcel} data-testid="button-export-excel">
-                  <Download className="mr-1 h-4 w-4" />
-                  Excel
-                </Button>
+                <>
+                  <Button variant="outline" onClick={exportToExcel} data-testid="button-export-excel">
+                    <Download className="mr-1 h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button variant="outline" onClick={exportSummaryExcel} data-testid="button-export-summary-excel">
+                    <Download className="mr-1 h-4 w-4" />
+                    Summary
+                  </Button>
+                </>
               )}
             </div>
           </CardContent>
