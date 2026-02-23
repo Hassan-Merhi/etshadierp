@@ -12444,12 +12444,16 @@ if (asOfDate) {
 
       const companyId = req.session.currentCompanyId;
 
+      // Determine company type — ERP suppliers must not appear in factory company vouchers
+      const currentCompany = await storage.getCompanyById(companyId);
+      const isFactoryCompany = currentCompany?.companyType === "factory";
+
       // Fetch all account types
       const ledgers = await storage.getAllLedgerAccounts(companyId);
       const banks = await storage.getAllBankAccounts(companyId);
       const assets = await storage.getAllFixedAssets(companyId);
       const employees = await storage.getAllEmployees(companyId);
-      const suppliers = await storage.getAllSuppliers();
+      const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
       const employeesData = await storage.getAllEmployees(companyId);
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
