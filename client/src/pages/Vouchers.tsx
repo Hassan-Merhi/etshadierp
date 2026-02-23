@@ -1078,6 +1078,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       
       // Clear edit mode and navigate back to daybook
       if (isEditMode) {
@@ -1696,6 +1699,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
