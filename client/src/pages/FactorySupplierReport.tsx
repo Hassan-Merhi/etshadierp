@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText, Filter, Loader2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,12 @@ export default function FactorySupplierReport() {
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/user/companies"],
   });
+
+  useEffect(() => {
+    if (companies.length === 1 && companyId === null) {
+      setCompanyId(companies[0].id);
+    }
+  }, [companies, companyId]);
 
   const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers", companyId],
@@ -98,27 +104,29 @@ export default function FactorySupplierReport() {
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-4 flex-wrap">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Company</Label>
-              <Select
-                value={companyId ? String(companyId) : ""}
-                onValueChange={(val) => {
-                  setCompanyId(Number(val));
-                  setSupplierId("");
-                }}
-              >
-                <SelectTrigger className="w-48" data-testid="select-company">
-                  <SelectValue placeholder="Select company" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {companies.length > 1 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Company</Label>
+                <Select
+                  value={companyId ? String(companyId) : ""}
+                  onValueChange={(val) => {
+                    setCompanyId(Number(val));
+                    setSupplierId("");
+                  }}
+                >
+                  <SelectTrigger className="w-48" data-testid="select-company">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">From</Label>

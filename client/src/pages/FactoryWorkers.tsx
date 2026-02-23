@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -95,6 +95,12 @@ export default function FactoryWorkers() {
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/user/companies"],
   });
+
+  useEffect(() => {
+    if (companies && companies.length === 1 && companyId === null) {
+      setCompanyId(companies[0].id);
+    }
+  }, [companies, companyId]);
 
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({
     queryKey: ["/api/factory/workers", companyId],
@@ -525,6 +531,9 @@ export default function FactoryWorkers() {
   );
 
   if (!companyId) {
+    if (companies && companies.length === 1) {
+      return null;
+    }
     return (
       <div className="space-y-6">
         <div>
@@ -574,14 +583,16 @@ export default function FactoryWorkers() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Select value={String(companyId)} onValueChange={(v) => setCompanyId(Number(v))}>
-            <SelectTrigger className="w-48" data-testid="select-company"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {companies?.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {companies && companies.length > 1 && (
+            <Select value={String(companyId)} onValueChange={(v) => setCompanyId(Number(v))}>
+              <SelectTrigger className="w-48" data-testid="select-company"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {companies?.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             onClick={() => { resetForm(); setCreateOpen(true); }}
             data-testid="button-add-worker"

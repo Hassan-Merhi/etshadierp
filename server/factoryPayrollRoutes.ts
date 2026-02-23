@@ -220,7 +220,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
   app.patch("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
     try {
       const id = parseInt(req.params.id);
-      const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status } = req.body;
+      const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status, paymentSource, paymentDate, paymentReference } = req.body;
 
       const [existing] = await db
         .select()
@@ -265,17 +265,34 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .returning();
 
       if (status && status !== existing.status) {
-        const today = new Date().toISOString().split("T")[0];
-        await writeDaybookEntry(db, {
-          companyId: existing.companyId,
-          txDate: today,
-          txType: "PAYROLL_STATUS_CHANGE",
-          referenceId: id,
-          referenceTable: "factory_payrolls",
-          description: `Payroll #${id} status changed from ${existing.status} to ${status}`,
-          amountCurrency: netSalary,
-          amountUsd: netSalary,
-        });
+        const entryDate = (status === "PAID" && paymentDate) ? paymentDate : new Date().toISOString().split("T")[0];
+
+        if (status === "PAID") {
+          const source = paymentSource || "Cash";
+          const ref = paymentReference ? ` | Ref: ${paymentReference}` : "";
+          await writeDaybookEntry(db, {
+            companyId: existing.companyId,
+            txDate: entryDate,
+            txType: "PAYROLL_PAYMENT",
+            referenceId: id,
+            referenceTable: "factory_payrolls",
+            description: `Payroll payment via ${source}${ref} — Payroll #${id}`,
+            amountCurrency: netSalary,
+            amountUsd: netSalary,
+            metaJson: JSON.stringify({ paymentSource: source, paymentReference: paymentReference || null }),
+          });
+        } else {
+          await writeDaybookEntry(db, {
+            companyId: existing.companyId,
+            txDate: entryDate,
+            txType: "PAYROLL_STATUS_CHANGE",
+            referenceId: id,
+            referenceTable: "factory_payrolls",
+            description: `Payroll #${id} status changed from ${existing.status} to ${status}`,
+            amountCurrency: netSalary,
+            amountUsd: netSalary,
+          });
+        }
       }
 
       res.json(updated);

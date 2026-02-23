@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Download, FileText, DollarSign, Users, Calendar, Loader2, Edit, Upload, Table2, CheckCircle2 } from "lucide-react";
@@ -102,6 +102,11 @@ export default function FactoryPayrollPage() {
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState("DRAFT");
 
+  const [showPayDialog, setShowPayDialog] = useState(false);
+  const [paySource, setPaySource] = useState("Cash");
+  const [payDate, setPayDate] = useState(today);
+  const [payReference, setPayReference] = useState("");
+
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
@@ -116,6 +121,12 @@ export default function FactoryPayrollPage() {
 
   const firstCompanyId = companies.length > 0 ? companies[0].id : null;
   const selectedCompanyId = companyId ?? firstCompanyId;
+
+  useEffect(() => {
+    if (companies.length === 1 && companyId === null) {
+      setCompanyId(companies[0].id);
+    }
+  }, [companies, companyId]);
 
   const payrollQueryParams = new URLSearchParams();
   if (selectedCompanyId) payrollQueryParams.set("companyId", String(selectedCompanyId));
@@ -202,6 +213,7 @@ export default function FactoryPayrollPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payroll"] });
       setEditRecord(null);
+      setShowPayDialog(false);
       toast({ title: "Payroll updated" });
     },
     onError: (e: any) => {
@@ -221,6 +233,13 @@ export default function FactoryPayrollPage() {
 
   const handleAdjustSubmit = () => {
     if (!editRecord) return;
+    if (editStatus === "PAID" && editRecord.status !== "PAID") {
+      setPayDate(today);
+      setPaySource("Cash");
+      setPayReference("");
+      setShowPayDialog(true);
+      return;
+    }
     adjustMutation.mutate({
       id: editRecord.id,
       data: {
@@ -230,6 +249,24 @@ export default function FactoryPayrollPage() {
         overtimeHours: editOvertimeHours,
         notes: editNotes,
         status: editStatus,
+      },
+    });
+  };
+
+  const handleConfirmPayment = () => {
+    if (!editRecord) return;
+    adjustMutation.mutate({
+      id: editRecord.id,
+      data: {
+        bonuses: editBonuses,
+        deductions: editDeductions,
+        advances: editAdvances,
+        overtimeHours: editOvertimeHours,
+        notes: editNotes,
+        status: "PAID",
+        paymentSource: paySource,
+        paymentDate: payDate,
+        paymentReference: payReference,
       },
     });
   };
@@ -310,22 +347,24 @@ export default function FactoryPayrollPage() {
           <p className="text-muted-foreground mt-1">Generate and manage factory worker payroll</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Company</Label>
-            <Select
-              value={selectedCompanyId ? String(selectedCompanyId) : ""}
-              onValueChange={(val) => setCompanyId(parseInt(val))}
-            >
-              <SelectTrigger className="w-48" data-testid="select-company">
-                <SelectValue placeholder="Select company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {companies.length > 1 && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Company</Label>
+              <Select
+                value={selectedCompanyId ? String(selectedCompanyId) : ""}
+                onValueChange={(val) => setCompanyId(parseInt(val))}
+              >
+                <SelectTrigger className="w-48" data-testid="select-company">
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <Button onClick={() => setShowGenerateDialog(true)} disabled={!selectedCompanyId} data-testid="button-generate-payroll">
               <DollarSign className="h-4 w-4 mr-1" />
@@ -573,6 +612,52 @@ export default function FactoryPayrollPage() {
               ) : (
                 "Generate"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPayDialog} onOpenChange={(open) => { if (!open) setShowPayDialog(false); }}>
+        <DialogContent data-testid="dialog-confirm-payment">
+          <DialogHeader>
+            <DialogTitle>Confirm Payment</DialogTitle>
+          </DialogHeader>
+          {editRecord && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Recording payment for <span className="font-medium text-foreground">{editRecord.workerName}</span> — net salary <span className="font-mono font-medium text-foreground">{parseFloat(editRecord.netSalary || "0").toFixed(2)}</span>
+              </p>
+              <div className="space-y-1">
+                <Label>Payment Source</Label>
+                <Select value={paySource} onValueChange={setPaySource}>
+                  <SelectTrigger data-testid="select-pay-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Bank">Bank</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="Cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Payment Date</Label>
+                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} data-testid="input-pay-date" />
+              </div>
+              <div className="space-y-1">
+                <Label>Reference / Notes <span className="text-muted-foreground">(optional)</span></Label>
+                <Input value={payReference} onChange={(e) => setPayReference(e.target.value)} placeholder="e.g. cheque no. or transfer ref" data-testid="input-pay-reference" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPayDialog(false)} data-testid="button-cancel-payment">
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmPayment} disabled={adjustMutation.isPending || !payDate} data-testid="button-confirm-payment">
+              {adjustMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+              Mark as Paid
             </Button>
           </DialogFooter>
         </DialogContent>
