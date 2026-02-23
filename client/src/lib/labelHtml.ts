@@ -23,11 +23,35 @@ function getHeaderImage(code: string): string {
   return HMD_LOGO_BASE64;
 }
 
+function isBrandUrl(src: string): boolean {
+  return src.startsWith("/labels/");
+}
+
 function buildDetailBlock(label: LabelData) {
+  const imgSrc = getHeaderImage(label.articleCode);
+  const brand = isBrandUrl(imgSrc);
+  if (brand) {
+    return `<div class="code-label">
+    <img class="header-banner-img" src="${imgSrc}" alt="HMD" />
+    <div class="info-section-row">
+      <span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span>
+      &nbsp;&nbsp;<span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span>
+      &nbsp;&nbsp;<span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span>
+    </div>
+    <div class="barcode-area">
+      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+      <div class="barcode-number">${label.referenceNumber}</div>
+    </div>
+    <div class="article-barcode-area">
+      <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
+      <div class="article-barcode-number">${label.productName}</div>
+    </div>
+  </div>`;
+  }
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="${getHeaderImage(label.articleCode)}" alt="HMD" />
+        <img class="logo-img" src="${imgSrc}" alt="HMD" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
@@ -45,6 +69,23 @@ function buildDetailBlock(label: LabelData) {
     </div>
   </div>`;
 }
+
+const detailBlockCss = `
+    .code-label { width: 76mm; height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: flex-start; gap: 1mm; background: #fff; overflow: hidden; }
+    .header-banner-img { width: 100%; height: 14mm; object-fit: cover; display: block; flex-shrink: 0; }
+    .info-section-row { font-size: 7.5pt; font-weight: 900; line-height: 1.4; white-space: nowrap; overflow: hidden; text-align: left; }
+    .label-top { display: flex; justify-content: space-between; align-items: center; }
+    .logo-section { flex-shrink: 0; }
+    .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
+    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
+    .info-key { font-weight: 900; }
+    .info-val { font-weight: 900; }
+    .barcode-area { text-align: center; margin-top: 1mm; }
+    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
+    .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .article-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; color: #000; text-align: center; }`;
 
 export function generateCombinedLabelsHtml(labels: LabelData[]) {
   let labelsHtml = '';
@@ -74,20 +115,7 @@ export function generateCombinedLabelsHtml(labels: LabelData[]) {
     @page { size: 210mm 297mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
-
-    .code-label { width: 76mm; height: 58.5mm; padding: 2mm 3mm; display: flex; flex-direction: column; justify-content: flex-start; gap: 1mm; background: #fff; overflow: hidden; }
-    .label-top { display: flex; justify-content: space-between; align-items: center; }
-    .logo-section { flex-shrink: 0; }
-    .logo-img { height: 14mm; width: auto; object-fit: contain; display: block; }
-    .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
-    .info-key { font-weight: 900; }
-    .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .article-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; color: #000; text-align: center; }
+${detailBlockCss}
 
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
@@ -111,7 +139,8 @@ export function generateCombinedLabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.3px #000; }
       .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -142,6 +171,8 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
 
     .code-label { width: 62mm; padding: 2mm 2mm; display: flex; flex-direction: column; justify-content: flex-start; gap: 1mm; background: #fff; overflow: hidden; }
+    .header-banner-img { width: 100%; height: 12mm; object-fit: cover; display: block; flex-shrink: 0; }
+    .info-section-row { font-size: 7pt; font-weight: 900; line-height: 1.4; white-space: nowrap; overflow: hidden; text-align: left; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .logo-img { height: 12mm; width: auto; object-fit: contain; display: block; }
@@ -175,7 +206,8 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .article-barcode-number { -webkit-text-stroke: 0.3px #000; }
       .a5-name-right-text, .a5-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">A5 Bale Labels (preprinted paper). Select A5 paper, Portrait, 100% scale. Set BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -183,20 +215,28 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
 export function generateStickerLabelsHtml(labels: LabelData[]) {
   let labelsHtml = '';
   for (const label of labels) {
+    const imgSrc = getHeaderImage(label.articleCode);
+    const brand = isBrandUrl(imgSrc);
+    const topSection = brand
+      ? `<div class="banner-top"><img class="sticker-banner-img header-banner-img" src="${imgSrc}" alt="HMD" /></div>
+         <div class="info-section-compact">
+           <span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span>
+           &nbsp;<span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span>
+           &nbsp;<span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span>
+         </div>`
+      : `<div class="label-top">
+           <div class="logo-section"><img class="sticker-logo" src="${imgSrc}" alt="HMD" /></div>
+           <div class="info-section">
+             <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
+             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+             <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+           </div>
+         </div>`;
     labelsHtml += `
       <div class="sticker-page">
         <div class="label">
           <div class="label-content">
-            <div class="label-top">
-              <div class="logo-section">
-                <img class="sticker-logo" src="${HMD_LOGO_BASE64}" alt="HMD" />
-              </div>
-              <div class="info-section">
-                <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
-                <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-                <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-              </div>
-            </div>
+            ${topSection}
             <div class="ref-barcode-section">
               <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
               <div class="ref-barcode-number">${label.referenceNumber}</div>
@@ -219,6 +259,9 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     .sticker-page:last-child { page-break-after: auto; }
     .label { width: 3in; height: 1.97in; padding: 1.5mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
     .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.5mm; height: 100%; }
+    .banner-top { flex-shrink: 0; }
+    .sticker-banner-img { width: 100%; height: 10mm; object-fit: cover; display: block; }
+    .info-section-compact { font-size: 7.5pt; font-weight: 900; line-height: 1.4; white-space: nowrap; overflow: hidden; }
     .label-top { display: flex; justify-content: space-between; align-items: center; }
     .logo-section { flex-shrink: 0; }
     .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
@@ -239,7 +282,8 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
       .product-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img):not(.sticker-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img, .sticker-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">Sticker Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
