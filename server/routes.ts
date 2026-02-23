@@ -12613,17 +12613,12 @@ if (asOfDate) {
             balance,
           };
         }),
-        // Suppliers (show all suppliers globally, but only company-specific balances)
-        // Show transactions from current company only (don't add opening balance to avoid double-counting)
+        // ERP Suppliers — only included for non-factory companies (factory companies use factorySuppliers)
         ...suppliers.map((supplier) => {
           const transactionBalance = supplierBalances.get(supplier.id) || 0;
-          
-          // For sidebar: only show transaction balance from this company, not global opening balance
-          // This prevents double-counting when supplier is used in multiple companies
-          const rawBalance = transactionBalance;
-          
-          // Negate: positive payable becomes negative (shown as credit in sidebar)
-          const balance = -rawBalance;
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          // Suppliers are always Cr (we owe them). Negate so credit balance is negative in the signed system.
+          const balance = -(openingBalance + transactionBalance);
 
           return {
             id: supplier.id,

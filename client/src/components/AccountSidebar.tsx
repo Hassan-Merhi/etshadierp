@@ -133,20 +133,11 @@ export default function AccountSidebar({
         )
         .reduce((sum, entry) => sum + Number(entry.amount), 0);
 
-      // Entry amounts affect balance differently based on account type:
-      // - For liability accounts (employee, supplier): Payment DECREASES balance (we're paying off what we owe)
-      // - For asset/expense accounts: Payment INCREASES balance (we're spending/acquiring)
-      // The inverse is true for receipts
-      const isLiabilityAccount =
-        account.type === "employee" || account.type === "supplier";
+      // Payment: debit entry increases the balance (moves liability toward zero, increases asset/expense).
+      // Receipt: credit entry decreases the balance.
+      // The sign convention on the stored balance handles the visual interpretation.
       if (entryAmount > 0) {
-        if (isLiabilityAccount) {
-          // Liability: Payment reduces balance (debit), Receipt increases balance (credit)
-          adjustment += mode === "payment" ? entryAmount : -entryAmount;
-        } else {
-          // Asset/Expense: Payment increases balance (debit), Receipt reduces balance (credit)
-          adjustment += mode === "payment" ? entryAmount : -entryAmount;
-        }
+        adjustment += mode === "payment" ? entryAmount : -entryAmount;
       }
     }
 
@@ -175,22 +166,14 @@ export default function AccountSidebar({
 
   const getBalanceColorClass = (
     balance: number | undefined,
-    accountType?: string,
+    _accountType?: string,
   ) => {
     if (balance === undefined) return "text-muted-foreground";
-    // For liability accounts (employee/supplier), flip the color logic:
-    // Positive balance = Cr (we owe them) = Red
-    // Negative balance = Dr (they owe us) = Green
-    const isLiabilityAccount =
-      accountType === "employee" || accountType === "supplier";
-    if (isLiabilityAccount) {
-      // your suppliers come as negative when it's Cr (we owe them)
-      if (balance < 0) return "text-destructive"; // Cr => red
-      if (balance > 0) return "text-chart-2"; // Dr => green
-    } else {
-      if (balance < 0) return "text-destructive";
-      if (balance > 0) return "text-chart-2";
-    }
+    // All account types use the same sign convention in the sidebar:
+    // negative = credit balance (red), positive = debit balance (green).
+    // Suppliers/employees are stored as negative when we owe them, which naturally turns them red.
+    if (balance < 0) return "text-destructive";
+    if (balance > 0) return "text-chart-2";
     return "text-muted-foreground";
   };
 
