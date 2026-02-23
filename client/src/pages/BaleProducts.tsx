@@ -66,7 +66,8 @@ export default function BaleProducts() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "" });
+  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "" });
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -80,6 +81,7 @@ export default function BaleProducts() {
         weightPerBaleKg: editingProduct.weightPerBaleKg ? String(editingProduct.weightPerBaleKg) : "",
         categoryId: editingProduct.categoryId ? String(editingProduct.categoryId) : "",
         description: editingProduct.description || "",
+        grade: "",
       });
     }
   }, [editingProduct]);
@@ -191,6 +193,37 @@ export default function BaleProducts() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await modeApiRequest("DELETE", `/api/factory/bale-products/${id}`);
+      if (!response.ok) throw new Error("Failed to delete product");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      setEditingProduct(null);
+      toast({ title: "Product deleted", description: "The product has been removed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleGradeChange = async (grade: string) => {
+    setEditForm(f => ({ ...f, grade }));
+    if (!grade) return;
+    setIsGeneratingCode(true);
+    try {
+      const response = await modeApiRequest("GET", `/api/factory/bale-products/generate-code?grade=${encodeURIComponent(grade)}`);
+      const data = await response.json();
+      if (data.articleCode) setEditForm(f => ({ ...f, articleCode: data.articleCode }));
+    } catch {
+      toast({ title: "Error", description: "Could not generate article code", variant: "destructive" });
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
 
   const handleEditSubmit = () => {
     if (!editForm.name.trim()) return;
@@ -641,12 +674,29 @@ export default function BaleProducts() {
               />
             </div>
             <div className="space-y-2">
+              <Label>Grade (generates new article code)</Label>
+              <Select value={editForm.grade} onValueChange={handleGradeChange}>
+                <SelectTrigger data-testid="select-edit-product-grade" disabled={isGeneratingCode}>
+                  <SelectValue placeholder="Select grade to regenerate code..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CREAM">CREAM</SelectItem>
+                  <SelectItem value="#1">#1</SelectItem>
+                  <SelectItem value="#2">#2</SelectItem>
+                  <SelectItem value="#3">#3</SelectItem>
+                  <SelectItem value="#4">#4</SelectItem>
+                  <SelectItem value="Garbage">Garbage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-articleCode">Article Code</Label>
               <Input
                 id="edit-articleCode"
-                value={editForm.articleCode}
-                readOnly
-                className="font-mono bg-muted"
+                value={isGeneratingCode ? "Generating..." : editForm.articleCode}
+                onChange={(e) => setEditForm({ ...editForm, articleCode: e.target.value })}
+                disabled={isGeneratingCode}
+                className="font-mono"
                 data-testid="input-edit-product-articleCode"
               />
             </div>
@@ -691,17 +741,32 @@ export default function BaleProducts() {
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>Changes to name, weight, and article code will also update all existing bales using this product.</span>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditingProduct(null)} data-testid="button-cancel-edit-product">
-                Cancel
-              </Button>
+            <div className="flex justify-between gap-2">
               <Button
-                onClick={handleEditSubmit}
-                disabled={!editForm.name.trim() || editProductMutation.isPending}
-                data-testid="button-save-edit-product"
+                variant="destructive"
+                onClick={() => {
+                  if (confirm("Delete this product? It will be removed from the products list.")) {
+                    deleteProductMutation.mutate(editingProduct!.id);
+                  }
+                }}
+                disabled={deleteProductMutation.isPending}
+                data-testid="button-delete-edit-product"
               >
-                {editProductMutation.isPending ? "Saving..." : "Save Changes"}
+                <Trash2 className="h-4 w-4 mr-1" />
+                {deleteProductMutation.isPending ? "Deleting..." : "Delete"}
               </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setEditingProduct(null)} data-testid="button-cancel-edit-product">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEditSubmit}
+                  disabled={!editForm.name.trim() || editProductMutation.isPending}
+                  data-testid="button-save-edit-product"
+                >
+                  {editProductMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

@@ -1077,6 +1077,57 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const grade = req.query.grade as string;
+      const gradeToPrefix: Record<string, string> = {
+        "CREAM": "HMD10",
+        "#1": "HMD11",
+        "#2": "HMD12",
+        "#3": "HMD13",
+        "#4": "HMD14",
+        "Garbage": "HMD16",
+      };
+
+      if (!grade || !gradeToPrefix[grade]) {
+        return res.status(400).json({ message: "Valid grade is required (CREAM, #1, #2, #3, #4, Garbage)" });
+      }
+
+      const prefix = gradeToPrefix[grade];
+      const prefixLen = prefix.length;
+      const [maxResult] = await db
+        .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+        .from(factoryBaleProducts)
+        .where(and(
+          eq(factoryBaleProducts.companyId, companyId),
+          sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
+          sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+        ));
+
+      let nextNum = (maxResult?.maxNum || 0) + 1;
+      let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+      let attempts = 0;
+      while (attempts < 100) {
+        const [dup] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
+        if (!dup) break;
+        nextNum++;
+        candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+        attempts++;
+      }
+
+      res.json({ articleCode: candidateCode });
+    } catch (error: any) {
+      console.error("Error generating article code:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
