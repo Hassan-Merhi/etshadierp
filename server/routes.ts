@@ -12133,11 +12133,15 @@ if (asOfDate) {
 
       const companyId = req.session.currentCompanyId;
 
+      const currentCompany = await storage.getCompanyById(companyId);
+      const isFactoryCompany = currentCompany?.companyType === "factory";
+
       const ledgers = await storage.getAllLedgerAccounts(companyId);
       const banks = await storage.getAllBankAccounts(companyId);
       const assets = await storage.getAllFixedAssets(companyId);
       const employees = await storage.getAllEmployees(companyId);
-      const suppliers = await storage.getAllSuppliers();
+      const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
+      const customers = await storage.getAllCustomers(companyId);
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
@@ -12400,8 +12404,35 @@ if (asOfDate) {
         })
       );
 
+      // Build customer accounts list with running balance from customerBalances table
+      const customerAccountsList = await Promise.all(
+        customers
+          .filter((c) => !c.deletedAt)
+          .map(async (customer) => {
+            const runningBalance = await storage.getCustomerBalance(customer.id, companyId);
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            // Use running balance if available, otherwise fall back to opening balance
+            const effectiveBalance = runningBalance !== 0 ? runningBalance : openingBalance;
+            const balanceSide = effectiveBalance >= 0 ? "Dr" : "Cr"; // Customers are receivable (Dr)
+
+            return {
+              id: `customer-${customer.id}`,
+              accountId: customer.id,
+              type: "customer",
+              code: customer.code,
+              name: customer.legalName,
+              balance: effectiveBalance.toFixed(2),
+              balanceSide,
+              openingBalance: openingBalance,
+              openingBalanceSide: customer.openingBalanceSide || "Dr",
+              active: customer.active,
+              parentId: null,
+            };
+          })
+      );
+
       // Combine all accounts
-      const allAccounts = [...accounts, ...supplierAccountsList];
+      const allAccounts = [...accounts, ...supplierAccountsList, ...customerAccountsList];
 
       res.json(allAccounts);
     } catch (error: any) {
@@ -12815,6 +12846,46 @@ if (asOfDate) {
         );
 
         res.json(transactions);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Get transactions for a specific customer (maps customerBalances to voucher-entry format)
+  app.get(
+    "/api/accounts/customer/:id/transactions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const customerId = parseInt(req.params.id);
+        if (isNaN(customerId)) {
+          return res.status(400).json({ message: "Invalid customer ID" });
+        }
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const { startDate, endDate } = req.query;
+        const statement = await storage.getCustomerStatement(
+          customerId,
+          companyId,
+          startDate as string | undefined,
+          endDate as string | undefined,
+        );
+        // Map CustomerBalance rows to the same shape the Accounts page expects for transactions
+        const mapped = statement.map((row) => ({
+          id: row.id,
+          voucherId: row.referenceId ?? row.id,
+          voucherNumber: row.referenceType ? `${row.referenceType}-${row.referenceId}` : `CB-${row.id}`,
+          voucherType: row.transactionType,
+          voucherDate: row.transactionDate,
+          voucherDescription: row.description || "",
+          narration: row.description || "",
+          debitAmount: row.debitAmount,
+          creditAmount: row.creditAmount,
+        }));
+        res.json(mapped);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
