@@ -14,11 +14,20 @@ export type LabelData = {
   productName: string;
 };
 
+function getHeaderImage(code: string): string {
+  if (!code) return HMD_LOGO_BASE64;
+  if (code.startsWith("HMD11")) return "/labels/hmd-purple.jpg";
+  if (code.startsWith("HMD12")) return "/labels/hmd-green.jpg";
+  if (code.startsWith("HMD13")) return "/labels/hmd-gold.jpg";
+  if (code.startsWith("HMD14")) return "/labels/hmd-white.jpg";
+  return HMD_LOGO_BASE64;
+}
+
 function buildDetailBlock(label: LabelData) {
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="${HMD_LOGO_BASE64}" alt="HMD" />
+        <img class="logo-img" src="${getHeaderImage(label.articleCode)}" alt="HMD" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
