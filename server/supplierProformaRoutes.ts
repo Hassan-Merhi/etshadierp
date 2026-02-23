@@ -856,11 +856,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         fullComparison.push({ barcode, itemName, expectedQty, loadedQty, qtyDiff, expPrice, loadPrice, priceDiff: loadPrice - expPrice, expWeight, loadWeight, expectedWeightTotal, loadedWeightTotal, expectedValueTotal, loadedValueTotal, status });
 
         if (expectedQty === 0 && loadedQty > 0) {
-          notRequested.push({ itemName, qty: loadedQty, totalBar: loadedWeightTotal });
+          notRequested.push({ itemName, qty: loadedQty });
         } else if (loadedQty > expectedQty) {
-          overloaded.push({ itemName, qty: loadedQty, totalBar: loadedWeightTotal });
+          overloaded.push({ itemName, qty: loadedQty });
         } else if (loadedQty < expectedQty) {
-          lessLoaded.push({ itemName, qty: -(expectedQty - loadedQty), totalBar: loadedWeightTotal });
+          lessLoaded.push({ itemName, qty: -(expectedQty - loadedQty) });
         }
         if (expPrice && loadPrice && Math.abs(loadPrice - expPrice) >= 0.01) {
           const kgDiff = (expWeight && loadWeight && Math.abs(loadWeight - expWeight) >= 0.001) ? (loadWeight - expWeight) : null;
@@ -873,104 +873,149 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       wb.created = new Date();
       const sheet = wb.addWorksheet("Comparison");
 
-      const sumColors = {
+      const sc = {
         headerBg: "1F4E79", headerFont: "FFFFFF",
         overloadedBg: "FCE4EC", shortBg: "FFF3E0", notRequestedBg: "FFF9C4",
         overloadedBorder: "C62828", shortBorder: "E65100", notRequestedBorder: "F57F17",
-        priceDiffBorder: "1565C0", titleBg: "263238", titleFont: "FFFFFF", grayFill: "E0E0E0",
+        priceDiffBorder: "1565C0", titleBg: "263238", titleFont: "FFFFFF", summaryBg: "F5F5F5",
       };
-      const sThinBorder: any = {
+      const sThin: any = {
         top: { style: "thin", color: { argb: "BDBDBD" } }, left: { style: "thin", color: { argb: "BDBDBD" } },
         bottom: { style: "thin", color: { argb: "BDBDBD" } }, right: { style: "thin", color: { argb: "BDBDBD" } },
       };
-      const autoW = (vals: (string | number | null | undefined)[]): number =>
-        Math.min(50, Math.max(2, ...vals.map(v => String(v ?? "").length)) + 2);
+      const dblBorder: any = { top: { style: "double", color: { argb: "424242" } }, bottom: { style: "double", color: { argb: "424242" } }, left: sThin.left, right: sThin.right };
 
-      const fullHeaders = ["Item Name", "Barcode", "Expected Qty", "Loaded Qty", "Qty Diff", "Proforma Price", "Loaded Price", "Price Diff/Bale", "Exp Weight", "Load Weight", "Exp Weight Total", "Load Weight Total", "Status"];
-      const fullHeaderRow = sheet.addRow(fullHeaders);
-      fullHeaderRow.height = 22;
-      fullHeaderRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 10, color: { argb: sumColors.headerFont } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sumColors.headerBg } };
-        cell.border = sThinBorder;
-        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      });
+      type ColDef = { header: string; key: string; width: number; numFmt?: string };
 
-      for (const row of fullComparison) {
-        const dataRow = sheet.addRow([
-          row.itemName, row.barcode, row.expectedQty, row.loadedQty, row.qtyDiff,
-          row.expPrice, row.loadPrice, row.priceDiff,
-          row.expWeight, row.loadWeight, row.expectedWeightTotal, row.loadedWeightTotal,
-          row.status,
-        ]);
-        dataRow.eachCell((cell: any) => { cell.border = sThinBorder; cell.alignment = { vertical: "middle" }; });
-        [3,4,5].forEach(c => { dataRow.getCell(c).numFmt = "#,##0"; dataRow.getCell(c).alignment = { horizontal: "right" }; });
-        [6,7,8,9,10,11,12].forEach(c => { dataRow.getCell(c).numFmt = "#,##0.00"; dataRow.getCell(c).alignment = { horizontal: "right" }; });
-        const rowBg = row.status === "OVERLOADED" ? sumColors.overloadedBg : row.status === "SHORT" || row.status === "MISSING" ? sumColors.shortBg : row.status === "NOT REQUESTED" ? sumColors.notRequestedBg : null;
-        if (rowBg) dataRow.eachCell((cell: any) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } }; });
-      }
+      const addBlock = (
+        title: string,
+        sectionColor: string,
+        columns: ColDef[],
+        data: any[],
+        statusColorFn?: (row: any) => string | null,
+        includeAutoFilter = false
+      ) => {
+        const numCols = columns.length;
 
-      const fullColData = [fullHeaders, ...fullComparison.map(r => [r.itemName, r.barcode, r.expectedQty, r.loadedQty, r.qtyDiff, r.expPrice, r.loadPrice, r.priceDiff, r.expWeight, r.loadWeight, r.expectedWeightTotal, r.loadedWeightTotal, r.status])];
-      fullHeaders.forEach((_h, i) => { sheet.getColumn(i + 1).width = autoW(fullColData.map(r => r[i])); });
-
-      sheet.addRow([]);
-
-      const addSection = (title: string, headerColor: string, headers: string[], rows: any[][], numFmts: Record<number, string>) => {
         const titleRow = sheet.addRow([title]);
-        titleRow.height = 28;
-        titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: sumColors.titleFont } };
-        titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sumColors.titleBg } };
-        titleRow.getCell(1).alignment = { vertical: "middle" };
+        titleRow.height = 30;
+        titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: sc.titleFont } };
+        titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sc.titleBg } };
+        titleRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+        if (numCols > 1) sheet.mergeCells(sheet.rowCount, 1, sheet.rowCount, numCols);
 
-        const headerRow = sheet.addRow(headers);
-        headerRow.height = 20;
+        const infoData = [
+          ["Supplier", supplier?.legalName || `ID ${supplierId}`],
+          ["Container", container?.containerNumber || `ID ${containerId}`],
+          ["Proforma", proforma.reference],
+          ["Date", new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })],
+          ["Total Items", String(data.length)],
+        ];
+        for (const [label, value] of infoData) {
+          const r = sheet.addRow([label, value]);
+          r.getCell(1).font = { bold: true, size: 10, color: { argb: "616161" } };
+          r.getCell(2).font = { size: 10 };
+        }
+        sheet.addRow([]);
+
+        const headerRowNum = sheet.rowCount + 1;
+        const headerRow = sheet.addRow(columns.map(c => c.header));
+        headerRow.height = 24;
         headerRow.eachCell((cell: any) => {
-          cell.font = { bold: true, size: 10, color: { argb: sumColors.headerFont } };
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerColor } };
-          cell.border = sThinBorder;
-          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.font = { bold: true, size: 10, color: { argb: sc.headerFont } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+          cell.border = sThin;
         });
 
-        if (rows.length === 0) {
+        columns.forEach((col, i) => {
+          const c = sheet.getColumn(i + 1);
+          if (!c.width || (c.width as number) < col.width) c.width = col.width;
+          if (col.numFmt) c.numFmt = col.numFmt;
+        });
+
+        if (data.length === 0) {
           const emptyRow = sheet.addRow(["No items"]);
+          if (numCols > 1) sheet.mergeCells(sheet.rowCount, 1, sheet.rowCount, numCols);
+          emptyRow.getCell(1).alignment = { horizontal: "center" };
           emptyRow.getCell(1).font = { italic: true, color: { argb: "9E9E9E" } };
         } else {
-          for (const row of rows) {
-            const dataRow = sheet.addRow(row);
-            dataRow.eachCell((cell: any, colN: number) => {
-              cell.border = sThinBorder;
+          for (let i = 0; i < data.length; i++) {
+            const item = data[i];
+            const values = columns.map(c => item[c.key]);
+            const dataRow = sheet.addRow(values);
+            const rowBg = statusColorFn ? statusColorFn(item) : (i % 2 !== 0 ? sc.summaryBg : null);
+            dataRow.eachCell((cell: any) => {
+              cell.border = sThin;
               cell.alignment = { vertical: "middle" };
-              if (numFmts[colN]) { cell.numFmt = numFmts[colN]; cell.alignment = { horizontal: "right" }; }
+              if (rowBg) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
             });
           }
+
+          sheet.addRow([]);
+          const totalValues = columns.map((c, i) => {
+            if (i === 0) return "TOTAL";
+            const sum = data.reduce((s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0), 0);
+            return typeof data[0]?.[c.key] === "number" ? sum : "";
+          });
+          const totalRow = sheet.addRow(totalValues);
+          totalRow.font = { bold: true, size: 10 };
+          totalRow.eachCell((cell: any) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sc.summaryBg } };
+            cell.border = dblBorder;
+          });
         }
 
-        const allVals = [headers, ...rows];
-        headers.forEach((_h, i) => {
-          const w = autoW(allVals.map(r => r[i]));
-          const col = sheet.getColumn(i + 1);
-          if (!col.width || col.width < w) col.width = w;
-        });
+        if (includeAutoFilter) {
+          sheet.autoFilter = { from: { row: headerRowNum, column: 1 }, to: { row: headerRowNum, column: numCols } };
+        }
         sheet.addRow([]);
       };
 
-      addSection("Less Loaded", sumColors.shortBorder, ["Item Name", "Qty"],
-        lessLoaded.map(r => [r.itemName, -Math.abs(r.qty)]),
-        { 2: "#,##0" });
+      addBlock(
+        "Container Verification - Full Comparison",
+        sc.headerBg,
+        [
+          { header: "Barcode", key: "barcode", width: 18 },
+          { header: "Item Name", key: "itemName", width: 28 },
+          { header: "Expected Qty", key: "expectedQty", width: 14, numFmt: "#,##0" },
+          { header: "Loaded Qty", key: "loadedQty", width: 14, numFmt: "#,##0" },
+          { header: "Qty Diff", key: "qtyDiff", width: 12, numFmt: "+#,##0;-#,##0;0" },
+          { header: "Proforma Price", key: "expPrice", width: 14, numFmt: "#,##0.00" },
+          { header: "Loaded Price", key: "loadPrice", width: 14, numFmt: "#,##0.00" },
+          { header: "Price Diff", key: "priceDiff", width: 12, numFmt: "+#,##0.00;-#,##0.00;0" },
+          { header: "Status", key: "status", width: 16 },
+        ],
+        fullComparison,
+        (item: any) => {
+          if (item.status === "OVERLOADED") return sc.overloadedBg;
+          if (item.status === "SHORT" || item.status === "MISSING") return sc.shortBg;
+          if (item.status === "NOT REQUESTED") return sc.notRequestedBg;
+          return null;
+        },
+        true
+      );
 
-      addSection("Over Loaded", sumColors.overloadedBorder, ["Item Name", "Qty"],
-        overloaded.map(r => [r.itemName, r.qty]),
-        { 2: "#,##0" });
+      addBlock("Less Loaded", sc.shortBorder,
+        [{ header: "Item Name", key: "itemName", width: 28 }, { header: "Qty", key: "qty", width: 14, numFmt: "#,##0" }],
+        lessLoaded
+      );
 
-      addSection("Loaded Not Requested", sumColors.notRequestedBorder, ["Item Name", "Qty"],
-        notRequested.map(r => [r.itemName, r.qty]),
-        { 2: "#,##0" });
+      addBlock("Over Loaded", sc.overloadedBorder,
+        [{ header: "Item Name", key: "itemName", width: 28 }, { header: "Qty", key: "qty", width: 14, numFmt: "#,##0" }],
+        overloaded
+      );
+
+      addBlock("Loaded Not Requested", sc.notRequestedBorder,
+        [{ header: "Item Name", key: "itemName", width: 28 }, { header: "Qty", key: "qty", width: 14, numFmt: "#,##0" }],
+        notRequested
+      );
 
       const hasKgDiff = priceDiffs.some(r => r.kgDiff != null);
-      addSection("Price Diff", sumColors.priceDiffBorder,
-        hasKgDiff ? ["Item Name", "KG Diff", "Item Price Diff"] : ["Item Name", "Item Price Diff"],
-        priceDiffs.map(r => hasKgDiff ? [r.itemName, r.kgDiff, r.itemPriceDiff] : [r.itemName, r.itemPriceDiff]),
-        hasKgDiff ? { 2: "#,##0.00", 3: "#,##0.00" } : { 2: "#,##0.00" });
+      const priceDiffCols: ColDef[] = hasKgDiff
+        ? [{ header: "Item Name", key: "itemName", width: 28 }, { header: "KG Diff", key: "kgDiff", width: 14, numFmt: "#,##0.00" }, { header: "Item Price Diff", key: "itemPriceDiff", width: 16, numFmt: "#,##0.00" }]
+        : [{ header: "Item Name", key: "itemName", width: 28 }, { header: "Item Price Diff", key: "itemPriceDiff", width: 16, numFmt: "#,##0.00" }];
+      addBlock("Price Diff", sc.priceDiffBorder, priceDiffCols, priceDiffs);
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       const summaryFileName = `Verification_Summary_${container?.containerNumber || containerId}_${proforma.reference.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
