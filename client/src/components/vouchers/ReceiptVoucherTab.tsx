@@ -31,6 +31,7 @@ import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface ReceiptVoucherTabProps {
   form: UseFormReturn<any>;
@@ -95,6 +96,7 @@ export function ReceiptVoucherTab({
   onAutoCreateAccount,
   isAutoCreating = false,
 }: ReceiptVoucherTabProps) {
+  const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
@@ -151,13 +153,17 @@ export function ReceiptVoucherTab({
                           </div>
                         </FormControl>
                         {paymentAccountId > 0 && (
-                          <p className="text-sm text-muted-foreground mt-1.5">
-                            Balance: $
-                            {accountBalance.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
+                          <div className="mt-1.5 space-y-0.5">
+                            <p className="text-sm text-muted-foreground">
+                              Balance: {formatAmount(accountBalance)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              After:{" "}
+                              <span className={cn("font-mono", total > 0 ? ((accountBalance + total) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400") : "")}>
+                                {total > 0 ? formatAmount(accountBalance + total) : "—"}
+                              </span>
+                            </p>
+                          </div>
                         )}
                         <FormMessage />
                       </FormItem>

@@ -159,9 +159,17 @@ export function PaymentVoucherTab({
                           </div>
                         </FormControl>
                         {paymentAccountId > 0 && (
-                          <p className="text-sm text-muted-foreground mt-1.5">
-                            Balance: {formatAmount(accountBalance)}
-                          </p>
+                          <div className="mt-1.5 space-y-0.5">
+                            <p className="text-sm text-muted-foreground">
+                              Balance: {formatAmount(accountBalance)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              After:{" "}
+                              <span className={cn("font-mono", total > 0 ? ((accountBalance - total) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400") : "")}>
+                                {total > 0 ? formatAmount(accountBalance - total) : "—"}
+                              </span>
+                            </p>
+                          </div>
                         )}
                         <FormMessage />
                       </FormItem>
