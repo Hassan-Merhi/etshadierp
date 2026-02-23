@@ -904,20 +904,6 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         titleRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
         if (numCols > 1) sheet.mergeCells(sheet.rowCount, 1, sheet.rowCount, numCols);
 
-        const infoData = [
-          ["Supplier", supplier?.legalName || `ID ${supplierId}`],
-          ["Container", container?.containerNumber || `ID ${containerId}`],
-          ["Proforma", proforma.reference],
-          ["Date", new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })],
-          ["Total Items", String(data.length)],
-        ];
-        for (const [label, value] of infoData) {
-          const r = sheet.addRow([label, value]);
-          r.getCell(1).font = { bold: true, size: 10, color: { argb: "616161" } };
-          r.getCell(2).font = { size: 10 };
-        }
-        sheet.addRow([]);
-
         const headerRowNum = sheet.rowCount + 1;
         const headerRow = sheet.addRow(columns.map(c => c.header));
         headerRow.height = 24;
@@ -960,9 +946,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           });
           const totalRow = sheet.addRow(totalValues);
           totalRow.font = { bold: true, size: 10 };
-          totalRow.eachCell((cell: any) => {
+          totalRow.eachCell((cell: any, colN: number) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sc.summaryBg } };
             cell.border = dblBorder;
+            const col = columns[colN - 1];
+            if (col?.numFmt) cell.numFmt = col.numFmt;
           });
         }
 
