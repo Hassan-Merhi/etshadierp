@@ -5986,6 +5986,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         }}
         companyId={selectedCompany?.id || 0}
         onAccountCreated={handleAccountCreated}
+        apiRequestFn={modeApiRequest}
       />
     </div>
   );

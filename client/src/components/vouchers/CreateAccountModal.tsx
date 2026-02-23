@@ -33,6 +33,13 @@ const subTypeOptions: Record<string, string[]> = {
   Liability: ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
 };
 
+function normalizeLedgerType(selection: string): { accountType: string; subType?: string } {
+  if (selection === "Indirect Expense") return { accountType: "Expense", subType: "Indirect Expense" };
+  if (selection === "Direct Expense") return { accountType: "Expense", subType: "Direct Expense" };
+  if (["Asset", "Liability", "Equity", "Income", "Expense"].includes(selection)) return { accountType: selection };
+  return { accountType: selection };
+}
+
 const createAccountSchema = z.object({
   name: z.string().min(1, "Name is required").refine(val => val.trim().length > 0, "Name cannot be empty"),
   accountType: z.string().min(1, "Account type is required"),
@@ -47,6 +54,7 @@ interface CreateAccountModalProps {
   companyId: number;
   onAccountCreated: (account: { id: number; name: string; type: string }) => void;
   defaultAccountType?: string;
+  apiRequestFn?: typeof apiRequest;
 }
 
 export function CreateAccountModal({
@@ -55,9 +63,11 @@ export function CreateAccountModal({
   companyId,
   onAccountCreated,
   defaultAccountType,
+  apiRequestFn,
 }: CreateAccountModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const req = apiRequestFn ?? apiRequest;
 
   const form = useForm<CreateAccountFormData>({
     resolver: zodResolver(createAccountSchema),
@@ -69,17 +79,18 @@ export function CreateAccountModal({
   });
 
   const selectedAccountType = form.watch("accountType");
-  const availableSubTypes = subTypeOptions[selectedAccountType] || [];
+  const availableSubTypes = subTypeOptions[normalizeLedgerType(selectedAccountType).accountType] || [];
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAccountFormData) => {
+      const normalized = normalizeLedgerType(data.accountType);
       const payload = {
         companyId,
         name: data.name.trim(),
-        accountType: data.accountType,
-        subType: data.subType || undefined,
+        accountType: normalized.accountType,
+        subType: normalized.subType || data.subType || undefined,
       };
-      const res = await apiRequest("POST", "/api/ledger-accounts", payload);
+      const res = await req("POST", "/api/ledger-accounts", payload);
       return await res.json();
     },
     onSuccess: async (newAccount) => {
