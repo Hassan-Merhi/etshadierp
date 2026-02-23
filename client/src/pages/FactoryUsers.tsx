@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Plus, Pencil, Shield, Check, X } from "lucide-react";
+import { Users, Plus, Pencil, Shield, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,7 @@ const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
 export default function FactoryUsers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState<FactoryUser | null>(null);
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -172,12 +173,32 @@ export default function FactoryUsers() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/users/${userId}`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to remove user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users"] });
+      toast({ title: "User removed", description: "User has been removed from this company" });
+      setDeletingUser(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleSubmit = () => {
     if (editingUser) {
       const isPrivileged = isAdminOrOwner(editingUser);
       updateMutation.mutate({
         userId: editingUser.id,
         data: {
+          username: formData.username !== editingUser.username ? formData.username : undefined,
           displayName: formData.displayName,
           pageAccess: Array.from(selectedPages),
           password: formData.password || undefined,
@@ -274,7 +295,7 @@ export default function FactoryUsers() {
                   <TableHead>Factory Access</TableHead>
                   <TableHead>Pages Access</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
+                  <TableHead className="w-28">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -336,14 +357,27 @@ export default function FactoryUsers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(user)}
-                        data-testid={`button-edit-user-${user.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(user)}
+                          data-testid={`button-edit-user-${user.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {!isAdminOrOwner(user) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingUser(user)}
+                            data-testid={`button-delete-user-${user.id}`}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -384,9 +418,11 @@ export default function FactoryUsers() {
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   placeholder="Enter username"
-                  disabled={!!editingUser}
                   data-testid="input-factory-user-username"
                 />
+                {editingUser && formData.username !== editingUser.username && (
+                  <p className="text-xs text-muted-foreground mt-1">Username will be changed on save</p>
+                )}
               </div>
               <div>
                 <Label>{editingUser ? "New Password (leave blank to keep)" : "Password *"}</Label>
@@ -518,6 +554,30 @@ export default function FactoryUsers() {
                 ? "Saving..."
                 : editingUser ? "Update" : "Create"
               }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingUser} onOpenChange={(open) => { if (!open) setDeletingUser(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove <strong>{deletingUser?.username}</strong>? Their account will be deactivated and they will lose all access to this company.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeletingUser(null)} data-testid="button-cancel-delete-user">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deletingUser && deleteMutation.mutate(deletingUser.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-user"
+            >
+              {deleteMutation.isPending ? "Removing..." : "Remove User"}
             </Button>
           </DialogFooter>
         </DialogContent>

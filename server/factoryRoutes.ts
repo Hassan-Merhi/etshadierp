@@ -6220,12 +6220,22 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }
 
       const { userId } = req.params;
-      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess } = req.body;
+      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, username } = req.body;
 
       await db.transaction(async (tx: any) => {
+        const userUpdates: any = {};
         if (password && password.length >= 4) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          await tx.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+          userUpdates.password = await bcrypt.hash(password, 10);
+        }
+        if (username && username.trim()) {
+          const existingWithUsername = await tx.select({ id: users.id }).from(users).where(eq(users.username, username.trim()));
+          if (existingWithUsername.length > 0 && existingWithUsername[0].id !== userId) {
+            throw new Error("Username already taken");
+          }
+          userUpdates.username = username.trim();
+        }
+        if (Object.keys(userUpdates).length > 0) {
+          await tx.update(users).set(userUpdates).where(eq(users.id, userId));
         }
 
         const profileUpdates: any = { updatedAt: new Date() };
@@ -6270,6 +6280,33 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       res.json({ message: "User updated" });
     } catch (error: any) {
       console.error("Error updating factory user:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const currentRole = (req.session as any).currentRole;
+      const sessionUserId = (req.session as any).userId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can manage users" });
+      }
+      const { userId } = req.params;
+      if (userId === sessionUserId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      await db.transaction(async (tx: any) => {
+        await tx.delete(factoryUserPageAccess)
+          .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
+        await tx.delete(factoryUserProfiles)
+          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
+        await tx.update(users).set({ active: false }).where(eq(users.id, userId));
+      });
+      res.json({ message: "User removed successfully" });
+    } catch (error: any) {
+      console.error("Error deleting factory user:", error);
       res.status(500).json({ message: error.message });
     }
   });
