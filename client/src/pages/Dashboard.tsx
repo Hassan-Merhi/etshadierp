@@ -167,11 +167,9 @@ export default function Dashboard() {
 
   // Fetch import cycle balance data
   const { data: importCycleData } = useQuery<ImportCycleBalanceData>({
-    queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id],
+    queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id, appMode],
     queryFn: async () => {
-      const response = await fetch("/api/stats/import-cycle-balance", {
-        credentials: "include",
-      });
+      const response = await modeApiRequest("GET", "/api/stats/import-cycle-balance");
       if (!response.ok) throw new Error("Failed to fetch import cycle balance");
       return await response.json();
     },

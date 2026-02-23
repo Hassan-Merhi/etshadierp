@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,11 @@ import {
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface PrecisionTrace {
   formula: string;
@@ -204,13 +209,40 @@ const SeverityBadge = ({ severity }: { severity: string }) => {
 
 export default function ImportCycleDiagnostics() {
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+  const { toast } = useToast();
 
   const { data, isLoading, error, refetch } = useQuery<ImportCycleData>({
-    queryKey: ["/api/stats/import-cycle-balance"],
+    queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id, appMode],
+    queryFn: () => modeApiRequest("GET", "/api/stats/import-cycle-balance").then(r => {
+      if (!r.ok) throw new Error("Failed to load import cycle balance");
+      return r.json();
+    }),
+    enabled: !!selectedCompany,
   });
 
   const { data: diagnosticsData, isLoading: diagnosticsLoading } = useQuery<DiagnosticsData>({
-    queryKey: ["/api/stats/import-cycle-diagnostics"],
+    queryKey: ["/api/stats/import-cycle-diagnostics", selectedCompany?.id, appMode],
+    queryFn: () => modeApiRequest("GET", "/api/stats/import-cycle-diagnostics").then(r => {
+      if (!r.ok) throw new Error("Failed to load diagnostics");
+      return r.json();
+    }),
+    enabled: !!selectedCompany,
+  });
+
+  const recalculateMutation = useMutation({
+    mutationFn: () => modeApiRequest("POST", "/api/admin/recalculate-equity-adjustment").then(r => {
+      if (!r.ok) throw new Error("Recalculate failed");
+      return r.json();
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-diagnostics"] });
+      toast({ title: "Recalculated", description: "Opening balance equity has been recalculated." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -312,9 +344,19 @@ export default function ImportCycleDiagnostics() {
             <p className="text-muted-foreground">Understand what's causing your import cycle balance</p>
           </div>
         </div>
-        <Button onClick={() => refetch()} variant="outline" data-testid="button-refresh">
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => refetch()} variant="outline" data-testid="button-refresh">
+            Refresh
+          </Button>
+          <Button
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            variant="outline"
+            data-testid="button-recalculate-equity"
+          >
+            {recalculateMutation.isPending ? "Recalculating..." : "Recalculate Equity"}
+          </Button>
+        </div>
       </div>
 
       {/* Main Balance Card */}
