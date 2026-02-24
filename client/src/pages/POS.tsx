@@ -844,7 +844,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
-    if (activeRow === null) return;
+    // If no row is active (e.g. clicked from sidebar), auto-pick the first empty row
+    let targetRow = activeRow;
+    if (targetRow === null) {
+      const emptyRowIndex = rows.findIndex(r => !r.itemName);
+      targetRow = emptyRowIndex >= 0 ? emptyRowIndex : rows.length - 1;
+    }
 
     // Use last sold price from any location if available, otherwise use configured price
     const lastSoldPrice = lastSoldPrices[item.stockItemId];
@@ -856,9 +861,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       : rateUSD;
 
     const newRows = [...rows];
-    const qty = newRows[activeRow].quantity || 1;
-    newRows[activeRow] = {
-      ...newRows[activeRow],
+    const qty = newRows[targetRow].quantity || 1;
+    newRows[targetRow] = {
+      ...newRows[targetRow],
       itemName: item.name,
       stockItemCode: item.code,
       rate: displayRate,
@@ -873,7 +878,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setHighlightedIndex(0);
 
     // Add new row if last row is being edited
-    if (activeRow === rows.length - 1) {
+    if (targetRow === rows.length - 1) {
       setRows([
         ...newRows,
         {
@@ -889,7 +894,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
     // Move to quantity field
     setTimeout(() => {
-      focusCell(activeRow, 1);
+      focusCell(targetRow!, 1);
       setActiveRow(null);
     }, 0);
   };
