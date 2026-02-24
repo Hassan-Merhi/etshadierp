@@ -826,7 +826,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     { key: "delete", label: "", width: "w-9 sm:w-12" },
   ];
 
-  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-]/g, "");
+  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
 
   const getFilteredInventory = () => {
     if (!searchTerm) return inventory;
