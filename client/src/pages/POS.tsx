@@ -1739,7 +1739,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {filteredItems.map((item, idx) => (
                 <button
                   key={item.code}
-                  onClick={() => selectItem(item)}
+                  onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
                   className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
                     item.stock === 0 ? "opacity-60" : ""
                   } ${idx === highlightedIndex && activeRow !== null ? "bg-accent" : ""}`}
