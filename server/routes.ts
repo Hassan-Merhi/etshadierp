@@ -7594,8 +7594,8 @@ if (asOfDate) {
             const quantity = parseFloat(getColumnValue(row, "Quantity") || "0");
             const rate = parseFloat(getColumnValue(row, "Rate") || "0");
 
-            if (!quantity || quantity <= 0) {
-              errors.push(`Row ${rowNum}: Quantity must be greater than 0`);
+            if (quantity === 0 || isNaN(quantity)) {
+              errors.push(`Row ${rowNum}: Quantity must be a non-zero number (negative quantities are allowed)`);
               continue;
             }
 

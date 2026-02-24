@@ -757,8 +757,8 @@ function DataToolsTab() {
         const quantity = parseFloat(row.quantity || "0");
         const rate = parseFloat(row.rate || "0");
         const value = parseFloat(row.value || "0");
-        if (isNaN(quantity) || quantity < 0) {
-          errors.push(`Row ${rowNumber}: Quantity must be >= 0`);
+        if (isNaN(quantity) || quantity === 0) {
+          errors.push(`Row ${rowNumber}: Quantity must be a non-zero number (negative quantities are allowed)`);
           return;
         }
         if (isNaN(rate) || rate < 0) {
