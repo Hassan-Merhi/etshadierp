@@ -137,6 +137,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
+    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toISOString().slice(0, 10)}`,
   });
 
   // Fetch all locations (only for non-POS users)

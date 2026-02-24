@@ -540,7 +540,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
+    documentTitle: `${(activeLocation?.name || "POS").replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}`,
     onAfterPrint: () => {
       setShowPrintDialog(false);
       if (editVoucherId) {
