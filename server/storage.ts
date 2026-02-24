@@ -400,7 +400,7 @@ export class DbStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    const [user] = await db.select().from(schema.users).where(sql`LOWER(${schema.users.username}) = LOWER(${username})`);
     return user;
   }
 
