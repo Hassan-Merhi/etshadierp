@@ -1,4 +1,4 @@
-import { eq, and, or, sql, inArray, desc, ne, isNull, asc } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc, ne, isNull, isNotNull, asc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -1970,7 +1970,13 @@ export class DbStorage implements IStorage {
         lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`.as('configured_price'),
       })
       .from(schema.inventory)
-      .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
+      .leftJoin(
+        schema.stockItems,
+        and(
+          eq(schema.inventory.stockItemId, schema.stockItems.id),
+          isNull(schema.stockItems.deletedAt)
+        )
+      )
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .leftJoin(
         schema.stockItemLocationPrices,
@@ -1979,7 +1985,12 @@ export class DbStorage implements IStorage {
           eq(schema.stockItemLocationPrices.locationId, locationId)
         )
       )
-      .where(eq(schema.inventory.locationId, locationId));
+      .where(
+        and(
+          eq(schema.inventory.locationId, locationId),
+          isNotNull(schema.stockItems.id)
+        )
+      );
 
     return results;
   }

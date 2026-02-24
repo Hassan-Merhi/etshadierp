@@ -42,10 +42,10 @@ interface StockGroup {
   name: string;
 }
 
-// Extend the schema to make stockGroupId and companyId optional for the form
-// (companyId is added during submission)
+// Extend the schema to make companyId optional for the form
+// (companyId is added during submission); stockGroupId is required
 const formSchema = insertStockItemSchema.extend({
-  stockGroupId: z.number().optional().nullable(),
+  stockGroupId: z.number({ required_error: "Stock Group is required", invalid_type_error: "Stock Group is required" }),
   companyId: z.number().optional(),
 });
 
@@ -70,7 +70,7 @@ export function StockItemCreateDialog({
       code: "",
       name: "",
       uom: "",
-      stockGroupId: null,
+      stockGroupId: undefined,
       sellingPrice: "0.00",
       openingQty: "0",
       openingRate: "0.00",
@@ -212,18 +212,17 @@ export function StockItemCreateDialog({
                 name="stockGroupId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stock Group</FormLabel>
+                    <FormLabel>Stock Group *</FormLabel>
                     <Select
-                      value={field.value?.toString() || "none"}
-                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                      value={field.value?.toString() || ""}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-stock-group">
-                          <SelectValue placeholder="Select a group" />
+                          <SelectValue placeholder="Select a group (required)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">Uncategorized</SelectItem>
                         {stockGroups.map((group) => (
                           <SelectItem key={group.id} value={group.id.toString()}>
                             {group.name}

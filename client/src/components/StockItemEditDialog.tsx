@@ -172,6 +172,15 @@ export function StockItemEditDialog({
       return;
     }
 
+    if (!stockGroupId) {
+      toast({
+        title: "Validation Error",
+        description: "Stock Group is required. Please select a stock group before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updateMutation.mutate({
       code: code.trim(),
       name: name.trim(),
@@ -254,18 +263,18 @@ export function StockItemEditDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="stockGroup">Stock Group</Label>
+                <Label htmlFor="stockGroup">Stock Group *</Label>
+                {!stockGroupId && (
+                  <p className="text-xs text-destructive">This item must be assigned to a Stock Group before saving.</p>
+                )}
                 <Select
-                  value={stockGroupId?.toString() || "none"}
-                  onValueChange={(value) =>
-                    setStockGroupId(value === "none" ? null : parseInt(value))
-                  }
+                  value={stockGroupId?.toString() || ""}
+                  onValueChange={(value) => setStockGroupId(parseInt(value))}
                 >
                   <SelectTrigger id="stockGroup" data-testid="select-stock-group">
-                    <SelectValue placeholder="Select stock group" />
+                    <SelectValue placeholder="Select stock group (required)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Uncategorized</SelectItem>
                     {stockGroups.map((group) => (
                       <SelectItem key={group.id} value={group.id.toString()}>
                         {group.name}

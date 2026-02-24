@@ -76,7 +76,7 @@ interface StockGroup {
 
 export default function StockItems() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null | "uncategorized">(null);
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -241,23 +241,20 @@ export default function StockItems() {
 
   const filteredStockItems = stockItems
     .filter((item) => {
-      // Filter by search term
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      // Filter by stock group
-      if (selectedGroupFilter === "uncategorized") {
-        return matchesSearch && !item.stockGroupId;
-      } else if (selectedGroupFilter !== null) {
+      if (selectedGroupFilter !== null) {
         return matchesSearch && item.stockGroupId === selectedGroupFilter;
       }
       return matchesSearch;
     })
-    .sort((a, b) => a.id - b.id); // Sort chronologically by ID
+    .sort((a, b) => a.id - b.id);
+
+  const unassignedItems = stockItems.filter(item => !item.stockGroupId);
 
   const getStockGroupName = (stockGroupId: number | null) => {
-    if (!stockGroupId) return "Uncategorized";
+    if (!stockGroupId) return "— No Group —";
     const group = stockGroups.find(g => g.id === stockGroupId);
     return group ? group.name : "Unknown";
   };
@@ -380,18 +377,24 @@ export default function StockItems() {
             value={selectedGroupFilter === null ? "all" : selectedGroupFilter}
             onChange={(e) => {
               const val = e.target.value;
-              setSelectedGroupFilter(val === "all" ? null : val === "uncategorized" ? "uncategorized" : parseInt(val));
+              setSelectedGroupFilter(val === "all" ? null : parseInt(val));
             }}
             className="w-full md:w-auto px-3 py-2 border rounded-md text-sm"
             data-testid="select-stock-group"
           >
             <option value="all">All Groups</option>
-            <option value="uncategorized">Uncategorized</option>
             {stockGroups.map(group => (
               <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>
+
+        {!isLoading && unassignedItems.length > 0 && (
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+            <span className="font-medium">Warning:</span>
+            <span>{unassignedItems.length} item{unassignedItems.length > 1 ? "s are" : " is"} not assigned to any Stock Group. Please edit {unassignedItems.length > 1 ? "them" : "it"} and assign a group.</span>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-2">

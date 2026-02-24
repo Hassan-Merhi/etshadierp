@@ -6157,6 +6157,11 @@ if (asOfDate) {
 
       const parsed = insertStockItemSchema.parse(dataWithCompany);
 
+      // Require a valid stock group (no null/uncategorized)
+      if (!parsed.stockGroupId) {
+        return res.status(400).json({ message: "Stock Group is required. Please select a valid stock group." });
+      }
+
       // Check for duplicate code within the same company
       const existing = await storage.getStockItemByCode(
         parsed.code,
@@ -6200,6 +6205,20 @@ if (asOfDate) {
       
       if (validIds.length === 0) {
         return res.status(404).json({ message: "No valid stock items found to delete" });
+      }
+
+      // Block deletion if any item has inventory records (regardless of quantity)
+      const inventoryCheck = await db.execute(
+        sql`SELECT stock_item_id FROM inventory WHERE stock_item_id = ANY(ARRAY[${sql.join(validIds.map(id => sql`${id}`), sql`, `)}]) GROUP BY stock_item_id`
+      );
+      if ((inventoryCheck.rows as any[]).length > 0) {
+        const blockedIds = new Set((inventoryCheck.rows as any[]).map((r: any) => parseInt(r.stock_item_id)));
+        const blockedCodes = validItems
+          .filter(item => blockedIds.has(item.id))
+          .map(item => item.code);
+        return res.status(400).json({
+          message: `Cannot delete ${blockedCodes.length} item(s) — they have existing inventory records: ${blockedCodes.join(", ")}. Please clear all inventory first.`,
+        });
       }
 
       await storage.bulkDeleteStockItems(validIds);
@@ -6706,6 +6725,9 @@ if (asOfDate) {
         }
 
         if (req.body.stockGroupId !== undefined) {
+          if (req.body.stockGroupId === null) {
+            return res.status(400).json({ message: "Stock Group is required. Please select a valid stock group." });
+          }
           updates.stockGroupId = req.body.stockGroupId;
         }
 
@@ -6769,22 +6791,16 @@ if (asOfDate) {
             });
         }
 
-        // Check if item has any inventory
-        const inventoryLocations = await storage.getInventoryLocationsByItem(
-          stockItemId,
-          req.session.currentCompanyId,
+        // Check if item has ANY inventory record (regardless of quantity)
+        const anyInventory = await db.execute(
+          sql`SELECT COUNT(*) as count FROM inventory WHERE stock_item_id = ${stockItemId}`
         );
-        const hasInventory = inventoryLocations.some(
-          (loc) => parseFloat(loc.quantity) > 0,
-        );
+        const inventoryCount = parseInt((anyInventory.rows as any[])[0]?.count || "0");
 
-        if (hasInventory) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Cannot delete stock item with existing inventory. Please transfer or adjust inventory to zero first.",
-            });
+        if (inventoryCount > 0) {
+          return res.status(400).json({
+            message: `Cannot delete stock item "${existingItem.code}": it has inventory records in ${inventoryCount} location(s). Please transfer or adjust all inventory to zero and clear the records first.`,
+          });
         }
 
         await storage.deleteStockItem(stockItemId);

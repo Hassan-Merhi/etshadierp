@@ -194,35 +194,40 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Filter out items with 0 quantity
   const inventory = inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
-  // Group inventory by stock group
-  const stockGroups: StockGroupSummary[] = inventory.reduce((groups, item) => {
-    const groupKey = item.stockGroupId || 0;
-    let group = groups.find(g => (g.groupId || 0) === groupKey);
-    
-    if (!group) {
-      group = {
-        groupId: item.stockGroupId,
-        groupCode: item.stockGroupCode,
-        groupName: item.stockGroupName || "Uncategorized",
-        totalQuantity: 0,
-        totalValue: 0,
-        averageRate: 0,
-        itemCount: 0,
-        items: [],
-      };
-      groups.push(group);
-    }
+  // Separate unassigned items (no stock group) — show warning, not as a group
+  const unassignedInventoryItems = inventory.filter(item => !item.stockGroupId);
 
-    const qty = parseFloat(item.quantity || "0");
-    const value = parseFloat(item.totalValue || "0");
-    
-    group.totalQuantity += qty;
-    group.totalValue += value;
-    group.itemCount += 1;
-    group.items.push(item);
+  // Group inventory by stock group — skip items with no stock group
+  const stockGroups: StockGroupSummary[] = inventory
+    .filter(item => !!item.stockGroupId)
+    .reduce((groups, item) => {
+      const groupKey = item.stockGroupId!;
+      let group = groups.find(g => g.groupId === groupKey);
+      
+      if (!group) {
+        group = {
+          groupId: item.stockGroupId,
+          groupCode: item.stockGroupCode,
+          groupName: item.stockGroupName || "Unknown Group",
+          totalQuantity: 0,
+          totalValue: 0,
+          averageRate: 0,
+          itemCount: 0,
+          items: [],
+        };
+        groups.push(group);
+      }
 
-    return groups;
-  }, [] as StockGroupSummary[]);
+      const qty = parseFloat(item.quantity || "0");
+      const value = parseFloat(item.totalValue || "0");
+      
+      group.totalQuantity += qty;
+      group.totalValue += value;
+      group.itemCount += 1;
+      group.items.push(item);
+
+      return groups;
+    }, [] as StockGroupSummary[]);
 
   // Calculate average rate for each group
   stockGroups.forEach(group => {
@@ -723,7 +728,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       "Item Code": item.code,
       "Item Name": item.name,
       "Qty": parseFloat(item.quantity),
-      "Group": item.groupName || "Uncategorized",
+      "Group": item.groupName || "Unassigned",
     }));
     const ws = utils.json_to_sheet(wsData);
     utils.book_append_sheet(wb, ws, "Negative Stock");
@@ -1124,15 +1129,27 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               />
             </div>
 
+            {!inventoryLoading && unassignedInventoryItems.length > 0 && (
+              <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+                <span className="font-medium">Warning:</span>
+                <span>{unassignedInventoryItems.length} item{unassignedInventoryItems.length > 1 ? "s have" : " has"} no Stock Group assigned and {unassignedInventoryItems.length > 1 ? "are" : "is"} hidden. Please go to Stock Items and assign a group to {unassignedInventoryItems.length > 1 ? "them" : "it"}.</span>
+              </div>
+            )}
+
             {inventoryLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
-            ) : stockGroups.length === 0 ? (
+            ) : stockGroups.length === 0 && unassignedInventoryItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No inventory found at this location.
+                <p className="font-medium mb-1">No inventory found at this location.</p>
+                <p className="text-xs">Create Stock Groups and Stock Items first, then import or receive stock.</p>
+              </div>
+            ) : stockGroups.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                All items at this location are unassigned. See the warning above.
               </div>
             ) : (
               <>
@@ -1695,7 +1712,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                   const groupedInventory = sortedInventory.reduce((acc, item) => {
                     const groupKey = item.stockGroupCode || "UNCAT";
-                    const groupName = item.stockGroupName || "Uncategorized";
+                    const groupName = item.stockGroupName || "Unassigned";
                     if (!acc[groupKey]) {
                       acc[groupKey] = { name: groupName, items: [] };
                     }
