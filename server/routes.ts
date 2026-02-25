@@ -33566,6 +33566,65 @@ if (asOfDate) {
     }
   });
 
+
+  // ==========================================
+  // ERP User Page Access
+  // ==========================================
+
+  app.get(
+    "/api/erp-user-page-access/:userId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const pageKeys = await storage.getErpUserPageAccess(companyId, req.params.userId);
+        res.json({ pageKeys });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.put(
+    "/api/erp-user-page-access/:userId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const { pageKeys } = req.body;
+        if (!Array.isArray(pageKeys)) return res.status(400).json({ message: "pageKeys must be an array" });
+        await storage.setErpUserPageAccess(companyId, req.params.userId, pageKeys);
+        res.json({ message: "Page access updated", pageKeys });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.get(
+    "/api/my-erp-pages",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        const role = req.session.currentRole;
+        const userId = req.user?.id;
+        if (!companyId || !role || !userId) return res.status(400).json({ message: "No company or role selected" });
+        if (role === "Admin") {
+          const { FEATURE_KEYS } = await import("@shared/schema");
+          return res.json({ pageKeys: [...FEATURE_KEYS], fullAccess: true });
+        }
+        const pageKeys = await storage.getErpUserPageAccess(companyId, userId);
+        res.json({ pageKeys, fullAccess: false });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
   const httpServer = createServer(app);
 
   return httpServer;

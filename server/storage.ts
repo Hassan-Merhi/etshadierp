@@ -377,6 +377,10 @@ export interface IStorage {
   upsertRoleFeaturePermission(permission: schema.InsertRoleFeaturePermission): Promise<schema.RoleFeaturePermission>;
   bulkUpsertRoleFeaturePermissions(permissions: schema.InsertRoleFeaturePermission[]): Promise<schema.RoleFeaturePermission[]>;
 
+  // ERP User Page Access
+  getErpUserPageAccess(companyId: number, userId: string): Promise<string[]>;
+  setErpUserPageAccess(companyId: number, userId: string, pageKeys: string[]): Promise<void>;
+
   // System Settings (global app-wide settings)
   getSystemSetting(key: string): Promise<schema.SystemSetting | undefined>;
   setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting>;
@@ -6172,6 +6176,32 @@ export class DbStorage implements IStorage {
       results.push(result);
     }
     return results;
+  }
+
+  // ERP User Page Access
+  async getErpUserPageAccess(companyId: number, userId: string): Promise<string[]> {
+    const rows = await db
+      .select({ pageKey: schema.erpUserPageAccess.pageKey })
+      .from(schema.erpUserPageAccess)
+      .where(and(
+        eq(schema.erpUserPageAccess.companyId, companyId),
+        eq(schema.erpUserPageAccess.userId, userId)
+      ));
+    return rows.map(r => r.pageKey);
+  }
+
+  async setErpUserPageAccess(companyId: number, userId: string, pageKeys: string[]): Promise<void> {
+    await db
+      .delete(schema.erpUserPageAccess)
+      .where(and(
+        eq(schema.erpUserPageAccess.companyId, companyId),
+        eq(schema.erpUserPageAccess.userId, userId)
+      ));
+    if (pageKeys.length > 0) {
+      await db.insert(schema.erpUserPageAccess).values(
+        pageKeys.map(pageKey => ({ companyId, userId, pageKey }))
+      );
+    }
   }
 
   // Stock Group Location Archives

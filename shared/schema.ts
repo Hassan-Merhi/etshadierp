@@ -3315,6 +3315,24 @@ export const insertFactoryUserPageAccessSchema = createInsertSchema(factoryUserP
 export type InsertFactoryUserPageAccess = z.infer<typeof insertFactoryUserPageAccessSchema>;
 export type FactoryUserPageAccess = typeof factoryUserPageAccess.$inferSelect;
 
+export const erpUserPageAccess = pgTable("erp_user_page_access", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  pageKey: text("page_key").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyUserPage: uniqueIndex("erp_user_page_access_unique").on(t.companyId, t.userId, t.pageKey),
+}));
+
+export const insertErpUserPageAccessSchema = createInsertSchema(erpUserPageAccess).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertErpUserPageAccess = z.infer<typeof insertErpUserPageAccessSchema>;
+export type ErpUserPageAccess = typeof erpUserPageAccess.$inferSelect;
+
 export const supplierProformas = pgTable("supplier_proformas", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

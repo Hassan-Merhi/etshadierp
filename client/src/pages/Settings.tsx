@@ -1,4 +1,4 @@
-  import { useState, Fragment } from "react";
+  import { useState, useEffect, Fragment } from "react";
   import { useForm } from "react-hook-form";
   import { zodResolver } from "@hookform/resolvers/zod";
   import { z } from "zod";
@@ -41,6 +41,7 @@
     SelectTrigger,
     SelectValue,
   } from "@/components/ui/select";
+  import { Checkbox } from "@/components/ui/checkbox";
   import {
     Table,
     TableBody,
@@ -49,13 +50,12 @@
     TableHeader,
     TableRow,
   } from "@/components/ui/table";
-  import { Checkbox } from "@/components/ui/checkbox";
   import { Badge } from "@/components/ui/badge";
   import { Switch } from "@/components/ui/switch";
   
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
-  import { queryClient } from "@/lib/queryClient";
+  import { queryClient, apiRequest } from "@/lib/queryClient";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart } from "lucide-react";
@@ -1512,6 +1512,224 @@ function BulkRenameTab() {
   );
 }
 
+const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
+  { key: "dashboard", label: "Dashboard", group: "Overview" },
+  { key: "pos", label: "Point of Sale", group: "Sales & POS" },
+  { key: "pos_daybook", label: "POS Daybook", group: "Sales & POS" },
+  { key: "stock_items", label: "Stock Items", group: "Inventory" },
+  { key: "location_inventory", label: "Location Inventory", group: "Inventory" },
+  { key: "containers", label: "Containers", group: "Inventory" },
+  { key: "stock_otw", label: "Stock OTW", group: "Inventory" },
+  { key: "stock_query", label: "Stock Query", group: "Inventory" },
+  { key: "location_summary", label: "Location Summary", group: "Inventory" },
+  { key: "accounts", label: "Accounts", group: "Accounting" },
+  { key: "suppliers", label: "Suppliers", group: "Accounting" },
+  { key: "customers", label: "Customers", group: "Accounting" },
+  { key: "daybook", label: "Daybook", group: "Accounting" },
+  { key: "payroll", label: "Payroll", group: "Accounting" },
+  { key: "vouchers", label: "Vouchers", group: "Vouchers" },
+  { key: "optional_vouchers", label: "Optional Vouchers", group: "Vouchers" },
+  { key: "create", label: "Create Voucher", group: "Vouchers" },
+  { key: "analytics", label: "Analytics", group: "Analytics" },
+  { key: "sales_report", label: "Sales Report", group: "Analytics" },
+  { key: "factory_production", label: "Factory Production", group: "Analytics" },
+  { key: "settings", label: "Settings", group: "System" },
+];
+
+const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
+
+function PageAccessSection({ users, companies, selectedCompany, featureLabels, toast }: any) {
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { data: userCompanyRoles = [] } = useQuery<any[]>({
+    queryKey: ["/api/users", selectedCompany?.id],
+    enabled: !!selectedCompany,
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: pageAccess, isLoading: isLoadingAccess } = useQuery<{ pageKeys: string[] }>({
+    queryKey: ["/api/erp-user-page-access", selectedUserId, selectedCompany?.id],
+    enabled: !!selectedUserId && !!selectedCompany,
+    queryFn: async () => {
+      const res = await fetch(`/api/erp-user-page-access/${selectedUserId}`, { credentials: "include" });
+      if (!res.ok) return { pageKeys: [] };
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (pageAccess) {
+      setSelectedPages(new Set(pageAccess.pageKeys));
+    }
+  }, [pageAccess]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (pageKeys: string[]) => {
+      const res = await apiRequest("PUT", `/api/erp-user-page-access/${selectedUserId}`, { pageKeys });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-page-access", selectedUserId] });
+      toast({ title: "Page Access Updated", description: "User page access has been saved." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const togglePage = (key: string) => {
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleGroup = (group: string) => {
+    const groupPages = ALL_ERP_PAGES.filter(p => p.group === group).map(p => p.key);
+    const allSelected = groupPages.every(k => selectedPages.has(k));
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      groupPages.forEach(k => allSelected ? next.delete(k) : next.add(k));
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedPages(new Set(ALL_ERP_PAGES.map(p => p.key)));
+  const selectNone = () => setSelectedPages(new Set());
+
+  const selectedUser = users.find((u: any) => u.id === selectedUserId);
+  const isAdmin = selectedUser && users.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Shield className="h-5 w-5" />
+        <h2 className="text-2xl font-semibold" data-testid="text-page-access-title">Page Access</h2>
+      </div>
+
+      <p className="text-muted-foreground">
+        Configure which pages each user can access. Admin users always have full access. Select a user to manage their page access for the current company.
+      </p>
+
+      {!selectedCompany ? (
+        <Card className="p-6">
+          <p className="text-muted-foreground">Please select a company first.</p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Label className="font-medium">User:</Label>
+              <Select value={selectedUserId} onValueChange={(val) => setSelectedUserId(val)}>
+                <SelectTrigger className="w-64" data-testid="select-page-access-user">
+                  <SelectValue placeholder="Select a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {users
+                    .filter((u: any) => u.active)
+                    .map((u: any) => (
+                      <SelectItem key={u.id} value={u.id} data-testid={`option-user-${u.id}`}>
+                        {u.username} {u.fullName ? `(${u.fullName})` : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </Card>
+
+          {selectedUserId && (
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-base font-semibold">Pages for {selectedUser?.username || "User"}</Label>
+                  {isLoadingAccess && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-erp-select-all">
+                    All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={selectNone} data-testid="button-erp-select-none">
+                    None
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4 border rounded-md p-4 max-h-96 overflow-y-auto">
+                {ERP_PAGE_GROUPS.map(group => {
+                  const groupPages = ALL_ERP_PAGES.filter(p => p.group === group);
+                  const allGroupSelected = groupPages.every(p => selectedPages.has(p.key));
+                  const someGroupSelected = groupPages.some(p => selectedPages.has(p.key));
+
+                  return (
+                    <div key={group} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={allGroupSelected}
+                          onCheckedChange={() => toggleGroup(group)}
+                          data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
+                        />
+                        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          {group}
+                        </span>
+                        {someGroupSelected && !allGroupSelected && (
+                          <span className="text-xs text-muted-foreground">(partial)</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 ml-6">
+                        {groupPages.map(page => (
+                          <div key={page.key} className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedPages.has(page.key)}
+                              onCheckedChange={() => togglePage(page.key)}
+                              data-testid={`checkbox-erp-page-${page.key}`}
+                            />
+                            <span className="text-sm">{page.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {selectedPages.size > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedPages.size} of {ALL_ERP_PAGES.length} pages selected
+                </p>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => saveMutation.mutate(Array.from(selectedPages))}
+                  disabled={saveMutation.isPending}
+                  data-testid="button-save-page-access"
+                >
+                  {saveMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Page Access"
+                  )}
+                </Button>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LoginHistoryTab() {
   const { data: history, isLoading } = useQuery<any[]>({
     queryKey: ["/api/login-history"],
@@ -2405,7 +2623,7 @@ function LoginHistoryTab() {
         label: "Users & Access",
         items: [
           { key: "users", label: "Users", icon: Users },
-          { key: "role-permissions", label: "Permissions", icon: Shield },
+          { key: "page-access", label: "Page Access", icon: Shield },
           { key: "active-users", label: "Active Users", icon: Eye },
           { key: "login-history", label: "Login History", icon: Clock },
         ],
@@ -4178,73 +4396,15 @@ function LoginHistoryTab() {
 
           {activeSection === "login-history" && <LoginHistoryTab />}
 
-          {/* Role Permissions Tab */}
-          {activeSection === "role-permissions" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <h2 className="text-2xl font-semibold">Role Permissions</h2>
-              </div>
-
-              <p className="text-muted-foreground">
-                Configure which menu features are accessible for each role. Admin users always have full access.
-              </p>
-
-              {!selectedCompany ? (
-                <Card className="p-6">
-                  <p className="text-muted-foreground">Please select a company to configure role permissions.</p>
-                </Card>
-              ) : isLoadingPermissions ? (
-                <Card className="p-6">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading permissions...</span>
-                  </div>
-                </Card>
-              ) : (
-                <Card className="p-0 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-10 min-w-[160px]">Feature</TableHead>
-                          {configurableRoles.map((role) => (
-                            <TableHead key={role} className="text-center min-w-[80px]">
-                              {role}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {FEATURE_KEYS.map((featureKey) => (
-                          <TableRow key={featureKey}>
-                            <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                              {featureLabels[featureKey]}
-                            </TableCell>
-                            {configurableRoles.map((role) => (
-                              <TableCell key={role} className="text-center">
-                                <Switch
-                                  checked={getPermission(role, featureKey)}
-                                  onCheckedChange={(checked) => {
-                                    updateRolePermissionMutation.mutate({
-                                      role,
-                                      featureKey,
-                                      enabled: checked,
-                                    });
-                                  }}
-                                  disabled={updateRolePermissionMutation.isPending}
-                                  data-testid={`switch-permission-${role}-${featureKey}`}
-                                />
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </Card>
-              )}
-            </div>
+          {/* Page Access Tab */}
+          {activeSection === "page-access" && (
+            <PageAccessSection
+              users={users}
+              companies={companies}
+              selectedCompany={selectedCompany}
+              featureLabels={featureLabels}
+              toast={toast}
+            />
           )}
 
           {activeSection === "edit-log" && (

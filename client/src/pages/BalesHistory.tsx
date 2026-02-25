@@ -228,10 +228,29 @@ export default function BalesHistory() {
     const stickerHtml = generateStickerLabelsHtml(labels);
 
     const w1 = window.open("", "_blank", "width=800,height=900");
-    if (w1) { w1.document.write(paperHtml); w1.document.close(); }
+    if (w1) {
+      w1.document.write(paperHtml);
+      w1.document.close();
+      w1.focus();
+      setTimeout(() => w1.print(), 500);
+    }
 
     const w2 = window.open("", "_blank", "width=400,height=600");
-    if (w2) { w2.document.write(stickerHtml); w2.document.close(); }
+    if (w2) {
+      w2.document.write(stickerHtml);
+      w2.document.close();
+      w2.focus();
+      const imgs = w2.document.images;
+      let loaded = 0;
+      const total = imgs.length;
+      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
+      if (total === 0) { setTimeout(() => w2.print(), 300); }
+      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+    }
+
+    if (!w1 && !w2) {
+      toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
+    }
   };
 
   const filtered = (balesData || []).filter((row: any) => {

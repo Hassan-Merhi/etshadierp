@@ -170,8 +170,8 @@ export function AppSidebar({ user }: { user?: any }) {
     }
   }, [location]);
 
-  const { data: myPermissions = [] } = useQuery<any[]>({
-    queryKey: ["/api/my-permissions"],
+  const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
+    queryKey: ["/api/my-erp-pages"],
     enabled: !!user,
   });
 
@@ -185,12 +185,7 @@ export function AppSidebar({ user }: { user?: any }) {
     },
   });
 
-  const allowedFeatures = new Set<string>();
-  myPermissions.forEach((p: any) => {
-    if (p.enabled) {
-      allowedFeatures.add(p.featureKey);
-    }
-  });
+  const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
 
   const isItemVisible = (item: MenuItem) => {
     const isPOSUser = user?.role?.startsWith("POS");
@@ -202,12 +197,7 @@ export function AppSidebar({ user }: { user?: any }) {
       if (!isFactoryCompany) return false;
     }
 
-    if (isAdmin) return true;
-
-    if (myPermissions.length > 0 && featureKey) {
-      const permissionEntry = myPermissions.find((p: any) => p.featureKey === featureKey);
-      return permissionEntry ? permissionEntry.enabled : false;
-    }
+    if (isAdmin || myErpPages?.fullAccess) return true;
 
     if (isPOSUser) {
       const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"];
@@ -215,6 +205,14 @@ export function AppSidebar({ user }: { user?: any }) {
         posRoutes.push("/pos-import");
       }
       return posRoutes.includes(item.url);
+    }
+
+    if (featureKey && allowedPages.size > 0) {
+      return allowedPages.has(featureKey);
+    }
+
+    if (allowedPages.size === 0 && myErpPages) {
+      return false;
     }
 
     if (item.url === "/settings") return false;
