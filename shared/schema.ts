@@ -977,7 +977,7 @@ export const salesItems = pgTable("sales_items", {
   voucherId: integer("voucher_id").notNull(),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
-  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
+  sellingPrice: decimal("selling_price", { precision: 15, scale: 6 }).notNull(),
   costPrice: decimal("cost_price", { precision: 15, scale: 2 }).notNull(),
   totalSales: decimal("total_sales", { precision: 15, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull(),

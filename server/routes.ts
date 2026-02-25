@@ -17208,6 +17208,7 @@ if (asOfDate) {
         voucherDate: providedVoucherDate,
         shiftId,
         currency,
+        exchangeRate,
       } = req.body;
 
       // Determine account type and ID by validating against actual database records
@@ -17513,6 +17514,7 @@ if (asOfDate) {
             totalAmount: grandTotal.toFixed(2),
             shiftId: shiftId || null,
             currency: currency || "USD",
+            exchangeRate: exchangeRate || null,
           })
           .returning();
 
