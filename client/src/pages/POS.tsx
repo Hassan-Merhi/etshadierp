@@ -1838,75 +1838,56 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 </div>
               )}
 
-              {/* Items Table */}
-              {(() => {
-                const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 1;
-                const printInCFA = savedSale?.voucher?.currency === "CFA" && lockedRate > 1;
-                const fmtTotal = (items: any[]) => {
-                  if (printInCFA) {
-                    const cfaTotal = items.reduce((sum: number, item: any) => {
-                      const rateUSD = parseFloat(item.rateUSD || item.rate);
-                      const cfaRate = Math.round(rateUSD * lockedRate);
-                      return sum + (parseFloat(item.quantity) * cfaRate);
-                    }, 0);
-                    return "CFA " + Math.round(cfaTotal).toLocaleString();
-                  }
-                  const total = items.reduce((sum: number, item: any) => {
+              {/* Items Table - Always print in USD */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid black' }}>
+                    <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900' }}>Description</th>
+                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
+                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(savedSale?.items ?? []).map((item: any, idx: number) => {
+                    const itemRateUSD = parseFloat(item.rateUSD || item.rate);
+                    const itemAmountUSD = parseFloat(item.quantity) * itemRateUSD;
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
+                        <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(parseFloat(item.quantity))}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(itemRateUSD, "$")}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(itemAmountUSD, "$")}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Totals Row */}
+                <tfoot>
+                  <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
+                    <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
+                    <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
+                    <td style={{ padding: '5px 3px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
+                      {fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => {
+                        const rateUSD = parseFloat(item.rateUSD || item.rate);
+                        return sum + (parseFloat(item.quantity) * rateUSD);
+                      }, 0), "$")}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Total Paid - Simple clean display */}
+              <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
+                <span>TOTAL PAID:</span>
+                <span>
+                  {fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => {
                     const rateUSD = parseFloat(item.rateUSD || item.rate);
                     return sum + (parseFloat(item.quantity) * rateUSD);
-                  }, 0);
-                  return fmtPrint(total, "$");
-                };
-                const allItems = savedSale?.items ?? [];
-                return (
-                  <>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid black' }}>
-                          <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900' }}>Description</th>
-                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
-                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
-                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allItems.map((item: any, idx: number) => {
-                          const rateUSD = parseFloat(item.rateUSD || item.rate);
-                          const displayRate = printInCFA ? Math.round(rateUSD * lockedRate) : rateUSD;
-                          const displayAmt = printInCFA
-                            ? Math.round(rateUSD * lockedRate) * parseFloat(item.quantity)
-                            : parseFloat(item.quantity) * rateUSD;
-                          return (
-                            <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
-                              <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(parseFloat(item.quantity))}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>
-                                {printInCFA ? ("CFA " + displayRate.toLocaleString()) : fmtPrint(rateUSD, "$")}
-                              </td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>
-                                {printInCFA ? ("CFA " + Math.round(displayAmt).toLocaleString()) : fmtPrint(displayAmt, "$")}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
-                          <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
-                          <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint(allItems.reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
-                          <td style={{ padding: '5px 3px' }}></td>
-                          <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>{fmtTotal(allItems)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-
-                    <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>TOTAL PAID:</span>
-                      <span>{fmtTotal(allItems)}</span>
-                    </div>
-                  </>
-                );
-              })()}
+                  }, 0), "$")}
+                </span>
+              </div>
 
               {/* Notes */}
               {savedSale?.voucher?.description && (
