@@ -88,12 +88,6 @@ function generateFullLabelHtml(label: {
           <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="REF Barcode" />
           <div class="ref-barcode-number">${label.referenceNumber}</div>
         </div>
-        <div class="article-barcode-section">
-          <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-        </div>
-        <div class="product-name-section">
-          <div class="product-name-text">${label.productName}</div>
-        </div>
       </div>
     </div>`;
 }
@@ -245,8 +239,8 @@ function generateLabelHtml(labels: Array<{
             body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             * { color: #000 !important; }
             .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
-            .product-name-text, .name-label-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-            .ref-barcode-img, .article-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+            .name-label-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
+            .ref-barcode-img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
           }
           .info-section {
             text-align: right;
@@ -262,43 +256,23 @@ function generateLabelHtml(labels: Array<{
           .ref-barcode-section {
             text-align: center;
             margin-top: 1mm;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
           }
           .ref-barcode-img {
             width: 100%;
-            height: 10mm;
+            height: 13mm;
             object-fit: fill;
           }
           .ref-barcode-number {
-            font-size: 9pt;
-            font-weight: 900;
-            font-family: 'Courier New', monospace;
-            margin-top: 0.5mm;
-            letter-spacing: 1.5px;
-            -webkit-text-stroke: 0.5px #000;
-          }
-          .article-barcode-section {
-            text-align: center;
-            margin-top: 2mm;
-          }
-          .article-barcode-img {
-            width: 100%;
-            height: 10mm;
-            object-fit: fill;
-          }
-          .product-name-section {
-            text-align: center;
-            margin-top: 1mm;
-            border-top: 0.3mm dashed #ccc;
-            padding-top: 0.5mm;
-          }
-          .product-name-text {
-            font-size: 9pt;
+            font-size: 13pt;
             font-weight: 900;
             font-family: Arial, Helvetica, sans-serif;
-            color: #000;
-            text-transform: uppercase;
-            word-break: break-word;
-            line-height: 1.1;
+            margin-top: 0.5mm;
+            letter-spacing: 2px;
+            -webkit-text-stroke: 0.5px #000;
           }
         </style>
       </head>

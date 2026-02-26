@@ -58,10 +58,6 @@ function generateFinalLabelHtml(labels: Array<{
             <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
             <div class="barcode-number">${label.referenceNumber}</div>
           </div>
-          <div class="article-barcode-area">
-            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="article-barcode-number">${label.productName}</div>
-          </div>
         </div>
         <div class="name-label">
           <div class="name-label-text">${label.productName}</div>
@@ -82,12 +78,9 @@ function generateFinalLabelHtml(labels: Array<{
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
-    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
+    .barcode-area { text-align: center; margin-top: auto; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 16mm; object-fit: fill; }
+    .barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; }
     .name-label { width: 76mm; height: 50mm; display: flex; align-items: center; justify-content: center; background: #fff; border-top: 0.3mm solid #ddd; }
     .name-label-text { font-size: 36pt; font-weight: 900; color: #000; text-align: center; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
