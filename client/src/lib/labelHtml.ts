@@ -77,13 +77,37 @@ const detailBlockCss = `
     .barcode-number { font-size: 16pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     `;
 
-export function generateCombinedLabelsHtml(labels: LabelData[]) {
+export type A4DesignColor = "purple" | "green" | "gold" | "white";
+
+export const A4_DESIGN_OPTIONS: { value: A4DesignColor; label: string; color: string }[] = [
+  { value: "purple", label: "Purple (#1)", color: "#5B21B6" },
+  { value: "green", label: "Green (#2)", color: "#047857" },
+  { value: "gold", label: "Gold (#3)", color: "#B8860B" },
+  { value: "white", label: "White (#4)", color: "#F5F5F5" },
+];
+
+function getDesignBannerUrl(design: A4DesignColor): string {
+  switch (design) {
+    case "purple": return "/labels/hmd-purple.jpg";
+    case "green": return "/labels/hmd-green.jpg";
+    case "gold": return "/labels/hmd-gold.jpg";
+    case "white": return "/labels/hmd-white.jpg";
+  }
+}
+
+export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
   let labelsHtml = '';
   for (const label of labels) {
+    const bannerUrl = designColor ? getDesignBannerUrl(designColor) : getHeaderImage(label.articleCode);
+    const hasBanner = designColor || isBrandUrl(bannerUrl);
+    const gapContent = hasBanner
+      ? `<div class="a4-preprint-gap"><img class="a4-banner-img header-banner-img" src="${bannerUrl}" alt="HMD" /></div>`
+      : `<div class="a4-preprint-gap"></div>`;
+
     labelsHtml += `
       <div class="a4-page">
         <div class="a4-top-half">
-          <div class="a4-top-preprint-gap"></div>
+          ${gapContent}
           <div class="a4-top-content">
             <div class="a4-detail-left">
               ${buildDetailBlock(label)}
@@ -94,7 +118,7 @@ export function generateCombinedLabelsHtml(labels: LabelData[]) {
           </div>
         </div>
         <div class="a4-bottom-half">
-          <div class="a4-bottom-preprint-gap"></div>
+          ${gapContent}
           <div class="a4-bottom-namebox">
             <div class="a4-bottom-name-text">${label.productName}</div>
           </div>
@@ -111,14 +135,14 @@ ${detailBlockCss}
     .a4-page:last-child { page-break-after: auto; }
 
     .a4-top-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
-    .a4-top-preprint-gap { height: 90mm; flex-shrink: 0; }
+    .a4-preprint-gap { height: 90mm; flex-shrink: 0; overflow: hidden; }
+    .a4-banner-img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .a4-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
     .a4-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
     .a4-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 58.5mm; }
     .a4-name-right-text { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
-    .a4-bottom-preprint-gap { height: 90mm; flex-shrink: 0; }
     .a4-bottom-namebox { height: 58.5mm; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 10mm; }
     .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 

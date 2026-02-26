@@ -37,7 +37,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, type LabelData } from "@/lib/labelHtml";
+import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
 
 
@@ -62,6 +62,8 @@ export default function BalesHistory() {
   const [bulkStatus, setBulkStatus] = useState("");
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+  const [designPickerOpen, setDesignPickerOpen] = useState(false);
+  const [pendingReprintLabels, setPendingReprintLabels] = useState<LabelData[] | null>(null);
   const [repackConfirm, setRepackConfirm] = useState<any>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -220,11 +222,16 @@ export default function BalesHistory() {
     }
   };
 
-  const openBrowserReprint = (labels: LabelData[]) => {
+  const openBrowserReprint = (labels: LabelData[], designColor?: A4DesignColor) => {
     const fmt = getPaperFormat();
+    if (fmt === "A4" && !designColor) {
+      setPendingReprintLabels(labels);
+      setDesignPickerOpen(true);
+      return;
+    }
     const paperHtml = fmt === "A5"
       ? generateA5LabelsHtml(labels)
-      : generateCombinedLabelsHtml(labels);
+      : generateCombinedLabelsHtml(labels, designColor);
     const stickerHtml = generateStickerLabelsHtml(labels);
 
     const w1 = window.open("", "_blank", "width=800,height=900");
@@ -628,6 +635,64 @@ export default function BalesHistory() {
             >
               {repackBale.isPending ? "Repacking..." : "Repack"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={designPickerOpen} onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingReprintLabels(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose Label Design</DialogTitle>
+            <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            {A4_DESIGN_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                data-testid={`button-design-${opt.value}`}
+                className="flex flex-col items-center gap-2 p-3 rounded-md border hover-elevate cursor-pointer"
+                onClick={() => {
+                  setDesignPickerOpen(false);
+                  if (pendingReprintLabels) {
+                    const labels = pendingReprintLabels;
+                    setPendingReprintLabels(null);
+                    openBrowserReprint(labels, opt.value);
+                  }
+                }}
+              >
+                <div
+                  className="w-full h-12 rounded-md border"
+                  style={{ backgroundColor: opt.color }}
+                />
+                <span className="text-sm font-medium">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDesignPickerOpen(false); setPendingReprintLabels(null); }}>Cancel</Button>
+            <Button
+              variant="secondary"
+              data-testid="button-design-none"
+              onClick={() => {
+                setDesignPickerOpen(false);
+                if (pendingReprintLabels) {
+                  const labels = pendingReprintLabels;
+                  setPendingReprintLabels(null);
+                  const paperHtml = generateCombinedLabelsHtml(labels);
+                  const stickerHtml = generateStickerLabelsHtml(labels);
+                  const w1 = window.open("", "_blank", "width=800,height=900");
+                  if (w1) { w1.document.write(paperHtml); w1.document.close(); w1.focus(); setTimeout(() => w1.print(), 500); }
+                  const w2 = window.open("", "_blank", "width=400,height=600");
+                  if (w2) {
+                    w2.document.write(stickerHtml); w2.document.close(); w2.focus();
+                    const imgs = w2.document.images; let loaded = 0; const total = imgs.length;
+                    const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
+                    if (total === 0) { setTimeout(() => w2.print(), 300); }
+                    else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+                  }
+                }
+              }}
+            >No Banner (Blank)</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

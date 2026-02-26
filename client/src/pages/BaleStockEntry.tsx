@@ -73,13 +73,37 @@ function buildDetailBlock(label: LabelData) {
   </div>`;
 }
 
-function generateCombinedLabelsHtml(labels: LabelData[]) {
+type A4DesignColor = "purple" | "green" | "gold" | "white";
+
+const A4_DESIGN_OPTIONS: { value: A4DesignColor; label: string; color: string }[] = [
+  { value: "purple", label: "Purple (#1)", color: "#5B21B6" },
+  { value: "green", label: "Green (#2)", color: "#047857" },
+  { value: "gold", label: "Gold (#3)", color: "#B8860B" },
+  { value: "white", label: "White (#4)", color: "#F5F5F5" },
+];
+
+function getDesignBannerUrl(design: A4DesignColor): string {
+  switch (design) {
+    case "purple": return "/labels/hmd-purple.jpg";
+    case "green": return "/labels/hmd-green.jpg";
+    case "gold": return "/labels/hmd-gold.jpg";
+    case "white": return "/labels/hmd-white.jpg";
+  }
+}
+
+function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
   let labelsHtml = '';
   for (const label of labels) {
+    const bannerUrl = designColor ? getDesignBannerUrl(designColor) : '';
+    const hasBanner = !!designColor;
+    const gapContent = hasBanner
+      ? `<div class="a4-preprint-gap"><img class="a4-banner-img header-banner-img" src="${bannerUrl}" alt="HMD" /></div>`
+      : `<div class="a4-preprint-gap"></div>`;
+
     labelsHtml += `
       <div class="a4-page">
         <div class="a4-top-half">
-          <div class="a4-top-preprint-gap"></div>
+          ${gapContent}
           <div class="a4-top-content">
             <div class="a4-detail-left">
               ${buildDetailBlock(label)}
@@ -90,7 +114,7 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
           </div>
         </div>
         <div class="a4-bottom-half">
-          <div class="a4-bottom-preprint-gap"></div>
+          ${gapContent}
           <div class="a4-bottom-namebox">
             <div class="a4-bottom-name-text">${label.productName}</div>
           </div>
@@ -116,14 +140,14 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .a4-page:last-child { page-break-after: auto; }
 
     .a4-top-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
-    .a4-top-preprint-gap { height: 90mm; flex-shrink: 0; }
+    .a4-preprint-gap { height: 90mm; flex-shrink: 0; overflow: hidden; }
+    .a4-banner-img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .a4-top-content { height: 58.5mm; flex-shrink: 0; display: flex; flex-direction: row; gap: 6mm; align-items: flex-start; padding: 0 10mm; }
     .a4-detail-left { flex-shrink: 0; width: 76mm; max-height: 58.5mm; overflow: hidden; border: 0.3mm solid #ccc; }
     .a4-name-right { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; height: 58.5mm; }
     .a4-name-right-text { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; overflow: hidden; font-size: clamp(18pt, 3.5vw, 36pt); line-height: 1.15; color: #000; word-break: break-word; }
 
     .a4-bottom-half { height: 148.5mm; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
-    .a4-bottom-preprint-gap { height: 90mm; flex-shrink: 0; }
     .a4-bottom-namebox { height: 58.5mm; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 10mm; }
     .a4-bottom-name-text { width: 100%; text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; overflow: hidden; font-size: clamp(28pt, 6vw, 56pt); line-height: 1.15; color: #000; word-break: break-word; }
 
@@ -134,7 +158,8 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number { -webkit-text-stroke: 0.3px #000; }
       .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -448,9 +473,17 @@ function StockEntryTab() {
     setConfirmDialogOpen(true);
   };
 
-  const openBrowserPrint = (labels: LabelData[]) => {
+  const [designPickerOpen, setDesignPickerOpen] = useState(false);
+  const [pendingPrintLabels, setPendingPrintLabels] = useState<LabelData[] | null>(null);
+
+  const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
     const paperFormat = getPaperFormat();
-    const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
+    if (paperFormat === "A4" && !designColor) {
+      setPendingPrintLabels(labels);
+      setDesignPickerOpen(true);
+      return;
+    }
+    const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
     const a4Window = window.open("", "_blank");
     if (a4Window) {
       a4Window.document.write(labelHtml);
@@ -1364,6 +1397,68 @@ function RemoveFromStockTab() {
             >
               {removeMutation.isPending ? "Removing..." : "Remove from Stock"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={designPickerOpen} onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingPrintLabels(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose Label Design</DialogTitle>
+            <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            {A4_DESIGN_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                data-testid={`button-design-${opt.value}`}
+                className="flex flex-col items-center gap-2 p-3 rounded-md border hover-elevate cursor-pointer"
+                onClick={() => {
+                  setDesignPickerOpen(false);
+                  if (pendingPrintLabels) {
+                    const labels = pendingPrintLabels;
+                    setPendingPrintLabels(null);
+                    openBrowserPrint(labels, opt.value);
+                  }
+                }}
+              >
+                <div
+                  className="w-full h-12 rounded-md border"
+                  style={{ backgroundColor: opt.color }}
+                />
+                <span className="text-sm font-medium">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDesignPickerOpen(false); setPendingPrintLabels(null); }}>Cancel</Button>
+            <Button
+              variant="secondary"
+              data-testid="button-design-none"
+              onClick={() => {
+                setDesignPickerOpen(false);
+                if (pendingPrintLabels) {
+                  const labels = pendingPrintLabels;
+                  setPendingPrintLabels(null);
+                  const paperFormat = getPaperFormat();
+                  const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
+                  const a4Window = window.open("", "_blank");
+                  if (a4Window) { a4Window.document.write(labelHtml); a4Window.document.close(); a4Window.focus(); setTimeout(() => a4Window.print(), 500); }
+                  const stickerWindow = window.open("", "_blank");
+                  if (stickerWindow) {
+                    stickerWindow.document.write(generateStickerLabelsHtml(labels));
+                    stickerWindow.document.close();
+                    stickerWindow.focus();
+                    const imgs = stickerWindow.document.images;
+                    let loaded = 0;
+                    const total = imgs.length;
+                    const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
+                    if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
+                    else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+                  }
+                }
+              }}
+            >No Banner (Blank)</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
