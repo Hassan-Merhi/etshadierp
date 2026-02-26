@@ -13428,6 +13428,8 @@ if (asOfDate) {
             }
           }
 
+          console.log(`[VOUCHER CREATE] type=${voucherType}, paymentAccount=${paymentAccountType}:${paymentAccountId}, entries:`, JSON.stringify(voucherEntriesToCreate.map(e => ({ dr: e.debitAmount, cr: e.creditAmount, supplier: e.supplierId, ledger: e.ledgerAccountId, bank: e.bankAccountId }))));
+
           // Batch insert all voucher entries
           const createdEntries = await tx
             .insert(voucherEntries)

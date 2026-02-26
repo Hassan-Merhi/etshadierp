@@ -1511,13 +1511,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
       journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
       
-      // Auto-set entry type based on account type:
-      // - Employee and Supplier accounts are liabilities (their balance is normally in Credit)
-      // - When making entries for them, we typically DEBIT to reduce what we owe them
-      // - So default to DR (Debit) for liability accounts
-      if (account.type === "employee" || account.type === "supplier") {
-        journalForm.setValue(`entries.${activeJournalRow}.type`, "DR");
-      }
       
       // Focus the amount field after selection
       setTimeout(() => {
