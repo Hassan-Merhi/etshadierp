@@ -13389,46 +13389,86 @@ if (asOfDate) {
               paymentAccountField.fixedAssetId = paymentAccountId;
             }
 
+            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
+
             if (voucherType === "Payment") {
-              // Payment: Debit the expense/asset accounts
-              voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
-                ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-
-              // Credit the payment account
-              voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
-                ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              if (isLiabilityPaymentAccount) {
+                // Payment from liability account (supplier/employee):
+                // DR payment account (reduce liability - we paid from what they owe/advanced)
+                // CR contra account
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              } else {
+                // Payment from asset account (cash/bank/ledger):
+                // DR contra account (expense/asset purchased)
+                // CR payment account (cash goes out)
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              }
             } else {
-              // Receipt: Debit the payment account
-              voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
-                ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-
-              // Credit the income/liability accounts
-              voucherEntriesToCreate.push({
-                voucherId: createdVoucher.id,
-                ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              if (isLiabilityPaymentAccount) {
+                // Receipt into liability account (supplier/employee):
+                // CR payment account (increase liability - we owe them more)
+                // DR contra account (the source, e.g. loans)
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              } else {
+                // Receipt into asset account (cash/bank/ledger):
+                // DR payment account (cash comes in)
+                // CR contra account (income/liability)
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: createdVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              }
             }
           }
-
-          console.log(`[VOUCHER CREATE] type=${voucherType}, paymentAccount=${paymentAccountType}:${paymentAccountId}, entries:`, JSON.stringify(voucherEntriesToCreate.map(e => ({ dr: e.debitAmount, cr: e.creditAmount, supplier: e.supplierId, ledger: e.ledgerAccountId, bank: e.bankAccountId }))));
 
           // Batch insert all voucher entries
           const createdEntries = await tx
@@ -13576,42 +13616,72 @@ if (asOfDate) {
               paymentAccountField.fixedAssetId = paymentAccountId;
             }
 
+            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
+
             if (voucherType === "Payment") {
-              // Payment: Debit the expense/asset accounts
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-
-              // Credit the payment account
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              if (isLiabilityPaymentAccount) {
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              } else {
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              }
             } else {
-              // Receipt: Debit the payment account
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-
-              // Credit the income/liability accounts
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              if (isLiabilityPaymentAccount) {
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              } else {
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...paymentAccountField,
+                  debitAmount: amount,
+                  creditAmount: "0",
+                  narration,
+                });
+                voucherEntriesToCreate.push({
+                  voucherId: updatedVoucher.id,
+                  ...entryAccountField,
+                  debitAmount: "0",
+                  creditAmount: amount,
+                  narration,
+                });
+              }
             }
           }
 

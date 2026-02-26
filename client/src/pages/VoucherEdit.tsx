@@ -834,9 +834,16 @@ export default function VoucherEdit() {
       // For Payment: source account is CREDITED (money leaving), destinations are DEBITED
       // For Receipt: source account is DEBITED (money coming in), destinations are CREDITED
       // Find the source account by looking for the entry with the correct direction
-      const paymentEntry = voucherType === "Payment"
-        ? voucher.entries.find(e => parseFloat(e.creditAmount || "0") > 0)
-        : voucher.entries.find(e => parseFloat(e.debitAmount || "0") > 0);
+      const paymentEntry = voucher.entries.find((e: any) => {
+        const cr = parseFloat(e.creditAmount || "0");
+        const dr = parseFloat(e.debitAmount || "0");
+        const isLiability = e.supplierId || e.employeeId;
+        if (voucherType === "Payment") {
+          return isLiability ? dr > 0 : cr > 0;
+        } else {
+          return isLiability ? cr > 0 : dr > 0;
+        }
+      });
       
       // Fallback to first entry if not found (shouldn't happen for valid vouchers)
       const sourceEntry = paymentEntry || voucher.entries[0];
@@ -845,11 +852,12 @@ export default function VoucherEdit() {
       // Destination entries are all other entries with the opposite direction
       // For Payment: entries with debit amounts (money going TO these accounts)
       // For Receipt: entries with credit amounts (money coming FROM these accounts)
+      const isLiabilityPayment = sourceEntry.supplierId || sourceEntry.employeeId;
       const voucherEntries = voucher.entries.filter(entry => {
-        if (entry.id === sourceEntry.id) return false; // Exclude source entry
-        const amount = voucherType === "Payment" 
-          ? parseFloat(entry.debitAmount || "0") 
-          : parseFloat(entry.creditAmount || "0");
+        if (entry.id === sourceEntry.id) return false;
+        const amount = voucherType === "Payment"
+          ? parseFloat(isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0"))
+          : parseFloat(isLiabilityPayment ? (entry.debitAmount || "0") : (entry.creditAmount || "0"));
         return amount > 0;
       });
 
@@ -862,11 +870,9 @@ export default function VoucherEdit() {
           currency: (voucher.currency as "USD" | "CFA") || "USD",
           entries: voucherEntries.map(entry => {
             const account = findAccountDetails(entry);
-            // For Payment: destinations have debit amounts
-            // For Receipt: destinations have credit amounts
-            const amount = voucherType === "Payment" 
-              ? entry.debitAmount 
-              : entry.creditAmount;
+            const amount = voucherType === "Payment"
+              ? (isLiabilityPayment ? entry.creditAmount : entry.debitAmount)
+              : (isLiabilityPayment ? entry.debitAmount : entry.creditAmount);
             
             return account ? {
               id: entry.id,
@@ -1203,25 +1209,29 @@ export default function VoucherEdit() {
       return sum + usdAmt;
     }, 0).toFixed(2);
     
+    const isLiabilityPayment = data.paymentAccountType === "supplier" || data.paymentAccountType === "employee";
+
+    // For liability payment accounts (supplier/employee), flip DR/CR
+    // Payment from liability: DR payment (reduce liability), CR contra
+    // Receipt into liability: CR payment (increase liability), DR contra
     const paymentEntry = {
       ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
       bankAccountId: data.paymentAccountType === "bank" ? data.paymentAccountId : null,
       supplierId: data.paymentAccountType === "supplier" ? data.paymentAccountId : null,
-      debitAmount: voucherType === "Receipt" ? total : "0",
-      creditAmount: voucherType === "Payment" ? total : "0",
+      employeeId: data.paymentAccountType === "employee" ? data.paymentAccountId : null,
+      debitAmount: (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment) ? total : "0",
+      creditAmount: (voucherType === "Payment" && !isLiabilityPayment) || (voucherType === "Receipt" && isLiabilityPayment) ? total : "0",
     };
 
-    // Build the contra entries (destination accounts)
-    // For Payment: destinations are DEBITED (money goes TO these accounts)
-    // For Receipt: destinations are CREDITED (money comes FROM these accounts)
     const contraEntries = data.entries.map((entry) => {
       const usdAmount = convertAmountToUSD(entry.amount, data.currency);
       return {
         ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
         bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
         supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-        debitAmount: voucherType === "Payment" ? usdAmount : "0",
-        creditAmount: voucherType === "Receipt" ? usdAmount : "0",
+        employeeId: entry.accountType === "employee" ? entry.accountId : null,
+        debitAmount: (voucherType === "Payment" && !isLiabilityPayment) || (voucherType === "Receipt" && isLiabilityPayment) ? usdAmount : "0",
+        creditAmount: (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment) ? usdAmount : "0",
       };
     });
 

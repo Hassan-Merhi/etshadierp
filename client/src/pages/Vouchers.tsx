@@ -758,16 +758,42 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Pre-populate form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
-      // For Payment vouchers: payment account is the one with CREDIT
-      // For Receipt vouchers: payment account is the one with DEBIT
-      const paymentEntry = voucherToEdit.entries.find((entry: any) => {
-        if (voucherToEdit.voucherType === "Payment") {
-          return parseFloat(entry.creditAmount || "0") > 0;
-        } else if (voucherToEdit.voucherType === "Receipt") {
-          return parseFloat(entry.debitAmount || "0") > 0;
-        }
-        return false;
-      });
+      // Identify the payment account entry.
+      // For asset-type payment accounts: Payment=CR, Receipt=DR
+      // For liability-type payment accounts (supplier/employee): Payment=DR, Receipt=CR
+      // We identify the payment entry by finding a pair of entries (same amount) and picking
+      // the one that matches the expected pattern. For simplicity, group entries by amount
+      // and identify by account type.
+      const allEntries = voucherToEdit.entries;
+      let paymentEntry: any = null;
+
+      // Try to find the payment account entry:
+      // In a standard voucher, entries come in pairs. The payment account entry is:
+      // - For Payment: the entry with CR > 0 (or DR > 0 if supplier/employee)
+      // - For Receipt: the entry with DR > 0 (or CR > 0 if supplier/employee)
+      // Since we can't easily distinguish, use the heuristic: for each pair, 
+      // the payment account tends to be bank/cash or the one that appears in both entries of a pair.
+      // Simpler approach: find entries where the amount appears exactly twice (a pair),
+      // and pick based on account type priority (bank > ledger > supplier > employee)
+      if (voucherToEdit.voucherType === "Payment") {
+        // Payment: payment account has CR (asset) or DR (liability)
+        paymentEntry = allEntries.find((entry: any) => {
+          const cr = parseFloat(entry.creditAmount || "0");
+          const dr = parseFloat(entry.debitAmount || "0");
+          const isLiability = entry.supplierId || entry.employeeId;
+          if (isLiability) return dr > 0;
+          return cr > 0;
+        });
+      } else if (voucherToEdit.voucherType === "Receipt") {
+        // Receipt: payment account has DR (asset) or CR (liability)
+        paymentEntry = allEntries.find((entry: any) => {
+          const cr = parseFloat(entry.creditAmount || "0");
+          const dr = parseFloat(entry.debitAmount || "0");
+          const isLiability = entry.supplierId || entry.employeeId;
+          if (isLiability) return cr > 0;
+          return dr > 0;
+        });
+      }
 
       if (!paymentEntry) return;
 
@@ -839,12 +865,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountName = asset?.name || "";
         }
 
-        // For Payment vouchers, contra entries are debits (expenses, assets purchased)
-        // For Receipt vouchers, contra entries are credits (revenue, liability decrease)
+        // Extract the amount from the contra entry
+        // For asset payment accounts: Payment contra=DR, Receipt contra=CR
+        // For liability payment accounts: Payment contra=CR, Receipt contra=DR
+        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId;
         if (voucherToEdit.voucherType === "Payment") {
-          amount = entry.debitAmount || "0";
+          amount = isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0");
         } else if (voucherToEdit.voucherType === "Receipt") {
-          amount = entry.creditAmount || "0";
+          amount = isLiabilityPayment ? (entry.debitAmount || "0") : (entry.creditAmount || "0");
         }
 
         return {
