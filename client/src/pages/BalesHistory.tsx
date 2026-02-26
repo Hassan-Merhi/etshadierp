@@ -293,8 +293,13 @@ export default function BalesHistory() {
     const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
     return baleDate === todayStr;
   });
-  const todayTotalQty = todayInStock.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const todayTotalKg = todayInStock.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const getArticleCode = (row: any) => (row.product?.articleCode || row.bale.articleCode || row.bale.category || "").toUpperCase();
+  const todayRegular = todayInStock.filter((row: any) => !getArticleCode(row).startsWith("HMD16"));
+  const todayGarbage = todayInStock.filter((row: any) => getArticleCode(row).startsWith("HMD16"));
+  const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const garbageKg = todayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   if (isLoading) {
     return (
@@ -322,9 +327,21 @@ export default function BalesHistory() {
                 <span className="text-xs text-muted-foreground font-medium">Today&apos;s In Stock</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold" data-testid="text-today-qty">{todayTotalQty} qty</span>
-                <span className="text-sm font-semibold" data-testid="text-today-kg">{formatLabelNum(todayTotalKg)} kg</span>
+                <span className="text-sm font-semibold" data-testid="text-today-qty">{regularQty} qty</span>
+                <span className="text-sm font-semibold" data-testid="text-today-kg">{formatLabelNum(regularKg)} kg</span>
               </div>
+              {garbageQty > 0 && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">Garbage</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold" data-testid="text-today-garbage-qty">{garbageQty} qty</span>
+                    <span className="text-sm font-semibold" data-testid="text-today-garbage-kg">{formatLabelNum(garbageKg)} kg</span>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
