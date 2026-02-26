@@ -109,9 +109,9 @@ function generateCombinedLabelsHtml(labels: LabelData[]) {
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
-    .barcode-number { font-size: 14pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 22mm; object-fit: fill; }
+    .barcode-number { font-size: 16pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .a4-page { width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a4-page:last-child { page-break-after: auto; }
 
@@ -171,9 +171,9 @@ function generateA5LabelsHtml(labels: LabelData[]) {
     .info-section { text-align: right; font-size: 7pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: 1mm; }
-    .barcode-img { width: 100%; height: 12mm; object-fit: fill; }
-    .barcode-number { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 18mm; object-fit: fill; }
+    .barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
     .a5-page1 { padding-top: 80mm; }
@@ -238,9 +238,9 @@ function generateStickerLabelsHtml(labels: LabelData[]) {
     .info-section { text-align: right; font-size: 8pt; line-height: 1.3; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
-    .ref-barcode-section { text-align: center; }
-    .ref-barcode-img { width: 100%; height: 9mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .ref-barcode-section { text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .ref-barcode-img { width: 100%; height: 13mm; object-fit: fill; }
+    .ref-barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {

@@ -76,9 +76,9 @@ function generatePressingLabelHtml(labels: Array<{
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: auto; }
-    .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
-    .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
+    .barcode-area { text-align: center; margin-top: auto; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 16mm; object-fit: fill; }
+    .barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; }
     .product-short { font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-top: 0.3mm; color: #000; white-space: nowrap; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
