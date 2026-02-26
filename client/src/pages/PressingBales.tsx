@@ -59,10 +59,6 @@ function generatePressingLabelHtml(labels: Array<{
             <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
             <div class="barcode-number">${label.referenceNumber}</div>
           </div>
-          <div class="article-barcode-area">
-            <img class="article-barcode-img" src="/api/barcode/${encodeURIComponent(label.articleCode)}" alt="Article Barcode" />
-            <div class="article-barcode-number">${label.productName}</div>
-          </div>
         </div>
       </div>`;
   }
@@ -84,9 +80,6 @@ function generatePressingLabelHtml(labels: Array<{
     .barcode-img { width: 60mm; height: 10mm; object-fit: contain; }
     .barcode-number { font-size: 8pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.5mm; letter-spacing: 1px; }
     .product-short { font-size: 7pt; font-weight: 900; text-transform: uppercase; margin-top: 0.3mm; color: #000; white-space: nowrap; }
-    .article-barcode-area { text-align: center; margin-top: 1mm; border-top: 0.3mm dashed #ccc; padding-top: 1mm; }
-    .article-barcode-img { width: 50mm; height: 8mm; object-fit: contain; }
-    .article-barcode-number { font-size: 7pt; font-weight: 700; font-family: 'Courier New', monospace; margin-top: 0.3mm; letter-spacing: 1px; color: #333; }
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print { .print-note { display: none !important; } }
   </style></head><body><div class="print-note">Pressing labels - disable "Headers and Footers" in print settings for cleanest output.</div>${labelsHtml}</body></html>`;
