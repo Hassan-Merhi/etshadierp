@@ -91,7 +91,7 @@ export default function FactoryWorkers() {
   });
 
   useEffect(() => {
-    if (companies && companies.length === 1 && companyId === null) setCompanyId(companies[0].id);
+    if (companies && companies.length > 0 && companyId === null) setCompanyId(companies[0].id);
   }, [companies, companyId]);
 
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({
@@ -356,26 +356,12 @@ export default function FactoryWorkers() {
     </div>
   );
 
-  if (!companyId) {
-    if (companies && companies.length === 1) return null;
+  if (!companyId || isLoading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Factory Workers</h1>
-        <Card><CardContent className="pt-6">
-          <Label className="text-sm mb-2 block">Select Company</Label>
-          <Select onValueChange={(v) => setCompanyId(Number(v))}>
-            <SelectTrigger data-testid="select-company"><SelectValue placeholder="Choose a company" /></SelectTrigger>
-            <SelectContent>{companies?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </CardContent></Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-md" />)}
       </div>
     );
-  }
-
-  if (isLoading) {
-    return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-md" />)}
-    </div>;
   }
 
   const balance = endResult ? parseFloat(endResult.balance) : 0;
@@ -391,12 +377,6 @@ export default function FactoryWorkers() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {companies && companies.length > 1 && (
-            <Select value={String(companyId)} onValueChange={(v) => setCompanyId(Number(v))}>
-              <SelectTrigger className="w-44" data-testid="select-company"><SelectValue /></SelectTrigger>
-              <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
           <Button variant="outline" onClick={() => window.open(`/api/factory/workers/template.xlsx?companyId=${companyId}`, "_blank")} data-testid="button-download-template">
             <Download className="h-4 w-4 mr-2" />Template

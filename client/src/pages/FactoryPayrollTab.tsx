@@ -57,7 +57,7 @@ export default function FactoryPayrollTab() {
   const { data: companies } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
 
   useEffect(() => {
-    if (companies && companies.length === 1 && companyId === null) setCompanyId(companies[0].id);
+    if (companies && companies.length > 0 && companyId === null) setCompanyId(companies[0].id);
   }, [companies, companyId]);
 
   const [runOpen, setRunOpen] = useState(false);
@@ -209,17 +209,9 @@ export default function FactoryPayrollTab() {
   const allSelected = unpaidPayrolls.length > 0 && unpaidPayrolls.every((p) => selectedIds.has(p.id));
 
   if (!companyId) {
-    if (companies && companies.length === 1) return null;
     return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Payroll</h2>
-        <div className="space-y-2 max-w-xs">
-          <Label className="text-sm">Select Company</Label>
-          <Select onValueChange={(v) => setCompanyId(Number(v))}>
-            <SelectTrigger data-testid="select-payroll-company"><SelectValue placeholder="Choose company" /></SelectTrigger>
-            <SelectContent>{companies?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-md" />)}
       </div>
     );
   }
