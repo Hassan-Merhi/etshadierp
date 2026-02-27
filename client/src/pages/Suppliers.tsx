@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import {
   Card,
@@ -37,7 +38,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink, FileText } from "lucide-react";
+import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink, FileText, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
@@ -64,12 +76,28 @@ export default function Suppliers() {
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
+  const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
 
   const { selectedCompany, selectCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
+  const { toast } = useToast();
   const [_location, navigate] = useLocation();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/suppliers/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers/stats"] });
+      toast({ title: "Supplier deleted" });
+      setSupplierToDelete(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setSupplierToDelete(null);
+    },
+  });
 
   // Handle clicking on a transaction to navigate to it
   const handleTransactionClick = async (txn: any) => {
@@ -337,6 +365,14 @@ export default function Suppliers() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSupplierToDelete({ id: supplier.id, name: supplier.legalName })}
+                            data-testid={`button-delete-supplier-${supplier.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -371,7 +407,7 @@ export default function Suppliers() {
                         {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
                       </span>
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -380,6 +416,14 @@ export default function Suppliers() {
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSupplierToDelete({ id: supplier.id, name: supplier.legalName })}
+                        data-testid={`button-delete-supplier-mobile-${supplier.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </div>
                   </CardContent>
@@ -685,6 +729,28 @@ export default function Suppliers() {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!supplierToDelete} onOpenChange={(o) => !o && setSupplierToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{supplierToDelete?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => supplierToDelete && deleteMutation.mutate(supplierToDelete.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
