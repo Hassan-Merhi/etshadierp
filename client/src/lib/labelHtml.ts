@@ -28,27 +28,10 @@ function isBrandUrl(src: string): boolean {
 }
 
 function buildDetailBlock(label: LabelData) {
-  const imgSrc = getHeaderImage(label.articleCode);
-  const brand = isBrandUrl(imgSrc);
-  if (brand) {
-    return `<div class="code-label">
-    <img class="header-banner-img" src="${imgSrc}" alt="HMD" />
-    <div class="info-section-row">
-      <span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span>
-      &nbsp;&nbsp;<span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span>
-      &nbsp;&nbsp;<span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span>
-    </div>
-    <div class="barcode-area">
-      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
-      <div class="barcode-number">${label.referenceNumber}</div>
-      <div class="barcode-subtext">${label.productName}</div>
-    </div>
-  </div>`;
-  }
   return `<div class="code-label">
     <div class="label-top">
       <div class="logo-section">
-        <img class="logo-img" src="${imgSrc}" alt="HMD" />
+        <img class="logo-img" src="${HMD_LOGO_BASE64}" alt="HMD" />
       </div>
       <div class="info-section">
         <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
