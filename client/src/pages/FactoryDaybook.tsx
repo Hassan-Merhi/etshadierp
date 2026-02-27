@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Filter, Download, Edit, History } from "lucide-react";
+import { BookOpen, Edit, History, List, AlignJustify } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -91,7 +91,6 @@ const TX_TYPE_COLORS: Record<string, string> = {
 export default function FactoryDaybook() {
   const { toast } = useToast();
   const today = new Date().toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -100,10 +99,11 @@ export default function FactoryDaybook() {
   const daybookEditDays = currentUser?.daybookEditDays || 0;
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
 
-  const [startDate, setStartDate] = useState(thirtyDaysAgo);
+  const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
+  const [isDetailed, setIsDetailed] = useState(false);
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
@@ -126,22 +126,17 @@ export default function FactoryDaybook() {
     },
   });
 
-  const totalUsd = useMemo(
-    () => entries.reduce((sum, e) => sum + parseFloat(e.amountUsd || "0"), 0),
-    [entries]
-  );
-
-  const uniqueCurrencies = useMemo(
-    () => Array.from(new Set(entries.map((e) => e.currencyCode))).sort(),
-    [entries]
-  );
-
-  const txTypeCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+  const condensedRows = useMemo(() => {
+    const byDate: Record<string, { date: string; count: number; totalUsd: number; types: Set<string> }> = {};
     entries.forEach((e) => {
-      counts[e.txType] = (counts[e.txType] || 0) + 1;
+      if (!byDate[e.txDate]) {
+        byDate[e.txDate] = { date: e.txDate, count: 0, totalUsd: 0, types: new Set() };
+      }
+      byDate[e.txDate].count += 1;
+      byDate[e.txDate].totalUsd += parseFloat(e.amountUsd || "0");
+      byDate[e.txDate].types.add(e.txType);
     });
-    return counts;
+    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
   }, [entries]);
 
   const editMutation = useMutation({
@@ -265,52 +260,26 @@ export default function FactoryDaybook() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Entries</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-entries">{entries.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total (USD)</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-usd">${formatNumber(totalUsd)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Currencies</p>
-            <div className="flex gap-1 mt-1 flex-wrap">
-              {uniqueCurrencies.length > 0 ? uniqueCurrencies.map((c) => (
-                <Badge key={c} variant="secondary">{c}</Badge>
-              )) : <span className="text-muted-foreground text-sm">-</span>}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Types</p>
-            <div className="flex gap-1 mt-1 flex-wrap">
-              {Object.entries(txTypeCounts).map(([type, count]) => (
-                <Badge key={type} variant="outline" className="text-xs">
-                  {TX_TYPE_LABELS[type] || type}: {count}
-                </Badge>
-              ))}
-              {Object.keys(txTypeCounts).length === 0 && (
-                <span className="text-muted-foreground text-sm">-</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Transactions
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Transactions
+            </CardTitle>
+            <Button
+              variant={isDetailed ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsDetailed(!isDetailed)}
+              data-testid="button-toggle-detailed"
+            >
+              {isDetailed ? (
+                <><List className="h-4 w-4 mr-1" />Condensed</>
+              ) : (
+                <><AlignJustify className="h-4 w-4 mr-1" />Detailed</>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -319,6 +288,49 @@ export default function FactoryDaybook() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
+          ) : !isDetailed ? (
+            condensedRows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">Total (USD)</TableHead>
+                      <TableHead>Types</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {condensedRows.map((row) => (
+                      <TableRow key={row.date} data-testid={`row-condensed-${row.date}`}>
+                        <TableCell className="font-mono text-sm whitespace-nowrap">
+                          {new Date(row.date + "T00:00:00").toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{row.count}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          ${formatNumber(row.totalUsd)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {Array.from(row.types).map((t) => (
+                              <Badge key={t} variant={(TX_TYPE_COLORS[t] as any) || "outline"} className="text-xs">
+                                {TX_TYPE_LABELS[t] || t}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
+                <p className="text-muted-foreground mt-2">Factory transactions will appear here as you perform operations</p>
+              </div>
+            )
           ) : entries.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
@@ -381,9 +393,7 @@ export default function FactoryDaybook() {
             <div className="text-center py-12">
               <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-              <p className="text-muted-foreground mt-2">
-                Factory transactions will appear here as you perform operations
-              </p>
+              <p className="text-muted-foreground mt-2">Factory transactions will appear here as you perform operations</p>
             </div>
           )}
         </CardContent>
