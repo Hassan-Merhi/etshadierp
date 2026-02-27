@@ -78,13 +78,13 @@ const menuGroups: MenuGroup[] = [
     title: "Inventory",
     icon: Boxes,
     items: [
-      { title: "Daybook", url: "/daybook", icon: Book },
       { title: "Location Inventory", url: "/location-inventory", icon: MapPin },
       { title: "Stock OTW", url: "/stock-otw", icon: Ship },
       { title: "Containers", url: "/containers", icon: Container },
       { title: "Stock Items", url: "/stock-items", icon: Package },
       { title: "Stock Query", url: "/stock-query", icon: Search },
       { title: "Location Summary", url: "/location-summary", icon: Grid3X3 },
+      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
     ],
   },
   {
@@ -94,18 +94,22 @@ const menuGroups: MenuGroup[] = [
       { title: "Accounts", url: "/accounts", icon: Wallet },
       { title: "Suppliers", url: "/suppliers", icon: Users },
       { title: "Customers", url: "/customers", icon: Users },
-      { title: "Daybook", url: "/daybook", icon: Book },
       { title: "Payroll", url: "/payroll", icon: UserCheck },
+    ],
+  },
+  {
+    title: "Daybook",
+    icon: Book,
+    items: [
+      { title: "Daybook", url: "/daybook", icon: Book },
     ],
   },
   {
     title: "Sales & POS",
     icon: Store,
     items: [
-      { title: "Dashboard", url: "/pos-dashboard", icon: LayoutDashboard },
       { title: "POS", url: "/pos", icon: ShoppingCart },
       { title: "POS Daybook", url: "/pos-daybook", icon: Book },
-      { title: "POS Import", url: "/pos-import", icon: Upload },
     ],
   },
   {
@@ -114,8 +118,6 @@ const menuGroups: MenuGroup[] = [
     items: [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
-      { title: "Factory Production", url: "/factory/raw-stock", icon: Factory },
-      { title: "Barcode Manager", url: "/barcode-manager", icon: Barcode },
     ],
   },
   {
@@ -123,7 +125,6 @@ const menuGroups: MenuGroup[] = [
     icon: Receipt,
     items: [
       { title: "Vouchers", url: "/vouchers", icon: Receipt },
-      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
       { title: "Transfer Order", url: "/stock-transfer-order", icon: ArrowLeftRight },
     ],
   },
