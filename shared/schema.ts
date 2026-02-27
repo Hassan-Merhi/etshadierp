@@ -3084,6 +3084,20 @@ export const insertFactoryPayrollSchema = createInsertSchema(factoryPayrolls).om
 export type InsertFactoryPayroll = z.infer<typeof insertFactoryPayrollSchema>;
 export type FactoryPayroll = typeof factoryPayrolls.$inferSelect;
 
+export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  workerId: integer("worker_id").notNull(),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  fileSize: integer("file_size"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export type FactoryWorkerDocument = typeof factoryWorkerDocuments.$inferSelect;
+
 export const factorySettings = pgTable("factory_settings", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

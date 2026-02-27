@@ -11,6 +11,7 @@ import {
   factoryDaybookEntries,
   factoryBales,
   factoryPayrolls,
+  factoryWorkerDocuments,
   ledgerAccounts,
 } from "@shared/schema";
 
@@ -458,6 +459,91 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.sendFile(filePath);
     } catch (error: any) {
       console.error("Error serving worker photo:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  const docUpload = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const dir = path.join(process.cwd(), "uploads", "workers", "docs");
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
+
+  // POST /api/factory/workers/:id/documents - Upload document
+  app.post("/api/factory/workers/:id/documents", requireAuth, docUpload.single("file"), async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const fileUrl = `/api/factory/uploads/workers/docs/${req.file.filename}`;
+      const [doc] = await db.insert(factoryWorkerDocuments).values({
+        companyId,
+        workerId,
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        fileUrl,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+      }).returning();
+      res.json(doc);
+    } catch (error: any) {
+      console.error("Error uploading worker document:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/workers/:id/documents - List documents
+  app.get("/api/factory/workers/:id/documents", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+      const docs = await db.select().from(factoryWorkerDocuments)
+        .where(and(eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)))
+        .orderBy(desc(factoryWorkerDocuments.uploadedAt));
+      res.json(docs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/workers/:id/documents/:docId - Delete document
+  app.delete("/api/factory/workers/:id/documents/:docId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+      const docId = parseInt(req.params.docId);
+      const [doc] = await db.select().from(factoryWorkerDocuments)
+        .where(and(eq(factoryWorkerDocuments.id, docId), eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)));
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      const filePath = path.join(process.cwd(), "uploads", "workers", "docs", doc.fileName);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      await db.delete(factoryWorkerDocuments).where(eq(factoryWorkerDocuments.id, docId));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/uploads/workers/docs/:filename - Serve worker documents
+  app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, (req: any, res: any) => {
+    try {
+      const filename = req.params.filename;
+      const filePath = path.join(process.cwd(), "uploads", "workers", "docs", filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+      res.sendFile(filePath);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

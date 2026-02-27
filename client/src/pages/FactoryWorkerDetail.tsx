@@ -5,6 +5,7 @@ import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Upload, Pencil, UserX, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
+  FileText, FileImage, File, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import type { FactoryWorker, FactoryBale } from "@shared/schema";
+import type { FactoryWorker, FactoryBale, FactoryWorkerDocument } from "@shared/schema";
 
 interface WorkerWithStats extends FactoryWorker {
   stats?: {
@@ -87,6 +88,8 @@ export default function FactoryWorkerDetail() {
   const workerId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const { formatDisplayDate } = useDateFormat();
   const formatDate = (val: string | null | undefined) => {
@@ -154,14 +157,55 @@ export default function FactoryWorkerDetail() {
     enabled: !!workerId,
   });
 
-  const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ["/api/factory/cash-accounts", worker?.companyId],
+  const { data: documents, isLoading: docsLoading } = useQuery<FactoryWorkerDocument[]>({
+    queryKey: ["/api/factory/workers", workerId, "documents"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/cash-accounts?companyId=${worker?.companyId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/workers/${workerId}/documents`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json();
     },
-    enabled: !!worker?.companyId,
+    enabled: !!workerId,
   });
+
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ["/api/factory/cash-accounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: async (docId: number) => {
+      const res = await fetch(`/api/factory/workers/${workerId}/documents/${docId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "documents"] });
+      toast({ title: "Document deleted" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !workerId) return;
+    if (docInputRef.current) docInputRef.current.value = "";
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/factory/workers/${workerId}/documents`, { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Upload failed"); }
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "documents"] });
+      toast({ title: "Document uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   const markPaidMutation = useMutation({
     mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
@@ -396,6 +440,7 @@ export default function FactoryWorkerDetail() {
               <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
               <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
               <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>
+              <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="space-y-4">
@@ -560,6 +605,96 @@ export default function FactoryWorkerDetail() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="documents" className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Worker Documents</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{documents?.length || 0} file{documents?.length !== 1 ? "s" : ""} uploaded</p>
+                </div>
+                <div>
+                  <input
+                    ref={docInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx,.xls"
+                    onChange={handleDocUpload}
+                    data-testid="input-doc-upload"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => docInputRef.current?.click()}
+                    disabled={uploadingDoc}
+                    data-testid="button-upload-doc"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploadingDoc ? "Uploading..." : "Upload Document"}
+                  </Button>
+                </div>
+              </div>
+
+              {docsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-md" />)}
+                </div>
+              ) : !documents?.length ? (
+                <Card>
+                  <CardContent className="py-16 text-center text-muted-foreground">
+                    <FileText className="mx-auto h-8 w-8 mb-3 opacity-30" />
+                    <p className="font-medium">No documents uploaded yet</p>
+                    <p className="text-sm mt-1">Upload contracts, IDs, permits, or any other files</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {documents.map((doc) => {
+                        const isImage = doc.fileType?.startsWith("image/");
+                        const isPdf = doc.fileType === "application/pdf";
+                        const Icon = isImage ? FileImage : isPdf ? FileText : File;
+                        const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : null;
+                        const uploadDate = doc.uploadedAt
+                          ? new Date(doc.uploadedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                          : "—";
+                        return (
+                          <div key={doc.id} className="flex items-center gap-3 p-3" data-testid={`row-doc-${doc.id}`}>
+                            <div className="shrink-0 text-muted-foreground">
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate" data-testid={`text-doc-name-${doc.id}`}>{doc.originalName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {uploadDate}{sizeKb ? ` · ${sizeKb} KB` : ""}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(doc.fileUrl, "_blank")}
+                                data-testid={`button-download-doc-${doc.id}`}
+                              >
+                                Download
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => deleteDocMutation.mutate(doc.id)}
+                                disabled={deleteDocMutation.isPending}
+                                data-testid={`button-delete-doc-${doc.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="bales">

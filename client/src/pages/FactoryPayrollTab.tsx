@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users,
@@ -22,8 +22,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { FactoryWorker } from "@shared/schema";
-
-interface Company { id: number; name: string; code: string; }
 
 interface PayrollRecord {
   id: number; workerId: number; periodStart: string; periodEnd: string;
@@ -52,13 +50,6 @@ function fmtDate(d: string | null | undefined) {
 
 export default function FactoryPayrollTab() {
   const { toast } = useToast();
-  const [companyId, setCompanyId] = useState<number | null>(null);
-
-  const { data: companies } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
-
-  useEffect(() => {
-    if (companies && companies.length > 0 && companyId === null) setCompanyId(companies[0].id);
-  }, [companies, companyId]);
 
   const [runOpen, setRunOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -83,30 +74,27 @@ export default function FactoryPayrollTab() {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: payrolls, isLoading } = useQuery<PayrollRecord[]>({
-    queryKey: ["/api/factory/payrolls", companyId],
+    queryKey: ["/api/factory/payrolls"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/payrolls?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/factory/payrolls", { credentials: "include" });
       return res.json();
     },
-    enabled: !!companyId,
   });
 
   const { data: workers } = useQuery<FactoryWorker[]>({
-    queryKey: ["/api/factory/workers", companyId],
+    queryKey: ["/api/factory/workers"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/workers?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/factory/workers", { credentials: "include" });
       return res.json();
     },
-    enabled: !!companyId,
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ["/api/factory/cash-accounts", companyId],
+    queryKey: ["/api/factory/cash-accounts"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/cash-accounts?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
-    enabled: !!companyId,
   });
 
   const activeWorkers = useMemo(() => workers?.filter((w) => w.active) || [], [workers]);
@@ -114,7 +102,7 @@ export default function FactoryPayrollTab() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const body: any = {
-        companyId, periodStart: runForm.periodStart, periodEnd: runForm.periodEnd,
+        periodStart: runForm.periodStart, periodEnd: runForm.periodEnd,
         bonusPerWorker: runForm.bonusPerWorker, notes: runForm.notes,
         cashAccountId: runForm.cashAccountId || undefined,
       };
@@ -126,7 +114,7 @@ export default function FactoryPayrollTab() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       toast({ title: "Payroll generated", description: `${data.created} records created` });
       setRunOpen(false); setPreviewOpen(false);
     },
@@ -136,14 +124,14 @@ export default function FactoryPayrollTab() {
   const markPaidMutation = useMutation({
     mutationFn: async ({ id, cashId }: { id: number; cashId: string }) => {
       const res = await apiRequest("PATCH", `/api/factory/payrolls/${id}/mark-paid`, {
-        companyId, cashAccountId: cashId ? parseInt(cashId) : undefined,
+        cashAccountId: cashId ? parseInt(cashId) : undefined,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed");
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       toast({ title: "Marked as paid" });
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
@@ -153,14 +141,14 @@ export default function FactoryPayrollTab() {
   const bulkMarkPaidMutation = useMutation({
     mutationFn: async (cashId: string) => {
       const res = await apiRequest("POST", "/api/factory/payrolls/mark-paid-bulk", {
-        companyId, payrollIds: [...selectedIds], cashAccountId: cashId ? parseInt(cashId) : undefined,
+        payrollIds: [...selectedIds], cashAccountId: cashId ? parseInt(cashId) : undefined,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed");
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       toast({ title: "Marked as paid", description: `${selectedIds.size} records updated` });
       setSelectedIds(new Set()); setBulkPayOpen(false); setBulkCashAccountId("");
     },
@@ -207,14 +195,6 @@ export default function FactoryPayrollTab() {
 
   const unpaidPayrolls = (payrolls || []).filter((p) => p.status !== "PAID");
   const allSelected = unpaidPayrolls.length > 0 && unpaidPayrolls.every((p) => selectedIds.has(p.id));
-
-  if (!companyId) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-md" />)}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

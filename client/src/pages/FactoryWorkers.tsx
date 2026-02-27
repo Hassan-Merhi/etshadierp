@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -23,7 +23,6 @@ import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker } from "@shared/schema";
 
-interface Company { id: number; name: string; code: string; }
 interface CashAccount { id: number; name: string; code: string; }
 
 const emptyForm = {
@@ -60,7 +59,6 @@ export default function FactoryWorkers() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [companyId, setCompanyId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("Active");
 
@@ -79,39 +77,31 @@ export default function FactoryWorkers() {
   const [endCashAccountId, setEndCashAccountId] = useState("");
   const [endSubmitting, setEndSubmitting] = useState(false);
 
-  const { data: companies } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
-
   const { data: cashAccounts } = useQuery<CashAccount[]>({
-    queryKey: ["/api/factory/cash-accounts", companyId],
+    queryKey: ["/api/factory/cash-accounts"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/cash-accounts?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
-    enabled: !!companyId,
   });
 
-  useEffect(() => {
-    if (companies && companies.length > 0 && companyId === null) setCompanyId(companies[0].id);
-  }, [companies, companyId]);
-
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({
-    queryKey: ["/api/factory/workers", companyId],
+    queryKey: ["/api/factory/workers"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/workers?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/factory/workers", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch workers");
       return res.json();
     },
-    enabled: !!companyId,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await factoryApiRequest("POST", "/api/factory/workers", { ...data, companyId });
+      const res = await factoryApiRequest("POST", "/api/factory/workers", { ...data });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker added" });
       resetForm(); setCreateOpen(false);
     },
@@ -120,12 +110,12 @@ export default function FactoryWorkers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      const res = await factoryApiRequest("PATCH", `/api/factory/workers/${id}`, { ...data, companyId });
+      const res = await factoryApiRequest("PATCH", `/api/factory/workers/${id}`, { ...data });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker updated" });
       resetForm(); setEditingWorker(null);
     },
@@ -134,17 +124,16 @@ export default function FactoryWorkers() {
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !companyId) return;
+    if (!file) return;
     e.target.value = "";
     setImportLoading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("companyId", String(companyId));
       const res = await fetch("/api/factory/workers/import-excel", { method: "POST", credentials: "include", body: fd });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Import failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       const parts: string[] = [];
       if (result.created) parts.push(`${result.created} created`);
       if (result.updated) parts.push(`${result.updated} updated`);
@@ -213,7 +202,7 @@ export default function FactoryWorkers() {
     setEndCalculating(true);
     try {
       const res = await factoryApiRequest("POST", `/api/factory/workers/${endContractWorker.id}/settle-and-end`, {
-        companyId, startDate: endStart, endDate: endEnd, dryRun: true,
+        startDate: endStart, endDate: endEnd, dryRun: true,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Calculation failed");
@@ -231,12 +220,12 @@ export default function FactoryWorkers() {
     setEndSubmitting(true);
     try {
       const res = await factoryApiRequest("POST", `/api/factory/workers/${endContractWorker.id}/settle-and-end`, {
-        companyId, startDate: endStart, endDate: endEnd,
+        startDate: endStart, endDate: endEnd,
         payNow, cashAccountId: payNow ? endCashAccountId : undefined,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to end contract");
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Contract ended", description: payNow ? `Paid $${data.balance}` : "Balance recorded as pending" });
       setEndContractWorker(null);
     } catch (err: any) {
@@ -356,7 +345,7 @@ export default function FactoryWorkers() {
     </div>
   );
 
-  if (!companyId || isLoading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-md" />)}
@@ -378,7 +367,7 @@ export default function FactoryWorkers() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
-          <Button variant="outline" onClick={() => window.open(`/api/factory/workers/template.xlsx?companyId=${companyId}`, "_blank")} data-testid="button-download-template">
+          <Button variant="outline" onClick={() => window.open("/api/factory/workers/template.xlsx", "_blank")} data-testid="button-download-template">
             <Download className="h-4 w-4 mr-2" />Template
           </Button>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importLoading} data-testid="button-import-workers">
