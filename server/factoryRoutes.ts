@@ -1206,7 +1206,40 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .select()
           .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
-        if (existing) return res.status(400).json({ message: "A product with this article code already exists" });
+        if (existing) {
+          // If this is an auto-generated code (grade prefix) that collided, regenerate a fresh unique one
+          const knownPrefixes = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16"];
+          const matchedPrefix = knownPrefixes.find(p => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length)));
+          if (matchedPrefix && grade) {
+            const prefix = matchedPrefix;
+            const prefixLen = prefix.length;
+            const [maxResult] = await db
+              .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+              .from(factoryBaleProducts)
+              .where(and(
+                eq(factoryBaleProducts.companyId, companyId),
+                sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
+                sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+              ));
+            let nextNum = (maxResult?.maxNum || 0) + 1;
+            let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+            let attempts = 0;
+            while (attempts < 100) {
+              const [dup] = await db
+                .select({ id: factoryBaleProducts.id })
+                .from(factoryBaleProducts)
+                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
+              if (!dup) break;
+              nextNum++;
+              candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
+              attempts++;
+            }
+            articleCode = candidateCode;
+            code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+          } else {
+            return res.status(400).json({ message: "A product with this article code already exists" });
+          }
+        }
       }
 
       const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
