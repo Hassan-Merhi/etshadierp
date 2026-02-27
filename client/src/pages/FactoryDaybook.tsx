@@ -278,12 +278,18 @@ export default function FactoryDaybook() {
           ) : !isDetailed ? (
             condensedRows.length > 0 ? (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[15%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[60%]" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead className="w-20 text-right">Entries</TableHead>
-                      <TableHead className="w-36 text-right">Total (USD)</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Entries</TableHead>
+                      <TableHead className="text-right">Total (USD)</TableHead>
                       <TableHead>Types</TableHead>
                     </TableRow>
                   </TableHeader>
