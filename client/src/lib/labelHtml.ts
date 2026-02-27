@@ -41,6 +41,7 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
+      <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
   }
@@ -58,6 +59,7 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
+      <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
 }
@@ -75,6 +77,7 @@ const detailBlockCss = `
     .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .barcode-img { width: 100%; height: 22mm; object-fit: fill; }
     .barcode-number { font-size: 16pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-subtext { font-size: 9pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     `;
 
 export type A4DesignColor = "purple" | "green" | "gold" | "white";
@@ -151,7 +154,7 @@ ${detailBlockCss}
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       * { color: #000 !important; }
-      .info-key, .info-val, .barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .header-banner-img { filter: none; }
@@ -196,6 +199,7 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
     .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .barcode-img { width: 100%; height: 18mm; object-fit: fill; }
     .barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
     .a5-page1 { padding-top: 80mm; }
@@ -214,7 +218,7 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
       .print-note { display: none !important; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       * { color: #000 !important; }
-      .info-key, .info-val, .barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a5-name-right-text, .a5-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
       img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .header-banner-img { filter: none; }
@@ -250,6 +254,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
             <div class="ref-barcode-section">
               <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
               <div class="ref-barcode-number">${label.referenceNumber}</div>
+              <div class="ref-bale-name">${label.productName}</div>
             </div>
           </div>
         </div>
@@ -275,12 +280,13 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     .ref-barcode-section { text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .ref-barcode-img { width: 100%; height: 13mm; object-fit: fill; }
     .ref-barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .ref-bale-name { font-size: 8pt; font-weight: 900; margin-top: 0.2mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
       .print-note { display: none !important; }
       * { color: #000 !important; }
-      .info-label, .info-value, .ref-barcode-number { -webkit-text-stroke: 0.3px #000; }
+      .info-label, .info-value, .ref-barcode-number, .ref-bale-name { -webkit-text-stroke: 0.3px #000; }
       img:not(.header-banner-img):not(.sticker-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .header-banner-img, .sticker-banner-img { filter: none; }
     }

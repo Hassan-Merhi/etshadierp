@@ -1701,7 +1701,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {salesItems.length > 0 && (
                           <div className="border rounded-md">
                             <Table>
-                              <TableHeader>
+                              <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                   <TableHead>Item Name</TableHead>
                                   <TableHead className="text-right">
@@ -1867,7 +1867,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         ledgerEntries.length > 0 ? (
                           <div className="border rounded-md">
                             <Table>
-                              <TableHeader>
+                              <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                   <TableHead>Item Name</TableHead>
                                   <TableHead className="text-right">
@@ -2090,7 +2090,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           // Fallback to ledger entries if no purchase items found
                           <div className="border rounded-md">
                             <Table>
-                              <TableHeader>
+                              <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                   <TableHead>Account</TableHead>
                                   {!isPOSUser && (
@@ -2139,7 +2139,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 ) : (
                   <div className="border rounded-md">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           {selectedVoucher.voucherType === "Consumption" ||
                           selectedVoucher.voucherType === "Production" ||

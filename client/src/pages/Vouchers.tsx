@@ -477,7 +477,7 @@ const PrintTemplate = ({
         </div>
 
         <table className="w-full border border-black mb-6">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-gray-100">
             <tr className="bg-gray-100">
               <th className="border border-black p-2 text-left">#</th>
               <th className="border border-black p-2 text-left">Account</th>
