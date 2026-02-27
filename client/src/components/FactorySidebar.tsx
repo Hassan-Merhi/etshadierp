@@ -94,6 +94,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Customers", url: "/factory/customers", icon: ShoppingCart },
       { title: "Containers", url: "/factory/containers", icon: Container },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
+      { title: "Workers", url: "/factory/workers", icon: HardHat },
     ],
   },
   {

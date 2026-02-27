@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, Filter,
+  Plus, Pencil, Search, Users, UserX, Filter, Upload, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,6 +91,8 @@ export default function FactoryWorkers() {
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
   const [endContractWorker, setEndContractWorker] = useState<FactoryWorker | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
+  const [importLoading, setImportLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/user/companies"],
@@ -170,6 +172,41 @@ export default function FactoryWorkers() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !companyId) return;
+    e.target.value = "";
+    setImportLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("companyId", String(companyId));
+      const res = await fetch("/api/factory/workers/import-excel", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Import failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      const parts: string[] = [];
+      if (result.created) parts.push(`${result.created} created`);
+      if (result.updated) parts.push(`${result.updated} updated`);
+      if (result.skipped) parts.push(`${result.skipped} skipped`);
+      toast({
+        title: "Import complete",
+        description: parts.join(", ") || "No changes",
+      });
+      if (result.errors?.length) {
+        console.warn("Import errors:", result.errors);
+      }
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({ ...emptyForm });
@@ -593,6 +630,30 @@ export default function FactoryWorkers() {
               </SelectContent>
             </Select>
           )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button
+            variant="outline"
+            onClick={() => window.open(`/api/factory/workers/template.xlsx?companyId=${companyId}`, "_blank")}
+            data-testid="button-download-template"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Template
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importLoading}
+            data-testid="button-import-workers"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {importLoading ? "Importing..." : "Import Excel"}
+          </Button>
           <Button
             onClick={() => { resetForm(); setCreateOpen(true); }}
             data-testid="button-add-worker"
