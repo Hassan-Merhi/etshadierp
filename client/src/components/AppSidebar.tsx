@@ -12,7 +12,7 @@ import {
   Users,
   Receipt,
   Book,
-  HardHat,
+  UserCheck,
   Search,
   PieChart,
   Ship,
@@ -94,7 +94,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Accounts", url: "/accounts", icon: Wallet },
       { title: "Suppliers", url: "/suppliers", icon: Users },
       { title: "Customers", url: "/customers", icon: Users },
-      { title: "Workers", url: "/factory/workers", icon: HardHat },
+      { title: "Payroll", url: "/payroll", icon: UserCheck },
     ],
   },
   {
