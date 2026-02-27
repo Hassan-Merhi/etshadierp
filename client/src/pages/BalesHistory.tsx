@@ -300,13 +300,16 @@ export default function BalesHistory() {
     const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
     return baleDate === todayStr;
   });
-  const getArticleCode = (row: any) => (row.product?.articleCode || row.bale.articleCode || row.bale.category || "").toUpperCase();
-  const todayRegular = todayInStock.filter((row: any) => !getArticleCode(row).startsWith("HMD16"));
-  const todayGarbage = todayInStock.filter((row: any) => getArticleCode(row).startsWith("HMD16"));
+  const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
+  const todayGarbage = todayInStock.filter((row: any) => getCategory(row) === "garbage");
+  const todayWipers = todayInStock.filter((row: any) => getCategory(row) === "wipers");
+  const todayRegular = todayInStock.filter((row: any) => !["garbage", "wipers"].includes(getCategory(row)));
   const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
   const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
   const garbageKg = todayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const wipersQty = todayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const wipersKg = todayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   if (isLoading) {
     return (
@@ -346,6 +349,18 @@ export default function BalesHistory() {
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold" data-testid="text-today-garbage-qty">{garbageQty} qty</span>
                     <span className="text-sm font-semibold" data-testid="text-today-garbage-kg">{formatLabelNum(garbageKg)} kg</span>
+                  </div>
+                </>
+              )}
+              {wipersQty > 0 && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">Wipers</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold" data-testid="text-today-wipers-qty">{wipersQty} qty</span>
+                    <span className="text-sm font-semibold" data-testid="text-today-wipers-kg">{formatLabelNum(wipersKg)} kg</span>
                   </div>
                 </>
               )}
