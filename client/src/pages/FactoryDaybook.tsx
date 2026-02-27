@@ -268,9 +268,9 @@ export default function FactoryDaybook() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2 p-6">
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
