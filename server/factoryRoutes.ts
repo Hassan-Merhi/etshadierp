@@ -1111,11 +1111,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
       let attempts = 0;
       while (attempts < 100) {
-        const [dup] = await db
+        const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+        const [dupArticle] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
-        if (!dup) break;
+        const [dupCode] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+        if (!dupArticle && !dupCode) break;
         nextNum++;
         candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
         attempts++;
@@ -1180,11 +1185,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
         let attempts = 0;
         while (attempts < 100) {
-          const [dup] = await db
+          const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+          const [dupArticle] = await db
             .select({ id: factoryBaleProducts.id })
             .from(factoryBaleProducts)
             .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
-          if (!dup) break;
+          const [dupCode] = await db
+            .select({ id: factoryBaleProducts.id })
+            .from(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+          if (!dupArticle && !dupCode) break;
           nextNum++;
           candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
           attempts++;
@@ -1225,11 +1235,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
             let attempts = 0;
             while (attempts < 100) {
-              const [dup] = await db
+              const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+              const [dupArticle] = await db
                 .select({ id: factoryBaleProducts.id })
                 .from(factoryBaleProducts)
                 .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
-              if (!dup) break;
+              const [dupCode] = await db
+                .select({ id: factoryBaleProducts.id })
+                .from(factoryBaleProducts)
+                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+              if (!dupArticle && !dupCode) break;
               nextNum++;
               candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
               attempts++;
