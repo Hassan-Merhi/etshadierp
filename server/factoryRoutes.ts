@@ -1119,7 +1119,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const [dupCode] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+          .where(eq(factoryBaleProducts.code, candidateCodeClean));
         if (!dupArticle && !dupCode) break;
         nextNum++;
         candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
@@ -1193,7 +1193,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const [dupCode] = await db
             .select({ id: factoryBaleProducts.id })
             .from(factoryBaleProducts)
-            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+            .where(eq(factoryBaleProducts.code, candidateCodeClean));
           if (!dupArticle && !dupCode) break;
           nextNum++;
           candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
@@ -1243,7 +1243,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               const [dupCode] = await db
                 .select({ id: factoryBaleProducts.id })
                 .from(factoryBaleProducts)
-                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+                .where(eq(factoryBaleProducts.code, candidateCodeClean));
               if (!dupArticle && !dupCode) break;
               nextNum++;
               candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
@@ -1257,8 +1257,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
-      const [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
+      // Try insert; if code/articleCode constraint fires (race condition or cross-company clash),
+      // append a short unique suffix and retry once.
+      let product: any;
+      try {
+        const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
+        [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
+      } catch (insertErr: any) {
+        const msg: string = insertErr?.message || "";
+        const isCodeDup = msg.includes("unique") && (msg.includes("company_code") || msg.includes("article_code") || msg.includes("_code"));
+        if (!isCodeDup) throw insertErr;
+        // Suffix with timestamp to guarantee uniqueness
+        const suffix = Date.now().toString(36).toUpperCase();
+        articleCode = `${articleCode}-${suffix}`;
+        code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+        const parsed2 = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
+        [product] = await db.insert(factoryBaleProducts).values(parsed2).returning();
+      }
       res.json(product);
     } catch (error: any) {
       console.error("Error creating factory bale product:", error);
