@@ -24,7 +24,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
-  DollarSign,
   TrendingUp,
   Plus,
   X,
@@ -34,7 +33,14 @@ import {
   Check,
   ChevronsUpDown,
   Truck,
+  Package,
+  Scale,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -132,12 +138,24 @@ type PayableAccount = {
   balance: number;
 };
 
+type FactoryDashboardKPIs = {
+  openingStockKg: string;
+  closingStockKg: string;
+  balesPressedToday: number;
+  kgsUsedToday: string;
+  totalBaleWeightToday: string;
+  categories: { name: string; count: number; totalKg: number }[];
+  balesDetail: { id: number; baleCode: string; productName: string | null; category: string | null; weightKg: string; pressedAt: string | null; status: string }[];
+};
+
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const [, setLocation] = useLocation();
+  const isFactoryMode = appMode === "factory";
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
@@ -146,6 +164,8 @@ export default function Dashboard() {
     useState<number>(0);
   const [payableComboboxOpen, setPayableComboboxOpen] = useState(false);
   const [cashComboboxOpen, setCashComboboxOpen] = useState(false);
+  const [balesExpanded, setBalesExpanded] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   // Fetch net profit data
   const {
@@ -173,6 +193,18 @@ export default function Dashboard() {
       return await response.json();
     },
     enabled: !!selectedCompany,
+  });
+
+  // Fetch factory dashboard KPIs (only in factory mode)
+  const { data: factoryKPIs } = useQuery<FactoryDashboardKPIs>({
+    queryKey: ["/api/factory/dashboard-kpis", selectedCompany?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/dashboard-kpis", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory KPIs");
+      return res.json();
+    },
+    enabled: !!selectedCompany && isFactoryMode,
+    refetchInterval: 60000,
   });
 
   // Fetch dashboard cash accounts
@@ -363,19 +395,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        <KPICard
-          title="Total Income"
-          value={
-            isLoading
-              ? "Loading..."
-              : formatAmount(profitData?.totalIncome || 0)
-          }
-          change="From all income accounts"
-          changeType="positive"
-          icon={DollarSign}
-          data-testid="kpi-total-income"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <KPICard
           title="Net Position"
           value={
@@ -414,7 +434,12 @@ export default function Dashboard() {
 
       {/* Net Position Breakdown: What We Have vs What We Owe vs Expenses */}
       <Card className="p-4 sm:p-6">
-        <h3 className="text-lg font-medium mb-4">Net Position Breakdown</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Net Position Breakdown</h3>
+          <Button size="icon" variant="outline" onClick={() => setLocation("/net-profit-details")} data-testid="button-net-position-detail">
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
             <p className="text-muted-foreground">Loading...</p>
@@ -539,6 +564,88 @@ export default function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Factory Production KPIs */}
+      {isFactoryMode && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <KPICard
+              title="Opening Stock"
+              value={factoryKPIs ? `${parseFloat(factoryKPIs.openingStockKg).toLocaleString()} kg` : "Loading..."}
+              change="Raw stock at start of today"
+              changeType="positive"
+              icon={Package}
+              data-testid="kpi-opening-stock"
+            />
+            <KPICard
+              title="Closing Stock"
+              value={factoryKPIs ? `${parseFloat(factoryKPIs.closingStockKg).toLocaleString()} kg` : "Loading..."}
+              change="Current remaining raw stock"
+              changeType={factoryKPIs && parseFloat(factoryKPIs.closingStockKg) > 0 ? "positive" : "negative"}
+              icon={Scale}
+              data-testid="kpi-closing-stock"
+            />
+
+            {/* Bales Pressed Today - expandable */}
+            <Card className="p-4 cursor-pointer hover-elevate" onClick={() => setBalesExpanded(!balesExpanded)} data-testid="kpi-bales-pressed">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Package className="h-4 w-4" />
+                  <span className="text-sm font-medium">Bales Pressed Today</span>
+                </div>
+                {balesExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="mt-2">
+                <p className="text-2xl font-bold font-mono">{factoryKPIs?.balesPressedToday ?? "—"}</p>
+                <p className="text-sm text-muted-foreground mt-1">{factoryKPIs ? `${parseFloat(factoryKPIs.totalBaleWeightToday).toLocaleString()} kg total` : "Loading..."}</p>
+              </div>
+              {balesExpanded && factoryKPIs && factoryKPIs.balesDetail.length > 0 && (
+                <div className="mt-3 border-t pt-3 space-y-1 max-h-48 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  {factoryKPIs.balesDetail.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground font-mono">{b.baleCode}</span>
+                      <span className="font-medium">{b.productName || b.category || "—"}</span>
+                      <span className="font-mono">{parseFloat(b.weightKg).toFixed(1)} kg</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {balesExpanded && factoryKPIs && factoryKPIs.balesDetail.length === 0 && (
+                <p className="mt-3 border-t pt-3 text-xs text-muted-foreground text-center">No bales pressed today</p>
+              )}
+            </Card>
+
+            {/* Categories - expandable */}
+            <Card className="p-4 cursor-pointer hover-elevate" onClick={() => setCategoriesExpanded(!categoriesExpanded)} data-testid="kpi-categories">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Layers className="h-4 w-4" />
+                  <span className="text-sm font-medium">Categories Today</span>
+                </div>
+                {categoriesExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div className="mt-2">
+                <p className="text-2xl font-bold font-mono">{factoryKPIs ? factoryKPIs.categories.length : "—"}</p>
+                <p className="text-sm text-muted-foreground mt-1">{factoryKPIs ? `${factoryKPIs.balesPressedToday} bales across all categories` : "Loading..."}</p>
+              </div>
+              {categoriesExpanded && factoryKPIs && factoryKPIs.categories.length > 0 && (
+                <div className="mt-3 border-t pt-3 space-y-1 max-h-48 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  {factoryKPIs.categories.map((cat) => (
+                    <div key={cat.name} className="flex items-center justify-between text-xs">
+                      <span className="font-medium truncate flex-1 mr-2">{cat.name}</span>
+                      <span className="text-muted-foreground">{cat.count} bales</span>
+                      <span className="font-mono ml-2">{cat.totalKg.toLocaleString()} kg</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {categoriesExpanded && factoryKPIs && factoryKPIs.categories.length === 0 && (
+                <p className="mt-3 border-t pt-3 text-xs text-muted-foreground text-center">No categories today</p>
+              )}
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">

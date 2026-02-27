@@ -3984,6 +3984,94 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // Factory Dashboard KPIs
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/dashboard-kpis", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const rawStockTotals = await db
+        .select({
+          totalReceived: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg}), 0)`,
+          totalUsed: sql<string>`COALESCE(SUM(${factoryRawStock.usedKg}), 0)`,
+        })
+        .from(factoryRawStock)
+        .where(eq(factoryRawStock.companyId, companyId));
+
+      const totalReceived = parseFloat(rawStockTotals[0]?.totalReceived || "0");
+      const totalUsed = parseFloat(rawStockTotals[0]?.totalUsed || "0");
+      const closingStockKg = totalReceived - totalUsed;
+
+      const todayMixBatches = await db
+        .select({ totalWeightKg: factoryMixBatches.totalWeightKg })
+        .from(factoryMixBatches)
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`${factoryMixBatches.createdAt} >= ${todayStart}`
+          )
+        );
+
+      const kgsUsedToday = todayMixBatches.reduce(
+        (sum, mb) => sum + (parseFloat(mb.totalWeightKg as string) || 0), 0
+      );
+      const openingStockKg = closingStockKg + kgsUsedToday;
+
+      const todayBales = await db
+        .select({
+          id: factoryBales.id,
+          baleCode: factoryBales.baleCode,
+          productName: factoryBales.productName,
+          category: factoryBales.category,
+          weightKg: factoryBales.weightKg,
+          pressedAt: factoryBales.pressedAt,
+          status: factoryBales.status,
+        })
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            sql`${factoryBales.pressedAt} >= ${todayStart}`
+          )
+        );
+
+      const balesPressedToday = todayBales.length;
+      const totalBaleWeightToday = todayBales.reduce(
+        (sum, b) => sum + (parseFloat(b.weightKg as string) || 0), 0
+      );
+
+      const categoryMap: Record<string, { count: number; totalKg: number }> = {};
+      for (const bale of todayBales) {
+        const name = bale.productName || bale.category || "Unknown";
+        if (!categoryMap[name]) categoryMap[name] = { count: 0, totalKg: 0 };
+        categoryMap[name].count++;
+        categoryMap[name].totalKg += parseFloat(bale.weightKg as string) || 0;
+      }
+      const categories = Object.entries(categoryMap)
+        .map(([name, data]) => ({ name, count: data.count, totalKg: parseFloat(data.totalKg.toFixed(3)) }))
+        .sort((a, b) => b.count - a.count);
+
+      res.json({
+        openingStockKg: openingStockKg.toFixed(3),
+        closingStockKg: closingStockKg.toFixed(3),
+        balesPressedToday,
+        kgsUsedToday: kgsUsedToday.toFixed(3),
+        totalBaleWeightToday: totalBaleWeightToday.toFixed(3),
+        categories,
+        balesDetail: todayBales,
+      });
+    } catch (error: any) {
+      console.error("Error fetching factory dashboard KPIs:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
   // Factory Import API Endpoints
   // ───────────────────────────────────────────────
 
