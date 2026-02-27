@@ -1019,9 +1019,40 @@
     const [removalReason, setRemovalReason] = useState("");
     const [authError, setAuthError] = useState("");
     const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
+    const [designPickerOpen, setDesignPickerOpen] = useState(false);
+    const [pendingPrintLabels, setPendingPrintLabels] = useState<LabelData[] | null>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
+
+    const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
+      const paperFormat = getPaperFormat();
+      if (paperFormat === "A4" && !designColor) {
+        setPendingPrintLabels(labels);
+        setDesignPickerOpen(true);
+        return;
+      }
+      const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
+      const a4Window = window.open("", "_blank");
+      if (a4Window) {
+        a4Window.document.write(labelHtml);
+        a4Window.document.close();
+        a4Window.focus();
+        setTimeout(() => a4Window.print(), 500);
+      }
+      const stickerWindow = window.open("", "_blank");
+      if (stickerWindow) {
+        stickerWindow.document.write(generateStickerLabelsHtml(labels));
+        stickerWindow.document.close();
+        stickerWindow.focus();
+        const imgs = stickerWindow.document.images;
+        let loaded = 0;
+        const total = imgs.length;
+        const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
+        if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
+        else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      }
+    };
 
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
     const activeLocations = locations?.filter((l) => l.active);
