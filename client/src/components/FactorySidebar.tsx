@@ -94,6 +94,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Customers", url: "/factory/customers", icon: ShoppingCart },
       { title: "Containers", url: "/factory/containers", icon: Container },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
+      { title: "Workers", url: "/factory/workers", icon: HardHat },
     ],
   },
   {
@@ -152,7 +153,6 @@ const allMenuGroups: MenuGroup[] = [
     title: "Finance",
     icon: Wallet,
     items: [
-      { title: "Payroll", url: "/factory/payroll", icon: Wallet },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
     ],
