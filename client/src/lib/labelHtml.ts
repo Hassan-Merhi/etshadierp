@@ -41,7 +41,6 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
-      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
       <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
@@ -60,7 +59,6 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
-      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
       <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
@@ -82,7 +80,6 @@ function buildDetailBlockNoBanner(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
-      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
       <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
@@ -101,8 +98,7 @@ const detailBlockCss = `
     .barcode-area { text-align: center; margin-top: 1mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .barcode-img { width: 100%; height: 16mm; object-fit: fill; }
     .barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .barcode-img-small { width: 100%; height: 8mm; object-fit: fill; margin-top: 1mm; }
-    .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
+    .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.5mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     `;
 
 export type A4DesignColor = "purple" | "green" | "gold" | "white";
@@ -224,8 +220,7 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
     .barcode-area { text-align: center; margin-top: 1mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
     .barcode-number { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .barcode-img-small { width: 100%; height: 7mm; object-fit: fill; margin-top: 1mm; }
-    .barcode-subtext { font-size: 7pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
+    .barcode-subtext { font-size: 7pt; font-weight: 900; margin-top: 0.5mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
     .a5-page1 { padding-top: 80mm; }
@@ -272,7 +267,6 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
               <div class="ref-barcode-number">${label.referenceNumber}</div>
             </div>
             <div class="name-barcode-section">
-              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
               <div class="ref-bale-name">${label.productName}</div>
             </div>
           </div>
@@ -297,7 +291,6 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     .ref-barcode-img { width: 100%; height: 11mm; object-fit: fill; }
     .ref-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.3mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
     .name-barcode-section { text-align: center; flex-shrink: 0; }
-    .name-barcode-img { width: 100%; height: 8mm; object-fit: fill; }
     .ref-bale-name { font-size: 7.5pt; font-weight: 900; margin-top: 0.2mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
