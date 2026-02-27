@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle } from "lucide-react";
+import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -236,6 +236,29 @@ export default function BaleProducts() {
     });
   };
 
+  const handleExportExcel = async () => {
+    if (!activeProducts || activeProducts.length === 0) {
+      toast({ title: "No products to export", variant: "destructive" });
+      return;
+    }
+    try {
+      const XLSX = await import("xlsx");
+      const exportData = activeProducts.map((p) => ({
+        Barcode: p.articleCode || "",
+        Name: p.name || "",
+        Category: p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
+        "Weight (kg/bale)": p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
+      XLSX.writeFile(wb, "bale_products_export.xlsx");
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
   const handleDownloadTemplate = async () => {
     try {
       const XLSX = await import("xlsx");
@@ -377,6 +400,14 @@ export default function BaleProducts() {
           >
             <Tags className="h-4 w-4 mr-2" />
             Categories
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportExcel}
+            data-testid="button-export-excel"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Export Excel
           </Button>
           <Button
             variant="outline"
