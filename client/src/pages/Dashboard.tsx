@@ -452,7 +452,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium">Net Position Breakdown</h3>
           {isFactoryMode && (
-            <Button size="icon" variant="outline" onClick={() => setLocation("/net-profit-details")} data-testid="button-net-position-detail">
+            <Button size="icon" variant="outline" onClick={() => setLocation(isFactoryMode ? "/factory/net-profit-details" : "/net-profit-details")} data-testid="button-net-position-detail">
               <ExternalLink className="h-4 w-4" />
             </Button>
           )}
