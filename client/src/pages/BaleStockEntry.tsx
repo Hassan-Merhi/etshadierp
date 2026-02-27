@@ -761,6 +761,59 @@
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={designPickerOpen} onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingPrintLabels(null); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Choose Label Design</DialogTitle>
+              <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 py-2">
+              {A4_DESIGN_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  data-testid={`button-design-${opt.value}`}
+                  className="flex flex-col items-center gap-2 p-3 rounded-md border hover-elevate cursor-pointer"
+                  onClick={() => {
+                    setDesignPickerOpen(false);
+                    if (pendingPrintLabels) {
+                      const labels = pendingPrintLabels;
+                      setPendingPrintLabels(null);
+                      openBrowserPrint(labels, opt.value);
+                    }
+                  }}
+                >
+                  <img
+                    src={opt.previewUrl}
+                    className="w-full h-16 rounded-md object-cover"
+                    alt={opt.label}
+                  />
+                  <span className="text-sm font-medium">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setDesignPickerOpen(false); setPendingPrintLabels(null); }}>Cancel</Button>
+              <Button
+                variant="secondary"
+                data-testid="button-design-none"
+                onClick={() => {
+                  setDesignPickerOpen(false);
+                  if (pendingPrintLabels) {
+                    const labels = pendingPrintLabels;
+                    setPendingPrintLabels(null);
+                    const paperFormat = getPaperFormat();
+                    const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
+                    const win = window.open("", "_blank");
+                    if (win) { win.document.write(labelHtml); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
+                  }
+                }}
+              >
+                No Design
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
