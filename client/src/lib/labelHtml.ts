@@ -41,6 +41,7 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
+      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
       <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
@@ -59,6 +60,29 @@ function buildDetailBlock(label: LabelData) {
     <div class="barcode-area">
       <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
+      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
+      <div class="barcode-subtext">${label.productName}</div>
+    </div>
+  </div>`;
+}
+
+function buildDetailBlockNoBanner(label: LabelData) {
+  const imgSrc = HMD_LOGO_BASE64;
+  return `<div class="code-label">
+    <div class="label-top">
+      <div class="logo-section">
+        <img class="logo-img" src="${imgSrc}" alt="HMD" />
+      </div>
+      <div class="info-section">
+        <div class="info-row"><span class="info-key">PIECES:</span> <span class="info-val">${formatLabelNum(label.pieces)}</span></div>
+        <div class="info-row"><span class="info-key">ARTICLE:</span> <span class="info-val">${label.articleCode}</span></div>
+        <div class="info-row"><span class="info-key">APRX WEIGHT:</span> <span class="info-val">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+      </div>
+    </div>
+    <div class="barcode-area">
+      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+      <div class="barcode-number">${label.referenceNumber}</div>
+      <img class="barcode-img-small" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name" />
       <div class="barcode-subtext">${label.productName}</div>
     </div>
   </div>`;
@@ -74,10 +98,11 @@ const detailBlockCss = `
     .info-section { text-align: right; font-size: 8pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-    .barcode-img { width: 100%; height: 22mm; object-fit: fill; }
-    .barcode-number { font-size: 16pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 1mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .barcode-subtext { font-size: 9pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
+    .barcode-area { text-align: center; margin-top: 1mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 16mm; object-fit: fill; }
+    .barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-img-small { width: 100%; height: 8mm; object-fit: fill; margin-top: 1mm; }
+    .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     `;
 
 export type A4DesignColor = "purple" | "green" | "gold" | "white";
@@ -169,7 +194,7 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
       <div class="a5-page a5-page1">
         <div class="a5-top-content">
           <div class="a5-detail-left">
-            ${buildDetailBlock(label)}
+            ${buildDetailBlockNoBanner(label)}
           </div>
           <div class="a5-name-right">
             <div class="a5-name-right-text">${label.productName}</div>
@@ -196,10 +221,11 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
     .info-section { text-align: right; font-size: 7pt; line-height: 1.4; }
     .info-key { font-weight: 900; }
     .info-val { font-weight: 900; }
-    .barcode-area { text-align: center; margin-top: 2mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-    .barcode-img { width: 100%; height: 18mm; object-fit: fill; }
-    .barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
+    .barcode-area { text-align: center; margin-top: 1mm; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .barcode-img { width: 100%; height: 14mm; object-fit: fill; }
+    .barcode-number { font-size: 11pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 1.5px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .barcode-img-small { width: 100%; height: 7mm; object-fit: fill; margin-top: 1mm; }
+    .barcode-subtext { font-size: 7pt; font-weight: 900; margin-top: 0.3mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     .a5-page { width: 148mm; height: 210mm; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
     .a5-page:last-child { page-break-after: auto; }
     .a5-page1 { padding-top: 80mm; }
@@ -229,31 +255,24 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
 export function generateStickerLabelsHtml(labels: LabelData[]) {
   let labelsHtml = '';
   for (const label of labels) {
-    const imgSrc = getHeaderImage(label.articleCode);
-    const brand = isBrandUrl(imgSrc);
-    const topSection = brand
-      ? `<div class="banner-top"><img class="sticker-banner-img header-banner-img" src="${imgSrc}" alt="HMD" /></div>
-         <div class="info-section-compact">
-           <span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span>
-           &nbsp;<span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span>
-           &nbsp;<span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span>
-         </div>`
-      : `<div class="label-top">
-           <div class="logo-section"><img class="sticker-logo" src="${imgSrc}" alt="HMD" /></div>
-           <div class="info-section">
-             <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
-             <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
-             <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
-           </div>
-         </div>`;
     labelsHtml += `
       <div class="sticker-page">
         <div class="label">
           <div class="label-content">
-            ${topSection}
+            <div class="label-top">
+              <div class="logo-section"><img class="sticker-logo" src="${HMD_LOGO_BASE64}" alt="HMD" /></div>
+              <div class="info-section">
+                <div><span class="info-label">PIECES:</span> <span class="info-value">${formatLabelNum(label.pieces)}</span></div>
+                <div><span class="info-label">ARTICLE:</span> <span class="info-value">${label.articleCode}</span></div>
+                <div><span class="info-label">APRX WEIGHT:</span> <span class="info-value">${formatLabelNum(label.approxWeightKg)} KGS</span></div>
+              </div>
+            </div>
             <div class="ref-barcode-section">
               <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
               <div class="ref-barcode-number">${label.referenceNumber}</div>
+            </div>
+            <div class="name-barcode-section">
+              <img class="name-barcode-img" src="/api/barcode/${encodeURIComponent(label.productName)}" alt="Name Barcode" />
               <div class="ref-bale-name">${label.productName}</div>
             </div>
           </div>
@@ -266,29 +285,28 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0; }
     .sticker-page { width: 3in; height: 1.97in; page-break-after: always; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
     .sticker-page:last-child { page-break-after: auto; }
-    .label { width: 3in; height: 1.97in; padding: 1.5mm 3mm; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; background: #fff; }
-    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.5mm; height: 100%; }
-    .banner-top { flex-shrink: 0; }
-    .sticker-banner-img { width: 100%; height: 10mm; object-fit: cover; display: block; }
-    .info-section-compact { font-size: 7.5pt; font-weight: 900; line-height: 1.4; white-space: nowrap; overflow: hidden; }
-    .label-top { display: flex; justify-content: space-between; align-items: center; }
+    .label { width: 3in; height: 1.97in; padding: 1.5mm 3mm; display: flex; flex-direction: column; overflow: hidden; position: relative; background: #fff; }
+    .label-content { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 0.5mm; height: 100%; }
+    .label-top { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     .logo-section { flex-shrink: 0; }
     .sticker-logo { height: 10mm; width: auto; object-fit: contain; display: block; }
-    .info-section { text-align: right; font-size: 8pt; line-height: 1.3; }
+    .info-section { text-align: right; font-size: 7.5pt; line-height: 1.3; }
     .info-label { font-weight: 900; }
     .info-value { font-weight: 900; }
     .ref-barcode-section { text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-    .ref-barcode-img { width: 100%; height: 13mm; object-fit: fill; }
-    .ref-barcode-number { font-size: 13pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.5mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
-    .ref-bale-name { font-size: 8pt; font-weight: 900; margin-top: 0.2mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
+    .ref-barcode-img { width: 100%; height: 11mm; object-fit: fill; }
+    .ref-barcode-number { font-size: 12pt; font-weight: 900; font-family: Arial, Helvetica, sans-serif; margin-top: 0.3mm; letter-spacing: 2px; text-transform: uppercase; -webkit-text-stroke: 0.5px #000; }
+    .name-barcode-section { text-align: center; flex-shrink: 0; }
+    .name-barcode-img { width: 100%; height: 8mm; object-fit: fill; }
+    .ref-bale-name { font-size: 7.5pt; font-weight: 900; margin-top: 0.2mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
 
     .print-note { text-align: center; font-size: 9pt; color: #666; padding: 4px; background: #fffbe6; border-bottom: 1px solid #eee; }
     @media print {
       .print-note { display: none !important; }
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number, .ref-bale-name { -webkit-text-stroke: 0.3px #000; }
-      img:not(.header-banner-img):not(.sticker-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
-      .header-banner-img, .sticker-banner-img { filter: none; }
+      img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .sticker-logo { filter: none; }
     }
   </style></head><body><div class="print-note">Sticker Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
