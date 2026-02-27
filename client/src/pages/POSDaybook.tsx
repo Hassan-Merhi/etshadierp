@@ -31,7 +31,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
+import { useRef } from "react";
+import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -87,6 +89,7 @@ export default function POSDaybook() {
   const [itemSearch, setItemSearch] = useState("");
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
+  const reprintRef = useRef<HTMLDivElement>(null);
 
   // Check for date and voucherId in URL query parameters (from stock item voucher history)
   const urlParams = new URLSearchParams(window.location.search);
@@ -260,13 +263,20 @@ export default function POSDaybook() {
   });
 
   const handleEdit = () => {
-    if (voucherDetails?.salesItems) {
-      // Deep clone to avoid mutating cached query data
-      setEditedItems(JSON.parse(JSON.stringify(voucherDetails.salesItems)));
-      setEditedNotes(voucherDetails.description || "");
-      setIsEditMode(true);
+    if (selectedVoucher) {
+      navigate(`/pos/edit/${selectedVoucher.id}`);
     }
   };
+
+  const fmtPrint = (n: number, prefix = "") => {
+    const parts = n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",").split(".");
+    if (parts[1] === "00") return prefix + parts[0];
+    return prefix + parts.join(".");
+  };
+
+  const handleReprint = useReactToPrint({
+    contentRef: reprintRef,
+  });
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
@@ -832,8 +842,70 @@ export default function POSDaybook() {
               </>
             ) : (
               <>
+                {/* Hidden print template for reprint */}
+                <div className="hidden">
+                  <div ref={reprintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
+                    <style dangerouslySetInnerHTML={{ __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }` }} />
+                    <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>POS INVOICE</div>
+                    <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+                      <span>Date: {voucherDetails?.voucherDate}</span>
+                      <span>#{voucherDetails?.voucherNumber}</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid black' }}>
+                          <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900' }}>Description</th>
+                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
+                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
+                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(voucherDetails?.salesItems ?? []).map((item, idx) => {
+                          const rate = parseFloat(item.sellingPrice || "0");
+                          const qty = parseFloat(item.quantity || "0");
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
+                              <td style={{ padding: '4px 3px', fontWeight: '600' }}>{item.stockItemName}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(qty)}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(rate, "$")}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(qty * rate, "$")}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
+                          <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
+                          <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
+                          <td></td>
+                          <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>TOTAL PAID:</span>
+                      <span>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
+                    </div>
+                    {voucherDetails?.description && (
+                      <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
+                        <span style={{ fontWeight: '900' }}>Note:</span> {voucherDetails.description}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <Button variant="outline" onClick={() => setSelectedVoucher(null)} data-testid="button-close">
                   Close
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleReprint()}
+                  disabled={!voucherDetails?.salesItems}
+                  data-testid="button-reprint"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Reprint
                 </Button>
                 <TooltipProvider>
                   <Tooltip>

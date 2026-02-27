@@ -1125,6 +1125,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           focusCell(rowIndex, colIndex + 1);
         }
         break;
+      case "Backspace": {
+        const inputVal = (e.target as HTMLInputElement).value;
+        const isQtyField = columns[colIndex].key === "quantity";
+        const isRateField = columns[colIndex].key === "rate";
+        if (inputVal === "" && (isQtyField || isRateField)) {
+          e.preventDefault();
+          setSelectedCell({ row: rowIndex, col: colIndex - 1 });
+          focusCell(rowIndex, colIndex - 1);
+        }
+        break;
+      }
     }
   };
 
@@ -1560,6 +1571,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                           className={`${col.width} border-r h-10 sm:h-10 ${
                             col.key === "amount" ? "bg-muted/30" : ""
                           }`}
+                          onMouseDown={(e) => {
+                            const invalidIdx = rows.findIndex(r => r.itemName?.trim() && !r.stockItemId);
+                            if (invalidIdx !== -1 && !(rowIndex === invalidIdx && col.key === "itemName")) {
+                              e.preventDefault();
+                              toast({ title: "Select an item first", description: `Row ${invalidIdx + 1} has an incomplete item. Please choose an item from the list.`, variant: "destructive" });
+                              focusCell(invalidIdx, 0);
+                            }
+                          }}
                         >
                           {col.key === "delete" ? (
                             <div className="flex items-center justify-center h-full">
