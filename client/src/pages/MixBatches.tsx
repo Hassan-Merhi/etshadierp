@@ -122,7 +122,7 @@ export default function MixBatches() {
             </div>
           ) : filteredBatches && filteredBatches.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>

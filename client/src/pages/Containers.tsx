@@ -998,7 +998,7 @@ export default function Containers() {
               <Card>
                 <CardContent className="p-0 overflow-x-auto hidden md:block">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow>
                         <TableHead className="sticky left-0 bg-muted z-10 min-w-[140px]">
                           Container Number
@@ -1215,7 +1215,7 @@ export default function Containers() {
             <Card>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="whitespace-nowrap">
                         Container #
@@ -1666,7 +1666,7 @@ export default function Containers() {
             <Card>
               <CardContent className="p-0 hidden md:block">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Container Number</TableHead>
                       <TableHead>Customer</TableHead>

@@ -406,7 +406,7 @@ export default function StockItems() {
           <>
           <div className="hidden md:block rounded-md border overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50">
+              <thead className="bg-muted/50 sticky top-0 z-10">
                 <tr className="h-12">
                   <th className="w-12 px-3">
                     <Checkbox

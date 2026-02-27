@@ -1435,7 +1435,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             {/* Desktop Table View */}
             <div className="hidden md:block border rounded-md overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
                     <TableHead className="sticky left-0 bg-muted z-10">
                       Date

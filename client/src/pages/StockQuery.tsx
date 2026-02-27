@@ -73,7 +73,7 @@ export default function StockQuery() {
             <>
               <div className="hidden md:block">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Status</TableHead>

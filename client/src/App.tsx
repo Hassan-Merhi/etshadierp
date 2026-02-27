@@ -267,10 +267,29 @@ function AuthenticatedApp() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
+
+      // Arrow key / page scrolling
+      const scrollKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"];
+      if (scrollKeys.includes(e.key) && !isInput) {
+        const main = document.querySelector("main");
+        if (main) {
+          e.preventDefault();
+          const amount = e.key === "ArrowDown" ? 80
+            : e.key === "ArrowUp" ? -80
+            : e.key === "PageDown" ? window.innerHeight * 0.85
+            : e.key === "PageUp" ? -window.innerHeight * 0.85
+            : e.key === "End" ? 99999
+            : -99999;
+          main.scrollBy({ top: amount, behavior: "smooth" });
+        }
+        return;
+      }
+
       if (e.key !== "Escape") return;
 
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+      if (isInput) {
         (target as HTMLInputElement).blur();
         return;
       }

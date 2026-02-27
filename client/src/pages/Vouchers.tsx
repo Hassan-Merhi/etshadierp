@@ -3769,7 +3769,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   {/* Spreadsheet table */}
                   <div className="border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
-                      <thead className="bg-muted/50">
+                      <thead className="bg-muted/50 sticky top-0 z-10">
                         <tr>
                           <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
                           <th className="text-left p-3 font-medium w-[50%]">Account</th>
@@ -5861,7 +5861,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 {/* Desktop table */}
                 <div className="hidden sm:block max-h-60 overflow-y-auto overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow>
                         <TableHead className="sticky left-0 bg-muted z-10">Source Location</TableHead>
                         <TableHead>Barcode</TableHead>

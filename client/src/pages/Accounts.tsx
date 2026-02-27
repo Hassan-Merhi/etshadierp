@@ -1521,7 +1521,7 @@ export default function Accounts() {
                       </div>
                       <div className="rounded-md border overflow-x-auto print:border-0 hidden md:block print:!block">
                         <Table>
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow className="bg-muted/30">
                               <TableHead className="w-[40px] py-2 print:hidden">
                                 <Checkbox

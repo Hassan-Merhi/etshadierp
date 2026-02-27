@@ -483,7 +483,7 @@ export default function ProductionRawStock() {
             </div>
           ) : rawStock && rawStock.length > 0 ? (
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead>Supplier</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>

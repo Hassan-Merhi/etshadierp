@@ -285,7 +285,7 @@ export default function FactoryDaybook() {
                     <col className="w-[15%]" />
                     <col className="w-[60%]" />
                   </colgroup>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Entries</TableHead>
@@ -355,7 +355,7 @@ export default function FactoryDaybook() {
           ) : entries.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>

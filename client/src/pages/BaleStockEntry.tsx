@@ -780,7 +780,7 @@
                   </div>
                 ) : (
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Product</TableHead>
                         <TableHead className="text-center w-40">Qty</TableHead>
@@ -890,7 +890,7 @@
             </DialogHeader>
             <div className="text-sm space-y-3">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
@@ -1267,7 +1267,7 @@
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Article</TableHead>
@@ -1319,7 +1319,7 @@
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Ref Number</TableHead>
@@ -1683,7 +1683,7 @@
             <CardContent>
               <div className="max-h-96 overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>#</TableHead>
                       <TableHead>Item Name</TableHead>
