@@ -50,6 +50,9 @@ const TX_TYPE_LABELS: Record<string, string> = {
   COMMISSION: "Commission",
   BALE_PRESSING: "Bale Pressing",
   BALE_FINALIZE: "Bale Finalize",
+  BALE_STOCK_ENTRY: "Bale Stock Entry",
+  BALE_REMOVAL: "Bale Removal",
+  OPENING_BALANCE_RAW: "Opening Balance Raw",
   INVOICE: "Invoice",
   PAYMENT: "Payment",
   DOC_UPLOAD: "Doc Upload",
@@ -66,27 +69,10 @@ const TX_TYPE_LABELS: Record<string, string> = {
   REPORT_GENERATED: "Report Generated",
 };
 
-const TX_TYPE_COLORS: Record<string, string> = {
-  CONTAINER_IMPORT: "default",
-  OFFLOAD_RAW_STOCK: "secondary",
-  COMMISSION: "outline",
-  BALE_PRESSING: "secondary",
-  BALE_FINALIZE: "default",
-  INVOICE: "default",
-  PAYMENT: "secondary",
-  DOC_UPLOAD: "outline",
-  DOC_DELETE: "destructive",
-  FREIGHT_ADD: "default",
-  FREIGHT_DELETE: "destructive",
-  FREIGHT_PAYMENT: "secondary",
-  FREIGHT_PAYMENT_DELETE: "destructive",
-  WORKER_CREATED: "default",
-  WORKER_EDITED: "outline",
-  CONTRACT_ENDED: "destructive",
-  WORKER_PHOTO_UPLOADED: "outline",
-  PAYROLL_GENERATED: "secondary",
-  REPORT_GENERATED: "outline",
-};
+function formatTxType(type: string): string {
+  if (TX_TYPE_LABELS[type]) return TX_TYPE_LABELS[type];
+  return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function FactoryDaybook() {
   const { toast } = useToast();
@@ -104,6 +90,7 @@ export default function FactoryDaybook() {
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const [isDetailed, setIsDetailed] = useState(false);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
@@ -301,26 +288,54 @@ export default function FactoryDaybook() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {condensedRows.map((row) => (
-                      <TableRow key={row.date} data-testid={`row-condensed-${row.date}`}>
-                        <TableCell className="font-mono text-sm whitespace-nowrap">
-                          {new Date(row.date + "T00:00:00").toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{row.count}</TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          ${formatNumber(row.totalUsd)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {Array.from(row.types).map((t) => (
-                              <Badge key={t} variant={(TX_TYPE_COLORS[t] as any) || "outline"} className="text-xs">
-                                {TX_TYPE_LABELS[t] || t}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {condensedRows.map((row) => {
+                      const isExpanded = expandedDate === row.date;
+                      const dayEntries = entries.filter((e) => e.txDate === row.date);
+                      return (
+                        <tbody key={row.date}>
+                          <TableRow
+                            data-testid={`row-condensed-${row.date}`}
+                            className="cursor-pointer hover-elevate"
+                            onClick={() => setExpandedDate(isExpanded ? null : row.date)}
+                          >
+                            <TableCell className="font-mono text-sm whitespace-nowrap">
+                              {new Date(row.date + "T00:00:00").toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{row.count}</TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              ${formatNumber(row.totalUsd)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 flex-wrap">
+                                {Array.from(row.types).map((t) => (
+                                  <Badge key={t} variant="default" className="text-xs">
+                                    {formatTxType(t)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && dayEntries.map((entry) => (
+                            <TableRow key={`expanded-${entry.id}`} className="bg-muted/40" data-testid={`row-expanded-${entry.id}`}>
+                              <TableCell className="pl-6 text-xs text-muted-foreground font-mono whitespace-nowrap" colSpan={1}>
+                                {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
+                              </TableCell>
+                              <TableCell colSpan={1}>
+                                <Badge variant="default" className="text-xs">
+                                  {formatTxType(entry.txType)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs" colSpan={1}>
+                                ${formatNumber(parseFloat(entry.amountUsd || "0"))}
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={entry.description}>
+                                {entry.description}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </tbody>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -353,8 +368,8 @@ export default function FactoryDaybook() {
                         {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={(TX_TYPE_COLORS[entry.txType] as any) || "outline"}>
-                          {TX_TYPE_LABELS[entry.txType] || entry.txType}
+                        <Badge variant="default">
+                          {formatTxType(entry.txType)}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={entry.description}>
