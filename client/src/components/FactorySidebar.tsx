@@ -154,7 +154,6 @@ const allMenuGroups: MenuGroup[] = [
     icon: Wallet,
     items: [
       { title: "Payroll", url: "/factory/payroll", icon: Wallet },
-      { title: "Worker Payroll", url: "/factory/worker-payroll", icon: HardHat },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
     ],

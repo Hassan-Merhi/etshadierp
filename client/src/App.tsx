@@ -97,9 +97,8 @@ import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
 import FactoryImport from "@/pages/FactoryImport";
 import FactoryUsers from "@/pages/FactoryUsers";
-import FactoryWorkers from "@/pages/FactoryWorkers";
+import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
-import FactoryPayrollPage from "@/pages/FactoryPayroll";
 import FactorySupplierReport from "@/pages/FactorySupplierReport";
 import CustomerProformas from "@/pages/CustomerProformas";
 import FactoryCustomers from "@/pages/FactoryCustomers";
@@ -575,8 +574,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/proformas" component={CustomerProformas} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers" component={FactoryWorkers} />
-                    <Route path="/factory/worker-payroll" component={FactoryPayrollPage} />
+                    <Route path="/factory/workers" component={FactoryWorkersHub} />
+                    <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
