@@ -233,11 +233,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           : [];
         const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
 
+        const categoryIdSet = new Set<number>();
+        factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
+        const categoryIds = Array.from(categoryIdSet);
+        const factoryCats = categoryIds.length > 0
+          ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
+          : [];
+        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+
         for (const item of items) {
           const qty = parseInt(item.quantity || item.qty || "1");
           const weight = parseFloat(item.weightPerBale || "25");
           const product = productMap.get(item.productId);
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
+          const categoryName: string | null = product.categoryId ? (categoryMap.get(product.categoryId)?.name || null) : null;
 
           for (let i = 0; i < qty; i++) {
             const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
@@ -256,6 +265,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 referenceNumber: refNum,
                 articleCode: product.articleCode,
                 productName: product.name,
+                category: categoryName,
                 weightKg: String(weight),
                 costPerKg: String(effectiveCostPerKg),
                 totalCost: String(baleTotalCost),
@@ -281,14 +291,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalWeight}`, updatedAt: now })
             .where(eq(factoryMixBatches.id, mixBatchId));
         }
-
-        const categoryIdSet = new Set<number>();
-        factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
-        const categoryIds = Array.from(categoryIdSet);
-        const factoryCats = categoryIds.length > 0
-          ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
-          : [];
-        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
 
         const stockGroupCache = new Map<string, number>();
         const stockItemCache = new Map<string, number>();
