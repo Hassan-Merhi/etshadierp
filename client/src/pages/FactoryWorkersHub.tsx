@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, DollarSign } from "lucide-react";
 import FactoryWorkers from "@/pages/FactoryWorkers";
-import FactoryPayrollPage from "@/pages/FactoryPayroll";
+import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
 
 export default function FactoryWorkersHub() {
   const [tab, setTab] = useState<string>(() => {
@@ -27,7 +27,7 @@ export default function FactoryWorkersHub() {
         <FactoryWorkers />
       </TabsContent>
       <TabsContent value="payroll" className="mt-0">
-        <FactoryPayrollPage />
+        <FactoryPayrollTab />
       </TabsContent>
     </Tabs>
   );

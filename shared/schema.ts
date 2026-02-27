@@ -3064,6 +3064,8 @@ export const factoryPayrolls = pgTable("factory_payrolls", {
   overtimeHours: decimal("overtime_hours", { precision: 10, scale: 2 }).default("0"),
   notes: text("notes"),
   status: varchar("status", { length: 30 }).notNull().default("DRAFT"),
+  cashAccountId: integer("cash_account_id"),
+  paidAt: timestamp("paid_at"),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
   approvedAt: timestamp("approved_at"),
   approvedBy: integer("approved_by"),

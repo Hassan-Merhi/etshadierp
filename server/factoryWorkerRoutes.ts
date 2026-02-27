@@ -11,6 +11,7 @@ import {
   factoryDaybookEntries,
   factoryBales,
   factoryPayrolls,
+  ledgerAccounts,
 } from "@shared/schema";
 
 const workerUpload = multer({
@@ -502,7 +503,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const { startDate, endDate, hoursWorked } = req.body;
+      const { startDate, endDate, hoursWorked, dryRun, payNow, cashAccountId } = req.body;
       if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
 
       const [worker] = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));
@@ -564,6 +565,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const totalPaid = paidPayrolls.reduce((s: number, p: any) => s + parseFloat(p.netSalary || "0"), 0);
       const balance = earned - totalPaid;
 
+      // dryRun: just return calculation, no DB changes
+      if (dryRun) {
+        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), dryRun: true });
+      }
+
+      const settlementStatus = payNow ? "PAID" : "APPROVED";
+      const settlementPaidAt = payNow ? new Date() : null;
+
       // Insert settlement payroll record
       const [settlement] = await db.insert(factoryPayrolls).values({
         companyId,
@@ -581,9 +590,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         balesCount: 0,
         kgProcessed: "0",
         overtimeHours: "0",
-        status: "APPROVED",
+        status: settlementStatus,
         notes: "Settlement - contract ended",
-      }).returning();
+        cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+        paidAt: settlementPaidAt,
+      } as any).returning();
 
       // Deactivate worker
       const today = new Date().toISOString().split("T")[0];
@@ -600,6 +611,136 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), settlementPayrollId: settlement.id, workerUpdated: true });
     } catch (error: any) {
       console.error("Error settling worker contract:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/cash-accounts - Get ledger accounts for cash account picker
+  app.get("/api/factory/cash-accounts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
+        .from(ledgerAccounts)
+        .where(eq(ledgerAccounts.companyId, companyId))
+        .orderBy(ledgerAccounts.name);
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/payrolls - All payroll records for company with worker info
+  app.get("/api/factory/payrolls", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const payrolls = await db.select().from(factoryPayrolls)
+        .where(eq(factoryPayrolls.companyId, companyId))
+        .orderBy(desc(factoryPayrolls.periodEnd));
+      // Attach worker names
+      const workerIds = [...new Set(payrolls.map((p: any) => p.workerId))];
+      const workers = workerIds.length ? await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName, employeeCode: factoryWorkers.employeeCode, position: factoryWorkers.position })
+        .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIds)) : [];
+      const workerMap = new Map(workers.map((w: any) => [w.id, w]));
+      const result = payrolls.map((p: any) => ({ ...p, worker: workerMap.get(p.workerId) || null }));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/workers/:id/payrolls - Payroll history for one worker
+  app.get("/api/factory/workers/:id/payrolls", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const payrolls = await db.select().from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
+        .orderBy(desc(factoryPayrolls.periodEnd));
+      res.json(payrolls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/payrolls/generate-bulk - Generate draft payrolls for multiple workers
+  app.post("/api/factory/payrolls/generate-bulk", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes } = req.body;
+      if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
+
+      const days = daysCount ? parseInt(daysCount) : Math.floor((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const bonus = parseFloat(bonusPerWorker || "0");
+
+      let targetWorkers;
+      if (workerIds && workerIds.length > 0) {
+        targetWorkers = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.companyId, companyId), inArray(factoryWorkers.id, workerIds)));
+      } else {
+        targetWorkers = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
+      }
+
+      const daysInMonth = (d: string) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); };
+      let created = 0;
+      for (const worker of targetWorkers) {
+        const baseSal = parseFloat(worker.baseSalary || "0");
+        const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
+        let base = 0;
+        if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
+        else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
+        else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
+        else base = baseSal * (days / daysInMonth(periodStart));
+        const net = base + bonus;
+        await db.insert(factoryPayrolls).values({
+          companyId, workerId: worker.id, periodStart, periodEnd,
+          baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
+          baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0", advances: "0",
+          netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
+          status: "DRAFT", notes: notes || null,
+          cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+        } as any);
+        created++;
+      }
+      res.json({ created });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/factory/payrolls/:id/mark-paid - Mark single payroll as paid
+  app.patch("/api/factory/payrolls/:id/mark-paid", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+      const [updated] = await db.update(factoryPayrolls)
+        .set({ status: "PAID", paidAt: new Date(), cashAccountId } as any)
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Payroll record not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/payrolls/mark-paid-bulk - Mark multiple payrolls as paid
+  app.post("/api/factory/payrolls/mark-paid-bulk", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { payrollIds, cashAccountId } = req.body;
+      if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
+      const cashId = cashAccountId ? parseInt(cashAccountId) : null;
+      await db.update(factoryPayrolls)
+        .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
+        .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
+      res.json({ updated: payrollIds.length });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

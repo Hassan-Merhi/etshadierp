@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, Filter, Upload, Download,
+  Plus, Pencil, Search, Users, UserX, Upload, Download, Calculator, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,9 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -26,56 +23,38 @@ import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker } from "@shared/schema";
 
-interface Company {
-  id: number;
-  name: string;
-  code: string;
-}
+interface Company { id: number; name: string; code: string; }
+interface CashAccount { id: number; name: string; code: string; }
 
 const emptyForm = {
-  fullName: "",
-  fatherName: "",
-  motherName: "",
-  nationalId: "",
-  passportNumber: "",
-  dateOfBirth: "",
-  gender: "",
-  nationality: "",
-  maritalStatus: "",
-  numberOfChildren: 0,
-  phone1: "",
-  phone2: "",
-  emergencyContactName: "",
-  emergencyContactPhone: "",
-  address: "",
-  city: "",
-  country: "",
-  position: "",
-  department: "",
-  dateJoined: "",
-  contractStartDate: "",
-  contractEndDate: "",
-  salaryType: "Monthly",
-  baseSalary: "",
-  perBaleRate: "",
-  perKgRate: "",
-  overtimeRate: "",
-  shiftType: "",
-  payFrequency: "Monthly",
-  hourlyRate: "",
-  weeklySalary: "",
-  biWeeklySalary: "",
-  visaNumber: "",
-  visaExpiry: "",
-  workPermitNumber: "",
-  workPermitExpiry: "",
-  residentialPermit: "",
-  residentialPermitExpiry: "",
-  bankName: "",
-  bankAccountNumber: "",
-  paymentMethod: "Cash",
-  notes: "",
+  fullName: "", fatherName: "", motherName: "", nationalId: "", passportNumber: "",
+  dateOfBirth: "", gender: "", nationality: "", maritalStatus: "", numberOfChildren: 0,
+  phone1: "", phone2: "", emergencyContactName: "", emergencyContactPhone: "",
+  address: "", city: "", country: "", position: "", department: "",
+  dateJoined: "", contractStartDate: "", contractEndDate: "",
+  salaryType: "Monthly", baseSalary: "", perBaleRate: "", perKgRate: "",
+  overtimeRate: "", shiftType: "", payFrequency: "Monthly", hourlyRate: "",
+  weeklySalary: "", biWeeklySalary: "", visaNumber: "", visaExpiry: "",
+  workPermitNumber: "", workPermitExpiry: "", residentialPermit: "",
+  residentialPermitExpiry: "", bankName: "", bankAccountNumber: "",
+  paymentMethod: "Cash", notes: "",
 };
+
+const AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700", "bg-purple-100 text-purple-700",
+  "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700", "bg-cyan-100 text-cyan-700",
+];
+
+function getAvatarColor(name: string) {
+  let hash = 0;
+  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string) {
+  return name.split(" ").filter(Boolean).slice(0, 2).map((n) => n[0]).join("").toUpperCase();
+}
 
 export default function FactoryWorkers() {
   const [, setLocation] = useLocation();
@@ -83,25 +62,36 @@ export default function FactoryWorkers() {
 
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [positionFilter, setPositionFilter] = useState("All");
-  const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("Active");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
-  const [endContractWorker, setEndContractWorker] = useState<FactoryWorker | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: companies } = useQuery<Company[]>({
-    queryKey: ["/api/user/companies"],
+  const [endContractWorker, setEndContractWorker] = useState<FactoryWorker | null>(null);
+  const [endStep, setEndStep] = useState<1 | 2>(1);
+  const [endStart, setEndStart] = useState("");
+  const [endEnd, setEndEnd] = useState(new Date().toISOString().split("T")[0]);
+  const [endCalculating, setEndCalculating] = useState(false);
+  const [endResult, setEndResult] = useState<{ earned: string; paid: string; balance: string } | null>(null);
+  const [endCashAccountId, setEndCashAccountId] = useState("");
+  const [endSubmitting, setEndSubmitting] = useState(false);
+
+  const { data: companies } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
+
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ["/api/factory/cash-accounts", companyId],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/cash-accounts?companyId=${companyId}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!companyId,
   });
 
   useEffect(() => {
-    if (companies && companies.length === 1 && companyId === null) {
-      setCompanyId(companies[0].id);
-    }
+    if (companies && companies.length === 1 && companyId === null) setCompanyId(companies[0].id);
   }, [companies, companyId]);
 
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({
@@ -117,60 +107,29 @@ export default function FactoryWorkers() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await factoryApiRequest("POST", "/api/factory/workers", { ...data, companyId });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to create worker");
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
-      toast({ title: "Created", description: "Worker added successfully" });
-      resetForm();
-      setCreateOpen(false);
+      toast({ title: "Worker added" });
+      resetForm(); setCreateOpen(false);
     },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/workers/${id}`, { ...data, companyId });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to update worker");
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
-      toast({ title: "Updated", description: "Worker updated successfully" });
-      resetForm();
-      setEditingWorker(null);
+      toast({ title: "Worker updated" });
+      resetForm(); setEditingWorker(null);
     },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const endContractMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await factoryApiRequest("POST", `/api/factory/workers/${id}/end-contract`, { companyId });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to end contract");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
-      toast({ title: "Contract Ended", description: "Worker contract has been ended" });
-      setEndContractWorker(null);
-    },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,14 +138,10 @@ export default function FactoryWorkers() {
     e.target.value = "";
     setImportLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("companyId", String(companyId));
-      const res = await fetch("/api/factory/workers/import-excel", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("companyId", String(companyId));
+      const res = await fetch("/api/factory/workers/import-excel", { method: "POST", credentials: "include", body: fd });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Import failed");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
@@ -194,13 +149,7 @@ export default function FactoryWorkers() {
       if (result.created) parts.push(`${result.created} created`);
       if (result.updated) parts.push(`${result.updated} updated`);
       if (result.skipped) parts.push(`${result.skipped} skipped`);
-      toast({
-        title: "Import complete",
-        description: parts.join(", ") || "No changes",
-      });
-      if (result.errors?.length) {
-        console.warn("Import errors:", result.errors);
-      }
+      toast({ title: "Import complete", description: parts.join(", ") || "No changes" });
     } catch (err: any) {
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     } finally {
@@ -208,641 +157,357 @@ export default function FactoryWorkers() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({ ...emptyForm });
-  };
+  const resetForm = () => setFormData({ ...emptyForm });
 
   const openEdit = (w: FactoryWorker) => {
     setEditingWorker(w);
     setFormData({
-      fullName: w.fullName || "",
-      fatherName: w.fatherName || "",
-      motherName: w.motherName || "",
-      nationalId: w.nationalId || "",
-      passportNumber: w.passportNumber || "",
-      dateOfBirth: w.dateOfBirth || "",
-      gender: w.gender || "",
-      nationality: w.nationality || "",
-      maritalStatus: w.maritalStatus || "",
-      numberOfChildren: w.numberOfChildren ?? 0,
-      phone1: w.phone1 || "",
-      phone2: w.phone2 || "",
-      emergencyContactName: w.emergencyContactName || "",
-      emergencyContactPhone: w.emergencyContactPhone || "",
-      address: w.address || "",
-      city: w.city || "",
-      country: w.country || "",
-      position: w.position || "",
-      department: w.department || "",
-      dateJoined: w.dateJoined || "",
-      contractStartDate: w.contractStartDate || "",
-      contractEndDate: w.contractEndDate || "",
-      salaryType: w.salaryType || "Monthly",
-      baseSalary: w.baseSalary || "",
-      perBaleRate: w.perBaleRate || "",
-      perKgRate: w.perKgRate || "",
-      overtimeRate: w.overtimeRate || "",
-      shiftType: w.shiftType || "",
-      payFrequency: (w as any).payFrequency || "Monthly",
-      hourlyRate: (w as any).hourlyRate || "",
-      weeklySalary: (w as any).weeklySalary || "",
-      biWeeklySalary: (w as any).biWeeklySalary || "",
-      visaNumber: (w as any).visaNumber || "",
-      visaExpiry: (w as any).visaExpiry || "",
-      workPermitNumber: (w as any).workPermitNumber || "",
+      fullName: w.fullName || "", fatherName: w.fatherName || "", motherName: w.motherName || "",
+      nationalId: w.nationalId || "", passportNumber: w.passportNumber || "",
+      dateOfBirth: w.dateOfBirth || "", gender: w.gender || "", nationality: w.nationality || "",
+      maritalStatus: w.maritalStatus || "", numberOfChildren: w.numberOfChildren ?? 0,
+      phone1: w.phone1 || "", phone2: w.phone2 || "",
+      emergencyContactName: w.emergencyContactName || "", emergencyContactPhone: w.emergencyContactPhone || "",
+      address: w.address || "", city: w.city || "", country: w.country || "",
+      position: w.position || "", department: w.department || "",
+      dateJoined: w.dateJoined || "", contractStartDate: w.contractStartDate || "",
+      contractEndDate: w.contractEndDate || "", salaryType: w.salaryType || "Monthly",
+      baseSalary: w.baseSalary || "", perBaleRate: w.perBaleRate || "",
+      perKgRate: w.perKgRate || "", overtimeRate: w.overtimeRate || "",
+      shiftType: w.shiftType || "", payFrequency: (w as any).payFrequency || "Monthly",
+      hourlyRate: (w as any).hourlyRate || "", weeklySalary: (w as any).weeklySalary || "",
+      biWeeklySalary: (w as any).biWeeklySalary || "", visaNumber: (w as any).visaNumber || "",
+      visaExpiry: (w as any).visaExpiry || "", workPermitNumber: (w as any).workPermitNumber || "",
       workPermitExpiry: (w as any).workPermitExpiry || "",
       residentialPermit: (w as any).residentialPermit || "",
       residentialPermitExpiry: (w as any).residentialPermitExpiry || "",
-      bankName: w.bankName || "",
-      bankAccountNumber: w.bankAccountNumber || "",
-      paymentMethod: w.paymentMethod || "Cash",
-      notes: w.notes || "",
+      bankName: w.bankName || "", bankAccountNumber: w.bankAccountNumber || "",
+      paymentMethod: w.paymentMethod || "Cash", notes: w.notes || "",
     });
   };
 
   const handleSubmit = () => {
     if (!formData.fullName.trim()) {
-      toast({ title: "Validation", description: "Full name is required", variant: "destructive" });
-      return;
+      toast({ title: "Full name is required", variant: "destructive" }); return;
     }
-    if (editingWorker) {
-      updateMutation.mutate({ id: editingWorker.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
-    }
+    if (editingWorker) updateMutation.mutate({ id: editingWorker.id, data: formData });
+    else createMutation.mutate(formData);
   };
 
-  const updateField = (field: string, value: string | number) => {
+  const updateField = (field: string, value: string | number) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
+
+  const openEndContract = (w: FactoryWorker) => {
+    setEndContractWorker(w);
+    setEndStep(1);
+    setEndResult(null);
+    setEndCashAccountId("");
+    const today = new Date().toISOString().split("T")[0];
+    const firstOfMonth = today.slice(0, 7) + "-01";
+    setEndStart(w.contractStartDate || w.dateJoined || firstOfMonth);
+    setEndEnd(today);
   };
 
-  const positions = useMemo(() => {
-    if (!workers) return [];
-    return Array.from(new Set(workers.map((w) => w.position).filter(Boolean))) as string[];
-  }, [workers]);
+  const handleCalculate = async () => {
+    if (!endContractWorker || !endStart || !endEnd) return;
+    setEndCalculating(true);
+    try {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${endContractWorker.id}/settle-and-end`, {
+        companyId, startDate: endStart, endDate: endEnd, dryRun: true,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Calculation failed");
+      setEndResult(data);
+      setEndStep(2);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setEndCalculating(false);
+    }
+  };
 
-  const departments = useMemo(() => {
-    if (!workers) return [];
-    return Array.from(new Set(workers.map((w) => w.department).filter(Boolean))) as string[];
-  }, [workers]);
+  const handleEndContract = async (payNow: boolean) => {
+    if (!endContractWorker) return;
+    setEndSubmitting(true);
+    try {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${endContractWorker.id}/settle-and-end`, {
+        companyId, startDate: endStart, endDate: endEnd,
+        payNow, cashAccountId: payNow ? endCashAccountId : undefined,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to end contract");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", companyId] });
+      toast({ title: "Contract ended", description: payNow ? `Paid $${data.balance}` : "Balance recorded as pending" });
+      setEndContractWorker(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setEndSubmitting(false);
+    }
+  };
 
   const filteredWorkers = useMemo(() => {
     if (!workers) return [];
     return workers.filter((w) => {
       if (statusFilter === "Active" && !w.active) return false;
       if (statusFilter === "Inactive" && w.active) return false;
-      if (positionFilter !== "All" && w.position !== positionFilter) return false;
-      if (departmentFilter !== "All" && w.department !== departmentFilter) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const match =
+        return (
           w.fullName?.toLowerCase().includes(q) ||
           w.employeeCode?.toLowerCase().includes(q) ||
           w.position?.toLowerCase().includes(q) ||
           w.department?.toLowerCase().includes(q) ||
-          w.phone1?.toLowerCase().includes(q);
-        if (!match) return false;
+          w.phone1?.toLowerCase().includes(q)
+        );
       }
       return true;
     });
-  }, [workers, statusFilter, positionFilter, departmentFilter, searchQuery]);
+  }, [workers, statusFilter, searchQuery]);
 
-  const dialogOpen = createOpen || editingWorker !== null;
-  const dialogTitle = editingWorker ? "Edit Worker" : "Add Worker";
+  const activeCount = workers?.filter((w) => w.active).length ?? 0;
+  const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
 
   const renderWorkerForm = () => (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
       <div>
         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Identity</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Full Name *</Label>
-            <Input value={formData.fullName} onChange={(e) => updateField("fullName", e.target.value)} data-testid="input-fullName" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Father Name</Label>
-            <Input value={formData.fatherName} onChange={(e) => updateField("fatherName", e.target.value)} data-testid="input-fatherName" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Mother Name</Label>
-            <Input value={formData.motherName} onChange={(e) => updateField("motherName", e.target.value)} data-testid="input-motherName" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">National ID</Label>
-            <Input value={formData.nationalId} onChange={(e) => updateField("nationalId", e.target.value)} data-testid="input-nationalId" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Passport Number</Label>
-            <Input value={formData.passportNumber} onChange={(e) => updateField("passportNumber", e.target.value)} data-testid="input-passportNumber" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Date of Birth</Label>
-            <Input type="date" value={formData.dateOfBirth} onChange={(e) => updateField("dateOfBirth", e.target.value)} data-testid="input-dateOfBirth" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Gender</Label>
+          <div className="space-y-1"><Label className="text-xs">Full Name *</Label><Input value={formData.fullName} onChange={(e) => updateField("fullName", e.target.value)} data-testid="input-fullName" /></div>
+          <div className="space-y-1"><Label className="text-xs">Father Name</Label><Input value={formData.fatherName} onChange={(e) => updateField("fatherName", e.target.value)} data-testid="input-fatherName" /></div>
+          <div className="space-y-1"><Label className="text-xs">National ID</Label><Input value={formData.nationalId} onChange={(e) => updateField("nationalId", e.target.value)} data-testid="input-nationalId" /></div>
+          <div className="space-y-1"><Label className="text-xs">Passport Number</Label><Input value={formData.passportNumber} onChange={(e) => updateField("passportNumber", e.target.value)} data-testid="input-passportNumber" /></div>
+          <div className="space-y-1"><Label className="text-xs">Date of Birth</Label><Input type="date" value={formData.dateOfBirth} onChange={(e) => updateField("dateOfBirth", e.target.value)} data-testid="input-dateOfBirth" /></div>
+          <div className="space-y-1"><Label className="text-xs">Gender</Label>
             <Select value={formData.gender} onValueChange={(v) => updateField("gender", v)}>
               <SelectTrigger data-testid="select-gender"><SelectValue placeholder="Select" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Male">Male</SelectItem>
-                <SelectItem value="Female">Female</SelectItem>
-              </SelectContent>
+              <SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem></SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Nationality</Label>
-            <Input value={formData.nationality} onChange={(e) => updateField("nationality", e.target.value)} data-testid="input-nationality" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Marital Status</Label>
+          <div className="space-y-1"><Label className="text-xs">Nationality</Label><Input value={formData.nationality} onChange={(e) => updateField("nationality", e.target.value)} data-testid="input-nationality" /></div>
+          <div className="space-y-1"><Label className="text-xs">Marital Status</Label>
             <Select value={formData.maritalStatus} onValueChange={(v) => updateField("maritalStatus", v)}>
               <SelectTrigger data-testid="select-maritalStatus"><SelectValue placeholder="Select" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Single">Single</SelectItem>
-                <SelectItem value="Married">Married</SelectItem>
-                <SelectItem value="Divorced">Divorced</SelectItem>
-                <SelectItem value="Widowed">Widowed</SelectItem>
-              </SelectContent>
+              <SelectContent><SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem><SelectItem value="Divorced">Divorced</SelectItem></SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Number of Children</Label>
-            <Input type="number" min={0} value={formData.numberOfChildren} onChange={(e) => updateField("numberOfChildren", parseInt(e.target.value) || 0)} data-testid="input-numberOfChildren" />
           </div>
         </div>
       </div>
-
       <div>
         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Contact</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Phone 1</Label>
-            <Input value={formData.phone1} onChange={(e) => updateField("phone1", e.target.value)} data-testid="input-phone1" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Phone 2</Label>
-            <Input value={formData.phone2} onChange={(e) => updateField("phone2", e.target.value)} data-testid="input-phone2" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Emergency Contact Name</Label>
-            <Input value={formData.emergencyContactName} onChange={(e) => updateField("emergencyContactName", e.target.value)} data-testid="input-emergencyContactName" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Emergency Contact Phone</Label>
-            <Input value={formData.emergencyContactPhone} onChange={(e) => updateField("emergencyContactPhone", e.target.value)} data-testid="input-emergencyContactPhone" />
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label className="text-xs">Address</Label>
-            <Input value={formData.address} onChange={(e) => updateField("address", e.target.value)} data-testid="input-address" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">City</Label>
-            <Input value={formData.city} onChange={(e) => updateField("city", e.target.value)} data-testid="input-city" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Country</Label>
-            <Input value={formData.country} onChange={(e) => updateField("country", e.target.value)} data-testid="input-country" />
-          </div>
+          <div className="space-y-1"><Label className="text-xs">Phone 1</Label><Input value={formData.phone1} onChange={(e) => updateField("phone1", e.target.value)} data-testid="input-phone1" /></div>
+          <div className="space-y-1"><Label className="text-xs">Phone 2</Label><Input value={formData.phone2} onChange={(e) => updateField("phone2", e.target.value)} data-testid="input-phone2" /></div>
+          <div className="space-y-1"><Label className="text-xs">Emergency Contact Name</Label><Input value={formData.emergencyContactName} onChange={(e) => updateField("emergencyContactName", e.target.value)} data-testid="input-emergencyContactName" /></div>
+          <div className="space-y-1"><Label className="text-xs">Emergency Contact Phone</Label><Input value={formData.emergencyContactPhone} onChange={(e) => updateField("emergencyContactPhone", e.target.value)} data-testid="input-emergencyContactPhone" /></div>
+          <div className="space-y-1 sm:col-span-2"><Label className="text-xs">Address</Label><Input value={formData.address} onChange={(e) => updateField("address", e.target.value)} data-testid="input-address" /></div>
+          <div className="space-y-1"><Label className="text-xs">City</Label><Input value={formData.city} onChange={(e) => updateField("city", e.target.value)} data-testid="input-city" /></div>
+          <div className="space-y-1"><Label className="text-xs">Country</Label><Input value={formData.country} onChange={(e) => updateField("country", e.target.value)} data-testid="input-country" /></div>
         </div>
       </div>
-
       <div>
         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Employment</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Position</Label>
-            <Input value={formData.position} onChange={(e) => updateField("position", e.target.value)} data-testid="input-position" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Department</Label>
-            <Input value={formData.department} onChange={(e) => updateField("department", e.target.value)} data-testid="input-department" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Date Joined</Label>
-            <Input type="date" value={formData.dateJoined} onChange={(e) => updateField("dateJoined", e.target.value)} data-testid="input-dateJoined" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Contract Start</Label>
-            <Input type="date" value={formData.contractStartDate} onChange={(e) => updateField("contractStartDate", e.target.value)} data-testid="input-contractStartDate" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Contract End</Label>
-            <Input type="date" value={formData.contractEndDate} onChange={(e) => updateField("contractEndDate", e.target.value)} data-testid="input-contractEndDate" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Salary Type</Label>
+          <div className="space-y-1"><Label className="text-xs">Position</Label><Input value={formData.position} onChange={(e) => updateField("position", e.target.value)} data-testid="input-position" /></div>
+          <div className="space-y-1"><Label className="text-xs">Department</Label><Input value={formData.department} onChange={(e) => updateField("department", e.target.value)} data-testid="input-department" /></div>
+          <div className="space-y-1"><Label className="text-xs">Date Joined</Label><Input type="date" value={formData.dateJoined} onChange={(e) => updateField("dateJoined", e.target.value)} data-testid="input-dateJoined" /></div>
+          <div className="space-y-1"><Label className="text-xs">Contract Start</Label><Input type="date" value={formData.contractStartDate} onChange={(e) => updateField("contractStartDate", e.target.value)} data-testid="input-contractStartDate" /></div>
+          <div className="space-y-1"><Label className="text-xs">Salary Type</Label>
             <Select value={formData.salaryType} onValueChange={(v) => updateField("salaryType", v)}>
               <SelectTrigger data-testid="select-salaryType"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Monthly">Monthly</SelectItem>
-                <SelectItem value="Daily">Daily</SelectItem>
-                <SelectItem value="Per Bale">Per Bale</SelectItem>
-                <SelectItem value="Per KG">Per KG</SelectItem>
-              </SelectContent>
+              <SelectContent><SelectItem value="Monthly">Monthly</SelectItem><SelectItem value="Daily">Daily</SelectItem><SelectItem value="Per Bale">Per Bale</SelectItem><SelectItem value="Per KG">Per KG</SelectItem></SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Base Salary</Label>
-            <Input type="number" step="0.01" value={formData.baseSalary} onChange={(e) => updateField("baseSalary", e.target.value)} data-testid="input-baseSalary" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Per Bale Rate</Label>
-            <Input type="number" step="0.0001" value={formData.perBaleRate} onChange={(e) => updateField("perBaleRate", e.target.value)} data-testid="input-perBaleRate" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Per KG Rate</Label>
-            <Input type="number" step="0.0001" value={formData.perKgRate} onChange={(e) => updateField("perKgRate", e.target.value)} data-testid="input-perKgRate" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Overtime Rate</Label>
-            <Input type="number" step="0.01" value={formData.overtimeRate} onChange={(e) => updateField("overtimeRate", e.target.value)} data-testid="input-overtimeRate" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Shift Type</Label>
-            <Input value={formData.shiftType} onChange={(e) => updateField("shiftType", e.target.value)} data-testid="input-shiftType" />
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Pay Frequency</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Pay Frequency</Label>
+          <div className="space-y-1"><Label className="text-xs">Base Salary</Label><Input type="number" step="0.01" value={formData.baseSalary} onChange={(e) => updateField("baseSalary", e.target.value)} data-testid="input-baseSalary" /></div>
+          <div className="space-y-1"><Label className="text-xs">Per Bale Rate</Label><Input type="number" step="0.0001" value={formData.perBaleRate} onChange={(e) => updateField("perBaleRate", e.target.value)} data-testid="input-perBaleRate" /></div>
+          <div className="space-y-1"><Label className="text-xs">Per KG Rate</Label><Input type="number" step="0.0001" value={formData.perKgRate} onChange={(e) => updateField("perKgRate", e.target.value)} data-testid="input-perKgRate" /></div>
+          <div className="space-y-1"><Label className="text-xs">Pay Frequency</Label>
             <Select value={formData.payFrequency} onValueChange={(v) => updateField("payFrequency", v)}>
               <SelectTrigger data-testid="select-payFrequency"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Monthly">Monthly</SelectItem>
-                <SelectItem value="Hourly">Hourly</SelectItem>
-                <SelectItem value="Weekly">Weekly</SelectItem>
-                <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
-              </SelectContent>
+              <SelectContent><SelectItem value="Monthly">Monthly</SelectItem><SelectItem value="Weekly">Weekly</SelectItem><SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem><SelectItem value="Hourly">Hourly</SelectItem></SelectContent>
             </Select>
           </div>
-          {formData.payFrequency === "Hourly" && (
-            <div className="space-y-1">
-              <Label className="text-xs">Hourly Rate</Label>
-              <Input type="number" step="0.0001" value={formData.hourlyRate} onChange={(e) => updateField("hourlyRate", e.target.value)} data-testid="input-hourlyRate" />
-            </div>
-          )}
-          {formData.payFrequency === "Weekly" && (
-            <div className="space-y-1">
-              <Label className="text-xs">Weekly Salary</Label>
-              <Input type="number" step="0.01" value={formData.weeklySalary} onChange={(e) => updateField("weeklySalary", e.target.value)} data-testid="input-weeklySalary" />
-            </div>
-          )}
-          {formData.payFrequency === "Bi-Weekly" && (
-            <div className="space-y-1">
-              <Label className="text-xs">Bi-Weekly Salary</Label>
-              <Input type="number" step="0.01" value={formData.biWeeklySalary} onChange={(e) => updateField("biWeeklySalary", e.target.value)} data-testid="input-biWeeklySalary" />
-            </div>
-          )}
+          {formData.payFrequency === "Weekly" && <div className="space-y-1"><Label className="text-xs">Weekly Salary</Label><Input type="number" step="0.01" value={formData.weeklySalary} onChange={(e) => updateField("weeklySalary", e.target.value)} data-testid="input-weeklySalary" /></div>}
+          {formData.payFrequency === "Bi-Weekly" && <div className="space-y-1"><Label className="text-xs">Bi-Weekly Salary</Label><Input type="number" step="0.01" value={formData.biWeeklySalary} onChange={(e) => updateField("biWeeklySalary", e.target.value)} data-testid="input-biWeeklySalary" /></div>}
+          {formData.payFrequency === "Hourly" && <div className="space-y-1"><Label className="text-xs">Hourly Rate</Label><Input type="number" step="0.0001" value={formData.hourlyRate} onChange={(e) => updateField("hourlyRate", e.target.value)} data-testid="input-hourlyRate" /></div>}
+          <div className="space-y-1"><Label className="text-xs">Payment Method</Label>
+            <Select value={formData.paymentMethod} onValueChange={(v) => updateField("paymentMethod", v)}>
+              <SelectTrigger data-testid="select-paymentMethod"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank">Bank</SelectItem><SelectItem value="Transfer">Transfer</SelectItem></SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
-
       <div>
         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Documents</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Visa Number</Label>
-            <Input value={formData.visaNumber} onChange={(e) => updateField("visaNumber", e.target.value)} data-testid="input-visaNumber" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Visa Expiry</Label>
-            <Input type="date" value={formData.visaExpiry} onChange={(e) => updateField("visaExpiry", e.target.value)} data-testid="input-visaExpiry" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Work Permit Number</Label>
-            <Input value={formData.workPermitNumber} onChange={(e) => updateField("workPermitNumber", e.target.value)} data-testid="input-workPermitNumber" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Work Permit Expiry</Label>
-            <Input type="date" value={formData.workPermitExpiry} onChange={(e) => updateField("workPermitExpiry", e.target.value)} data-testid="input-workPermitExpiry" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Residential Permit</Label>
-            <Input value={formData.residentialPermit} onChange={(e) => updateField("residentialPermit", e.target.value)} data-testid="input-residentialPermit" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Residential Permit Expiry</Label>
-            <Input type="date" value={formData.residentialPermitExpiry} onChange={(e) => updateField("residentialPermitExpiry", e.target.value)} data-testid="input-residentialPermitExpiry" />
-          </div>
+          <div className="space-y-1"><Label className="text-xs">Visa Number</Label><Input value={formData.visaNumber} onChange={(e) => updateField("visaNumber", e.target.value)} data-testid="input-visaNumber" /></div>
+          <div className="space-y-1"><Label className="text-xs">Visa Expiry</Label><Input type="date" value={formData.visaExpiry} onChange={(e) => updateField("visaExpiry", e.target.value)} data-testid="input-visaExpiry" /></div>
+          <div className="space-y-1"><Label className="text-xs">Work Permit No.</Label><Input value={formData.workPermitNumber} onChange={(e) => updateField("workPermitNumber", e.target.value)} data-testid="input-workPermitNumber" /></div>
+          <div className="space-y-1"><Label className="text-xs">Work Permit Expiry</Label><Input type="date" value={formData.workPermitExpiry} onChange={(e) => updateField("workPermitExpiry", e.target.value)} data-testid="input-workPermitExpiry" /></div>
+          <div className="space-y-1"><Label className="text-xs">Bank Name</Label><Input value={formData.bankName} onChange={(e) => updateField("bankName", e.target.value)} data-testid="input-bankName" /></div>
+          <div className="space-y-1"><Label className="text-xs">Bank Account No.</Label><Input value={formData.bankAccountNumber} onChange={(e) => updateField("bankAccountNumber", e.target.value)} data-testid="input-bankAccountNumber" /></div>
         </div>
       </div>
-
-      <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Financial</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Bank Name</Label>
-            <Input value={formData.bankName} onChange={(e) => updateField("bankName", e.target.value)} data-testid="input-bankName" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Bank Account Number</Label>
-            <Input value={formData.bankAccountNumber} onChange={(e) => updateField("bankAccountNumber", e.target.value)} data-testid="input-bankAccountNumber" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Payment Method</Label>
-            <Select value={formData.paymentMethod} onValueChange={(v) => updateField("paymentMethod", v)}>
-              <SelectTrigger data-testid="select-paymentMethod"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Cash">Cash</SelectItem>
-                <SelectItem value="Bank">Bank</SelectItem>
-                <SelectItem value="Transfer">Transfer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
       <div>
         <h4 className="text-sm font-semibold text-muted-foreground mb-3">Notes</h4>
-        <Textarea
-          value={formData.notes}
-          onChange={(e) => updateField("notes", e.target.value)}
-          rows={3}
-          data-testid="input-notes"
-        />
+        <Textarea value={formData.notes} onChange={(e) => updateField("notes", e.target.value)} rows={3} data-testid="input-notes" />
       </div>
     </div>
   );
 
   if (!companyId) {
-    if (companies && companies.length === 1) {
-      return null;
-    }
+    if (companies && companies.length === 1) return null;
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Workers</h1>
-          <p className="text-muted-foreground mt-1">Select a company to manage workers</p>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label className="text-sm">Select Company</Label>
-              <Select onValueChange={(v) => setCompanyId(Number(v))}>
-                <SelectTrigger data-testid="select-company"><SelectValue placeholder="Choose a company" /></SelectTrigger>
-                <SelectContent>
-                  {companies?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name} ({c.code})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <h1 className="text-2xl font-bold">Factory Workers</h1>
+        <Card><CardContent className="pt-6">
+          <Label className="text-sm mb-2 block">Select Company</Label>
+          <Select onValueChange={(v) => setCompanyId(Number(v))}>
+            <SelectTrigger data-testid="select-company"><SelectValue placeholder="Choose a company" /></SelectTrigger>
+            <SelectContent>{companies?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </CardContent></Card>
       </div>
     );
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+    return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-md" />)}
+    </div>;
   }
 
-  const activeCount = workers?.filter((w) => w.active).length ?? 0;
-  const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
+  const balance = endResult ? parseFloat(endResult.balance) : 0;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Workers</h1>
-          <p className="text-muted-foreground mt-1">
-            {activeCount} active worker{activeCount !== 1 ? "s" : ""}
-            {inactiveCount > 0 && ` / ${inactiveCount} inactive`}
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-title">Workers</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            <span className="font-medium text-foreground">{activeCount}</span> active
+            {inactiveCount > 0 && <span className="ml-2"><span className="font-medium text-foreground">{inactiveCount}</span> inactive</span>}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {companies && companies.length > 1 && (
             <Select value={String(companyId)} onValueChange={(v) => setCompanyId(Number(v))}>
-              <SelectTrigger className="w-48" data-testid="select-company"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {companies?.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger className="w-44" data-testid="select-company"><SelectValue /></SelectTrigger>
+              <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-          <Button
-            variant="outline"
-            onClick={() => window.open(`/api/factory/workers/template.xlsx?companyId=${companyId}`, "_blank")}
-            data-testid="button-download-template"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Template
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+          <Button variant="outline" onClick={() => window.open(`/api/factory/workers/template.xlsx?companyId=${companyId}`, "_blank")} data-testid="button-download-template">
+            <Download className="h-4 w-4 mr-2" />Template
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importLoading}
-            data-testid="button-import-workers"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {importLoading ? "Importing..." : "Import Excel"}
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importLoading} data-testid="button-import-workers">
+            <Upload className="h-4 w-4 mr-2" />{importLoading ? "Importing..." : "Import Excel"}
           </Button>
-          <Button
-            onClick={() => { resetForm(); setCreateOpen(true); }}
-            data-testid="button-add-worker"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Worker
+          <Button onClick={() => { resetForm(); setCreateOpen(true); }} data-testid="button-add-worker">
+            <Plus className="h-4 w-4 mr-2" />Add Worker
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="space-y-1 flex-1 min-w-48">
-              <Label className="text-xs text-muted-foreground">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Name, code, phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {positions.length > 0 && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Position</Label>
-                <Select value={positionFilter} onValueChange={setPositionFilter}>
-                  <SelectTrigger className="w-40" data-testid="select-position-filter"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Positions</SelectItem>
-                    {positions.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {departments.length > 0 && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Department</Label>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger className="w-40" data-testid="select-department-filter"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Departments</SelectItem>
-                    {departments.map((d) => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex gap-3 flex-wrap items-center">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by name, code, position..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" data-testid="input-search" />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {filteredWorkers.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Photo</TableHead>
-                    <TableHead>Employee Code</TableHead>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Salary Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredWorkers.map((worker) => (
-                    <TableRow
-                      key={worker.id}
-                      className={`cursor-pointer ${!worker.active ? "opacity-60" : ""}`}
-                      onClick={() => setLocation(`/factory/workers/${worker.id}`)}
-                      data-testid={`row-worker-${worker.id}`}
+      {filteredWorkers.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground">
+          <Users className="mx-auto h-10 w-10 mb-3 opacity-40" />
+          <p className="font-medium" data-testid="text-empty">No workers found</p>
+          <p className="text-sm mt-1">
+            {searchQuery || statusFilter !== "All" ? "Try adjusting your search or filters" : "Add your first worker to get started"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredWorkers.map((worker) => (
+            <div
+              key={worker.id}
+              className="group cursor-pointer"
+              onClick={() => setLocation(`/factory/workers/${worker.id}`)}
+              data-testid={`card-worker-${worker.id}`}
+            >
+              <Card className="hover-elevate h-full">
+                <CardContent className="p-4 flex flex-col h-full">
+                  <div className="flex items-start justify-between mb-3">
+                    <Avatar className={`h-12 w-12 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
+                      {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
+                      <AvatarFallback className={getAvatarColor(worker.fullName)}>
+                        {getInitials(worker.fullName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Badge
+                      variant={worker.active ? "default" : "secondary"}
+                      className="text-xs no-default-active-elevate"
+                      data-testid={`badge-status-${worker.id}`}
                     >
-                      <TableCell>
-                        <Avatar className="h-8 w-8">
-                          {worker.photoUrl ? (
-                            <AvatarImage src={worker.photoUrl} />
-                          ) : (
-                            <AvatarFallback>{worker.fullName?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                          )}
-                        </Avatar>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-code-${worker.id}`}>
-                        {worker.employeeCode || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-name-${worker.id}`}>
-                        {worker.fullName}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {worker.position || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {worker.department || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">{worker.salaryType}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {worker.active ? (
-                          <Badge variant="default" className="bg-green-600 text-xs" data-testid={`badge-status-${worker.id}`}>Active</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs" data-testid={`badge-status-${worker.id}`}>Inactive</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openEdit(worker)}
-                            data-testid={`button-edit-worker-${worker.id}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          {worker.active && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEndContractWorker(worker)}
-                              data-testid={`button-end-contract-${worker.id}`}
-                            >
-                              <UserX className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold" data-testid="text-empty">No workers found</h3>
-              <p className="text-muted-foreground mt-2">
-                {searchQuery || statusFilter !== "All" || positionFilter !== "All" || departmentFilter !== "All"
-                  ? "Try adjusting your filters"
-                  : "Add your first worker to get started"}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                      {worker.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) { setCreateOpen(false); setEditingWorker(null); resetForm(); } }}>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
+                      {worker.fullName}
+                    </p>
+                    {worker.position && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{worker.position}</p>
+                    )}
+                    {worker.department && (
+                      <p className="text-xs text-muted-foreground">{worker.department}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                    <span className="text-xs text-muted-foreground font-mono" data-testid={`text-code-${worker.id}`}>
+                      {worker.employeeCode || "—"}
+                    </span>
+                    <div
+                      className="flex gap-1 invisible group-hover:visible"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      {worker.active && (
+                        <Button size="icon" variant="ghost" onClick={() => openEndContract(worker)} data-testid={`button-end-contract-${worker.id}`}>
+                          <UserX className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={createOpen || editingWorker !== null} onOpenChange={(open) => { if (!open) { setCreateOpen(false); setEditingWorker(null); resetForm(); } }}>
         <DialogContent className="max-w-2xl" data-testid="dialog-worker-form">
           <DialogHeader>
-            <DialogTitle>{dialogTitle}</DialogTitle>
-            <DialogDescription>
-              {editingWorker ? "Update the worker details below" : "Fill in the worker details below"}
-            </DialogDescription>
+            <DialogTitle>{editingWorker ? "Edit Worker" : "Add Worker"}</DialogTitle>
+            <DialogDescription>{editingWorker ? "Update worker details" : "Fill in the worker details below"}</DialogDescription>
           </DialogHeader>
           {renderWorkerForm()}
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => { setCreateOpen(false); setEditingWorker(null); resetForm(); }}
-              data-testid="button-cancel-worker"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              data-testid="button-submit-worker"
-            >
-              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingWorker ? "Update Worker" : "Add Worker"}
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditingWorker(null); resetForm(); }} data-testid="button-cancel-worker">Cancel</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-worker">
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingWorker ? "Update" : "Add Worker"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -851,24 +516,92 @@ export default function FactoryWorkers() {
       <Dialog open={endContractWorker !== null} onOpenChange={(open) => { if (!open) setEndContractWorker(null); }}>
         <DialogContent data-testid="dialog-end-contract">
           <DialogHeader>
-            <DialogTitle>End Contract</DialogTitle>
+            <DialogTitle>End Contract — {endContractWorker?.fullName}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to end the contract for <strong>{endContractWorker?.fullName}</strong>? This will mark the worker as inactive.
+              {endStep === 1 ? "Set the period to calculate the final settlement." : "Review the settlement and choose how to pay."}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEndContractWorker(null)} data-testid="button-cancel-end-contract">
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => endContractWorker && endContractMutation.mutate(endContractWorker.id)}
-              disabled={endContractMutation.isPending}
-              data-testid="button-confirm-end-contract"
-            >
-              {endContractMutation.isPending ? "Ending..." : "End Contract"}
-            </Button>
-          </DialogFooter>
+
+          {endStep === 1 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Period Start</Label>
+                  <Input type="date" value={endStart} onChange={(e) => setEndStart(e.target.value)} data-testid="input-end-start" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Period End</Label>
+                  <Input type="date" value={endEnd} onChange={(e) => setEndEnd(e.target.value)} data-testid="input-end-end" />
+                </div>
+              </div>
+              <Button onClick={handleCalculate} disabled={endCalculating || !endStart || !endEnd} className="w-full" data-testid="button-calculate-settlement">
+                <Calculator className="h-4 w-4 mr-2" />
+                {endCalculating ? "Calculating..." : "Calculate Settlement"}
+              </Button>
+            </div>
+          )}
+
+          {endStep === 2 && endResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Earned</p>
+                  <p className="font-semibold text-sm" data-testid="text-settlement-earned">${parseFloat(endResult.earned).toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Already Paid</p>
+                  <p className="font-semibold text-sm" data-testid="text-settlement-paid">${parseFloat(endResult.paid).toFixed(2)}</p>
+                </div>
+                <div className={`rounded-md border p-3 text-center ${balance > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20" : "border-green-300 bg-green-50 dark:bg-green-900/20"}`}>
+                  <p className="text-xs text-muted-foreground mb-1">Balance Owed</p>
+                  <p className="font-semibold text-sm" data-testid="text-settlement-balance">${balance.toFixed(2)}</p>
+                </div>
+              </div>
+
+              {balance > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Cash Account (for Pay Now)</Label>
+                  <Select value={endCashAccountId} onValueChange={setEndCashAccountId}>
+                    <SelectTrigger data-testid="select-end-cash-account"><SelectValue placeholder="Select account..." /></SelectTrigger>
+                    <SelectContent>
+                      {cashAccounts?.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="icon" onClick={() => { setEndStep(1); setEndResult(null); }} data-testid="button-back-step">
+                  <X className="h-4 w-4" />
+                </Button>
+                {balance > 0 ? (
+                  <>
+                    <Button
+                      className="flex-1"
+                      onClick={() => handleEndContract(true)}
+                      disabled={endSubmitting || !endCashAccountId}
+                      data-testid="button-pay-now"
+                    >
+                      {endSubmitting ? "Processing..." : `Pay Now $${balance.toFixed(2)}`}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleEndContract(false)}
+                      disabled={endSubmitting}
+                      data-testid="button-pay-later"
+                    >
+                      Pay Later — End Contract
+                    </Button>
+                  </>
+                ) : (
+                  <Button className="flex-1" onClick={() => handleEndContract(false)} disabled={endSubmitting} data-testid="button-end-contract-confirm">
+                    {endSubmitting ? "Processing..." : "End Contract"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
