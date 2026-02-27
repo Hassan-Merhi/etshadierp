@@ -830,9 +830,14 @@
     const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
     const [designPickerOpen, setDesignPickerOpen] = useState(false);
     const [pendingPrintLabels, setPendingPrintLabels] = useState<LabelData[] | null>(null);
+    const [printWorkerBale, setPrintWorkerBale] = useState<any | null>(null);
+    const [printWorkerIdSelected, setPrintWorkerIdSelected] = useState<string>("");
+    const [assigningWorker, setAssigningWorker] = useState(false);
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
+
+    const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
 
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
@@ -860,6 +865,59 @@
         const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
         if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
         else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      }
+    };
+
+    const printSingleBale = async (bale: any) => {
+      try {
+        const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", {
+          bales: [{
+            productionBaleId: bale.id,
+            productId: bale.productId,
+            articleCode: bale.articleCode || "",
+            pieces: 1,
+            approxWeightKg: bale.weightKg || "0",
+          }],
+        });
+        if (!labelResponse.ok) throw new Error("Failed to create label");
+        const { labelPrints } = await labelResponse.json();
+        const labels: LabelData[] = labelPrints.map((lp: any) => ({
+          referenceNumber: lp.referenceNumber,
+          articleCode: lp.articleCode || bale.articleCode || "",
+          pieces: lp.pieces || 1,
+          approxWeightKg: lp.approxWeightKg || bale.weightKg || "0",
+          productName: bale.productName || "",
+        }));
+        if (isZebraMode()) {
+          try {
+            await printRawZpl(buildZplBatch(labels, true));
+            toast({ title: "Label sent to Zebra printer" });
+          } catch (err: any) {
+            openBrowserPrint(labels);
+          }
+        } else {
+          openBrowserPrint(labels);
+        }
+      } catch (error: any) {
+        toast({ title: "Print Error", description: error.message, variant: "destructive" });
+      }
+    };
+
+    const handlePrintWithWorker = async () => {
+      if (!printWorkerBale) return;
+      setAssigningWorker(true);
+      try {
+        if (printWorkerIdSelected) {
+          await modeApiRequest("PATCH", `/api/factory/bales/${printWorkerBale.id}/assign-worker`, { workerId: parseInt(printWorkerIdSelected) });
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
+        }
+        setPrintWorkerBale(null);
+        setPrintWorkerIdSelected("");
+        await printSingleBale(printWorkerBale);
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+      } finally {
+        setAssigningWorker(false);
       }
     };
 

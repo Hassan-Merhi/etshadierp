@@ -3836,6 +3836,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.patch("/api/factory/bales/:id/assign-worker", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const { workerId } = req.body;
+      if (!workerId) return res.status(400).json({ message: "workerId is required" });
+      const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+      if (!bale) return res.status(404).json({ message: "Bale not found" });
+      const [updated] = await db.update(factoryBales).set({ finalizedBy: parseInt(workerId), updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error assigning worker to bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bales/:id/repack", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
