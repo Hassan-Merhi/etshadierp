@@ -39,6 +39,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  DollarSign,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -395,7 +396,21 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${!isFactoryMode ? "lg:grid-cols-3" : ""} gap-3 sm:gap-4`}>
+        {!isFactoryMode && (
+          <KPICard
+            title="Total Income"
+            value={
+              isLoading
+                ? "Loading..."
+                : formatAmount(profitData?.totalIncome || 0)
+            }
+            change="From all income accounts"
+            changeType="positive"
+            icon={DollarSign}
+            data-testid="kpi-total-income"
+          />
+        )}
         <KPICard
           title="Net Position"
           value={
@@ -436,9 +451,11 @@ export default function Dashboard() {
       <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium">Net Position Breakdown</h3>
-          <Button size="icon" variant="outline" onClick={() => setLocation("/net-profit-details")} data-testid="button-net-position-detail">
-            <ExternalLink className="h-4 w-4" />
-          </Button>
+          {isFactoryMode && (
+            <Button size="icon" variant="outline" onClick={() => setLocation("/net-profit-details")} data-testid="button-net-position-detail">
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
@@ -564,6 +581,356 @@ export default function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Bottom Row - ERP only */}
+      {!isFactoryMode && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
+          {/* Available Cash */}
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <ArrowDownLeft className="h-5 w-5 text-green-600" />
+                Available
+              </h3>
+
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" data-testid="button-add-cash-account">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </DialogTrigger>
+
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Cash Account to Dashboard</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Account
+                      </label>
+
+                      <Popover
+                        open={cashComboboxOpen}
+                        onOpenChange={setCashComboboxOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={cashComboboxOpen}
+                            className="w-full justify-between"
+                            data-testid="select-account"
+                          >
+                            {selectedAccountId > 0
+                              ? availableCashAccounts.find(
+                                  (acc) => acc.accountId === selectedAccountId,
+                                )?.name || "Select account..."
+                              : "Search accounts..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search accounts..." />
+                            <CommandList>
+                              <CommandEmpty>No account found.</CommandEmpty>
+                              <CommandGroup>
+                                {availableCashAccounts.map((account) => (
+                                  <CommandItem
+                                    key={account.id}
+                                    value={account.name}
+                                    onSelect={() => {
+                                      setSelectedAccountId(account.accountId);
+                                      setCashComboboxOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedAccountId === account.accountId
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    {account.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        if (selectedAccountId > 0) {
+                          const account = allAccounts.find(
+                            (a) => a.accountId === selectedAccountId,
+                          );
+                          addAccountMutation.mutate({
+                            accountType: account?.type.toLowerCase() || "ledger",
+                            accountId: selectedAccountId,
+                          });
+                        }
+                      }}
+                      disabled={
+                        selectedAccountId === 0 || addAccountMutation.isPending
+                      }
+                      className="w-full"
+                      data-testid="button-save-cash-account"
+                    >
+                      {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {displayedCashAccounts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No accounts added</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {displayedCashAccounts.map((dca) => {
+                  const balance = parseFloat(
+                    String(
+                      dca.account.balance || dca.account.currentBalance || 0,
+                    ),
+                  );
+                  return (
+                    <div
+                      key={dca.id}
+                      className="flex items-center justify-between py-2 px-3 rounded hover-elevate group"
+                      data-testid={`cash-account-row-${dca.id}`}
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{dca.account.name}</p>
+                      </div>
+
+                      <div className="text-right">
+                        <p
+                          className="text-sm font-bold font-mono text-green-600"
+                          data-testid={`text-balance-${dca.id}`}
+                        >
+                          {formatAmount(balance)}
+                        </p>
+                      </div>
+
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="ml-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeAccountMutation.mutate(dca.id)}
+                        data-testid={`button-remove-cash-account-${dca.id}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+
+                {displayedCashAccounts.length > 0 && (
+                  <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-green-50 dark:bg-green-950/30 rounded font-bold">
+                    <span>Total</span>
+                    <span
+                      className="text-green-600 font-mono"
+                      data-testid="text-total-available"
+                    >
+                      {formatAmount(
+                        displayedCashAccounts.reduce((sum, dca) => {
+                          const balance = parseFloat(
+                            String(
+                              dca.account.balance ||
+                                dca.account.currentBalance ||
+                                0,
+                            ),
+                          );
+                          return sum + balance;
+                        }, 0),
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* To Pay */}
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <ArrowUpRight className="h-5 w-5 text-red-600" />
+                To Pay
+              </h3>
+
+              <Dialog
+                open={isAddPayableDialogOpen}
+                onOpenChange={setIsAddPayableDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" data-testid="button-add-payable-account">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </DialogTrigger>
+
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Payable Account to Dashboard</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Supplier
+                      </label>
+
+                      <Popover
+                        open={payableComboboxOpen}
+                        onOpenChange={setPayableComboboxOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={payableComboboxOpen}
+                            className="w-full justify-between"
+                            data-testid="select-payable-account"
+                          >
+                            {selectedPayableAccountId > 0
+                              ? availablePayableAccounts.find(
+                                  (acc) =>
+                                    acc.accountId === selectedPayableAccountId,
+                                )?.name || "Select account..."
+                              : "Search accounts..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search accounts..." />
+                            <CommandList>
+                              <CommandEmpty>No account found.</CommandEmpty>
+                              <CommandGroup>
+                                {availablePayableAccounts.map((account) => (
+                                  <CommandItem
+                                    key={account.accountId}
+                                    value={account.name}
+                                    onSelect={() => {
+                                      setSelectedPayableAccountId(
+                                        account.accountId,
+                                      );
+                                      setPayableComboboxOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedPayableAccountId ===
+                                          account.accountId
+                                          ? "opacity-100"
+                                          : "opacity-0",
+                                      )}
+                                    />
+                                    {account.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        if (selectedPayableAccountId > 0) {
+                          addPayableAccountMutation.mutate({
+                            accountId: selectedPayableAccountId,
+                          });
+                        }
+                      }}
+                      disabled={
+                        selectedPayableAccountId === 0 ||
+                        addPayableAccountMutation.isPending
+                      }
+                      className="w-full"
+                      data-testid="button-save-payable-account"
+                    >
+                      {addPayableAccountMutation.isPending
+                        ? "Adding..."
+                        : "Add Account"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {displayedPayableAccounts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No payable accounts</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {displayedPayableAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between py-2 px-3 rounded hover-elevate group"
+                    data-testid={`payable-account-row-${account.id}`}
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{account.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="text-sm font-bold font-mono text-red-600"
+                        data-testid={`text-payable-${account.id}`}
+                      >
+                        {formatAmount(Math.abs(account.balance))}
+                      </p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="ml-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() =>
+                        removePayableAccountMutation.mutate(account.id)
+                      }
+                      data-testid={`button-remove-payable-account-${account.id}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                {displayedPayableAccounts.length > 0 && (
+                  <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-red-50 dark:bg-red-950/30 rounded font-bold">
+                    <span>Total</span>
+                    <span
+                      className="text-red-600 font-mono"
+                      data-testid="text-total-payable"
+                    >
+                      {formatAmount(
+                        displayedPayableAccounts.reduce(
+                          (sum, acc) => sum + Math.abs(acc.balance),
+                          0,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* Factory Production KPIs */}
       {isFactoryMode && (
