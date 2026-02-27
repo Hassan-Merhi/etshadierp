@@ -281,9 +281,9 @@ export default function FactoryDaybook() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Entries</TableHead>
-                      <TableHead className="text-right">Total (USD)</TableHead>
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead className="w-20 text-right">Entries</TableHead>
+                      <TableHead className="w-36 text-right">Total (USD)</TableHead>
                       <TableHead>Types</TableHead>
                     </TableRow>
                   </TableHeader>
