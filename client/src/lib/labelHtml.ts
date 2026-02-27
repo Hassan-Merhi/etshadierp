@@ -103,11 +103,11 @@ const detailBlockCss = `
 
 export type A4DesignColor = "purple" | "green" | "gold" | "white";
 
-export const A4_DESIGN_OPTIONS: { value: A4DesignColor; label: string; color: string }[] = [
-  { value: "purple", label: "Purple (#1)", color: "#5B21B6" },
-  { value: "green", label: "Green (#2)", color: "#047857" },
-  { value: "gold", label: "Gold (#3)", color: "#B8860B" },
-  { value: "white", label: "White (#4)", color: "#F5F5F5" },
+export const A4_DESIGN_OPTIONS: { value: A4DesignColor; label: string; color: string; previewUrl: string }[] = [
+  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/hmd-purple.jpg" },
+  { value: "green", label: "Green (#2)", color: "#047857", previewUrl: "/labels/hmd-green.jpg" },
+  { value: "gold", label: "Gold (#3)", color: "#B8860B", previewUrl: "/labels/hmd-gold.jpg" },
+  { value: "white", label: "White (#4)", color: "#F5F5F5", previewUrl: "/labels/hmd-white.jpg" },
 ];
 
 function getDesignBannerUrl(design: A4DesignColor): string {
@@ -125,7 +125,7 @@ export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4
     const bannerUrl = designColor ? getDesignBannerUrl(designColor) : getHeaderImage(label.articleCode);
     const hasBanner = designColor || isBrandUrl(bannerUrl);
     const gapContent = hasBanner
-      ? `<div class="a4-preprint-gap"><img class="a4-banner-img header-banner-img" src="${bannerUrl}" alt="HMD" /></div>`
+      ? `<div class="a4-preprint-gap"><img class="a4-banner-img" src="${bannerUrl}" alt="HMD" /></div>`
       : `<div class="a4-preprint-gap"></div>`;
 
     labelsHtml += `
@@ -177,8 +177,8 @@ ${detailBlockCss}
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
-      .header-banner-img { filter: none; }
+      img:not(.header-banner-img):not(.a4-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img, .a4-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -241,8 +241,8 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a5-name-right-text, .a5-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img:not(.header-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
-      .header-banner-img { filter: none; }
+      img:not(.header-banner-img):not(.a4-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      .header-banner-img, .a4-banner-img { filter: none; }
     }
   </style></head><body><div class="print-note">A5 Bale Labels (preprinted paper). Select A5 paper, Portrait, 100% scale. Set BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }

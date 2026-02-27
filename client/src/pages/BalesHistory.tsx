@@ -675,9 +675,10 @@ export default function BalesHistory() {
                   }
                 }}
               >
-                <div
-                  className="w-full h-12 rounded-md border"
-                  style={{ backgroundColor: opt.color }}
+                <img
+                  src={opt.previewUrl}
+                  className="w-full h-16 rounded-md object-cover"
+                  alt={opt.label}
                 />
                 <span className="text-sm font-medium">{opt.label}</span>
               </button>
