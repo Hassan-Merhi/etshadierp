@@ -575,6 +575,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
+                    {user?.role === "Admin" && <Route path="/net-profit-details" component={NetProfitDetails} />}
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                 </div>
