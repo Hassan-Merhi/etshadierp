@@ -1613,10 +1613,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
             const code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
 
-            const [existing] = await db
+            let [existing] = await db
               .select()
               .from(factoryBaleProducts)
               .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
+
+            if (!existing) {
+              [existing] = await db
+                .select()
+                .from(factoryBaleProducts)
+                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, code)));
+            }
 
             if (existing) {
               await db
