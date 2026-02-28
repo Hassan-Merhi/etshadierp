@@ -1629,6 +1629,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                   updatedAt: new Date(),
                 })
                 .where(eq(factoryBaleProducts.id, existing.id));
+              await db
+                .update(factoryBales)
+                .set({ productName: name, updatedAt: new Date() })
+                .where(eq(factoryBales.productId, existing.id));
               updated++;
             } else {
               await db.insert(factoryBaleProducts).values({
