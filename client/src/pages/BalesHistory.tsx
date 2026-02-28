@@ -70,6 +70,11 @@ export default function BalesHistory() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hiddenCost = myAccess?.hiddenCostFields ?? [];
+
   const { data: balesData, isLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/bales"],
   });
@@ -488,7 +493,7 @@ export default function BalesHistory() {
                     <TableHead>Article</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right">Cost/kg</TableHead>
+                    {!hiddenCost.includes("bales_list_cost_per_kg") && <TableHead className="text-right">Cost/kg</TableHead>}
                     <TableHead>Status</TableHead>
                     <TableHead>Last Printed</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -540,7 +545,7 @@ export default function BalesHistory() {
                         <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
                         <TableCell className="text-right">{bale.quantity}</TableCell>
                         <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">{formatLabelNum(bale.costPerKg)}</TableCell>
+                        {!hiddenCost.includes("bales_list_cost_per_kg") && <TableCell className="text-right font-mono text-muted-foreground">{formatLabelNum(bale.costPerKg)}</TableCell>}
                         <TableCell>
                           <Select
                             value={bale.status}

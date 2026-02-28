@@ -6519,6 +6519,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           displayName: profile?.displayName || null,
           hasErpAccess: profile?.hasErpAccess ?? true,
           hasFactoryAccess: profile?.hasFactoryAccess ?? true,
+          hiddenCostFields: profile?.hiddenCostFields ?? [],
           pageAccess: accessMap.get(u.id) || [],
         };
       });
@@ -6610,7 +6611,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }
 
       const { userId } = req.params;
-      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, username } = req.body;
+      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, hiddenCostFields, username } = req.body;
 
       await db.transaction(async (tx: any) => {
         const userUpdates: any = {};
@@ -6632,6 +6633,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         if (displayName !== undefined) profileUpdates.displayName = displayName;
         if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
         if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
+        if (Array.isArray(hiddenCostFields)) profileUpdates.hiddenCostFields = hiddenCostFields;
 
         const existingProfile = await tx.select()
           .from(factoryUserProfiles)
@@ -6648,6 +6650,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             displayName: displayName || "User",
             hasErpAccess: hasErpAccess ?? true,
             hasFactoryAccess: hasFactoryAccess ?? true,
+            hiddenCostFields: Array.isArray(hiddenCostFields) ? hiddenCostFields : [],
           });
         }
 
@@ -6709,25 +6712,27 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner") {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [] });
       }
 
       const [profile] = await db.select({
         hasErpAccess: factoryUserProfiles.hasErpAccess,
         hasFactoryAccess: factoryUserProfiles.hasFactoryAccess,
+        hiddenCostFields: factoryUserProfiles.hiddenCostFields,
       })
         .from(factoryUserProfiles)
         .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
 
       const hasErpAccess = profile ? profile.hasErpAccess : true;
       const hasFactoryAccess = profile ? profile.hasFactoryAccess : true;
+      const hiddenCostFields = profile?.hiddenCostFields ?? [];
 
       const access = await db.select({ pageKey: factoryUserPageAccess.pageKey })
         .from(factoryUserPageAccess)
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
       if (access.length === 0) {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields });
       }
 
       res.json({
@@ -6735,6 +6740,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         pageKeys: access.map((a: any) => a.pageKey),
         hasErpAccess,
         hasFactoryAccess,
+        hiddenCostFields,
       });
     } catch (error: any) {
       console.error("Error fetching my access:", error);

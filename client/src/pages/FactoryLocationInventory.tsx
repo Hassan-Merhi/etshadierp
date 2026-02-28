@@ -135,6 +135,11 @@ export default function FactoryLocationInventory() {
     queryKey: ["/api/locations"],
   });
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hiddenCost = myAccess?.hiddenCostFields ?? [];
+
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: selectedLocation
       ? [`/api/factory/location-inventory/${selectedLocation.id}`]
@@ -995,7 +1000,9 @@ export default function FactoryLocationInventory() {
   const totalBales = filteredProducts.reduce((s, p) => s + p.baleCount, 0);
   const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
-  const colSpanAll = isAllItems ? (proformaMode ? 11 : 8) : (proformaMode ? 10 : 7);
+  const hideAvgRate = hiddenCost.includes("inventory_avg_rate");
+  const hideTotalValue = hiddenCost.includes("inventory_total_value");
+  const colSpanAll = (isAllItems ? (proformaMode ? 11 : 8) : (proformaMode ? 10 : 7)) - (hideAvgRate ? 1 : 0) - (hideTotalValue ? 1 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
@@ -1128,8 +1135,8 @@ export default function FactoryLocationInventory() {
                       <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                      <div className="text-right"><span className="text-muted-foreground">Avg Rate: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>
-                      <div className="col-span-2 text-right"><span className="text-muted-foreground">Total Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>
+                      {!hideAvgRate && <div className="text-right"><span className="text-muted-foreground">Avg Rate: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
+                      {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Total Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>}
                     </div>
                     {proformaMode && isSelected && selection && (
                       <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
@@ -1163,7 +1170,7 @@ export default function FactoryLocationInventory() {
                   <span>Total ({filteredProducts.length} products, {totalBales.toLocaleString()} bales)</span>
                   <span className="font-mono">{fmt(totalKg)} KG</span>
                 </div>
-                <div className="text-right text-sm font-mono font-bold mt-1">{formatAmount(totalCost)}</div>
+                {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">{formatAmount(totalCost)}</div>}
               </Card>
             </>
           )}
@@ -1194,8 +1201,8 @@ export default function FactoryLocationInventory() {
                 {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                 {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                 <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                <th className="text-right px-3 font-medium">Avg Rate</th>
-                <th className="text-right px-3 font-medium">Total Value</th>
+                {!hideAvgRate && <th className="text-right px-3 font-medium">Avg Rate</th>}
+                {!hideTotalValue && <th className="text-right px-3 font-medium">Total Value</th>}
                 <th className="text-right px-3 font-medium">Total KG</th>
               </tr>
             </thead>
@@ -1268,8 +1275,8 @@ export default function FactoryLocationInventory() {
                           </td>
                         )}
                         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                        <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>
-                        <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>
+                        {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                        {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                         <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                       </tr>
                     );
@@ -1281,8 +1288,8 @@ export default function FactoryLocationInventory() {
                     {proformaMode && <td></td>}
                     {proformaMode && <td></td>}
                     <td className="text-right px-3 font-mono"></td>
-                    <td className="text-right px-3 font-mono"></td>
-                    <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>
+                    {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
+                    {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
                     <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
                   </tr>
                 </>

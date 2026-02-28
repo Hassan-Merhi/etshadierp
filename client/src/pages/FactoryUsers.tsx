@@ -37,9 +37,18 @@ interface FactoryUser {
   pageAccess: string[];
   hasErpAccess: boolean;
   hasFactoryAccess: boolean;
+  hiddenCostFields: string[];
   createdAt: string;
   role?: string;
 }
+
+const COST_FIELDS: { key: string; label: string }[] = [
+  { key: "inventory_avg_rate", label: "Location Inventory: Avg Rate" },
+  { key: "inventory_total_value", label: "Location Inventory: Total Value" },
+  { key: "bale_history_cost_per_kg", label: "Bale History: Cost/KG" },
+  { key: "bale_history_total_cost", label: "Bale History: Total Cost" },
+  { key: "bales_list_cost_per_kg", label: "Bales List: Cost/kg" },
+];
 
 const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
   { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
@@ -86,6 +95,7 @@ export default function FactoryUsers() {
     hasFactoryAccess: true,
   });
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [hiddenCostFields, setHiddenCostFields] = useState<string[]>([]);
   const { toast } = useToast();
 
   const { data: factoryUsers, isLoading } = useQuery<FactoryUser[]>({
@@ -93,7 +103,7 @@ export default function FactoryUsers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean }) => {
+    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; hiddenCostFields: string[] }) => {
       const res = await factoryApiRequest("POST", "/api/factory/users", data);
       if (!res.ok) {
         const err = await res.json();
@@ -135,6 +145,7 @@ export default function FactoryUsers() {
   const resetForm = () => {
     setFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
     setSelectedPages(new Set());
+    setHiddenCostFields([]);
   };
 
   const openEdit = (user: FactoryUser) => {
@@ -147,6 +158,13 @@ export default function FactoryUsers() {
       hasFactoryAccess: user.hasFactoryAccess ?? true,
     });
     setSelectedPages(new Set(user.pageAccess));
+    setHiddenCostFields(user.hiddenCostFields ?? []);
+  };
+
+  const toggleCostField = (key: string) => {
+    setHiddenCostFields(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
   };
 
   const isAdminOrOwner = (user: FactoryUser) => {
@@ -203,6 +221,7 @@ export default function FactoryUsers() {
           password: formData.password || undefined,
           hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
           hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
+          hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
         },
       });
     } else {
@@ -213,6 +232,7 @@ export default function FactoryUsers() {
         pageAccess: Array.from(selectedPages),
         hasErpAccess: formData.hasErpAccess,
         hasFactoryAccess: formData.hasFactoryAccess,
+        hiddenCostFields,
       });
     }
   };
@@ -531,6 +551,29 @@ export default function FactoryUsers() {
                 </p>
               )}
             </div>
+
+            {!(editingUser && isAdminOrOwner(editingUser)) && (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-base font-semibold">Cost Pricing Visibility</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Toggle off to hide cost pricing fields from this user. On = visible, Off = hidden.
+                  </p>
+                </div>
+                <div className="border rounded-md divide-y">
+                  {COST_FIELDS.map(field => (
+                    <div key={field.key} className="flex items-center justify-between px-4 py-3">
+                      <span className="text-sm">{field.label}</span>
+                      <Switch
+                        checked={!hiddenCostFields.includes(field.key)}
+                        onCheckedChange={() => toggleCostField(field.key)}
+                        data-testid={`switch-cost-field-${field.key}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

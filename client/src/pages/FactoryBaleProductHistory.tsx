@@ -85,6 +85,11 @@ export default function FactoryBaleProductHistory() {
 
   useEscapeBack(() => navigate("/factory/location-inventory"));
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hiddenCost = myAccess?.hiddenCostFields ?? [];
+
   const { data, isLoading } = useQuery<BaleProductHistoryResponse>({
     queryKey: ["/api/factory/bale-product-history", productId, locationId, { year: selectedYear }],
     queryFn: async () => {
@@ -198,7 +203,7 @@ export default function FactoryBaleProductHistory() {
                   <TableHead>Month</TableHead>
                   <TableHead className="text-right">Bales</TableHead>
                   <TableHead className="text-right">Total KG</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
+                  {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Total Cost</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,11 +231,13 @@ export default function FactoryBaleProductHistory() {
                           ? formatNumber(month.totalWeight)
                           : ""}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {month.totalCost > 0
-                          ? formatAmount(month.totalCost)
-                          : ""}
-                      </TableCell>
+                      {!hiddenCost.includes("bale_history_total_cost") && (
+                        <TableCell className="text-right font-mono">
+                          {month.totalCost > 0
+                            ? formatAmount(month.totalCost)
+                            : ""}
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -252,12 +259,14 @@ export default function FactoryBaleProductHistory() {
                   >
                     {formatNumber(data?.grandTotal.totalWeight || 0)}
                   </TableCell>
-                  <TableCell
-                    className="text-right font-mono"
-                    data-testid="text-total-cost"
-                  >
-                    {formatAmount(data?.grandTotal.totalCost || 0)}
-                  </TableCell>
+                  {!hiddenCost.includes("bale_history_total_cost") && (
+                    <TableCell
+                      className="text-right font-mono"
+                      data-testid="text-total-cost"
+                    >
+                      {formatAmount(data?.grandTotal.totalCost || 0)}
+                    </TableCell>
+                  )}
                 </TableRow>
               </TableBody>
             </Table>
@@ -295,14 +304,16 @@ export default function FactoryBaleProductHistory() {
                           : "-"}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-muted-foreground">Total Cost</div>
-                      <div className="font-mono">
-                        {month.totalCost > 0
-                          ? formatAmount(month.totalCost)
-                          : "-"}
+                    {!hiddenCost.includes("bale_history_total_cost") && (
+                      <div>
+                        <div className="text-muted-foreground">Total Cost</div>
+                        <div className="font-mono">
+                          {month.totalCost > 0
+                            ? formatAmount(month.totalCost)
+                            : "-"}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -331,14 +342,16 @@ export default function FactoryBaleProductHistory() {
                       {formatNumber(data.grandTotal.totalWeight)}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-muted-foreground font-normal">
-                      Total Cost
+                  {!hiddenCost.includes("bale_history_total_cost") && (
+                    <div>
+                      <div className="text-muted-foreground font-normal">
+                        Total Cost
+                      </div>
+                      <div className="font-mono">
+                        {formatAmount(data.grandTotal.totalCost)}
+                      </div>
                     </div>
-                    <div className="font-mono">
-                      {formatAmount(data.grandTotal.totalCost)}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -396,6 +409,11 @@ export function FactoryBaleProductMonthDetail() {
   const backPath = `/factory/bale-product-history/${productId}/${locationId}`;
 
   useEscapeBack(() => navigate(backPath));
+
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+  });
+  const hiddenCost = myAccess?.hiddenCostFields ?? [];
 
   const { data, isLoading } = useQuery<BaleDetail[]>({
     queryKey: [
@@ -507,8 +525,8 @@ export function FactoryBaleProductMonthDetail() {
                   <TableHead>Bale Code</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead className="text-right">Weight (KG)</TableHead>
-                  <TableHead className="text-right">Cost/KG</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
+                  {!hiddenCost.includes("bale_history_cost_per_kg") && <TableHead className="text-right">Cost/KG</TableHead>}
+                  {!hiddenCost.includes("bale_history_total_cost") && <TableHead className="text-right">Total Cost</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead>Date/Time</TableHead>
                 </TableRow>
@@ -531,18 +549,22 @@ export function FactoryBaleProductMonthDetail() {
                     >
                       {formatNumber(bale.weightKg)}
                     </TableCell>
-                    <TableCell
-                      className="text-right font-mono"
-                      data-testid={`text-cost-per-kg-${bale.id}`}
-                    >
-                      {formatAmount(bale.costPerKg)}
-                    </TableCell>
-                    <TableCell
-                      className="text-right font-mono"
-                      data-testid={`text-total-cost-${bale.id}`}
-                    >
-                      {formatAmount(bale.totalCost)}
-                    </TableCell>
+                    {!hiddenCost.includes("bale_history_cost_per_kg") && (
+                      <TableCell
+                        className="text-right font-mono"
+                        data-testid={`text-cost-per-kg-${bale.id}`}
+                      >
+                        {formatAmount(bale.costPerKg)}
+                      </TableCell>
+                    )}
+                    {!hiddenCost.includes("bale_history_total_cost") && (
+                      <TableCell
+                        className="text-right font-mono"
+                        data-testid={`text-total-cost-${bale.id}`}
+                      >
+                        {formatAmount(bale.totalCost)}
+                      </TableCell>
+                    )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
                       <Badge variant="secondary">{bale.status}</Badge>
                     </TableCell>
@@ -595,14 +617,18 @@ export function FactoryBaleProductMonthDetail() {
                     <div className="text-muted-foreground">Weight</div>
                     <div className="font-mono">{formatNumber(bale.weightKg)} KG</div>
                   </div>
-                  <div>
-                    <div className="text-muted-foreground">Cost/KG</div>
-                    <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Total</div>
-                    <div className="font-mono">{formatAmount(bale.totalCost)}</div>
-                  </div>
+                  {!hiddenCost.includes("bale_history_cost_per_kg") && (
+                    <div>
+                      <div className="text-muted-foreground">Cost/KG</div>
+                      <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
+                    </div>
+                  )}
+                  {!hiddenCost.includes("bale_history_total_cost") && (
+                    <div>
+                      <div className="text-muted-foreground">Total</div>
+                      <div className="font-mono">{formatAmount(bale.totalCost)}</div>
+                    </div>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-2">
                   {formatDateTime(bale.createdAt)}
