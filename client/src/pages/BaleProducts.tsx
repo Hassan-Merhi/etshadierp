@@ -163,11 +163,42 @@ export default function BaleProducts() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
-      const parts = [];
-      if (result.created) parts.push(`${result.created} created`);
-      if (result.updated) parts.push(`${result.updated} updated`);
-      if (result.categoriesCreated) parts.push(`${result.categoriesCreated} categories auto-created`);
-      toast({ title: "Import Complete", description: parts.join(", ") || `${result.count} products processed` });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"], exact: false });
+
+      const cols = result.detectedColumns || {};
+      const detectedInfo = [
+        cols.articleCode ? `Article Code: "${cols.articleCode}"` : null,
+        cols.productionPrice ? `Cost Price: "${cols.productionPrice}"` : null,
+        cols.sellingPrice ? `Sell Price: "${cols.sellingPrice}"` : null,
+      ].filter(Boolean).join(", ");
+
+      const noPriceColsFound = !cols.productionPrice && !cols.sellingPrice;
+      const allSkipped = result.skippedNoArticleCode > 0 && (result.created + result.updated) === 0;
+
+      if (allSkipped || !cols.articleCode) {
+        toast({
+          title: "Import Warning",
+          description: `No products were matched — article code column not found. Your file must have a column named "Article Code". Columns seen: ${Object.keys(result.detectedColumns || {}).filter(k => result.detectedColumns[k]).map((k: string) => `"${result.detectedColumns[k]}"`).join(", ") || "none detected"}`,
+          variant: "destructive",
+        });
+      } else if (noPriceColsFound) {
+        toast({
+          title: "Import Complete — No Prices Updated",
+          description: `${result.updated || 0} updated, ${result.created || 0} created. Column detected: ${detectedInfo}. No price columns found — add "Production Price" and/or "Selling Price" columns to your file.`,
+          variant: "destructive",
+        });
+      } else {
+        const parts = [];
+        if (result.created) parts.push(`${result.created} created`);
+        if (result.updated) parts.push(`${result.updated} updated`);
+        if (result.pricesUpdated) parts.push(`${result.pricesUpdated} with prices`);
+        if (result.categoriesCreated) parts.push(`${result.categoriesCreated} categories auto-created`);
+        toast({
+          title: "Import Complete",
+          description: (parts.join(", ") || "0 products processed") + (detectedInfo ? ` | Columns: ${detectedInfo}` : ""),
+        });
+      }
+
       setImportDialogOpen(false);
       setImportPreview([]);
       setImportFile(null);

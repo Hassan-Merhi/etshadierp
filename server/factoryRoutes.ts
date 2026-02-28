@@ -1727,6 +1727,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           let created = 0;
           let updated = 0;
           let categoriesCreated = 0;
+          let pricesUpdated = 0;
+          let skippedNoArticleCode = 0;
+
+          // Detect column names from the first row for feedback
+          const firstRow = rows[0] || {};
+          const detectedArticleCodeCol = Object.keys(firstRow).find(k => ["articlecode", "article_code", "article code", "barcode"].includes(k.toLowerCase())) || null;
+          const detectedProductionPriceCol = Object.keys(firstRow).find(k => ["production price", "productionprice", "production_price", "cost price", "costprice", "cost_price"].includes(k.toLowerCase())) || null;
+          const detectedSellingPriceCol = Object.keys(firstRow).find(k => ["selling price", "sellingprice", "selling_price"].includes(k.toLowerCase())) || null;
 
           const categoryCache = new Map<string, number>();
           const existingCategories = await db
@@ -1739,7 +1747,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           for (const row of rows) {
             const articleCode = String(row.articleCode || row.article_code || row.ArticleCode || row["Article Code"] || "").trim();
-            if (!articleCode) continue;
+            if (!articleCode) { skippedNoArticleCode++; continue; }
 
             const name = String(row.name || row.Name || row.productName || row["Product Name"] || articleCode).trim();
             const description = String(row.description || row.Description || "").trim() || null;
@@ -1782,6 +1790,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, code)));
             }
 
+            const hasPriceData = (productionPrice !== null && parseFloat(productionPrice) > 0) || (sellingPrice !== null && parseFloat(sellingPrice) > 0);
+
             if (existing) {
               await db
                 .update(factoryBaleProducts)
@@ -1800,6 +1810,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 .set({ productName: name, updatedAt: new Date() })
                 .where(eq(factoryBales.productId, existing.id));
               updated++;
+              if (hasPriceData) pricesUpdated++;
             } else {
               await db.insert(factoryBaleProducts).values({
                 companyId,
@@ -1813,10 +1824,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 ...(productionPrice !== null ? { productionPrice } : {}),
               });
               created++;
+              if (hasPriceData) pricesUpdated++;
             }
           }
 
-          res.json({ created, updated, categoriesCreated });
+          res.json({
+            created,
+            updated,
+            categoriesCreated,
+            pricesUpdated,
+            skippedNoArticleCode,
+            detectedColumns: {
+              articleCode: detectedArticleCodeCol,
+              productionPrice: detectedProductionPriceCol,
+              sellingPrice: detectedSellingPriceCol,
+            },
+          });
         } catch (innerError: any) {
           console.error("Error processing Excel import:", innerError);
           res.status(500).json({ message: innerError.message });
