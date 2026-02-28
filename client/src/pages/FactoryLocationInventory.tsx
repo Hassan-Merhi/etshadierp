@@ -1095,7 +1095,7 @@ export default function FactoryLocationInventory() {
           ) : (
             <>
               {filteredProducts.map((prod) => {
-                const avgRate = prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0;
+                const avgRate = (prod as any).productionPrice ?? (prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0);
                 const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                 const isSelected = selections.has(prod.productId);
                 const selection = selections.get(prod.productId);
@@ -1207,7 +1207,7 @@ export default function FactoryLocationInventory() {
               ) : (
                 <>
                   {filteredProducts.map((prod) => {
-                    const avgRate = prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0;
+                    const avgRate = (prod as any).productionPrice ?? (prod.baleCount > 0 ? prod.totalCost / prod.baleCount : 0);
                     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                     const isSelected = selections.has(prod.productId);
                     const selection = selections.get(prod.productId);

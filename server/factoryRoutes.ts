@@ -692,6 +692,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
       const productCategoryIdMap = new Map(products.map(p => [p.id, p.categoryId || null]));
       const productSellingPriceMap = new Map(products.map(p => [p.id, p.sellingPrice || "0"]));
+      const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
 
       const grouped = new Map<number, {
         productId: number;
@@ -704,6 +705,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalCost: number;
         baleCount: number;
         sellingPrice: string;
+        productionPrice: number;
       }>();
 
       for (const b of bales) {
@@ -711,11 +713,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const existing = grouped.get(pid);
         const qty = parseFloat(String(b.quantity || "1"));
         const weight = parseFloat(String(b.weightKg || "0"));
-        const cost = parseFloat(String(b.totalCost || "0"));
+        const productionPrice = productProductionPriceMap.get(pid) || 0;
         if (existing) {
           existing.quantity += qty;
           existing.totalWeight += weight;
-          existing.totalCost += cost;
+          existing.totalCost += productionPrice;
           existing.baleCount += 1;
         } else {
           grouped.set(pid, {
@@ -726,9 +728,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             categoryId: productCategoryIdMap.get(pid) || null,
             quantity: qty,
             totalWeight: weight,
-            totalCost: cost,
+            totalCost: productionPrice,
             baleCount: 1,
             sellingPrice: productSellingPriceMap.get(pid) || "0",
+            productionPrice,
           });
         }
       }
