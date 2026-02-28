@@ -66,7 +66,7 @@ export default function BaleProducts() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "" });
+  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "" });
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -82,6 +82,8 @@ export default function BaleProducts() {
         categoryId: editingProduct.categoryId ? String(editingProduct.categoryId) : "",
         description: editingProduct.description || "",
         grade: "",
+        productionPrice: editingProduct.productionPrice && parseFloat(editingProduct.productionPrice) > 0 ? String(parseFloat(editingProduct.productionPrice)) : "",
+        sellingPrice: editingProduct.sellingPrice && parseFloat(editingProduct.sellingPrice) > 0 ? String(parseFloat(editingProduct.sellingPrice)) : "",
       });
     }
   }, [editingProduct]);
@@ -233,6 +235,8 @@ export default function BaleProducts() {
       weightPerBaleKg: editForm.weightPerBaleKg ? parseFloat(editForm.weightPerBaleKg) : null,
       categoryId: editForm.categoryId ? parseInt(editForm.categoryId) : null,
       description: editForm.description.trim(),
+      productionPrice: editForm.productionPrice,
+      sellingPrice: editForm.sellingPrice,
     });
   };
 
@@ -756,6 +760,34 @@ export default function BaleProducts() {
                 onChange={(e) => setEditForm({ ...editForm, weightPerBaleKg: e.target.value })}
                 data-testid="input-edit-product-weight"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-productionPrice">Cost Price</Label>
+                <Input
+                  id="edit-productionPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={editForm.productionPrice}
+                  onChange={(e) => setEditForm({ ...editForm, productionPrice: e.target.value })}
+                  data-testid="input-edit-product-production-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sellingPrice">Sell Price</Label>
+                <Input
+                  id="edit-sellingPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={editForm.sellingPrice}
+                  onChange={(e) => setEditForm({ ...editForm, sellingPrice: e.target.value })}
+                  data-testid="input-edit-product-selling-price"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Category</Label>

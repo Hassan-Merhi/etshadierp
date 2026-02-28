@@ -1458,7 +1458,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const { name, weightPerBaleKg, articleCode, description, categoryId } = req.body;
+      const { name, weightPerBaleKg, articleCode, description, categoryId, productionPrice, sellingPrice } = req.body;
 
       const [existing] = await db
         .select()
@@ -1473,6 +1473,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (articleCode !== undefined) productUpdate.articleCode = articleCode;
       if (description !== undefined) productUpdate.description = description;
       if (categoryId !== undefined) productUpdate.categoryId = categoryId;
+      if (productionPrice !== undefined && productionPrice !== "") productUpdate.productionPrice = String(parseFloat(productionPrice) || 0);
+      if (sellingPrice !== undefined && sellingPrice !== "") productUpdate.sellingPrice = String(parseFloat(sellingPrice) || 0);
 
       const [updatedProduct] = await db
         .update(factoryBaleProducts)
