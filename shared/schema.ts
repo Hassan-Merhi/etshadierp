@@ -2209,6 +2209,7 @@ export const factoryBaleProducts = pgTable("factory_bale_products", {
   weightPerBaleKg: decimal("weight_per_bale_kg", { precision: 10, scale: 2 }),
   categoryId: integer("category_id"),
   sellingPrice: decimal("selling_price", { precision: 20, scale: 2 }).default("0"),
+  productionPrice: decimal("production_price", { precision: 20, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2229,6 +2230,7 @@ export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProd
   description: z.string().optional().nullable(),
   weightPerBaleKg: z.string().optional().nullable(),
   sellingPrice: z.string().optional().nullable(),
+  productionPrice: z.string().optional().nullable(),
   categoryId: z.number().optional().nullable(),
   active: z.boolean().optional(),
 });

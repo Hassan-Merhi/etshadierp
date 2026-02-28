@@ -1592,8 +1592,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
             const name = String(row.name || row.Name || row.productName || row["Product Name"] || articleCode).trim();
             const description = String(row.description || row.Description || "").trim() || null;
-            const weightPerBaleKg = row.weightPerBaleKg || row.weight_per_bale_kg || row.WeightPerBaleKg || row["Weight Per Bale"] || null;
+            const weightPerBaleKg = row.weightPerBaleKg || row.weight_per_bale_kg || row.WeightPerBaleKg || row["Weight Per Bale"] || row.weight || null;
             const categoryName = String(row.category || row.Category || row.categoryName || "").trim();
+
+            const rawSellingPrice = row["selling price"] ?? row["sellingPrice"] ?? row["selling_price"] ?? row["Selling Price"] ?? row["SELLING PRICE"] ?? null;
+            const sellingPrice = rawSellingPrice !== null && rawSellingPrice !== "" ? String(parseFloat(String(rawSellingPrice)) || 0) : null;
+
+            const rawProductionPrice = row["production price"] ?? row["productionPrice"] ?? row["production_price"] ?? row["Production Price"] ?? row["PRODUCTION PRICE"] ?? row["cost price"] ?? row["costPrice"] ?? row["cost_price"] ?? row["Cost Price"] ?? null;
+            const productionPrice = rawProductionPrice !== null && rawProductionPrice !== "" ? String(parseFloat(String(rawProductionPrice)) || 0) : null;
 
             let categoryId: number | null = null;
             if (categoryName) {
@@ -1633,6 +1639,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                   description,
                   weightPerBaleKg: weightPerBaleKg ? String(weightPerBaleKg) : existing.weightPerBaleKg,
                   categoryId: categoryId || existing.categoryId,
+                  ...(sellingPrice !== null ? { sellingPrice } : {}),
+                  ...(productionPrice !== null ? { productionPrice } : {}),
                   updatedAt: new Date(),
                 })
                 .where(eq(factoryBaleProducts.id, existing.id));
@@ -1650,6 +1658,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 description,
                 weightPerBaleKg: weightPerBaleKg ? String(weightPerBaleKg) : null,
                 categoryId,
+                ...(sellingPrice !== null ? { sellingPrice } : {}),
+                ...(productionPrice !== null ? { productionPrice } : {}),
               });
               created++;
             }

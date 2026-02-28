@@ -267,16 +267,18 @@ export default function BaleProducts() {
           articleCode: "HMD01000",
           name: "Sample Product 1",
           category: "Category A",
-          description: "Optional description",
-          weightPerBaleKg: "45",
+          "production price": "100.00",
+          "selling price": "120.00",
+          weight: "45",
           active: true,
         },
         {
           articleCode: "HMD02000",
           name: "Sample Product 2",
           category: "Category B",
-          description: "",
-          weightPerBaleKg: "50",
+          "production price": "80.00",
+          "selling price": "100.00",
+          weight: "50",
           active: true,
         },
       ];
@@ -285,8 +287,9 @@ export default function BaleProducts() {
         { wch: 15 },
         { wch: 25 },
         { wch: 20 },
-        { wch: 30 },
         { wch: 18 },
+        { wch: 18 },
+        { wch: 10 },
         { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
