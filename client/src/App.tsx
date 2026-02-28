@@ -106,6 +106,7 @@ import CustomerInvoiceCreate from "@/pages/CustomerInvoiceCreate";
 import CustomerInvoices from "@/pages/CustomerInvoices";
 import CustomerInvoiceDetail from "@/pages/CustomerInvoiceDetail";
 import ContainerLoadingScan from "@/pages/ContainerLoadingScan";
+import PendingLoadings from "@/pages/PendingLoadings";
 import PendingInvoices from "@/pages/PendingInvoices";
 import PendingInvoiceVerify from "@/pages/PendingInvoiceVerify";
 import FactoryDashboardIntel from "@/pages/FactoryDashboard";
@@ -566,6 +567,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/analytics" component={Analytics} />
                     <Route path="/factory/production-summary" component={ProductionSummary} />
                     <Route path="/factory/sales/new" component={CustomerInvoiceCreate} />
+                    <Route path="/factory/sales/loading/pending" component={PendingLoadings} />
                     <Route path="/factory/sales/loading/new" component={ContainerLoadingScan} />
                     <Route path="/factory/sales/pending-invoices/:id/verify" component={PendingInvoiceVerify} />
                     <Route path="/factory/sales/pending-invoices" component={PendingInvoices} />
