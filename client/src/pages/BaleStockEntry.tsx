@@ -2,7 +2,7 @@
   import { useQuery, useMutation } from "@tanstack/react-query";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList
+    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download
   } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -833,11 +833,41 @@
     const [printWorkerBale, setPrintWorkerBale] = useState<any | null>(null);
     const [printWorkerIdSelected, setPrintWorkerIdSelected] = useState<string>("");
     const [assigningWorker, setAssigningWorker] = useState(false);
+    const [importingNames, setImportingNames] = useState(false);
+    const namesFileRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
 
     const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+
+    const bulkUpdateNamesMutation = useMutation({
+      mutationFn: async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/factory/bales/bulk-update-names", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || "Upload failed");
+        }
+        return res.json();
+      },
+      onSuccess: (data) => {
+        toast({
+          title: "Names updated",
+          description: `Updated ${data.updated} bale${data.updated !== 1 ? "s" : ""}, skipped ${data.skipped}.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      },
+      onError: (err: Error) => {
+        toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      },
+      onSettled: () => setImportingNames(false),
+    });
 
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
@@ -1096,6 +1126,42 @@
                 <LayoutList className="h-4 w-4" />
               </Button>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/api/factory/bales/export-names.xlsx", "_blank")}
+              data-testid="button-export-bale-names"
+              title="Download all bales as Excel to edit product names"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Export Names
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => namesFileRef.current?.click()}
+              disabled={bulkUpdateNamesMutation.isPending || importingNames}
+              data-testid="button-import-bale-names"
+              title="Upload edited Excel to update product names"
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              {bulkUpdateNamesMutation.isPending ? "Importing..." : "Import Names"}
+            </Button>
+            <input
+              ref={namesFileRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setImportingNames(true);
+                  bulkUpdateNamesMutation.mutate(file);
+                  e.target.value = "";
+                }
+              }}
+              data-testid="input-import-bale-names"
+            />
             {filteredBales && filteredBales.length > 0 && (
               <>
                 <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">Select All</Button>
