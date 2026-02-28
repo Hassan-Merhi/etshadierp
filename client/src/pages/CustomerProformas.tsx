@@ -10,10 +10,11 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download } from "lucide-react";
 
 interface ProformaLine {
   id: number;
@@ -22,6 +23,7 @@ interface ProformaLine {
   productName: string;
   quantity: number;
   pricePerBale: string;
+  weightPerBaleKg?: string | null;
 }
 
 interface Proforma {
@@ -45,6 +47,7 @@ export default function CustomerProformas() {
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const [, navigate] = useLocation();
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [expandedProformaId, setExpandedProformaId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -306,21 +309,52 @@ export default function CustomerProformas() {
 
                   {isExpanded && (
                     <div className="mt-4">
-                      <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                         <span className="text-sm font-medium text-muted-foreground">Price Lines</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setAddLineProformaId(proforma.id);
-                            setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
-                            setIsAddLineOpen(true);
-                          }}
-                          data-testid={`button-add-line-${proforma.id}`}
-                        >
-                          <Plus className="mr-1 h-3 w-3" />
-                          Add Line
-                        </Button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigate(`/factory/location-inventory?editProformaId=${proforma.id}&editProformaName=${encodeURIComponent(proforma.name)}&editCustomerId=${proforma.customerId}`);
+                            }}
+                            data-testid={`button-edit-in-inventory-${proforma.id}`}
+                          >
+                            <LayoutGrid className="mr-1 h-3 w-3" />
+                            Edit in Inventory
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")}
+                            data-testid={`button-export-excel-${proforma.id}`}
+                          >
+                            <Download className="mr-1 h-3 w-3" />
+                            Excel
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank")}
+                            data-testid={`button-export-pdf-${proforma.id}`}
+                          >
+                            <Download className="mr-1 h-3 w-3" />
+                            PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setAddLineProformaId(proforma.id);
+                              setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+                              setIsAddLineOpen(true);
+                            }}
+                            data-testid={`button-add-line-${proforma.id}`}
+                          >
+                            <Plus className="mr-1 h-3 w-3" />
+                            Add Line
+                          </Button>
+                        </div>
                       </div>
 
                       {proforma.lines && proforma.lines.length > 0 ? (
@@ -386,6 +420,27 @@ export default function CustomerProformas() {
                               ))}
                             </TableBody>
                           </Table>
+                          {(() => {
+                            const totalQty = proforma.lines.reduce((s, l) => s + l.quantity, 0);
+                            const totalWeight = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0);
+                            const totalAmount = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0);
+                            return (
+                              <div className="flex items-center gap-4 mt-3 pt-3 border-t flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">Total Bales:</span>
+                                  <span className="text-sm font-semibold" data-testid={`text-total-qty-${proforma.id}`}>{totalQty.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">Total Weight:</span>
+                                  <span className="text-sm font-semibold" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">Total Amount:</span>
+                                  <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground text-center py-4" data-testid={`text-no-lines-${proforma.id}`}>

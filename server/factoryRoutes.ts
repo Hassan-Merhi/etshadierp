@@ -62,6 +62,7 @@ import {
   insertDirectMessageSchema,
   factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
+  companySettings,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -5007,9 +5008,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
       }
 
+      // Enrich lines with weightPerBaleKg from factoryBaleProducts
+      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      let weightMap = new Map<string, string>();
+      if (articleCodes.length > 0) {
+        const baleProds = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        baleProds.forEach((p: any) => { if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0"); });
+      }
+
+      const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+
       const result = proformas.map((p: any) => ({
         ...p,
-        lines: lines.filter((l: any) => l.proformaId === p.id),
+        lines: enrichedLines.filter((l: any) => l.proformaId === p.id),
       }));
 
       res.json(result);
@@ -5177,6 +5190,46 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      const { lines } = req.body;
+      if (!Array.isArray(lines) || lines.length === 0) {
+        return res.status(400).json({ message: "At least one line is required" });
+      }
+
+      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      if (validLines.length === 0) {
+        return res.status(400).json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        await tx.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+        const lineValues = validLines.map((l: any) => ({
+          proformaId: id,
+          articleCode: l.articleCode,
+          productName: l.productName,
+          quantity: parseInt(l.quantity),
+          pricePerBale: String(l.pricePerBale || "0"),
+        }));
+        const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
+        return { ...proforma, lines: insertedLines };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error replacing proforma lines:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -5187,50 +5240,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
-      const lines = await db.select().from(customerProformaLines)
+      const rawLines = await db.select().from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, id));
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+
+      // Fetch weight per bale from factoryBaleProducts by articleCode
+      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const wMap = new Map<string, number>();
+      if (articleCodes.length > 0) {
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
+      }
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Proforma");
+      const sheet = workbook.addWorksheet("Proforma Invoice");
 
+      const COL_COUNT = 8;
       sheet.columns = [
-        { header: "#", key: "num", width: 6 },
-        { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 30 },
-        { header: "Quantity", key: "quantity", width: 12 },
-        { header: "Price/Bale", key: "pricePerBale", width: 15 },
-        { header: "Total", key: "total", width: 18 },
+        { key: "num", width: 6 },
+        { key: "articleCode", width: 18 },
+        { key: "productName", width: 32 },
+        { key: "qty", width: 12 },
+        { key: "kgPerBale", width: 13 },
+        { key: "pricePerBale", width: 14 },
+        { key: "totalKg", width: 13 },
+        { key: "totalPrice", width: 15 },
       ];
 
-      const headerRow = sheet.getRow(1);
-      headerRow.font = { bold: true };
+      const companyName = (company as any)?.legalName || "Company";
+      const r1 = sheet.addRow([companyName]);
+      r1.getCell(1).font = { bold: true, size: 16 };
+      r1.getCell(1).alignment = { horizontal: "center" };
+      sheet.mergeCells(r1.number, 1, r1.number, COL_COUNT);
+
+      const r2 = sheet.addRow([`Customer: ${customer?.legalName || "N/A"}`]);
+      r2.getCell(1).font = { size: 11 };
+      sheet.mergeCells(r2.number, 1, r2.number, COL_COUNT);
+
+      const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+      const r3 = sheet.addRow([`Date: ${dateStr}`]);
+      r3.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+      sheet.mergeCells(r3.number, 1, r3.number, COL_COUNT);
+
+      const r4 = sheet.addRow([`Proforma: ${proforma.name}`]);
+      r4.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+      sheet.mergeCells(r4.number, 1, r4.number, COL_COUNT);
 
       sheet.addRow([]);
-      sheet.addRow(["Customer:", customer?.legalName || "N/A"]);
-      sheet.addRow(["Proforma:", proforma.name]);
-      sheet.addRow(["Date:", new Date().toLocaleDateString()]);
-      sheet.addRow([]);
 
-      let grandTotal = 0;
-      lines.forEach((line, idx) => {
-        const lineTotal = parseInt(String(line.quantity)) * parseFloat(String(line.pricePerBale));
-        grandTotal += lineTotal;
-        sheet.addRow({
-          num: idx + 1,
-          articleCode: line.articleCode,
-          productName: line.productName,
-          quantity: line.quantity,
-          pricePerBale: parseFloat(String(line.pricePerBale)),
-          total: lineTotal,
-        });
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product Name", "Qty (Bales)", "Kg / Bale", "Price / Bale", "Total KG", "Total Price"]);
+      hdrRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+        cell.alignment = { horizontal: "center" };
+      });
+
+      let totalQty = 0, totalKgAll = 0, totalPriceAll = 0;
+      rawLines.forEach((line: any, idx: number) => {
+        const qty = parseInt(String(line.quantity));
+        const kgPerBale = wMap.get(line.articleCode) || 0;
+        const price = parseFloat(String(line.pricePerBale));
+        const totalKg = qty * kgPerBale;
+        const totalPrice = qty * price;
+        totalQty += qty;
+        totalKgAll += totalKg;
+        totalPriceAll += totalPrice;
+
+        const dr = sheet.addRow([idx + 1, line.articleCode, line.productName, qty, parseFloat(kgPerBale.toFixed(2)), parseFloat(price.toFixed(2)), parseFloat(totalKg.toFixed(2)), parseFloat(totalPrice.toFixed(2))]);
+        dr.getCell(4).alignment = { horizontal: "right" };
+        dr.getCell(5).alignment = { horizontal: "right" };
+        dr.getCell(6).alignment = { horizontal: "right" };
+        dr.getCell(7).alignment = { horizontal: "right" };
+        dr.getCell(8).alignment = { horizontal: "right" };
+        if (idx % 2 === 1) {
+          dr.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } }; });
+        }
       });
 
       sheet.addRow([]);
-      const totalRow = sheet.addRow(["", "", "GRAND TOTAL", lines.reduce((s, l) => s + l.quantity, 0), "", grandTotal]);
-      totalRow.font = { bold: true };
+      const totRow = sheet.addRow(["", "", "GRAND TOTAL", totalQty, "", "", parseFloat(totalKgAll.toFixed(2)), parseFloat(totalPriceAll.toFixed(2))]);
+      totRow.eachCell((cell) => { cell.font = { bold: true }; });
+      totRow.getCell(4).alignment = { horizontal: "right" };
+      totRow.getCell(7).alignment = { horizontal: "right" };
+      totRow.getCell(8).alignment = { horizontal: "right" };
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
@@ -5252,63 +5350,127 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
-      const lines = await db.select().from(customerProformaLines)
+      const rawLines = await db.select().from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, id));
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+
+      // Fetch weight per bale from factoryBaleProducts by articleCode
+      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const wMap = new Map<string, number>();
+      if (articleCodes.length > 0) {
+        const prods = await db.select({ articleCode: factoryBaleProducts.articleCode, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
+        prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
+      }
 
       const PDFDocument = (await import("pdfkit")).default;
-      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      const fs = await import("fs");
 
+      const companyName = (company as any)?.legalName || "Company";
+      const logoUrl: string | null = (settings as any)?.logoUrl || null;
+
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
 
-      doc.fontSize(18).font("Helvetica-Bold").text("PROFORMA INVOICE", { align: "center" });
-      doc.moveDown(0.5);
-      doc.fontSize(10).font("Helvetica");
-      doc.text(`Customer: ${customer?.legalName || "N/A"}`);
-      doc.text(`Proforma: ${proforma.name}`);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`);
+      // ── Header ──
+      let headerY = 40;
+      let logoWidth = 0;
+
+      // Attempt to embed logo if it's a local file path
+      if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
+        try {
+          doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] });
+          logoWidth = 90;
+        } catch {}
+      }
+
+      doc.fontSize(20).font("Helvetica-Bold")
+        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
+      doc.fontSize(10).font("Helvetica").fillColor("#555555")
+        .text("PROFORMA INVOICE", 40 + logoWidth, headerY + 24, { width: 515 - logoWidth });
+
+      const headerBottom = Math.max(doc.y, headerY + 56);
+      doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // ── Meta info ──
+      const metaY = headerBottom + 12;
+      const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+      doc.fillColor("#000000").fontSize(10).font("Helvetica");
+      doc.text(`Customer:`, 40, metaY, { continued: true }).font("Helvetica-Bold").text(` ${customer?.legalName || "N/A"}`);
+      doc.font("Helvetica").text(`Proforma:`, 40, doc.y + 2, { continued: true }).font("Helvetica-Bold").text(` ${proforma.name}`);
+      doc.font("Helvetica").text(`Date:`, 40, doc.y + 2, { continued: true }).font("Helvetica-Bold").text(` ${dateStr}`);
+
       doc.moveDown(1);
 
-      const tableTop = doc.y;
-      const colX = [40, 80, 160, 360, 430, 500];
-      const colHeaders = ["#", "Article Code", "Product Name", "Qty", "Price/Bale", "Total"];
+      // ── Table ──
+      // Columns: # | Article Code | Product Name | Qty | Kg/Bale | Price/Bale | Total KG | Total Price
+      // x positions (left edge), total usable width = 515 (40..555)
+      const colX  = [40,  62,  132, 310, 355, 403, 455, 508];
+      const colW  = [22,  70,  178,  45,  48,  52,  53,  47];
+      const colHdr= ["#","Code","Product Name","Qty","Kg/Bale","Pr/Bale","Total KG","Total Price"];
+      const colAlign: Array<"left"|"right"> = ["right","left","left","right","right","right","right","right"];
 
-      doc.font("Helvetica-Bold").fontSize(9);
-      colHeaders.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: (colX[i + 1] || 560) - colX[i] }));
-      doc.moveTo(40, tableTop + 14).lineTo(560, tableTop + 14).stroke();
+      const tableTop = doc.y + 4;
 
-      doc.font("Helvetica").fontSize(9);
-      let y = tableTop + 20;
-      let grandTotal = 0;
+      // Header row background
+      doc.rect(40, tableTop, 515, 14).fill("#1F3864");
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+      colHdr.forEach((h, i) => {
+        doc.text(h, colX[i] + 2, tableTop + 3, { width: colW[i] - 4, align: colAlign[i] });
+      });
 
-      lines.forEach((line, idx) => {
-        const lineTotal = line.quantity * parseFloat(String(line.pricePerBale));
-        grandTotal += lineTotal;
+      doc.fillColor("#000000").font("Helvetica").fontSize(8);
+      let y = tableTop + 16;
+      let totalQty = 0, totalKgAll = 0, totalPriceAll = 0;
 
-        if (y > 750) {
+      rawLines.forEach((line: any, idx: number) => {
+        const qty = parseInt(String(line.quantity));
+        const kgPerBale = wMap.get(line.articleCode) || 0;
+        const price = parseFloat(String(line.pricePerBale));
+        const totalKg = qty * kgPerBale;
+        const totalPrice = qty * price;
+        totalQty += qty;
+        totalKgAll += totalKg;
+        totalPriceAll += totalPrice;
+
+        if (y > 770) {
           doc.addPage();
           y = 40;
         }
 
-        doc.text(String(idx + 1), colX[0], y, { width: colX[1] - colX[0] });
-        doc.text(line.articleCode, colX[1], y, { width: colX[2] - colX[1] });
-        doc.text(line.productName, colX[2], y, { width: colX[3] - colX[2] });
-        doc.text(String(line.quantity), colX[3], y, { width: colX[4] - colX[3] });
-        doc.text(parseFloat(String(line.pricePerBale)).toFixed(2), colX[4], y, { width: colX[5] - colX[4] });
-        doc.text(lineTotal.toFixed(2), colX[5], y, { width: 560 - colX[5] });
-        y += 16;
+        const rowH = 14;
+        if (idx % 2 === 1) {
+          doc.rect(40, y, 515, rowH).fill("#F8F8F8");
+          doc.fillColor("#000000");
+        }
+
+        const vals = [String(idx + 1), line.articleCode, line.productName, String(qty), kgPerBale.toFixed(2), price.toFixed(2), totalKg.toFixed(2), totalPrice.toFixed(2)];
+        vals.forEach((v, i) => {
+          doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i] });
+        });
+        y += rowH;
       });
 
-      y += 4;
-      doc.moveTo(40, y).lineTo(560, y).stroke();
-      y += 8;
-      doc.font("Helvetica-Bold");
-      doc.text("GRAND TOTAL", colX[2], y);
-      doc.text(String(lines.reduce((s, l) => s + l.quantity, 0)), colX[3], y, { width: colX[4] - colX[3] });
-      doc.text(grandTotal.toFixed(2), colX[5], y, { width: 560 - colX[5] });
+      // Separator line
+      y += 2;
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      y += 6;
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // Grand total row
+      doc.rect(40, y, 515, 16).fill("#EFF3FB");
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
+      const totVals = ["", "", "GRAND TOTAL", String(totalQty), "", "", totalKgAll.toFixed(2), totalPriceAll.toFixed(2)];
+      totVals.forEach((v, i) => {
+        if (v) doc.text(v, colX[i] + 2, y + 4, { width: colW[i] - 4, align: colAlign[i] });
+      });
 
       doc.end();
     } catch (error: any) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -129,6 +129,11 @@ export default function FactoryLocationInventory() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [savedProformaId, setSavedProformaId] = useState<number | null>(null);
 
+  // Edit-mode state (deep-link from CustomerProformas "Edit in Inventory")
+  const [editingProformaId, setEditingProformaId] = useState<number | null>(null);
+  const [editProformaLines, setEditProformaLines] = useState<Array<{ articleCode: string; quantity: number; pricePerBale: string }>>([]);
+  const [editModeInitialized, setEditModeInitialized] = useState(false);
+
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -186,6 +191,73 @@ export default function FactoryLocationInventory() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const replaceLinesMutation = useMutation({
+    mutationFn: async (data: { id: number; lines: any[] }) => {
+      const res = await modeApiRequest("PUT", `/api/factory/customer-proformas/${data.id}/replace-lines`, { lines: data.lines });
+      return await res.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ title: "Proforma updated", description: "Lines saved successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      setSavedProformaId(result.id);
+      setTimeout(() => navigate("/factory/sales/proformas"), 800);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // On mount: read URL params for edit-mode deep-link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get("editProformaId");
+    const editName = params.get("editProformaName");
+    const editCustId = params.get("editCustomerId");
+    if (editId && editName && editCustId) {
+      const proformaId = parseInt(editId);
+      setEditingProformaId(proformaId);
+      setProformaName(decodeURIComponent(editName));
+      setSelectedCustomerId(editCustId);
+      setProformaMode(true);
+      // Fetch existing proforma lines to pre-populate inventory selections
+      fetch(`/api/factory/customer-proformas?customerId=${editCustId}`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((proformas: any[]) => {
+          const found = proformas.find((p: any) => p.id === proformaId);
+          if (found?.lines?.length) {
+            setEditProformaLines(found.lines.map((l: any) => ({
+              articleCode: l.articleCode,
+              quantity: l.quantity,
+              pricePerBale: l.pricePerBale,
+            })));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // When inventory loads in edit mode, pre-populate selections from existing proforma lines
+  useEffect(() => {
+    if (!editingProformaId || editProformaLines.length === 0 || inventoryData.length === 0 || editModeInitialized) return;
+    const lineMap = new Map(editProformaLines.map((l) => [l.articleCode, l]));
+    const newSelections = new Map<number, ProformaSelection>();
+    (inventoryData as any[]).forEach((prod: any) => {
+      const line = lineMap.get(prod.articleCode);
+      if (line) {
+        newSelections.set(prod.productId, {
+          productId: prod.productId,
+          articleCode: prod.articleCode,
+          productName: prod.productName,
+          availableBales: prod.baleCount,
+          selectedQty: Math.min(line.quantity, prod.baleCount),
+          pricePerBale: line.pricePerBale,
+        });
+      }
+    });
+    if (newSelections.size > 0) setSelections(newSelections);
+    setEditModeInitialized(true);
+  }, [editingProformaId, editProformaLines, inventoryData, editModeInitialized]);
 
   const categoryGroups: CategoryGroup[] = inventoryData.reduce((groups, item) => {
     const catId = item.categoryId || 0;
@@ -436,12 +508,16 @@ export default function FactoryLocationInventory() {
       quantity: item.selectedQty,
       pricePerBale: item.pricePerBale,
     }));
-    bulkCreateMutation.mutate({
-      customerId: parseInt(selectedCustomerId),
-      name: proformaName.trim(),
-      isActive: false,
-      lines,
-    });
+    if (editingProformaId) {
+      replaceLinesMutation.mutate({ id: editingProformaId, lines });
+    } else {
+      bulkCreateMutation.mutate({
+        customerId: parseInt(selectedCustomerId),
+        name: proformaName.trim(),
+        isActive: false,
+        lines,
+      });
+    }
   };
 
   const handleExportExcel = () => {
@@ -640,11 +716,11 @@ export default function FactoryLocationInventory() {
               </Button>
               <Button
                 onClick={handleSaveProforma}
-                disabled={!selectedCustomerId || !proformaName.trim() || selectedItems.length === 0 || bulkCreateMutation.isPending}
+                disabled={!selectedCustomerId || !proformaName.trim() || selectedItems.length === 0 || bulkCreateMutation.isPending || replaceLinesMutation.isPending}
                 data-testid="button-save-proforma"
               >
                 <FileText className="h-4 w-4 mr-1" />
-                {bulkCreateMutation.isPending ? "Saving..." : "Save Proforma"}
+                {(bulkCreateMutation.isPending || replaceLinesMutation.isPending) ? "Saving..." : editingProformaId ? "Update Proforma" : "Save Proforma"}
               </Button>
             </div>
           </div>
@@ -1046,6 +1122,13 @@ export default function FactoryLocationInventory() {
 
       {proformaMode && (
         <div className="mb-4 flex items-center gap-2 flex-wrap">
+          {editingProformaId && (
+            <div className="w-full flex items-center gap-2 mb-1 p-2 rounded-md bg-primary/10 border border-primary/20">
+              <FileText className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-sm font-medium text-primary">Editing proforma: <span className="font-bold">{proformaName}</span></span>
+              <span className="text-xs text-muted-foreground ml-1">— Select items from inventory and click Update Proforma to save changes</span>
+            </div>
+          )}
           <Button variant="outline" size="sm" onClick={selectAllVisible} data-testid="button-select-all">
             <Check className="h-4 w-4 mr-1" /> Select All
           </Button>
@@ -1330,8 +1413,13 @@ export default function FactoryLocationInventory() {
                 {formatAmount(grandTotal)} total
               </span>
             </div>
-            <Button onClick={handleFinalize} data-testid="button-finalize-proforma-bar">
-              <FileText className="h-4 w-4 mr-1" /> Finalize Proforma
+            <Button
+              onClick={editingProformaId ? handleSaveProforma : handleFinalize}
+              disabled={(bulkCreateMutation.isPending || replaceLinesMutation.isPending) && !!editingProformaId}
+              data-testid="button-finalize-proforma-bar"
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              {editingProformaId ? "Update Proforma" : "Finalize Proforma"}
             </Button>
           </div>
         </div>
