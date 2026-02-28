@@ -248,14 +248,15 @@ export default function BaleProducts() {
     try {
       const XLSX = await import("xlsx");
       const exportData = activeProducts.map((p) => ({
-        Barcode: p.articleCode || "",
+        "Article Code": p.articleCode || "",
         Name: p.name || "",
         Category: p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
-        "Weight (kg/bale)": p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
+        "Weight Per Bale": p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
         "Production Price": p.productionPrice ? parseFloat(p.productionPrice) : 0,
+        "Selling Price": p.sellingPrice ? parseFloat(p.sellingPrice) : 0,
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 16 }];
+      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       XLSX.writeFile(wb, "bale_products_export.xlsx");
@@ -269,22 +270,20 @@ export default function BaleProducts() {
       const XLSX = await import("xlsx");
       const templateData = [
         {
-          articleCode: "HMD01000",
-          name: "Sample Product 1",
-          category: "Category A",
-          "production price": "100.00",
-          "selling price": "120.00",
-          weight: "45",
-          active: true,
+          "Article Code": "HMD01000",
+          Name: "Sample Product 1",
+          Category: "Category A",
+          "Weight Per Bale": "45",
+          "Production Price": "100.00",
+          "Selling Price": "120.00",
         },
         {
-          articleCode: "HMD02000",
-          name: "Sample Product 2",
-          category: "Category B",
-          "production price": "80.00",
-          "selling price": "100.00",
-          weight: "50",
-          active: true,
+          "Article Code": "HMD02000",
+          Name: "Sample Product 2",
+          Category: "Category B",
+          "Weight Per Bale": "50",
+          "Production Price": "80.00",
+          "Selling Price": "100.00",
         },
       ];
       const ws = XLSX.utils.json_to_sheet(templateData);
@@ -292,10 +291,9 @@ export default function BaleProducts() {
         { wch: 15 },
         { wch: 25 },
         { wch: 20 },
+        { wch: 16 },
         { wch: 18 },
         { wch: 18 },
-        { wch: 10 },
-        { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
