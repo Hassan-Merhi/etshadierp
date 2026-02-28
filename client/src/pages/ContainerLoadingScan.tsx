@@ -380,7 +380,7 @@ export default function ContainerLoadingScan() {
                   value={scanCode}
                   onChange={(e) => setScanCode(e.target.value)}
                   onKeyDown={handleScan}
-                  placeholder="Scan or type bale code..."
+                  placeholder="Scan barcode, ref number, or article code…"
                   disabled={!orderId || !selectedLocationId || addBaleMutation.isPending}
                   className={`text-lg h-12 font-mono ${scanInputClass}`}
                   autoFocus
