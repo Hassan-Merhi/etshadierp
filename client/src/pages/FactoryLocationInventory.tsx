@@ -1078,7 +1078,7 @@ export default function FactoryLocationInventory() {
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
   const hideAvgRate = hiddenCost.includes("inventory_avg_rate");
   const hideTotalValue = hiddenCost.includes("inventory_total_value");
-  const colSpanAll = (isAllItems ? (proformaMode ? 11 : 8) : (proformaMode ? 10 : 7)) - (hideAvgRate ? 1 : 0) - (hideTotalValue ? 1 : 0);
+  const colSpanAll = (isAllItems ? (proformaMode ? 12 : 9) : (proformaMode ? 11 : 8)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 1 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
@@ -1229,7 +1229,8 @@ export default function FactoryLocationInventory() {
                       <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
                       <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                      {!hideAvgRate && <div className="text-right"><span className="text-muted-foreground">Avg Rate: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
+                      {!hideAvgRate && <div><span className="text-muted-foreground">Cost/Bale: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
+                      {!hideAvgRate && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
                       {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Total Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>}
                     </div>
                     {proformaMode && isSelected && selection && (
@@ -1295,7 +1296,8 @@ export default function FactoryLocationInventory() {
                 {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                 {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                 <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                {!hideAvgRate && <th className="text-right px-3 font-medium">Avg Rate</th>}
+                {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
+                {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
                 {!hideTotalValue && <th className="text-right px-3 font-medium">Total Value</th>}
                 <th className="text-right px-3 font-medium">Total KG</th>
               </tr>
@@ -1370,6 +1372,7 @@ export default function FactoryLocationInventory() {
                         )}
                         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
                         {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                        {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
                         {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                         <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                       </tr>
@@ -1382,6 +1385,7 @@ export default function FactoryLocationInventory() {
                     {proformaMode && <td></td>}
                     {proformaMode && <td></td>}
                     <td className="text-right px-3 font-mono"></td>
+                    {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
                     {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
                     {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
                     <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>

@@ -680,22 +680,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           )
         );
 
-      const productIds = [...new Set(bales.map(b => b.productId).filter((id): id is number => id != null && id > 0))];
-      const products = productIds.length > 0
-        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
-        : [];
-      const categoryIds = [...new Set(products.map(p => p.categoryId).filter((id): id is number => id != null))];
+      // Fetch ALL products for the company so we can also match by articleCode
+      // (bales imported historically may have productId=null but articleCode set)
+      const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+
+      const categoryIds = [...new Set(allProducts.map(p => p.categoryId).filter((id): id is number => id != null))];
       const categories = categoryIds.length > 0
         ? await db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), inArray(factoryCategories.id, categoryIds)))
         : [];
 
       const categoryMap = new Map(categories.map(c => [c.id, c.name]));
-      const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || null]));
-      const productCategoryIdMap = new Map(products.map(p => [p.id, p.categoryId || null]));
-      const productSellingPriceMap = new Map(products.map(p => [p.id, p.sellingPrice || "0"]));
-      const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
+      // Primary lookup: by product id
+      const productById = new Map(allProducts.map(p => [p.id, p]));
+      // Fallback lookup: by articleCode (for bales where productId is null/0)
+      const productByArticleCode = new Map(
+        allProducts.filter(p => p.articleCode).map(p => [p.articleCode!.toLowerCase(), p])
+      );
 
-      const grouped = new Map<number, {
+      const getProduct = (bale: typeof bales[number]) => {
+        const byId = bale.productId ? productById.get(bale.productId) : undefined;
+        if (byId) return byId;
+        return bale.articleCode ? productByArticleCode.get(bale.articleCode.toLowerCase()) : undefined;
+      };
+
+      const grouped = new Map<string, {
         productId: number;
         articleCode: string;
         productName: string;
@@ -710,28 +718,32 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }>();
 
       for (const b of bales) {
-        const pid = b.productId || 0;
-        const existing = grouped.get(pid);
+        const product = getProduct(b);
+        const groupKey = product ? `p:${product.id}` : `a:${b.articleCode || b.baleCode || "unknown"}`;
+        const existing = grouped.get(groupKey);
         const qty = parseFloat(String(b.quantity || "1"));
         const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = productProductionPriceMap.get(pid) || 0;
+        const productionPrice = parseFloat(String((product as any)?.productionPrice || "0"));
+        const sellingPrice = String(product?.sellingPrice || "0");
+        const categoryName = product?.categoryId ? (categoryMap.get(product.categoryId) || b.category || null) : (b.category || null);
+        const categoryId = product?.categoryId || null;
         if (existing) {
           existing.quantity += qty;
           existing.totalWeight += weight;
           existing.totalCost += productionPrice;
           existing.baleCount += 1;
         } else {
-          grouped.set(pid, {
-            productId: pid,
-            articleCode: b.articleCode || b.baleCode || "",
-            productName: b.productName || "Unknown",
-            category: productCategoryNameMap.get(pid) || b.category || null,
-            categoryId: productCategoryIdMap.get(pid) || null,
+          grouped.set(groupKey, {
+            productId: product?.id || b.productId || 0,
+            articleCode: product?.articleCode || b.articleCode || b.baleCode || "",
+            productName: product?.name || b.productName || "Unknown",
+            category: categoryName,
+            categoryId,
             quantity: qty,
             totalWeight: weight,
             totalCost: productionPrice,
             baleCount: 1,
-            sellingPrice: productSellingPriceMap.get(pid) || "0",
+            sellingPrice,
             productionPrice,
           });
         }
