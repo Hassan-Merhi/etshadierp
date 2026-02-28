@@ -255,10 +255,15 @@ export default function ContainerLoadingScan() {
   const proformaProgress = linkedProforma?.lines.map((line) => {
     const loaded = loadedByArticle[line.articleCode] || 0;
     const remaining = line.quantity - loaded;
-    return { ...line, loaded, remaining, fulfilled: remaining <= 0 };
+    const status: "fulfilled" | "overloaded" | "short" | "none" =
+      loaded === 0 ? "none"
+      : loaded > line.quantity ? "overloaded"
+      : loaded === line.quantity ? "fulfilled"
+      : "short";
+    return { ...line, loaded, remaining, fulfilled: loaded >= line.quantity, status, excess: Math.max(0, loaded - line.quantity) };
   }) || [];
 
-  const fulfilledCount = proformaProgress.filter((l) => l.fulfilled).length;
+  const fulfilledCount = proformaProgress.filter((l) => l.status === "fulfilled" || l.status === "overloaded").length;
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
@@ -486,39 +491,51 @@ export default function ContainerLoadingScan() {
                     {proformaProgress.map((line) => (
                       <TableRow
                         key={line.id}
-                        className={line.fulfilled ? "bg-green-50 dark:bg-green-950/40" : ""}
+                        className={
+                          line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
+                          : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
+                          : ""
+                        }
                         data-testid={`row-progress-${line.articleCode}`}
                       >
                         <TableCell className="text-xs font-mono py-1.5">
                           <div className="flex items-center gap-1">
-                            {line.fulfilled && <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />}
-                            <span className={line.fulfilled ? "text-green-700 dark:text-green-400" : ""}>{line.articleCode}</span>
+                            {line.status === "fulfilled" && <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />}
+                            {line.status === "overloaded" && <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />}
+                            <span className={
+                              line.status === "fulfilled" ? "text-green-700 dark:text-green-400"
+                              : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400"
+                              : ""
+                            }>{line.articleCode}</span>
                           </div>
                           <div className="text-muted-foreground truncate max-w-[100px]">{line.productName}</div>
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">{line.quantity}</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
-                          <span className={line.fulfilled ? "text-green-600 dark:text-green-400 font-semibold" : ""}>{line.loaded}</span>
+                          <span className={
+                            line.status === "fulfilled" ? "text-green-600 dark:text-green-400 font-semibold"
+                            : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400 font-semibold"
+                            : ""
+                          }>{line.loaded}</span>
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
-                          {line.fulfilled ? (
-                            <span className="text-green-600 dark:text-green-400">✓</span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>
-                          )}
+                          {line.status === "fulfilled" && <span className="text-green-600 dark:text-green-400">✓</span>}
+                          {line.status === "overloaded" && <span className="text-orange-600 dark:text-orange-400">+{line.excess}</span>}
+                          {line.status === "short" && <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>}
+                          {line.status === "none" && <span className="text-muted-foreground">{line.quantity}</span>}
                         </TableCell>
                       </TableRow>
                     ))}
                     {extraArticles.map((code) => (
-                      <TableRow key={code} className="bg-blue-50 dark:bg-blue-950/30" data-testid={`row-extra-${code}`}>
+                      <TableRow key={code} className="bg-red-50 dark:bg-red-950/30" data-testid={`row-extra-${code}`}>
                         <TableCell className="text-xs font-mono py-1.5">
-                          <div>{code}</div>
-                          <div className="text-muted-foreground">Extra</div>
+                          <div className="text-red-700 dark:text-red-400">{code}</div>
+                          <div className="text-red-500 dark:text-red-500 text-[10px]">Not on proforma</div>
                         </TableCell>
-                        <TableCell className="text-xs text-right py-1.5">—</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">{loadedByArticle[code]}</TableCell>
+                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">—</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
                         <TableCell className="text-xs text-right py-1.5">
-                          <Badge variant="outline" className="text-xs px-1 py-0 no-default-hover-elevate no-default-active-elevate">Extra</Badge>
+                          <Badge variant="destructive" className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate">!</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -599,7 +616,14 @@ export default function ContainerLoadingScan() {
                     </TableHeader>
                     <TableBody>
                       {proformaProgress.map((line) => (
-                        <TableRow key={line.id} className={line.fulfilled ? "bg-green-50 dark:bg-green-950/40" : ""}>
+                        <TableRow
+                          key={line.id}
+                          className={
+                            line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
+                            : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
+                            : ""
+                          }
+                        >
                           <TableCell className="text-sm">
                             <div className="font-mono text-xs">{line.articleCode}</div>
                             <div className="text-muted-foreground text-xs">{line.productName}</div>
@@ -607,9 +631,16 @@ export default function ContainerLoadingScan() {
                           <TableCell className="text-right font-mono text-sm">{line.quantity}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{line.loaded}</TableCell>
                           <TableCell className="text-right text-sm">
-                            {line.fulfilled ? (
+                            {line.status === "fulfilled" && (
                               <span className="text-green-600 dark:text-green-400 font-semibold">✓ Done</span>
-                            ) : (
+                            )}
+                            {line.status === "overloaded" && (
+                              <span className="text-orange-600 dark:text-orange-400 font-semibold flex items-center justify-end gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Over +{line.excess}
+                              </span>
+                            )}
+                            {(line.status === "short" || line.status === "none") && (
                               <span className="text-amber-600 dark:text-amber-400 flex items-center justify-end gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 Short {line.remaining}
@@ -619,23 +650,34 @@ export default function ContainerLoadingScan() {
                         </TableRow>
                       ))}
                       {extraArticles.map((code) => (
-                        <TableRow key={code} className="bg-blue-50 dark:bg-blue-950/30">
+                        <TableRow key={code} className="bg-red-50 dark:bg-red-950/30">
                           <TableCell className="text-sm">
-                            <div className="font-mono text-xs">{code}</div>
-                            <div className="text-muted-foreground text-xs">Not in proforma</div>
+                            <div className="font-mono text-xs text-red-700 dark:text-red-400">{code}</div>
+                            <div className="text-red-500 text-xs">Not on proforma</div>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">—</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{loadedByArticle[code]}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
                           <TableCell className="text-right text-sm">
-                            <Badge variant="outline" className="text-xs no-default-hover-elevate no-default-active-elevate">Extra</Badge>
+                            <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">Not on proforma</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="flex items-center justify-between gap-2 text-sm font-medium border-t pt-2">
-                  <span>{fulfilledCount} of {totalLines} proforma lines fulfilled</span>
+                <div className="flex items-center justify-between gap-2 text-sm border-t pt-2 flex-wrap gap-y-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-green-600 dark:text-green-400 font-medium">{proformaProgress.filter(l => l.status === "fulfilled").length} fulfilled</span>
+                    {proformaProgress.filter(l => l.status === "overloaded").length > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400 font-medium">{proformaProgress.filter(l => l.status === "overloaded").length} overloaded</span>
+                    )}
+                    {proformaProgress.filter(l => l.status === "short" || l.status === "none").length > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">{proformaProgress.filter(l => l.status === "short" || l.status === "none").length} short</span>
+                    )}
+                    {extraArticles.length > 0 && (
+                      <span className="text-red-600 dark:text-red-400 font-medium">{extraArticles.length} not on proforma</span>
+                    )}
+                  </div>
                   <span className="text-muted-foreground">{bales.length} bales · {totalWeight.toFixed(1)} kg</span>
                 </div>
               </>
