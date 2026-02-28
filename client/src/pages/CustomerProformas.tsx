@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download } from "lucide-react";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface ProformaLine {
   id: number;
@@ -44,6 +45,7 @@ interface Customer {
 
 export default function CustomerProformas() {
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -365,6 +367,7 @@ export default function CustomerProformas() {
                                 <TableHead>Article Code</TableHead>
                                 <TableHead>Product Name</TableHead>
                                 <TableHead className="text-right">Qty</TableHead>
+                                <TableHead className="text-right">Kg/Bale</TableHead>
                                 <TableHead className="text-right">Price/Bale</TableHead>
                                 <TableHead className="w-[80px]"></TableHead>
                               </TableRow>
@@ -381,8 +384,11 @@ export default function CustomerProformas() {
                                   <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
                                     {line.quantity}
                                   </TableCell>
+                                  <TableCell className="text-right font-mono text-sm" data-testid={`text-kg-bale-${line.id}`}>
+                                    {(() => { const w = parseFloat(line.weightPerBaleKg || "0"); return w % 1 === 0 ? w.toLocaleString() : w.toFixed(2); })()}
+                                  </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
-                                    {parseFloat(line.pricePerBale).toFixed(2)}
+                                    {formatAmount(parseFloat(line.pricePerBale))}
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-1">
@@ -436,7 +442,7 @@ export default function CustomerProformas() {
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-muted-foreground">Total Amount:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
                                 </div>
                               </div>
                             );

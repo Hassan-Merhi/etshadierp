@@ -5257,6 +5257,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
       }
 
+      const baseCurrency = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMap: Record<string, string> = {
+        USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
+        CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+        MXN: "MX$ ", BRL: "R$ ", ZAR: "R", SGD: "S$ ", HKD: "HK$ ", NOK: "kr ", SEK: "kr ", DKK: "kr ",
+      };
+      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? (baseCurrency + " ");
+      const fmtPrice = (n: number) => currSym + (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
+      const fmtKg = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(2);
+
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Proforma Invoice");
@@ -5312,7 +5322,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalKgAll += totalKg;
         totalPriceAll += totalPrice;
 
-        const dr = sheet.addRow([idx + 1, line.articleCode, line.productName, qty, parseFloat(kgPerBale.toFixed(2)), parseFloat(price.toFixed(2)), parseFloat(totalKg.toFixed(2)), parseFloat(totalPrice.toFixed(2))]);
+        const dr = sheet.addRow([idx + 1, line.articleCode, line.productName, qty, fmtKg(kgPerBale), fmtPrice(price), fmtKg(totalKg), fmtPrice(totalPrice)]);
         dr.getCell(4).alignment = { horizontal: "right" };
         dr.getCell(5).alignment = { horizontal: "right" };
         dr.getCell(6).alignment = { horizontal: "right" };
@@ -5324,7 +5334,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
 
       sheet.addRow([]);
-      const totRow = sheet.addRow(["", "", "GRAND TOTAL", totalQty, "", "", parseFloat(totalKgAll.toFixed(2)), parseFloat(totalPriceAll.toFixed(2))]);
+      const totRow = sheet.addRow(["", "", "GRAND TOTAL", totalQty, "", "", fmtKg(totalKgAll), fmtPrice(totalPriceAll)]);
       totRow.eachCell((cell) => { cell.font = { bold: true }; });
       totRow.getCell(4).alignment = { horizontal: "right" };
       totRow.getCell(7).alignment = { horizontal: "right" };
@@ -5366,6 +5376,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes as string[])));
         prods.forEach((p: any) => { if (p.articleCode) wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0")); });
       }
+
+      const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
+      const currencySymbolMapPdf: Record<string, string> = {
+        USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
+        CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+        MXN: "MX$ ", BRL: "R$ ", ZAR: "R", SGD: "S$ ", HKD: "HK$ ", NOK: "kr ", SEK: "kr ", DKK: "kr ",
+      };
+      const currSymPdf = currencySymbolMapPdf[baseCurrencyPdf.toUpperCase()] ?? (baseCurrencyPdf + " ");
+      const fmtPricePdf = (n: number) => currSymPdf + (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
+      const fmtKgPdf = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(2);
 
       const PDFDocument = (await import("pdfkit")).default;
       const fs = await import("fs");
@@ -5451,7 +5471,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           doc.fillColor("#000000");
         }
 
-        const vals = [String(idx + 1), line.articleCode, line.productName, String(qty), kgPerBale.toFixed(2), price.toFixed(2), totalKg.toFixed(2), totalPrice.toFixed(2)];
+        const vals = [String(idx + 1), line.articleCode, line.productName, String(qty), fmtKgPdf(kgPerBale), fmtPricePdf(price), fmtKgPdf(totalKg), fmtPricePdf(totalPrice)];
         vals.forEach((v, i) => {
           doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i] });
         });
@@ -5467,7 +5487,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Grand total row
       doc.rect(40, y, 515, 16).fill("#EFF3FB");
       doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
-      const totVals = ["", "", "GRAND TOTAL", String(totalQty), "", "", totalKgAll.toFixed(2), totalPriceAll.toFixed(2)];
+      const totVals = ["", "", "GRAND TOTAL", String(totalQty), "", "", fmtKgPdf(totalKgAll), fmtPricePdf(totalPriceAll)];
       totVals.forEach((v, i) => {
         if (v) doc.text(v, colX[i] + 2, y + 4, { width: colW[i] - 4, align: colAlign[i] });
       });

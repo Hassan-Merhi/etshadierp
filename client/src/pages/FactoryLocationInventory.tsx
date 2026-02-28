@@ -684,7 +684,7 @@ export default function FactoryLocationInventory() {
                               data-testid={`input-finalize-price-${item.productId}`}
                             />
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmt(lineTotal)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatAmount(lineTotal)}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -702,7 +702,7 @@ export default function FactoryLocationInventory() {
                       <TableCell colSpan={2}>Grand Total</TableCell>
                       <TableCell className="text-right font-mono">{totalSelectedBales}</TableCell>
                       <TableCell></TableCell>
-                      <TableCell className="text-right font-mono">{fmt(grandTotal)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(grandTotal)}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   </TableBody>
