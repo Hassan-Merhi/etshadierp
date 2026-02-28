@@ -248,9 +248,10 @@ export default function BaleProducts() {
         Name: p.name || "",
         Category: p.categoryId ? (categoryMap.get(p.categoryId) || "") : "",
         "Weight (kg/bale)": p.weightPerBaleKg != null ? p.weightPerBaleKg : "",
+        "Production Price": p.productionPrice ? parseFloat(p.productionPrice) : 0,
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }];
+      ws["!cols"] = [{ wch: 18 }, { wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 16 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       XLSX.writeFile(wb, "bale_products_export.xlsx");
@@ -576,6 +577,8 @@ export default function BaleProducts() {
                     <TableHead>Article Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Wt/Bale (kg)</TableHead>
+                    <TableHead className="text-right">Prod. Price</TableHead>
                     <TableHead className="text-right">Count</TableHead>
                     <TableHead className="w-[60px]">Actions</TableHead>
                   </TableRow>
@@ -601,6 +604,8 @@ export default function BaleProducts() {
                         <TableCell className="text-muted-foreground">
                           {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
                         </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
                         <TableCell className="text-right">
                           <Badge variant="secondary">{group.count}</Badge>
                         </TableCell>
@@ -619,6 +624,10 @@ export default function BaleProducts() {
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {product.weightPerBaleKg ? `${product.weightPerBaleKg} kg` : "-"}
                             </TableCell>
+                            <TableCell className="text-right text-sm font-mono text-muted-foreground">
+                              {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                            </TableCell>
+                            <TableCell></TableCell>
                             <TableCell>
                               <Button
                                 size="icon"
@@ -646,6 +655,7 @@ export default function BaleProducts() {
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Weight/Bale (kg)</TableHead>
+                  <TableHead className="text-right">Prod. Price</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]">Actions</TableHead>
@@ -660,6 +670,9 @@ export default function BaleProducts() {
                       {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
                     </TableCell>
                     <TableCell className="text-right font-mono">{product.weightPerBaleKg || "-"}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{product.description || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={product.active ? "secondary" : "outline"}>

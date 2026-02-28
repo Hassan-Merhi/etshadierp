@@ -1022,6 +1022,17 @@ export default function FactoryLocationInventory() {
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const includeCost = (hideAvgRate && hideTotalValue) ? 0 : 1;
+              window.open(`/api/factory/location-inventory/${selectedLocation!.id}/export/excel?includeCost=${includeCost}`, "_blank");
+            }}
+            data-testid="button-export-inventory-excel"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
+          </Button>
+          <Button
             variant={proformaMode ? "destructive" : "default"}
             size="sm"
             onClick={toggleProformaMode}

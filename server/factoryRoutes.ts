@@ -744,6 +744,139 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/location-inventory/:locationId/export/excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+
+      const includeCost = req.query.includeCost !== "0";
+
+      const bales = await db
+        .select()
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.erpLocationId, locationId),
+            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          )
+        );
+
+      const productIds = [...new Set(bales.map(b => b.productId).filter((id): id is number => id != null && id > 0))];
+      const products = productIds.length > 0
+        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+        : [];
+      const categoryIds = [...new Set(products.map(p => p.categoryId).filter((id): id is number => id != null))];
+      const categories = categoryIds.length > 0
+        ? await db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), inArray(factoryCategories.id, categoryIds)))
+        : [];
+
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || ""]));
+      const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
+
+      const grouped = new Map<number, { articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
+
+      for (const b of bales) {
+        const pid = b.productId || 0;
+        const existing = grouped.get(pid);
+        const weight = parseFloat(String(b.weightKg || "0"));
+        const productionPrice = productProductionPriceMap.get(pid) || 0;
+        if (existing) {
+          existing.totalWeight += weight;
+          existing.baleCount += 1;
+        } else {
+          grouped.set(pid, {
+            articleCode: b.articleCode || b.baleCode || "",
+            productName: b.productName || "Unknown",
+            category: productCategoryNameMap.get(pid) || b.category || "",
+            totalWeight: weight,
+            baleCount: 1,
+            productionPrice,
+          });
+        }
+      }
+
+      const rows = Array.from(grouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Inventory");
+
+      const columns: any[] = [
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Bales", key: "baleCount", width: 10 },
+        { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
+        { header: "Total KG", key: "totalWeight", width: 14 },
+      ];
+      if (includeCost) {
+        columns.push({ header: "Avg Rate (Cost)", key: "productionPrice", width: 16 });
+        columns.push({ header: "Total Value", key: "totalValue", width: 16 });
+      }
+      sheet.columns = columns;
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+
+      let totalBales = 0;
+      let totalKg = 0;
+      let totalValue = 0;
+
+      for (const row of rows) {
+        const weightPerBale = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
+        const rowTotalValue = row.productionPrice * row.baleCount;
+        totalBales += row.baleCount;
+        totalKg += row.totalWeight;
+        totalValue += rowTotalValue;
+
+        const rowData: any = {
+          articleCode: row.articleCode,
+          productName: row.productName,
+          category: row.category,
+          baleCount: row.baleCount,
+          weightPerBale: parseFloat(weightPerBale.toFixed(2)),
+          totalWeight: parseFloat(row.totalWeight.toFixed(2)),
+        };
+        if (includeCost) {
+          rowData.productionPrice = row.productionPrice;
+          rowData.totalValue = parseFloat(rowTotalValue.toFixed(2));
+        }
+        sheet.addRow(rowData);
+      }
+
+      sheet.addRow({});
+      const totalRowData: any = {
+        articleCode: "",
+        productName: `TOTAL (${rows.length} products)`,
+        category: "",
+        baleCount: totalBales,
+        weightPerBale: "",
+        totalWeight: parseFloat(totalKg.toFixed(2)),
+      };
+      if (includeCost) {
+        totalRowData.productionPrice = "";
+        totalRowData.totalValue = parseFloat(totalValue.toFixed(2));
+      }
+      const tr = sheet.addRow(totalRowData);
+      tr.font = { bold: true };
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting inventory Excel:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
