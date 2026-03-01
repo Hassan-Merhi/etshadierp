@@ -14,7 +14,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface ProformaLine {
@@ -154,6 +154,23 @@ export default function CustomerProformas() {
     onSuccess: () => {
       toast({ title: "Success", description: "Line deleted" });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyCatalogPricesMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`, {});
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      const msg = result.skipped > 0
+        ? `${result.updated} line(s) updated, ${result.skipped} skipped (no catalog price)`
+        : `${result.updated} line(s) updated with catalog prices`;
+      toast({ title: "Prices Applied", description: msg });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -355,6 +372,16 @@ export default function CustomerProformas() {
                           >
                             <Plus className="mr-1 h-3 w-3" />
                             Add Line
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => applyCatalogPricesMutation.mutate(proforma.id)}
+                            disabled={applyCatalogPricesMutation.isPending}
+                            data-testid={`button-apply-catalog-prices-${proforma.id}`}
+                          >
+                            <RefreshCw className="mr-1 h-3 w-3" />
+                            Apply Catalog Prices
                           </Button>
                         </div>
                       </div>

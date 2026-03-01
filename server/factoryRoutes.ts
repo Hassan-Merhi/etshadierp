@@ -5267,6 +5267,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/customer-proformas/:id/apply-catalog-prices", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+      if (!lines.length) return res.json({ updated: 0, skipped: 0 });
+
+      const products = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const priceByArticleCode = new Map<string, string>();
+      for (const p of products) {
+        if (p.articleCode && p.sellingPrice && parseFloat(String(p.sellingPrice)) > 0) {
+          priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.sellingPrice));
+        }
+      }
+
+      let updated = 0;
+      let skipped = 0;
+      for (const line of lines) {
+        const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
+        if (newPrice) {
+          await db.update(customerProformaLines)
+            .set({ pricePerBale: newPrice })
+            .where(eq(customerProformaLines.id, line.id));
+          updated++;
+        } else {
+          skipped++;
+        }
+      }
+
+      res.json({ updated, skipped });
+    } catch (error: any) {
+      console.error("Error applying catalog prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;

@@ -215,11 +215,29 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+
+  const doListen = () => {
+    server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+      log(`serving on port ${port}`);
+    });
+  };
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`Port ${port} in use — killing zombie process and retrying...`);
+      try {
+        const { execSync } = require("child_process");
+        execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
+      } catch {}
+      setTimeout(() => {
+        server.removeAllListeners("error");
+        server.on("error", (e: any) => { console.error("Server error:", e); });
+        doListen();
+      }, 600);
+    } else {
+      console.error("Server error:", err);
+    }
   });
+
+  doListen();
 })();
