@@ -9135,6 +9135,7 @@ if (asOfDate) {
             voucherDate: saleDate,
             description: `Credit Sale Import - ${items.length} items - Customer: ${customer.legalName}`,
             totalAmount: "0",
+            isCreditSale: true,
           })
           .returning();
 
@@ -17072,12 +17073,15 @@ if (asOfDate) {
           locationCode: locations.code,
           voucherDate: vouchers.voucherDate,
           totalAmount: vouchers.totalAmount,
+          isCreditSale: vouchers.isCreditSale,
         })
         .from(vouchers)
         .leftJoin(locations, eq(vouchers.locationId, locations.id))
         .where(and(...conditions));
 
-      // Group by location
+      const CREDIT_SALES_ID = -1;
+
+      // Group by location; credit sales go into a dedicated synthetic group
       const salesByLocation = new Map<
         number,
         {
@@ -17090,22 +17094,37 @@ if (asOfDate) {
       >();
 
       for (const sale of salesVouchers) {
-        if (!sale.locationId) continue;
-
-        const existing = salesByLocation.get(sale.locationId);
         const amount = parseFloat(sale.totalAmount || "0");
 
-        if (existing) {
-          existing.totalSales += amount;
-          existing.totalTransactions += 1;
+        if (sale.isCreditSale) {
+          const existing = salesByLocation.get(CREDIT_SALES_ID);
+          if (existing) {
+            existing.totalSales += amount;
+            existing.totalTransactions += 1;
+          } else {
+            salesByLocation.set(CREDIT_SALES_ID, {
+              locationId: CREDIT_SALES_ID,
+              locationName: "Credit Sales",
+              locationCode: "CREDIT",
+              totalSales: amount,
+              totalTransactions: 1,
+            });
+          }
         } else {
-          salesByLocation.set(sale.locationId, {
-            locationId: sale.locationId,
-            locationName: sale.locationName || "Unknown",
-            locationCode: sale.locationCode || "",
-            totalSales: amount,
-            totalTransactions: 1,
-          });
+          if (!sale.locationId) continue;
+          const existing = salesByLocation.get(sale.locationId);
+          if (existing) {
+            existing.totalSales += amount;
+            existing.totalTransactions += 1;
+          } else {
+            salesByLocation.set(sale.locationId, {
+              locationId: sale.locationId,
+              locationName: sale.locationName || "Unknown",
+              locationCode: sale.locationCode || "",
+              totalSales: amount,
+              totalTransactions: 1,
+            });
+          }
         }
       }
 
@@ -17185,7 +17204,11 @@ if (asOfDate) {
   app.get(
     "/api/financial/sales/:locationId/transactions",
     requireAuth,
-    checkPOSLocation,
+    async (req, res, next) => {
+      // Credit Sales synthetic group (-1) doesn't need POS location validation
+      if (req.params.locationId === "-1") return next();
+      return checkPOSLocation(req, res, next);
+    },
     async (req, res) => {
       try {
         if (!req.session.currentCompanyId) {
@@ -17199,13 +17222,18 @@ if (asOfDate) {
 
         const { startDate, endDate } = req.query;
 
-        // Build query conditions
-        const conditions = [
+        // Build query conditions — credit sales group uses isCreditSale flag, not locationId
+        const conditions: any[] = [
           eq(vouchers.companyId, req.session.currentCompanyId),
           eq(vouchers.voucherType, "Sales"),
-          eq(vouchers.locationId, locationId),
           isNull(vouchers.deletedAt),
         ];
+
+        if (locationId === -1) {
+          conditions.push(eq(vouchers.isCreditSale, true));
+        } else {
+          conditions.push(eq(vouchers.locationId, locationId));
+        }
 
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
@@ -17587,6 +17615,7 @@ if (asOfDate) {
             shiftId: shiftId || null,
             currency: currency || "USD",
             exchangeRate: exchangeRate || null,
+            isCreditSale: !!isCreditSale,
           })
           .returning();
 
