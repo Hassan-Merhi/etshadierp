@@ -77,23 +77,25 @@ export default function CombinedInventory() {
 
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
-      const detail = q.data as ContainerDetail;
-      (detail.lineItems || []).forEach((li) => {
-        const qty = parseFloat(li.quantity || "0");
-        const existing = map.get(li.stockItemId);
-        if (existing) {
-          existing.otwQty += qty;
-          existing.totalQty += qty;
-        } else {
-          map.set(li.stockItemId, {
-            stockItemId: li.stockItemId,
-            stockItemName: li.stockItemName,
-            otwQty: qty,
-            inHandQty: 0,
-            totalQty: qty,
-            inHandValue: 0,
-          });
-        }
+      const containerData = q.data as any;
+      containerData?.pos?.forEach((po: any) => {
+        po.items?.forEach((item: any) => {
+          const qty = parseFloat(item.quantity || "0");
+          const existing = map.get(item.stockItemId);
+          if (existing) {
+            existing.otwQty += qty;
+            existing.totalQty += qty;
+          } else {
+            map.set(item.stockItemId, {
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName,
+              otwQty: qty,
+              inHandQty: 0,
+              totalQty: qty,
+              inHandValue: 0,
+            });
+          }
+        });
       });
     });
 

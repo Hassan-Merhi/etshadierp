@@ -41,10 +41,14 @@ export default function OptionalVouchers() {
   const queryString = queryParams.toString();
   const queryUrl = `/api/vouchers/optional${queryString ? `?${queryString}` : ""}`;
 
-  const { data: vouchers = [], isLoading } = useQuery<any[]>({
+  const { data: vouchers = [], isLoading, isError, error } = useQuery<any[]>({
     queryKey: ["/api/vouchers/optional", typeFilter, startDate, endDate, search],
     queryFn: async () => {
       const res = await apiRequest("GET", queryUrl);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || "Failed to load optional vouchers");
+      }
       return res.json();
     },
   });
@@ -166,6 +170,12 @@ export default function OptionalVouchers() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
+            </div>
+          ) : isError ? (
+            <div className="text-center py-12 text-destructive" data-testid="text-optional-vouchers-error">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">Failed to load optional vouchers</p>
+              <p className="text-sm mt-1">{(error as any)?.message}</p>
             </div>
           ) : vouchers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground" data-testid="text-no-optional-vouchers">

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -114,8 +115,6 @@ export default function SalesReport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
-  const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const { toast } = useToast();
@@ -305,9 +304,29 @@ export default function SalesReport() {
     setSelectedCompanies([]);
   };
 
+  const [, navigate] = useLocation();
+
   const handleRowClick = (summary: DailySummary) => {
-    setSelectedDaySummary(summary);
-    setDetailsDialogOpen(true);
+    const params = new URLSearchParams();
+    params.set("displayDate", summary.displayDate);
+    params.set("grouping", grouping);
+    if (grouping === "daily") {
+      params.set("startDate", summary.date);
+      params.set("endDate", summary.date);
+    } else if (grouping === "monthly") {
+      const [y, m] = summary.date.split("-").map(Number);
+      const start = `${summary.date}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const end = `${summary.date}-${String(lastDay).padStart(2, "0")}`;
+      params.set("startDate", start);
+      params.set("endDate", end);
+    } else {
+      params.set("startDate", `${summary.date}-01-01`);
+      params.set("endDate", `${summary.date}-12-31`);
+    }
+    if (selectedLocation && selectedLocation !== "all") params.set("locationId", selectedLocation);
+    if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
+    navigate(`/sales-report/detail?${params.toString()}`);
   };
 
   const handleExportExcel = async () => {
@@ -671,7 +690,7 @@ export default function SalesReport() {
             <>
             <div className="hidden md:block overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Items</TableHead>
@@ -829,8 +848,8 @@ export default function SalesReport() {
         </CardContent>
       </Card>
 
-      {/* Details Dialog */}
-      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+      {/* Details Dialog — removed; row click now navigates to /sales-report/detail */}
+      {false && <Dialog open={false} onOpenChange={() => {}}>
         <DialogContent className="max-w-6xl w-[95vw] md:w-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Sales Details - {selectedDaySummary?.displayDate}</DialogTitle>
