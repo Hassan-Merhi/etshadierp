@@ -99,6 +99,7 @@ import {
   userCompanyRoles,
   factoryBales,
   loginHistory,
+  storedFiles,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -33728,6 +33729,85 @@ if (asOfDate) {
       }
     }
   );
+
+  // ── File Storage ─────────────────────────────────────────────
+  app.get("/api/files", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.companyId || req.user?.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company context" });
+      const files = await db
+        .select({
+          id: storedFiles.id,
+          fileName: storedFiles.fileName,
+          fileType: storedFiles.fileType,
+          fileSize: storedFiles.fileSize,
+          description: storedFiles.description,
+          uploadedBy: storedFiles.uploadedBy,
+          uploadedAt: storedFiles.uploadedAt,
+        })
+        .from(storedFiles)
+        .where(eq(storedFiles.companyId, companyId))
+        .orderBy(desc(storedFiles.uploadedAt));
+      res.json(files);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/files/upload", requireAuth, upload.single("file"), async (req: any, res) => {
+    try {
+      const companyId = req.session?.companyId || req.user?.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company context" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const { description } = req.body;
+      const fileData = req.file.buffer.toString("base64");
+      const [inserted] = await db.insert(storedFiles).values({
+        companyId,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+        fileData,
+        description: description || null,
+        uploadedBy: req.user?.id || null,
+      }).returning({ id: storedFiles.id });
+      res.json({ id: inserted.id, message: "File uploaded successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/files/:id/download", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.companyId || req.user?.companyId;
+      const fileId = parseInt(req.params.id);
+      const [file] = await db.select().from(storedFiles).where(
+        and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId))
+      );
+      if (!file) return res.status(404).json({ message: "File not found" });
+      const buffer = Buffer.from(file.fileData, "base64");
+      res.set("Content-Type", file.fileType);
+      res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+      res.set("Content-Length", buffer.length.toString());
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/files/:id", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session?.companyId || req.user?.companyId;
+      const fileId = parseInt(req.params.id);
+      const [deleted] = await db.delete(storedFiles).where(
+        and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId))
+      ).returning({ id: storedFiles.id });
+      if (!deleted) return res.status(404).json({ message: "File not found" });
+      res.json({ message: "File deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

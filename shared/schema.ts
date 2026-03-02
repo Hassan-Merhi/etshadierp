@@ -3425,3 +3425,31 @@ export const insertSupplierContainerLoadedItemSchema = createInsertSchema(suppli
 
 export type InsertSupplierContainerLoadedItem = z.infer<typeof insertSupplierContainerLoadedItemSchema>;
 export type SupplierContainerLoadedItem = typeof supplierContainerLoadedItems.$inferSelect;
+
+export const storedFiles = pgTable("stored_files", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileData: text("file_data").notNull(),
+  description: text("description"),
+  uploadedBy: integer("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+});
+
+export const insertStoredFileSchema = createInsertSchema(storedFiles).omit({
+  id: true,
+  uploadedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  fileName: z.string().min(1),
+  fileType: z.string().min(1),
+  fileSize: z.number().min(0),
+  fileData: z.string().min(1),
+  description: z.string().optional(),
+  uploadedBy: z.number().optional(),
+});
+
+export type InsertStoredFile = z.infer<typeof insertStoredFileSchema>;
+export type StoredFile = typeof storedFiles.$inferSelect;
