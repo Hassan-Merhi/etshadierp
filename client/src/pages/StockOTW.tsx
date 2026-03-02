@@ -3,7 +3,7 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -308,7 +308,7 @@ export default function StockOTW() {
           <CardContent>
             <div className="border rounded-md hidden md:block">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
                     <TableHead>Item Name</TableHead>
@@ -390,6 +390,15 @@ export default function StockOTW() {
                     );
                   })}
                 </TableBody>
+                <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
+                  <TableRow className="font-semibold">
+                    <TableCell></TableCell>
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right font-mono" data-testid="text-summary-quantity">{Math.round(totalQuantity).toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono" data-testid="text-summary-value">{formatAmount(totalValue)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </div>
 
@@ -447,22 +456,6 @@ export default function StockOTW() {
               })}
             </div>
             
-            <div className="mt-4 pt-4 border-t">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                <div className="flex justify-between sm:justify-end gap-2">
-                  <span className="text-sm text-muted-foreground">Total Quantity:</span>
-                  <span className="font-mono font-semibold" data-testid="text-summary-quantity">
-                    {Math.round(totalQuantity).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between sm:justify-end gap-2">
-                  <span className="text-sm text-muted-foreground">Total Value:</span>
-                  <span className="font-mono font-semibold" data-testid="text-summary-value">
-                    {formatAmount(totalValue)}
-                  </span>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       )}

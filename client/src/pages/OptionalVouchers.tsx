@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -180,7 +180,7 @@ export default function OptionalVouchers() {
               </div>
               <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Voucher #</TableHead>
@@ -237,6 +237,15 @@ export default function OptionalVouchers() {
                       </TableRow>
                     ))}
                   </TableBody>
+                  <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
+                    <TableRow className="font-semibold">
+                      <TableCell colSpan={4}>Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})</TableCell>
+                      <TableCell className="text-right font-mono" data-testid="text-optional-grand-total">
+                        {vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableFooter>
                 </Table>
               </div>
             </>

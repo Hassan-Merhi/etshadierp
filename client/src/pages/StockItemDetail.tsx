@@ -4,7 +4,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -184,6 +184,13 @@ export default function StockItemDetail() {
                             </TableRow>
                           ))}
                         </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-background border-t">
+                          <TableRow className="font-semibold text-sm">
+                            <TableCell>Total</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-purchase-qty">{formatSmartNumber(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.quantity || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-purchase-value">{formatAmount(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.amount || '0'), 0))}</TableCell>
+                          </TableRow>
+                        </TableFooter>
                       </Table>
                     </div>
                     <div className="md:hidden space-y-2">
@@ -196,13 +203,6 @@ export default function StockItemDetail() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                  <div className="border-t mt-2 pt-2 flex justify-between items-center text-sm font-semibold px-1">
-                    <span>Total</span>
-                    <div className="flex gap-6 font-mono">
-                      <span data-testid="total-purchase-qty">{formatSmartNumber(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.quantity || '0'), 0))}</span>
-                      <span data-testid="total-purchase-value">{formatAmount(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.amount || '0'), 0))}</span>
                     </div>
                   </div>
                 </>
@@ -251,6 +251,14 @@ export default function StockItemDetail() {
                             </TableRow>
                           ))}
                         </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-background border-t">
+                          <TableRow className="font-semibold text-sm">
+                            <TableCell>Total</TableCell>
+                            <TableCell></TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-sales-qty">{formatSmartNumber(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.quantity || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-sales-value">{formatAmount(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.totalSales || '0'), 0))}</TableCell>
+                          </TableRow>
+                        </TableFooter>
                       </Table>
                     </div>
                     <div className="md:hidden space-y-2">
@@ -271,13 +279,6 @@ export default function StockItemDetail() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                  <div className="border-t mt-2 pt-2 flex justify-between items-center text-sm font-semibold px-1">
-                    <span>Total</span>
-                    <div className="flex gap-6 font-mono">
-                      <span data-testid="total-sales-qty">{formatSmartNumber(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.quantity || '0'), 0))}</span>
-                      <span data-testid="total-sales-value">{formatAmount(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.totalSales || '0'), 0))}</span>
                     </div>
                   </div>
                 </>
@@ -327,6 +328,14 @@ export default function StockItemDetail() {
                             </TableRow>
                           ))}
                         </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-background border-t">
+                          <TableRow className="font-semibold text-sm">
+                            <TableCell>Total</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-inventory-qty">{formatSmartNumber(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.quantity || '0'), 0))}</TableCell>
+                            <TableCell></TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-inventory-value">{formatAmount(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.totalValue || '0'), 0))}</TableCell>
+                          </TableRow>
+                        </TableFooter>
                       </Table>
                     </div>
                     <div className="md:hidden space-y-2">
@@ -349,13 +358,6 @@ export default function StockItemDetail() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                  <div className="border-t mt-2 pt-2 flex justify-between items-center text-sm font-semibold px-1">
-                    <span>Total</span>
-                    <div className="flex gap-6 font-mono">
-                      <span data-testid="total-inventory-qty">{formatSmartNumber(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.quantity || '0'), 0))}</span>
-                      <span data-testid="total-inventory-value">{formatAmount(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.totalValue || '0'), 0))}</span>
                     </div>
                   </div>
                 </>

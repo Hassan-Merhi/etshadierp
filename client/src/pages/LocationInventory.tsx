@@ -996,7 +996,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <div className="rounded-md border overflow-hidden w-full min-w-0">
                 <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                     </tr>
@@ -1233,7 +1233,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       </>
                     )}
                   </colgroup>
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                       <th className="text-right px-3 font-medium">Items</th>
@@ -1438,7 +1438,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     </>
                   )}
                 </colgroup>
-                <thead className="bg-muted/50">
+                <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
                     <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
@@ -1798,7 +1798,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                   </>
                                 )}
                               </colgroup>
-                              <thead className="bg-muted/50">
+                              <thead className="bg-muted/50 sticky top-0 z-10">
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
                                   <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
