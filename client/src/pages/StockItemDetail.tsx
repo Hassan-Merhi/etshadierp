@@ -170,7 +170,7 @@ export default function StockItemDetail() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-background">
                           <TableRow>
-                            <TableHead>Supplier</TableHead>
+                            <TableHead>Container</TableHead>
                             <TableHead className="text-right">Qty</TableHead>
                             <TableHead className="text-right">Rate</TableHead>
                           </TableRow>
@@ -178,7 +178,7 @@ export default function StockItemDetail() {
                         <TableBody>
                           {itemDetails.purchases.map((purchase, idx) => (
                             <TableRow key={idx}>
-                              <TableCell className="text-sm">{purchase.supplierName || "-"}</TableCell>
+                              <TableCell className="text-sm font-mono">{purchase.containerNumber || purchase.supplierName || "-"}</TableCell>
                               <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
                               <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(purchase.rate))}</TableCell>
                             </TableRow>
@@ -196,7 +196,7 @@ export default function StockItemDetail() {
                     <div className="md:hidden space-y-2">
                       {itemDetails.purchases.map((purchase, idx) => (
                         <div key={idx} className="p-2 rounded-md border text-sm">
-                          <div className="font-medium">{purchase.supplierName || "-"}</div>
+                          <div className="font-mono font-medium">{purchase.containerNumber || purchase.supplierName || "-"}</div>
                           <div className="flex justify-between mt-1 text-muted-foreground">
                             <span>Qty: {formatSmartNumber(purchase.quantity)}</span>
                             <span>Rate: {formatAmount(parseFloat(purchase.rate))}</span>

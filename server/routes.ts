@@ -14014,6 +14014,57 @@ if (asOfDate) {
     },
   );
 
+  app.get("/api/vouchers/optional", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { type, locationId, startDate, endDate, search } = req.query;
+
+      const conditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, true),
+        isNull(vouchers.deletedAt),
+      ];
+
+      if (type) {
+        conditions.push(eq(vouchers.voucherType, type as string));
+      }
+      if (locationId) {
+        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+      }
+      if (startDate) {
+        conditions.push(sql`${vouchers.voucherDate} >= ${startDate as string}`);
+      }
+      if (endDate) {
+        conditions.push(sql`${vouchers.voucherDate} <= ${endDate as string}`);
+      }
+
+      const results = await db
+        .select()
+        .from(vouchers)
+        .where(and(...conditions))
+        .orderBy(sql`${vouchers.voucherDate} DESC`);
+
+      let filtered = results;
+      if (search) {
+        const s = (search as string).toLowerCase();
+        filtered = filtered.filter(r =>
+          r.voucherNumber.toLowerCase().includes(s) ||
+          (r.description || "").toLowerCase().includes(s) ||
+          (r.locationName || "").toLowerCase().includes(s)
+        );
+      }
+
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Optional vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
+    try {
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
@@ -33571,57 +33622,6 @@ if (asOfDate) {
     }
   });
 
-  app.get("/api/vouchers/optional", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const { type, locationId, startDate, endDate, search } = req.query;
-
-      const conditions: any[] = [
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.optional, true),
-        isNull(vouchers.deletedAt),
-      ];
-
-      if (type) {
-        conditions.push(eq(vouchers.voucherType, type as string));
-      }
-      if (locationId) {
-        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
-      }
-      if (startDate) {
-        conditions.push(sql`${vouchers.voucherDate} >= ${startDate as string}`);
-      }
-      if (endDate) {
-        conditions.push(sql`${vouchers.voucherDate} <= ${endDate as string}`);
-      }
-
-      const results = await db
-        .select()
-        .from(vouchers)
-        .where(and(...conditions))
-        .orderBy(sql`${vouchers.voucherDate} DESC`);
-
-      let filtered = results;
-      if (search) {
-        const s = (search as string).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.voucherNumber.toLowerCase().includes(s) ||
-          (r.description || "").toLowerCase().includes(s) ||
-          (r.locationName || "").toLowerCase().includes(s)
-        );
-      }
-
-      res.json(filtered);
-    } catch (error: any) {
-      console.error("Optional vouchers error:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
-    try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -33768,7 +33768,7 @@ if (asOfDate) {
         fileSize: req.file.size,
         fileData,
         description: description || null,
-        uploadedBy: req.user?.id || null,
+        uploadedBy: null,
       }).returning({ id: storedFiles.id });
       res.json({ id: inserted.id, message: "File uploaded successfully" });
     } catch (error: any) {

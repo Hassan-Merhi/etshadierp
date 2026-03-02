@@ -24,6 +24,7 @@ interface StockItem {
   stockItemName: string;
   quantity: string;
   totalCost: string;
+  rate: string;
   containerNumber: string;
   supplierName: string;
   importDate: string;
@@ -38,6 +39,7 @@ interface GroupedStockItem {
     containerNumber: string;
     quantity: number;
     cost: number;
+    rate: number;
     supplierName: string;
   }[];
 }
@@ -102,6 +104,7 @@ export default function StockOTW() {
               stockItemName: item.stockItemName,
               quantity: item.quantity,
               totalCost: item.totalCost,
+              rate: item.rate,
               containerNumber: container.containerNumber,
               supplierName: supplier?.legalName || "Unknown",
               importDate: container.importDate,
@@ -142,6 +145,7 @@ export default function StockOTW() {
         c => c.containerNumber === item.containerNumber
       );
       
+      const itemRate = parseFloat(item.rate || "0");
       if (existingContainer) {
         // Add to existing container
         existingContainer.quantity += isNaN(qty) ? 0 : qty;
@@ -152,6 +156,7 @@ export default function StockOTW() {
           containerNumber: item.containerNumber,
           quantity: isNaN(qty) ? 0 : qty,
           cost: isNaN(cost) ? 0 : cost,
+          rate: isNaN(itemRate) ? 0 : itemRate,
           supplierName: item.supplierName,
         });
       }
@@ -379,7 +384,7 @@ export default function StockOTW() {
                               {Math.round(container.quantity).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              {formatAmount(container.cost)}
+                              {formatAmount(container.rate)}
                             </TableCell>
                             <TableCell className="text-sm">
                               {container.supplierName}
