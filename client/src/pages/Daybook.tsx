@@ -1165,22 +1165,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
     filters.voucherType !== "all" ||
     filters.searchQuery;
 
-  const getVoucherTypeBadgeVariant = (type: string) => {
+  const getVoucherTypeBadge = (type: string): { variant: "default" | "secondary" | "destructive" | "outline"; className?: string } => {
     switch (type) {
-      case "Sales":
-        return "default";
-      case "Purchase":
-        return "secondary";
-      case "Payment":
-        return "destructive";
-      case "Receipt":
-        return "default";
-      case "Journal":
-        return "outline";
-      case "Contra":
-        return "secondary";
-      default:
-        return "outline";
+      case "Sales":    return { variant: "default" };
+      case "Purchase": return { variant: "secondary" };
+      case "Payment":  return { variant: "destructive" };
+      case "Receipt":  return { variant: "default" };
+      case "Journal":  return { variant: "outline" };
+      case "Contra":   return { variant: "secondary" };
+      case "Stock Transfer": return { variant: "outline", className: "bg-green-500 text-white border-green-500 dark:bg-green-600 dark:border-green-600" };
+      default:         return { variant: "outline" };
     }
   };
 
@@ -1367,7 +1361,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge
-                        variant={getVoucherTypeBadgeVariant(voucher.voucherType)}
+                        {...getVoucherTypeBadge(voucher.voucherType)}
                         data-testid={`badge-type-${voucher.id}`}
                       >
                         {voucher.voucherType}
@@ -1461,9 +1455,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Badge
-                            variant={getVoucherTypeBadgeVariant(
-                              voucher.voucherType,
-                            )}
+                            {...getVoucherTypeBadge(voucher.voucherType)}
                             data-testid={`badge-type-${voucher.id}`}
                           >
                             {voucher.voucherType}
@@ -1552,9 +1544,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <p className="text-sm text-muted-foreground">Type</p>
                   <div className="flex gap-2 items-center">
                     <Badge
-                      variant={getVoucherTypeBadgeVariant(
-                        selectedVoucher.voucherType,
-                      )}
+                      {...getVoucherTypeBadge(selectedVoucher.voucherType)}
                     >
                       {selectedVoucher.voucherType}
                     </Badge>

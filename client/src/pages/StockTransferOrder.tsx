@@ -154,6 +154,12 @@ export default function StockTransferOrder() {
     prevDialogOpen.current = quantityPicker.open;
   }, [quantityPicker.open]);
 
+  useEffect(() => {
+    if (focusedCell === null) return;
+    const el = matrixRef.current?.querySelector('[data-focused="true"]');
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusedCell]);
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -787,7 +793,7 @@ export default function StockTransferOrder() {
                                   const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
                                   
                                   return (
-                                    <td key={loc.id} className="p-1 align-middle">
+                                    <td key={loc.id} className="p-1 align-middle" data-focused={isFocused ? "true" : undefined}>
                                       <Button
                                         variant="ghost"
                                         size="sm"
