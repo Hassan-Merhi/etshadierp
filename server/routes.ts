@@ -33733,7 +33733,7 @@ if (asOfDate) {
   // ── File Storage ─────────────────────────────────────────────
   app.get("/api/files", requireAuth, async (req: any, res) => {
     try {
-      const companyId = req.session?.companyId || req.user?.companyId;
+      const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
       const files = await db
         .select({
@@ -33756,7 +33756,7 @@ if (asOfDate) {
 
   app.post("/api/files/upload", requireAuth, upload.single("file"), async (req: any, res) => {
     try {
-      const companyId = req.session?.companyId || req.user?.companyId;
+      const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       const { description } = req.body;
@@ -33778,7 +33778,7 @@ if (asOfDate) {
 
   app.get("/api/files/:id/download", requireAuth, async (req: any, res) => {
     try {
-      const companyId = req.session?.companyId || req.user?.companyId;
+      const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
       const [file] = await db.select().from(storedFiles).where(
         and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId))
@@ -33796,7 +33796,7 @@ if (asOfDate) {
 
   app.delete("/api/files/:id", requireAuth, async (req: any, res) => {
     try {
-      const companyId = req.session?.companyId || req.user?.companyId;
+      const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
       const [deleted] = await db.delete(storedFiles).where(
         and(eq(storedFiles.id, fileId), eq(storedFiles.companyId, companyId))
