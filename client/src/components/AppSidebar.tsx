@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Upload,
   MessageCircle,
+  Layers,
 } from "lucide-react";
 import {
   Sidebar,
@@ -84,6 +85,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Stock Items", url: "/stock-items", icon: Package },
       { title: "Stock Query", url: "/stock-query", icon: Search },
       { title: "Location Summary", url: "/location-summary", icon: Grid3X3 },
+      { title: "Combined Inventory", url: "/combined-inventory", icon: Layers },
       { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
     ],
   },

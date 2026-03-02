@@ -95,6 +95,8 @@ import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
+import CombinedInventory from "@/pages/CombinedInventory";
+import SalesReportDetail from "@/pages/SalesReportDetail";
 import FactoryImport from "@/pages/FactoryImport";
 import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
@@ -205,6 +207,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary />}</Route>
       <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>
       <Route path="/sales-report" component={SalesReport} />
+      <Route path="/sales-report/detail" component={SalesReportDetail} />
+      <Route path="/combined-inventory" component={CombinedInventory} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
       <Route path="/containers/:containerId/verification" component={ContainerVerification} />
