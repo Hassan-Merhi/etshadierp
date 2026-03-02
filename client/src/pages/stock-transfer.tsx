@@ -328,7 +328,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
   useEffect(() => {
     if (itemListRef.current && activeRowIndex !== null) {
-      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
+      const highlightedElement = itemListRef.current.children[0]?.children[highlightedIndex] as HTMLElement;
       if (highlightedElement) {
         highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
