@@ -308,6 +308,8 @@ export default function Analytics() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hideAnalyticsFinancials = (myErpPages?.hiddenErpCostFields ?? []).includes("analytics_financials");
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
@@ -1000,7 +1002,7 @@ export default function Analytics() {
         {activeSection === "overview" && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <Card>
+            {!hideAnalyticsFinancials && <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
                 <DollarSign className="h-4 w-4 text-green-600" />
@@ -1010,9 +1012,9 @@ export default function Analytics() {
                   {profitLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
 
-            <Card>
+            {!hideAnalyticsFinancials && <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
@@ -1022,9 +1024,9 @@ export default function Analytics() {
                   {profitLoading ? "Loading..." : formatCurrency(profitData?.totalExpenses || 0)}
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
 
-            <Card>
+            {!hideAnalyticsFinancials && <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -1038,7 +1040,7 @@ export default function Analytics() {
                   {profitLoading ? "Loading..." : formatCurrency(profitData?.netProfit || 0)}
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
           </div>
 
           {ratiosData && (

@@ -381,6 +381,10 @@ export interface IStorage {
   getErpUserPageAccess(companyId: number, userId: string): Promise<string[]>;
   setErpUserPageAccess(companyId: number, userId: string, pageKeys: string[]): Promise<void>;
 
+  // ERP User Hidden Cost Fields
+  getErpUserHiddenCostFields(userId: string): Promise<string[]>;
+  setErpUserHiddenCostFields(userId: string, fields: string[]): Promise<void>;
+
   // System Settings (global app-wide settings)
   getSystemSetting(key: string): Promise<schema.SystemSetting | undefined>;
   setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting>;
@@ -6206,6 +6210,21 @@ export class DbStorage implements IStorage {
         pageKeys.map(pageKey => ({ companyId, userId, pageKey }))
       );
     }
+  }
+
+  async getErpUserHiddenCostFields(userId: string): Promise<string[]> {
+    const [user] = await db
+      .select({ hiddenErpCostFields: schema.users.hiddenErpCostFields })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    return user?.hiddenErpCostFields ?? [];
+  }
+
+  async setErpUserHiddenCostFields(userId: string, fields: string[]): Promise<void> {
+    await db
+      .update(schema.users)
+      .set({ hiddenErpCostFields: fields })
+      .where(eq(schema.users.id, userId));
   }
 
   // Stock Group Location Archives

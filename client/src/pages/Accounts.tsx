@@ -123,6 +123,8 @@ export default function Accounts() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
@@ -1560,15 +1562,15 @@ export default function Accounts() {
                               <TableHead className="py-2">
                                 Particulars
                               </TableHead>
-                              <TableHead className="text-right w-[120px] py-2">
+                              {!hideBalances && <TableHead className="text-right w-[120px] py-2">
                                 Debit
-                              </TableHead>
-                              <TableHead className="text-right w-[120px] py-2">
+                              </TableHead>}
+                              {!hideBalances && <TableHead className="text-right w-[120px] py-2">
                                 Credit
-                              </TableHead>
-                              <TableHead className="text-right w-[130px] py-2">
+                              </TableHead>}
+                              {!hideBalances && <TableHead className="text-right w-[130px] py-2">
                                 Balance
-                              </TableHead>
+                              </TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1683,17 +1685,17 @@ export default function Accounts() {
                                       <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                     </button>
                                   </TableCell>
-                                  <TableCell className="text-right font-mono py-2">
+                                  {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalDebit > 0
                                       ? formatAmount(voucher.totalDebit)
                                       : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-2">
+                                  </TableCell>}
+                                  {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalCredit > 0
                                       ? formatAmount(voucher.totalCredit)
                                       : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono font-medium py-2">
+                                  </TableCell>}
+                                  {!hideBalances && <TableCell className="text-right font-mono font-medium py-2">
                                     {formatAmount(
                                       Math.abs(voucher.runningBalance ?? 0),
                                     )}{" "}
@@ -1704,7 +1706,7 @@ export default function Accounts() {
                                       : (voucher.runningBalance ?? 0) >= 0
                                         ? "Dr"
                                         : "Cr"}
-                                  </TableCell>
+                                  </TableCell>}
                                 </TableRow>
                               ))
                             )}
@@ -1769,7 +1771,7 @@ export default function Accounts() {
                                     {voucher.voucherDate ? formatDisplayDate(new Date(voucher.voucherDate)) : "-"}
                                   </span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                                {!hideBalances && <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
                                   <div>
                                     <span className="text-muted-foreground block">Debit</span>
                                     <span className="font-mono">
@@ -1791,7 +1793,7 @@ export default function Accounts() {
                                         : (voucher.runningBalance ?? 0) >= 0 ? "Dr" : "Cr"}
                                     </span>
                                   </div>
-                                </div>
+                                </div>}
                               </CardContent>
                             </Card>
                           ))

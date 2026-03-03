@@ -75,6 +75,8 @@ interface StockGroup {
 }
 
 export default function StockItems() {
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
@@ -546,10 +548,10 @@ export default function StockItems() {
                             <span className="text-muted-foreground">Group: </span>
                             <span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span>
                           </div>
-                          <div>
+                          {!hideStockRates && <div>
                             <span className="text-muted-foreground">Price: </span>
                             <span>{formatAmount(item.sellingPrice)}</span>
-                          </div>
+                          </div>}
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <Badge variant={item.active ? "default" : "secondary"} data-testid={`status-mobile-${item.id}`}>

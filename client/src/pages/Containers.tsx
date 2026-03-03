@@ -113,6 +113,8 @@ export default function Containers() {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const tableRef = useRef<HTMLTableElement>(null);
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
 
   const trackingFields = [
     "shopName",
@@ -1005,7 +1007,7 @@ export default function Containers() {
                         </TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Grand Total</TableHead>
+                        {!hideContainerCosts && <TableHead>Grand Total</TableHead>}
                         <TableHead>Import Date</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -1033,11 +1035,11 @@ export default function Containers() {
                               {container.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono">
+                          {!hideContainerCosts && <TableCell className="font-mono">
                             {formatAmount(
                               parseFloat(container.grandTotal || "0")
                             )}
-                          </TableCell>
+                          </TableCell>}
                           <TableCell className="font-mono">
                             {new Date(
                               container.importDate,
@@ -1079,9 +1081,9 @@ export default function Containers() {
                           {getSupplierName(container.supplierId)}
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="font-mono font-semibold">
+                          {!hideContainerCosts && <span className="font-mono font-semibold">
                             {formatAmount(parseFloat(container.grandTotal || "0"))}
-                          </span>
+                          </span>}
                           <span className="text-xs text-muted-foreground">
                             {new Date(container.importDate).toLocaleDateString()}
                           </span>

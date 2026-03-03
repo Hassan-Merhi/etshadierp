@@ -393,6 +393,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
+  const hideAmounts = hiddenErpCosts.includes("daybook_amounts");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
   const [filters, setFilters] = useState({
     voucherType: "all",
@@ -1637,7 +1640,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     </TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    {!hideAmounts && <TableHead className="text-right">Amount</TableHead>}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1659,9 +1662,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           <TableCell className="max-w-md truncate">
                             {o.containerNumber}{o.locationName ? ` — ${o.locationName}` : ""}
                           </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
+                          {!hideAmounts && <TableCell className="text-right font-mono font-medium">
                             {formatAmount(Number(o.itemsTotal))}
-                          </TableCell>
+                          </TableCell>}
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
@@ -1724,9 +1727,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
                               : "-")}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
+                        {!hideAmounts && <TableCell className="text-right font-mono font-medium">
                           {formatAmount(voucher.totalAmount)}
-                        </TableCell>
+                        </TableCell>}
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button

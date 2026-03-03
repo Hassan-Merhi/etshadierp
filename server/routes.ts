@@ -34039,6 +34039,36 @@ if (asOfDate) {
   );
 
   app.get(
+    "/api/erp-user-hidden-costs/:userId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const fields = await storage.getErpUserHiddenCostFields(req.params.userId);
+        res.json({ hiddenCostFields: fields });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.put(
+    "/api/erp-user-hidden-costs/:userId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { hiddenCostFields } = req.body;
+        if (!Array.isArray(hiddenCostFields)) return res.status(400).json({ message: "hiddenCostFields must be an array" });
+        await storage.setErpUserHiddenCostFields(req.params.userId, hiddenCostFields);
+        res.json({ message: "Cost visibility updated", hiddenCostFields });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.get(
     "/api/my-erp-pages",
     requireAuth,
     async (req, res) => {
@@ -34047,12 +34077,13 @@ if (asOfDate) {
         const role = req.session.currentRole;
         const userId = req.user?.id;
         if (!companyId || !role || !userId) return res.status(400).json({ message: "No company or role selected" });
+        const hiddenErpCostFields = await storage.getErpUserHiddenCostFields(userId);
         if (role === "Admin") {
           const { FEATURE_KEYS } = await import("@shared/schema");
-          return res.json({ pageKeys: [...FEATURE_KEYS], fullAccess: true });
+          return res.json({ pageKeys: [...FEATURE_KEYS], fullAccess: true, hiddenErpCostFields: [] });
         }
         const pageKeys = await storage.getErpUserPageAccess(companyId, userId);
-        res.json({ pageKeys, fullAccess: false });
+        res.json({ pageKeys, fullAccess: false, hiddenErpCostFields });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }

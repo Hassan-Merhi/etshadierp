@@ -561,6 +561,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const isFactoryCompany = selectedCompany?.companyType === "factory";
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hideVoucherAmounts = (myErpPages?.hiddenErpCostFields ?? []).includes("voucher_amounts");
   const [isAutoCreating, setIsAutoCreating] = useState(false);
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount, selectedCurrency, convertToUSD, exchangeRate: dailyExchangeRate } = useCurrencyContext();
