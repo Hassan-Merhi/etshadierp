@@ -3167,14 +3167,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {offloadDetail.items.map((item) => (
                           <tr key={item.id} className="border-b last:border-0">
                             <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.quantity))}</td>
+                            <td className="p-3 text-right font-mono">{formatNumber(Number(item.quantity))}</td>
                             <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
                             <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
                           </tr>
                         ))}
                         <tr className="border-t-2 bg-muted/20 font-medium">
                           <td className="p-3">Total</td>
-                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.quantity), 0))}</td>
+                          <td className="p-3 text-right font-mono">{formatNumber(offloadDetail.items.reduce((s, i) => s + Number(i.quantity), 0))}</td>
                           <td></td>
                           <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.totalValue), 0))}</td>
                         </tr>
@@ -3184,7 +3184,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <div className="grid grid-cols-2 gap-4 text-sm mt-3">
                     <div>
                       <p className="text-muted-foreground">Total Bales</p>
-                      <p className="font-medium font-mono">BL {formatNumber(Number(selectedOffload.totalBales))}</p>
+                      <p className="font-medium font-mono">{formatNumber(Number(selectedOffload.totalBales))}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Additional Cost / Bale</p>
