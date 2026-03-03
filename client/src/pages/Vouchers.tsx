@@ -4409,7 +4409,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/stock-transfer-order?edit=${voucherIdToEdit}`)}
+                    onClick={() => setLocation(`/stock-transfer-order?edit=${voucherIdToEdit}`)}
                     data-testid="button-switch-to-order-view"
                   >
                     <LayoutGrid className="h-4 w-4 mr-2" />
