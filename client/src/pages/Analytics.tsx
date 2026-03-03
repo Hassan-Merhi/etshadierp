@@ -1940,7 +1940,7 @@ export default function Analytics() {
                     {/* Gross Profit c/o */}
                     <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
                       <span>Gross Profit c/o</span>
-                      <span className={`font-mono ${netProfitData.leftPane.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className="font-mono">
                         {formatAmount(Math.abs(netProfitData.leftPane.grossProfit))}
                       </span>
                     </div>
@@ -2047,7 +2047,7 @@ export default function Analytics() {
                     {/* Gross Profit b/f */}
                     <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
                       <span>Gross Profit b/f</span>
-                      <span className={`font-mono ${(netProfitData.rightPane?.grossProfitBf || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className="font-mono">
                         {formatAmount(Math.abs(netProfitData.rightPane?.grossProfitBf || 0))}
                       </span>
                     </div>
