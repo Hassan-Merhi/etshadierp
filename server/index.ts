@@ -197,6 +197,23 @@ app.use((req, res, next) => {
     )`,
     `CREATE INDEX IF NOT EXISTS login_history_user_idx ON login_history(user_id)`,
     `CREATE INDEX IF NOT EXISTS login_history_login_at_idx ON login_history(login_at)`,
+    // ── Add missing columns to companies table ────────────────────────────────
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type text NOT NULL DEFAULT 'erp'`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS base_currency varchar(10) DEFAULT 'USD'`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS display_currency varchar(10)`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
+    // ── Create exchange_rates table ────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS exchange_rates (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      from_currency varchar(10) NOT NULL,
+      to_currency varchar(10) NOT NULL,
+      rate decimal(20,6) NOT NULL,
+      effective_date date NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS exchange_rates_company_idx ON exchange_rates(company_id)`,
+    `CREATE INDEX IF NOT EXISTS exchange_rates_date_idx ON exchange_rates(effective_date)`,
     // ── Add missing columns to existing tables ─────────────────────────────────
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden_erp_cost_fields text[] NOT NULL DEFAULT '{}'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS chatbot_enabled boolean NOT NULL DEFAULT false`,
