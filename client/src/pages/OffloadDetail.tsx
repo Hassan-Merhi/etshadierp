@@ -63,7 +63,7 @@ export default function OffloadDetail() {
   });
 
   const itemsTotal = offload?.items.reduce((s, i) => s + Number(i.totalValue), 0) ?? 0;
-  const grandTotal = itemsTotal + Number(offload?.totalCharges ?? 0);
+  const grandTotal = itemsTotal;
 
   return (
     <div className="w-full p-4 sm:p-8 space-y-6">
@@ -198,7 +198,7 @@ export default function OffloadDetail() {
 
           <div className="border rounded-md p-4 flex items-center justify-between bg-muted/20">
             <div>
-              <p className="text-sm text-muted-foreground">Grand Total (Stock + Charges)</p>
+              <p className="text-sm text-muted-foreground">Grand Total (charges included in rates)</p>
               <p className="text-2xl font-semibold font-mono mt-0.5">{formatAmount(grandTotal)}</p>
             </div>
             <Button
