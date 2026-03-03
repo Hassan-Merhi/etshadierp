@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown } from "lucide-react";
+import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,7 +111,13 @@ const STORAGE_KEY = "stockTransferOrder_selectedLocations";
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
-  
+
+  const editVoucherId = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("edit");
+    return v ? parseInt(v) : null;
+  })();
+
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
@@ -135,6 +141,7 @@ export default function StockTransferOrder() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transferDate, setTransferDate] = useState<Date>(new Date());
   const [isOptional, setIsOptional] = useState(false);
+  const [editDataLoaded, setEditDataLoaded] = useState(false);
   
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -142,8 +149,48 @@ export default function StockTransferOrder() {
   const prevDialogOpen = useRef(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
-  }, [selectedLocationIds]);
+    if (!editVoucherId) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
+    }
+  }, [selectedLocationIds, editVoucherId]);
+
+  useEffect(() => {
+    if (editVoucherId && existingTransfer && existingVoucher && locations.length > 0 && stockItems.length > 0 && !editDataLoaded) {
+      const destId = existingTransfer.destinationLocationId;
+      if (destId) setDestinationLocationId(destId);
+
+      if (existingVoucher.voucherDate) {
+        setTransferDate(new Date(existingVoucher.voucherDate));
+      }
+      if (existingVoucher.optional !== undefined) {
+        setIsOptional(existingVoucher.optional);
+      }
+
+      if (existingTransfer.items && existingTransfer.items.length > 0) {
+        const sourceIds = Array.from(new Set<number>(existingTransfer.items.map((i: any) => i.sourceLocationId).filter(Boolean)));
+        setSelectedLocationIds(sourceIds as number[]);
+
+        const preloaded: OrderItem[] = existingTransfer.items.map((item: any) => {
+          const srcLoc = locations.find((l) => l.id === item.sourceLocationId);
+          const stockItem = stockItems.find((s) => s.id === item.stockItemId);
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: stockItem?.name || "",
+            stockItemCode: stockItem?.code || "",
+            uom: stockItem?.uom || "",
+            sourceLocationId: item.sourceLocationId,
+            sourceLocationName: srcLoc?.name || "",
+            quantity: parseFloat(item.quantity) || 0,
+            availableQty: parseFloat(item.quantity) || 0,
+            rate: parseFloat(item.rate) || 0,
+          };
+        });
+        setOrderItems(preloaded);
+      }
+
+      setEditDataLoaded(true);
+    }
+  }, [editVoucherId, existingTransfer, existingVoucher, locations, stockItems, editDataLoaded]);
 
   useEffect(() => {
     if (prevDialogOpen.current && !quantityPicker.open) {
@@ -162,6 +209,31 @@ export default function StockTransferOrder() {
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: existingTransfer } = useQuery<any>({
+    queryKey: ["/api/stock-transfers", editVoucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transfer");
+      return res.json();
+    },
+    enabled: !!editVoucherId,
+  });
+
+  const { data: existingVoucher } = useQuery<any>({
+    queryKey: ["/api/vouchers", editVoucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/vouchers/${editVoucherId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch voucher");
+      return res.json();
+    },
+    enabled: !!editVoucherId,
+  });
+
+  const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
+    queryKey: ["/api/stock-items"],
+    enabled: !!editVoucherId,
   });
 
   const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
@@ -476,25 +548,44 @@ export default function StockTransferOrder() {
 
   const processOrderMutation = useMutation({
     mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number; voucherDate: string; optional: boolean }) => {
-      const response = await apiRequest("POST", "/api/stock-transfers", {
-        destinationLocationId: data.destinationLocationId,
-        notes: `Stock Transfer Order - ${data.orderItems.length} items`,
-        voucherDate: data.voucherDate,
-        optional: data.optional,
-        items: data.orderItems.map(item => ({
-          stockItemId: item.stockItemId,
-          sourceLocationId: item.sourceLocationId,
-          quantity: item.quantity.toString(),
-        })),
-      });
-      return response.json();
+      if (editVoucherId && existingTransfer?.id) {
+        await apiRequest("PATCH", `/api/vouchers/${editVoucherId}`, {
+          voucherDate: data.voucherDate,
+          optional: data.optional,
+        });
+        const response = await apiRequest("PUT", `/api/stock-transfers/${existingTransfer.id}`, {
+          destinationLocationId: data.destinationLocationId,
+          notes: `Stock Transfer Order - ${data.orderItems.length} items`,
+          items: data.orderItems.map(item => ({
+            stockItemId: item.stockItemId,
+            sourceLocationId: item.sourceLocationId,
+            quantity: item.quantity,
+            rate: item.rate,
+          })),
+        });
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/stock-transfers", {
+          destinationLocationId: data.destinationLocationId,
+          notes: `Stock Transfer Order - ${data.orderItems.length} items`,
+          voucherDate: data.voucherDate,
+          optional: data.optional,
+          items: data.orderItems.map(item => ({
+            stockItemId: item.stockItemId,
+            sourceLocationId: item.sourceLocationId,
+            quantity: item.quantity.toString(),
+          })),
+        });
+        return response.json();
+      }
     },
     onSuccess: () => {
       toast({
-        title: "Order Processed",
-        description: "Successfully created stock transfer voucher",
+        title: editVoucherId ? "Order Updated" : "Order Processed",
+        description: editVoucherId ? "Successfully updated stock transfer voucher" : "Successfully created stock transfer voucher",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", editVoucherId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
     },
@@ -529,7 +620,9 @@ export default function StockTransferOrder() {
         voucherDate: format(transferDate, "yyyy-MM-dd"),
         optional: isOptional,
       });
-      setOrderItems([]);
+      if (!editVoucherId) {
+        setOrderItems([]);
+      }
       setValidationErrors([]);
     } finally {
       setIsProcessing(false);
@@ -543,10 +636,10 @@ export default function StockTransferOrder() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="heading-stock-transfer-order">
-            Stock Transfer Order
+            {editVoucherId ? "Edit Stock Transfer Order" : "Stock Transfer Order"}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Build orders by selecting items from multiple source locations
+            {editVoucherId ? "Edit and update this stock transfer using the order view" : "Build orders by selecting items from multiple source locations"}
           </p>
         </div>
         
@@ -647,6 +740,18 @@ export default function StockTransferOrder() {
               Optional
             </Label>
           </div>
+
+          {editVoucherId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/vouchers?edit=${editVoucherId}&tab=transfer`)}
+              data-testid="button-switch-to-normal-view"
+            >
+              <List className="h-4 w-4 mr-2" />
+              Normal View
+            </Button>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -912,7 +1017,7 @@ export default function StockTransferOrder() {
                         className="flex-1"
                         data-testid="button-process-order"
                       >
-                        {isProcessing ? "Processing..." : "Process"}
+                        {isProcessing ? (editVoucherId ? "Updating..." : "Processing...") : (editVoucherId ? "Update Order" : "Process")}
                       </Button>
                     </div>
                   </div>

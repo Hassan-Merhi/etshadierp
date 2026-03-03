@@ -79,7 +79,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -4403,6 +4403,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 />
 
                 <div className="flex-1" />
+
+                {!isPOS && voucherIdToEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/stock-transfer-order?edit=${voucherIdToEdit}`)}
+                    data-testid="button-switch-to-order-view"
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Order View
+                  </Button>
+                )}
 
                 {!isPOS && (
                   <Button
