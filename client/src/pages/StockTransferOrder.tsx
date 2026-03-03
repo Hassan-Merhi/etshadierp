@@ -148,6 +148,51 @@ export default function StockTransferOrder() {
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const prevDialogOpen = useRef(false);
 
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const { data: existingTransfer } = useQuery<any>({
+    queryKey: ["/api/stock-transfers", editVoucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch transfer");
+      return res.json();
+    },
+    enabled: !!editVoucherId,
+  });
+
+  const { data: existingVoucher } = useQuery<any>({
+    queryKey: ["/api/vouchers", editVoucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/vouchers/${editVoucherId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch voucher");
+      return res.json();
+    },
+    enabled: !!editVoucherId,
+  });
+
+  const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
+    queryKey: ["/api/stock-items"],
+    enabled: !!editVoucherId,
+  });
+
+  const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
+    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(',') }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedLocationIds.length > 0) {
+        params.append('locationIds', selectedLocationIds.join(','));
+      }
+      const res = await fetch(`/api/location-summary?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch location summary');
+      return res.json();
+    },
+    enabled: selectedLocationIds.length > 0,
+  });
+
   useEffect(() => {
     if (!editVoucherId) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -206,51 +251,6 @@ export default function StockTransferOrder() {
     const el = matrixRef.current?.querySelector('[data-focused="true"]');
     el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusedCell]);
-
-  const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-  });
-
-  const { data: existingTransfer } = useQuery<any>({
-    queryKey: ["/api/stock-transfers", editVoucherId],
-    queryFn: async () => {
-      const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch transfer");
-      return res.json();
-    },
-    enabled: !!editVoucherId,
-  });
-
-  const { data: existingVoucher } = useQuery<any>({
-    queryKey: ["/api/vouchers", editVoucherId],
-    queryFn: async () => {
-      const res = await fetch(`/api/vouchers/${editVoucherId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch voucher");
-      return res.json();
-    },
-    enabled: !!editVoucherId,
-  });
-
-  const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
-    queryKey: ["/api/stock-items"],
-    enabled: !!editVoucherId,
-  });
-
-  const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
-    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(',') }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedLocationIds.length > 0) {
-        params.append('locationIds', selectedLocationIds.join(','));
-      }
-      const res = await fetch(`/api/location-summary?${params.toString()}`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to fetch location summary');
-      return res.json();
-    },
-    enabled: selectedLocationIds.length > 0,
-  });
 
   const selectedLocations = selectedLocationIds
     .map(id => locations.find(loc => loc.id === id))

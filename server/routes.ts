@@ -14063,8 +14063,6 @@ if (asOfDate) {
     }
   });
 
-  app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
-    try {
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
@@ -33622,6 +33620,8 @@ if (asOfDate) {
     }
   });
 
+  app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
+    try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
