@@ -65,6 +65,7 @@ import OrphanedRecords from "@/pages/OrphanedRecords";
 import DeletedItems from "@/pages/DeletedItems";
 import ChatbotSettings from "@/pages/ChatbotSettings";
 import PurchaseOrderEdit from "@/pages/PurchaseOrderEdit";
+import OffloadDetail from "@/pages/OffloadDetail";
 import StockItemHistory from "@/pages/StockItemHistory";
 import StockItemVouchers from "@/pages/StockItemVouchers";
 import LocationMonthlySummary from "@/pages/LocationMonthlySummary";
@@ -182,6 +183,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
+      <Route path="/offloads/:id" component={OffloadDetail} />
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/pos-import" component={POSImport} />

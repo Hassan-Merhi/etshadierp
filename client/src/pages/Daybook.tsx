@@ -406,8 +406,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [editFormInitialized, setEditFormInitialized] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
-  const [offloadViewOpen, setOffloadViewOpen] = useState(false);
-  const [selectedOffload, setSelectedOffload] = useState<OffloadListItem | null>(null);
 
   // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -701,11 +699,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     enabled: !!selectedCompany,
   });
 
-  // Fetch full offload detail when viewing
-  const { data: offloadDetail, isLoading: offloadDetailLoading } = useQuery<OffloadDetail>({
-    queryKey: selectedOffload ? [`/api/offloads/${selectedOffload.id}`] : [],
-    enabled: !!selectedOffload && offloadViewOpen,
-  });
 
   // Fetch account names for Payment/Receipt/Journal vouchers
   useEffect(() => {
@@ -1541,7 +1534,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => { setSelectedOffload(o); setOffloadViewOpen(true); }}
+                          onClick={() => navigate(`/offloads/${o.id}`)}
                           data-testid={`button-view-offload-${o.id}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -1674,7 +1667,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => { setSelectedOffload(o); setOffloadViewOpen(true); }}
+                                onClick={() => navigate(`/offloads/${o.id}`)}
                                 data-testid={`button-view-offload-${o.id}`}
                               >
                                 <Eye className="w-4 h-4" />
@@ -3113,139 +3106,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <div className="space-y-2">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Offload View Dialog */}
-      <Dialog open={offloadViewOpen} onOpenChange={setOffloadViewOpen}>
-        <DialogContent className="w-full max-w-[95vw] md:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Offload Details</DialogTitle>
-            <DialogDescription>
-              {selectedOffload ? `Container ${selectedOffload.containerNumber}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedOffload && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">{formatDisplayDate(parseISO(selectedOffload.offloadedAt.slice(0, 10)))}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Container</p>
-                  <p className="font-medium">{selectedOffload.containerNumber}</p>
-                </div>
-                {selectedOffload.locationName && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Location</p>
-                    <p className="font-medium">{selectedOffload.locationName}</p>
-                  </div>
-                )}
-              </div>
-
-              {offloadDetailLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              ) : offloadDetail?.items && offloadDetail.items.length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium mb-2">Stock Items</p>
-                  <div className="border rounded-md overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/40">
-                          <th className="text-left p-3 font-medium">Item</th>
-                          <th className="text-right p-3 font-medium">Qty</th>
-                          <th className="text-right p-3 font-medium">Rate</th>
-                          <th className="text-right p-3 font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {offloadDetail.items.map((item) => (
-                          <tr key={item.id} className="border-b last:border-0">
-                            <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
-                            <td className="p-3 text-right font-mono">{formatNumber(Number(item.quantity))}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
-                          </tr>
-                        ))}
-                        <tr className="border-t-2 bg-muted/20 font-medium">
-                          <td className="p-3">Total</td>
-                          <td className="p-3 text-right font-mono">{formatNumber(offloadDetail.items.reduce((s, i) => s + Number(i.quantity), 0))}</td>
-                          <td></td>
-                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.totalValue), 0))}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mt-3">
-                    <div>
-                      <p className="text-muted-foreground">Total Bales</p>
-                      <p className="font-medium font-mono">{formatNumber(Number(selectedOffload.totalBales))}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Additional Cost / Bale</p>
-                      <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.additionalCostPerBale))}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="border rounded-md">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="text-left p-3 font-medium">Charge</th>
-                      <th className="text-right p-3 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Number(selectedOffload.duties) !== 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Duties</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.duties))}</td>
-                      </tr>
-                    )}
-                    {Number(selectedOffload.officeCharges) !== 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Office Charges</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.officeCharges))}</td>
-                      </tr>
-                    )}
-                    {Number(selectedOffload.transferCharges) !== 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Transfer Charges</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.transferCharges))}</td>
-                      </tr>
-                    )}
-                    {Number(selectedOffload.transportFees) !== 0 && (
-                      <tr className="border-b">
-                        <td className="p-3">Transport Fees</td>
-                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.transportFees))}</td>
-                      </tr>
-                    )}
-                    <tr className="bg-muted/20 font-medium">
-                      <td className="p-3">Total Charges</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.totalCharges))}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { setOffloadViewOpen(false); navigate(`/containers/${selectedOffload.containerId}`); }}
-                  data-testid="button-goto-container-dialog"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Container
-                </Button>
-              </div>
             </div>
           )}
         </DialogContent>
