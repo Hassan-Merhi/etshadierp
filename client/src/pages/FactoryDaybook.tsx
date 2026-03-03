@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { BookOpen, Edit, History, List, AlignJustify } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -74,8 +75,16 @@ function formatTxType(type: string): string {
   return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const VOUCHER_TX_TYPES: Record<string, string> = {
+  PAYMENT: "payment",
+  RECEIPT: "receipt",
+  INVOICE: "receipt",
+  FREIGHT_PAYMENT: "payment",
+};
+
 export default function FactoryDaybook() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const today = new Date().toISOString().split("T")[0];
 
   const { data: currentUser } = useQuery<any>({
@@ -156,6 +165,14 @@ export default function FactoryDaybook() {
     setEditAmountCurrency(entry.amountCurrency);
     setEditAmountUsd(entry.amountUsd);
     setEditReason("");
+  };
+
+  const handleEntryClick = (entry: DaybookEntry, e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const tab = VOUCHER_TX_TYPES[entry.txType];
+    if (tab && entry.referenceId) {
+      navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
+    }
   };
 
   const handleEditSubmit = () => {
@@ -321,8 +338,15 @@ export default function FactoryDaybook() {
                               </div>
                             </TableCell>
                           </TableRow>
-                          {isExpanded && dayEntries.map((entry) => (
-                            <TableRow key={`expanded-${entry.id}`} className="bg-muted/40" data-testid={`row-expanded-${entry.id}`}>
+                          {isExpanded && dayEntries.map((entry) => {
+                            const isClickable = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId;
+                            return (
+                            <TableRow
+                              key={`expanded-${entry.id}`}
+                              className={`bg-muted/40${isClickable ? " cursor-pointer hover-elevate" : ""}`}
+                              data-testid={`row-expanded-${entry.id}`}
+                              onClick={isClickable ? (e) => handleEntryClick(entry, e) : undefined}
+                            >
                               <TableCell className="pl-6 text-xs text-muted-foreground font-mono whitespace-nowrap" colSpan={1}>
                                 {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
                               </TableCell>
@@ -338,7 +362,8 @@ export default function FactoryDaybook() {
                                 {entry.description}
                               </TableCell>
                             </TableRow>
-                          ))}
+                          );
+                          })}
                         </tbody>
                       );
                     })}
@@ -368,8 +393,15 @@ export default function FactoryDaybook() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id} data-testid={`row-daybook-${entry.id}`}>
+                  {entries.map((entry) => {
+                    const isClickable = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId;
+                    return (
+                    <TableRow
+                      key={entry.id}
+                      data-testid={`row-daybook-${entry.id}`}
+                      className={isClickable ? "cursor-pointer hover-elevate" : ""}
+                      onClick={isClickable ? (e) => handleEntryClick(entry, e) : undefined}
+                    >
                       <TableCell className="font-mono text-sm whitespace-nowrap">
                         {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
                       </TableCell>
@@ -406,7 +438,8 @@ export default function FactoryDaybook() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                  })}
                 </TableBody>
               </Table>
             </div>

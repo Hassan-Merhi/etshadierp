@@ -552,11 +552,12 @@ export default function Accounts() {
       "Credit Note": "credit-note",
       "Debit Note": "credit-note",
     };
+    const base = appMode === "factory" ? "/factory" : "";
     const tabName = voucherTypeMap[voucher.voucherType];
     if (tabName) {
-      navigate(`/vouchers?edit=${voucher.voucherId}&tab=${tabName}`);
+      navigate(`${base}/vouchers?edit=${voucher.voucherId}&tab=${tabName}`);
     } else {
-      navigate(`/vouchers/${voucher.voucherId}/edit`);
+      navigate(`${base}/vouchers/${voucher.voucherId}/edit`);
     }
   };
 
