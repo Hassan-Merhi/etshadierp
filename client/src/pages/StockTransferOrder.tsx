@@ -588,6 +588,9 @@ export default function StockTransferOrder() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", editVoucherId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+      if (editVoucherId) {
+        navigate("/daybook");
+      }
     },
     onError: (error: any) => {
       toast({
