@@ -129,11 +129,13 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     } else if (curr === "CFA" && !exchangeRate) {
       // No exchange rate available - show USD with warning
       console.warn("[Currency] No exchange rate available, displaying in USD");
-      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const isWhole = Math.abs(numAmount) % 1 === 0;
+      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     }
     
     if (curr === "USD") {
-      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const isWhole = Math.abs(numAmount) % 1 === 0;
+      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     } else {
       return `CFA ${Math.round(displayAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }

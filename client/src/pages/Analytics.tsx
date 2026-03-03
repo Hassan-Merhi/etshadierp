@@ -1775,6 +1775,30 @@ export default function Analytics() {
                 ))}
               </div>
             ) : netProfitData ? (
+              <div className="space-y-6">
+                {/* Net Profit Summary — matches Dashboard "Net Profit" */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="border rounded-lg p-4 text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Total Income</p>
+                    <p className="text-xl font-bold text-green-600 font-mono">
+                      {profitLoading ? "..." : formatAmount(profitData?.totalIncome || 0)}
+                    </p>
+                  </div>
+                  <div className="border rounded-lg p-4 text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Total Expenses</p>
+                    <p className="text-xl font-bold text-red-600 font-mono">
+                      {profitLoading ? "..." : formatAmount(profitData?.totalExpenses || 0)}
+                    </p>
+                  </div>
+                  <div className={`border-2 rounded-lg p-4 text-center ${(profitData?.netProfit || 0) >= 0 ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-red-500 bg-red-50 dark:bg-red-950/20'}`}>
+                    <p className="text-sm text-muted-foreground mb-1">Net Profit</p>
+                    <p className={`text-xl font-bold font-mono ${(profitData?.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {profitLoading ? "..." : formatAmount(Math.abs(profitData?.netProfit || 0))}
+                      {(profitData?.netProfit || 0) < 0 && ' (Loss)'}
+                    </p>
+                  </div>
+                </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Pane */}
                 <div className="border rounded-lg overflow-hidden">
@@ -2084,6 +2108,7 @@ export default function Analytics() {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
