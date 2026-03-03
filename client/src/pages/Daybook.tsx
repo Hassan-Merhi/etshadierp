@@ -485,6 +485,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // State to store cash account balance
   const [cashAccountBalance, setCashAccountBalance] = useState<string>("0");
 
+  // State to store per-entry balances for the entries table
+  const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
+
   // Fetch balance when cash account ID is available and dialog is open
   useEffect(() => {
     const fetchBalance = async () => {
@@ -506,6 +509,46 @@ export default function Daybook({ user }: { user?: any } = {}) {
     };
     fetchBalance();
   }, [cashAccountId, viewDialogOpen]);
+
+  // Fetch balances for all displayed entries in Payment/Receipt/Journal vouchers
+  useEffect(() => {
+    if (!viewDialogOpen || !selectedVoucher) {
+      setEntryBalances({});
+      return;
+    }
+    const type = selectedVoucher.voucherType;
+    if (type !== "Payment" && type !== "Receipt" && type !== "Journal") {
+      setEntryBalances({});
+      return;
+    }
+
+    const displayEntries = viewVoucherEntries.filter((entry: ViewVoucherEntry) => {
+      if (type === "Payment") return parseFloat(entry.debitAmount || "0") > 0;
+      if (type === "Receipt") return parseFloat(entry.creditAmount || "0") > 0;
+      return true;
+    });
+
+    const fetchAll = async () => {
+      const results: Record<number, string> = {};
+      await Promise.all(
+        displayEntries.map(async (entry: ViewVoucherEntry) => {
+          const accountId = entry.ledgerAccountId || entry.bankAccountId;
+          if (!accountId) return;
+          try {
+            const res = await fetch(`/api/accounts/ledger/${accountId}/balance`, { credentials: "include" });
+            if (res.ok) {
+              const data = await res.json();
+              results[accountId] = data.balance?.toString() || "0";
+            }
+          } catch {
+            // ignore individual failures
+          }
+        })
+      );
+      setEntryBalances(results);
+    };
+    fetchAll();
+  }, [viewDialogOpen, selectedVoucher, viewVoucherEntries]);
 
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<
@@ -2298,6 +2341,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <div className="font-medium">
                                   {entry.accountName}
                                 </div>
+                                {(selectedVoucher.voucherType === "Payment" ||
+                                  selectedVoucher.voucherType === "Receipt" ||
+                                  selectedVoucher.voucherType === "Journal") && (
+                                  <div className="text-xs text-muted-foreground mt-0.5">
+                                    Balance: {formatAmount(entryBalances[entry.ledgerAccountId! || entry.bankAccountId!] ?? "0")}
+                                  </div>
+                                )}
                               </TableCell>
                               {selectedVoucher.voucherType === "Payment" ||
                               selectedVoucher.voucherType === "Receipt" ||
