@@ -8,6 +8,14 @@ import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db } from "./db";
 
+// Global error handlers — prevent unhandled rejections from crashing the process in production
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[UnhandledRejection]", reason?.message || reason);
+});
+process.on("uncaughtException", (err: Error) => {
+  console.error("[UncaughtException]", err.message, err.stack);
+});
+
 // Build version for cache busting and deployment tracking
 const BUILD_VERSION = process.env.BUILD_VERSION || 
                       process.env.RENDER_GIT_COMMIT?.substring(0, 8) || 
@@ -150,12 +158,48 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Run database migrations to ensure all columns exist in production
+  // Run database migrations to ensure all tables and columns exist in production
   const migrations = [
-    // users table
+    // ── Create missing tables ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS user_presence (
+      id serial PRIMARY KEY,
+      session_id varchar(255) NOT NULL,
+      user_id varchar NOT NULL,
+      username text NOT NULL,
+      current_route text NOT NULL DEFAULT '/',
+      company_id integer,
+      company_name text,
+      role text,
+      last_seen timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT user_presence_session_unique UNIQUE (session_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS direct_messages (
+      id serial PRIMARY KEY,
+      sender_id varchar NOT NULL,
+      receiver_id varchar NOT NULL,
+      message text NOT NULL,
+      read_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS direct_messages_sender_idx ON direct_messages(sender_id)`,
+    `CREATE INDEX IF NOT EXISTS direct_messages_receiver_idx ON direct_messages(receiver_id)`,
+    `CREATE TABLE IF NOT EXISTS login_history (
+      id serial PRIMARY KEY,
+      user_id varchar NOT NULL,
+      username text NOT NULL,
+      company_id integer,
+      company_name text,
+      ip_address text,
+      user_agent text,
+      city text,
+      country text,
+      login_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS login_history_user_idx ON login_history(user_id)`,
+    `CREATE INDEX IF NOT EXISTS login_history_login_at_idx ON login_history(login_at)`,
+    // ── Add missing columns to existing tables ─────────────────────────────────
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden_erp_cost_fields text[] NOT NULL DEFAULT '{}'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS chatbot_enabled boolean NOT NULL DEFAULT false`,
-    // user_company_roles table
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_sell_negative_stock boolean NOT NULL DEFAULT false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS daybook_edit_days integer NOT NULL DEFAULT 0`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_access_customers boolean NOT NULL DEFAULT false`,
@@ -166,10 +210,10 @@ app.use((req, res, next) => {
     try {
       await db.execute(migration);
     } catch (err: any) {
-      console.warn(`Migration skipped: ${err.message}`);
+      console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
     }
   }
-  console.log("✓ Database columns verified/migrated");
+  console.log("✓ Database tables and columns verified/migrated");
 
   // Build info endpoint for frontend version checking (must be before registerRoutes)
   app.get("/api/build-info", (_req, res) => {
