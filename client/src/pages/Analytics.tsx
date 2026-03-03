@@ -1843,7 +1843,7 @@ export default function Analytics() {
                       </div>
                       {expandedNetProfitSections.has("purchaseAccounts") && netProfitData.leftPane.purchaseAccounts.accounts.length > 0 && (
                         <div className="bg-muted/30 divide-y">
-                          {netProfitData.leftPane.purchaseAccounts.accounts.map((acc) => (
+                          {netProfitData.leftPane.purchaseAccounts.accounts.filter((acc) => Number(acc.debit) !== 0 || Number(acc.credit) !== 0).map((acc) => (
                             <div 
                               key={acc.id} 
                               className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
@@ -1864,7 +1864,7 @@ export default function Analytics() {
                     </div>
 
                     {/* Direct Incomes - Moved to Right Pane (Credit side) */}
-                    {(netProfitData.rightPane?.directIncomes?.count ?? 0) > 0 && (
+                    {(netProfitData.rightPane?.directIncomes?.accounts?.filter((a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0).length ?? 0) > 0 && (
                       <div>
                         <div 
                           className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
@@ -1879,14 +1879,14 @@ export default function Analytics() {
                             )}
                             Direct Incomes
                             <span className="text-xs text-muted-foreground">
-                              ({netProfitData.rightPane!.directIncomes.count})
+                              ({netProfitData.rightPane!.directIncomes.accounts.filter((a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0).length})
                             </span>
                           </span>
                           <span className="font-mono">{formatAmount(netProfitData.rightPane!.directIncomes.total)}</span>
                         </div>
-                        {expandedNetProfitSections.has("directIncomes") && netProfitData.rightPane!.directIncomes.accounts.length > 0 && (
+                        {expandedNetProfitSections.has("directIncomes") && (
                           <div className="bg-muted/30 divide-y">
-                            {netProfitData.rightPane!.directIncomes.accounts.map((acc) => (
+                            {netProfitData.rightPane!.directIncomes.accounts.filter((a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0).map((acc) => (
                               <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                                 <span>{acc.name}</span>
                                 <span className="font-mono">
@@ -1900,7 +1900,7 @@ export default function Analytics() {
                     )}
 
                     {/* Direct Expenses */}
-                    {netProfitData.leftPane.directExpenses.count > 0 && (
+                    {netProfitData.leftPane.directExpenses.accounts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0).length > 0 && (
                       <div>
                         <div 
                           className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
@@ -1915,14 +1915,14 @@ export default function Analytics() {
                             )}
                             Direct Expenses
                             <span className="text-xs text-muted-foreground">
-                              ({netProfitData.leftPane.directExpenses.count})
+                              ({netProfitData.leftPane.directExpenses.accounts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0).length})
                             </span>
                           </span>
                           <span className="font-mono">{formatAmount(netProfitData.leftPane.directExpenses.total)}</span>
                         </div>
-                        {expandedNetProfitSections.has("directExpenses") && netProfitData.leftPane.directExpenses.accounts.length > 0 && (
+                        {expandedNetProfitSections.has("directExpenses") && (
                           <div className="bg-muted/30 divide-y">
-                            {netProfitData.leftPane.directExpenses.accounts.map((acc) => (
+                            {netProfitData.leftPane.directExpenses.accounts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0).map((acc) => (
                               <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                                 <span>{acc.name}</span>
                                 <span className="font-mono">
@@ -1955,38 +1955,45 @@ export default function Analytics() {
 
                     {/* Indirect Expenses */}
                     <div>
-                      <div 
-                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                        onClick={() => toggleNetProfitSection("indirectExpenses")}
-                        data-testid="row-indirect-expenses"
-                      >
-                        <span className="flex items-center gap-2">
-                          {expandedNetProfitSections.has("indirectExpenses") ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                          Indirect Expenses
-                          {netProfitData.leftPane.indirectExpenses.count > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                              ({netProfitData.leftPane.indirectExpenses.count})
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-mono">{formatAmount(netProfitData.leftPane.indirectExpenses.total)}</span>
-                      </div>
-                      {expandedNetProfitSections.has("indirectExpenses") && netProfitData.leftPane.indirectExpenses.accounts.length > 0 && (
-                        <div className="bg-muted/30 divide-y">
-                          {netProfitData.leftPane.indirectExpenses.accounts.map((acc) => (
-                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
-                              <span>{acc.name}</span>
-                              <span className="font-mono">
-                                Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
+                      {(() => {
+                        const nonZeroIndirectExp = netProfitData.leftPane.indirectExpenses.accounts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
+                        return (
+                          <>
+                            <div 
+                              className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                              onClick={() => toggleNetProfitSection("indirectExpenses")}
+                              data-testid="row-indirect-expenses"
+                            >
+                              <span className="flex items-center gap-2">
+                                {expandedNetProfitSections.has("indirectExpenses") ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                                Indirect Expenses
+                                {nonZeroIndirectExp.length > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({nonZeroIndirectExp.length})
+                                  </span>
+                                )}
                               </span>
+                              <span className="font-mono">{formatAmount(netProfitData.leftPane.indirectExpenses.total)}</span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            {expandedNetProfitSections.has("indirectExpenses") && nonZeroIndirectExp.length > 0 && (
+                              <div className="bg-muted/30 divide-y">
+                                {nonZeroIndirectExp.map((acc) => (
+                                  <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                                    <span>{acc.name}</span>
+                                    <span className="font-mono">
+                                      Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Net Profit */}
@@ -2056,46 +2063,53 @@ export default function Analytics() {
 
                     {/* Indirect Incomes */}
                     <div>
-                      <div 
-                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                        onClick={() => toggleNetProfitSection("indirectIncomes")}
-                        data-testid="row-indirect-incomes"
-                      >
-                        <span className="flex items-center gap-2">
-                          {expandedNetProfitSections.has("indirectIncomes") ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                          Indirect Incomes
-                          {(netProfitData.rightPane?.indirectIncomes?.count || 0) > 0 && (
-                            <span className="text-xs text-muted-foreground">
-                              ({netProfitData.rightPane?.indirectIncomes?.count})
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-mono">{formatAmount(netProfitData.rightPane?.indirectIncomes?.total || 0)}</span>
-                      </div>
-                      {expandedNetProfitSections.has("indirectIncomes") && (netProfitData.rightPane?.indirectIncomes?.accounts?.length || 0) > 0 && (
-                        <div className="bg-muted/30 divide-y">
-                          {netProfitData.rightPane?.indirectIncomes?.accounts?.map((acc: any) => (
+                      {(() => {
+                        const nonZeroIndirectInc = (netProfitData.rightPane?.indirectIncomes?.accounts || []).filter((a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
+                        return (
+                          <>
                             <div 
-                              key={acc.id} 
-                              className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
-                              onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
-                              data-testid={`row-indirect-income-${acc.id}`}
+                              className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                              onClick={() => toggleNetProfitSection("indirectIncomes")}
+                              data-testid="row-indirect-incomes"
                             >
                               <span className="flex items-center gap-2">
-                                <ChevronRight className="h-3 w-3" />
-                                {acc.name}
+                                {expandedNetProfitSections.has("indirectIncomes") ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                                Indirect Incomes
+                                {nonZeroIndirectInc.length > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({nonZeroIndirectInc.length})
+                                  </span>
+                                )}
                               </span>
-                              <span className="font-mono">
-                                Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
-                              </span>
+                              <span className="font-mono">{formatAmount(netProfitData.rightPane?.indirectIncomes?.total || 0)}</span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            {expandedNetProfitSections.has("indirectIncomes") && nonZeroIndirectInc.length > 0 && (
+                              <div className="bg-muted/30 divide-y">
+                                {nonZeroIndirectInc.map((acc: any) => (
+                                  <div 
+                                    key={acc.id} 
+                                    className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
+                                    onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
+                                    data-testid={`row-indirect-income-${acc.id}`}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <ChevronRight className="h-3 w-3" />
+                                      {acc.name}
+                                    </span>
+                                    <span className="font-mono">
+                                      Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Net Profit (display only - matches left pane) */}

@@ -196,7 +196,7 @@ export default function NetProfitDetails() {
       <Card data-testid="card-formula">
         <CardHeader>
           <CardTitle>Calculation Formula</CardTitle>
-          <CardDescription>How Net Position is calculated</CardDescription>
+          <CardDescription>How Net Profit is calculated</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 text-base sm:text-lg flex-wrap">
@@ -224,7 +224,7 @@ export default function NetProfitDetails() {
               <span
                 className={`font-semibold ${(data?.netPosition || 0) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
               >
-                Net Position
+                Net Profit
               </span>
               <span
                 className={
@@ -243,7 +243,7 @@ export default function NetProfitDetails() {
                 (data?.netPosition || 0) >= 0 ? "default" : "destructive"
               }
             >
-              {data?.netPositionLabel || "Net Position"}
+              {data?.netPositionLabel || "Net Profit"}
             </Badge>
           </div>
         </CardContent>
