@@ -26,6 +26,7 @@ interface VoucherEntriesTableProps {
   setSidebarHighlightedIndex: (index: number) => void;
   setSidebarSearchValue: (value: string) => void;
   handleSidebarAccountSelect: (account: Account) => void;
+  sidebarAccounts?: Account[];
   onRowFocus: (rowIndex: number, fieldName: string) => void;
   onRowBlur: () => void;
   isFactoryCompany?: boolean;
@@ -46,6 +47,7 @@ export function VoucherEntriesTable({
   setSidebarHighlightedIndex,
   setSidebarSearchValue,
   handleSidebarAccountSelect,
+  sidebarAccounts = [],
   onRowFocus,
   onRowBlur,
   isFactoryCompany = false,
@@ -54,6 +56,20 @@ export function VoucherEntriesTable({
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
+
+  const getEntryBalance = (index: number): number | null => {
+    const entry = entries[index];
+    if (!entry || !entry.accountId || !sidebarAccounts.length) return null;
+    const found = sidebarAccounts.find((a) => {
+      if (a.type !== (entry.accountType as any)) return false;
+      if (entry.accountType === "employee") {
+        return (a as any).accountId === entry.accountId;
+      }
+      return a.id === entry.accountId;
+    });
+    if (!found || found.balance == null) return null;
+    return typeof found.balance === "string" ? parseFloat(found.balance) : found.balance;
+  };
 
   const handleAddRow = () => {
     append({
@@ -189,6 +205,15 @@ export function VoucherEntriesTable({
                           }}
                         />
                       </FormControl>
+                      {(() => {
+                        const bal = getEntryBalance(index);
+                        if (bal == null) return null;
+                        return (
+                          <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                            Balance: {formatAmount(bal)}
+                          </p>
+                        );
+                      })()}
                       <FormMessage />
                     </FormItem>
                   )}

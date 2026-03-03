@@ -63,6 +63,7 @@ interface ReceiptVoucherTabProps {
   isFactoryCompany?: boolean;
   onAutoCreateAccount?: (name: string) => Promise<Account | null>;
   isAutoCreating?: boolean;
+  isEditMode?: boolean;
 }
 
 export function ReceiptVoucherTab({
@@ -95,6 +96,7 @@ export function ReceiptVoucherTab({
   isFactoryCompany = false,
   onAutoCreateAccount,
   isAutoCreating = false,
+  isEditMode = false,
 }: ReceiptVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
@@ -154,12 +156,12 @@ export function ReceiptVoucherTab({
                         </FormControl>
                         {paymentAccountId > 0 && (
                           <p className={cn("text-sm mt-1.5 font-mono", (() => {
-                            const live = total > 0 ? accountBalance + total : accountBalance;
+                            const live = isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance);
                             if (live < 0) return "text-red-600 dark:text-red-400";
                             if (live > 0) return "text-emerald-600 dark:text-emerald-400";
                             return "text-muted-foreground";
                           })())}>
-                            Balance: {formatAmount(total > 0 ? accountBalance + total : accountBalance)}
+                            Balance: {formatAmount(isEditMode ? accountBalance : (total > 0 ? accountBalance + total : accountBalance))}
                           </p>
                         )}
                         <FormMessage />
@@ -279,6 +281,7 @@ export function ReceiptVoucherTab({
                   setSidebarHighlightedIndex={setSidebarHighlightedIndex}
                   setSidebarSearchValue={setSidebarSearchValue}
                   handleSidebarAccountSelect={handleSidebarAccountSelect}
+                  sidebarAccounts={sidebarAccounts}
                   onRowFocus={(rowIndex, fieldName) => {
                     if (fieldName === "account") {
                       setActiveRowIndex(rowIndex);
