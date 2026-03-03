@@ -18684,11 +18684,14 @@ if (asOfDate) {
 
               transferItems.push(insertedItem);
 
-              // Deduct from source location (transfer out = negative delta)
-              await adjustInventory(tx, item.sourceLocationId || sourceLocationId, item.stockItemId, -quantity, companyId!);
+              // Only update inventory for non-optional (confirmed) transfers
+              if (!optional) {
+                // Deduct from source location (transfer out = negative delta)
+                await adjustInventory(tx, item.sourceLocationId || sourceLocationId, item.stockItemId, -quantity, companyId!);
 
-              // Add to destination location (transfer in = positive delta with rate)
-              await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
+                // Add to destination location (transfer in = positive delta with rate)
+                await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
+              }
             }
 
             await tx
@@ -33636,11 +33639,39 @@ if (asOfDate) {
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
       if (!voucher.optional) return res.status(400).json({ message: "Voucher is already finalized" });
 
-      const [updated] = await db
-        .update(vouchers)
-        .set({ optional: false })
-        .where(eq(vouchers.id, voucherId))
-        .returning();
+      // For stock transfers: apply inventory changes on finalization
+      const updated = await db.transaction(async (tx) => {
+        if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
+          const [transferRecord] = await tx
+            .select()
+            .from(stockTransferVouchers)
+            .where(eq(stockTransferVouchers.voucherId, voucherId));
+
+          if (transferRecord) {
+            const items = await tx
+              .select()
+              .from(stockTransferItems)
+              .where(eq(stockTransferItems.transferId, transferRecord.id));
+
+            for (const item of items) {
+              const srcId = item.sourceLocationId || transferRecord.sourceLocationId;
+              const qty = parseFloat(item.quantity);
+              const rate = parseFloat(item.rate || "0");
+              if (srcId && qty > 0) {
+                await adjustInventory(tx, srcId, item.stockItemId, -qty, companyId);
+                await adjustInventory(tx, transferRecord.destinationLocationId, item.stockItemId, qty, companyId, rate);
+              }
+            }
+          }
+        }
+
+        const [updated] = await tx
+          .update(vouchers)
+          .set({ optional: false })
+          .where(eq(vouchers.id, voucherId))
+          .returning();
+        return updated;
+      });
 
       res.json(updated);
     } catch (error: any) {
