@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type { FactoryBaleProduct } from "@shared/schema";
 import {
   Upload, FileSpreadsheet, Plus, Trash2, Download,
   Users, Package, Boxes, AlertCircle, CheckCircle2, X, Loader2
@@ -411,6 +412,17 @@ function BaleImport() {
   const [result, setResult] = useState<{ imported: number; errors: string[] } | null>(null);
   const { toast } = useToast();
 
+  const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
+  });
+
+  const productByArticleCode = new Map<string, FactoryBaleProduct>();
+  if (baleProducts) {
+    for (const p of baleProducts) {
+      if (p.articleCode) productByArticleCode.set(p.articleCode.toLowerCase(), p);
+    }
+  }
+
   const importMutation = useMutation({
     mutationFn: async (bales: BaleRow[]) => {
       const res = await factoryApiRequest("POST", "/api/factory/import/bales", { bales });
@@ -519,22 +531,37 @@ function BaleImport() {
                   <TableHead>Grade</TableHead>
                   <TableHead>Weight (kg)</TableHead>
                   <TableHead>Cost/Kg</TableHead>
+                  <TableHead className="text-right">Prod. Price</TableHead>
+                  <TableHead className="text-right">Sell Price</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {csvData.map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{row.baleCode}</TableCell>
-                    <TableCell>{row.articleCode}</TableCell>
-                    <TableCell>{row.productName}</TableCell>
-                    <TableCell>{row.category}</TableCell>
-                    <TableCell>{row.grade}</TableCell>
-                    <TableCell>{row.weightKg}</TableCell>
-                    <TableCell>{row.costPerKg}</TableCell>
-                    <TableCell><Badge variant="secondary">{row.status}</Badge></TableCell>
-                  </TableRow>
-                ))}
+                {csvData.map((row, i) => {
+                  const matched = row.articleCode ? productByArticleCode.get(row.articleCode.toLowerCase()) : undefined;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{row.baleCode}</TableCell>
+                      <TableCell>{row.articleCode}</TableCell>
+                      <TableCell>{row.productName || matched?.name || "-"}</TableCell>
+                      <TableCell>{row.category}</TableCell>
+                      <TableCell>{row.grade}</TableCell>
+                      <TableCell>{row.weightKg}</TableCell>
+                      <TableCell>{row.costPerKg}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {matched?.productionPrice && parseFloat(matched.productionPrice) > 0
+                          ? parseFloat(matched.productionPrice).toLocaleString()
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {matched?.sellingPrice && parseFloat(matched.sellingPrice) > 0
+                          ? parseFloat(matched.sellingPrice).toLocaleString()
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell><Badge variant="secondary">{row.status}</Badge></TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
