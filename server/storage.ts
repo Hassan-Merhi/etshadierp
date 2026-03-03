@@ -1002,7 +1002,9 @@ export class DbStorage implements IStorage {
 
   // Suppliers
   async getAllSuppliers(): Promise<Supplier[]> {
-    return await db.select().from(schema.suppliers).orderBy(asc(schema.suppliers.legalName));
+    return await db.select().from(schema.suppliers)
+      .where(isNull(schema.suppliers.deletedAt))
+      .orderBy(asc(schema.suppliers.legalName));
   }
 
   async getSupplierByCode(code: string): Promise<Supplier | undefined> {
@@ -5110,7 +5112,7 @@ export class DbStorage implements IStorage {
   // Customer Methods
   async getAllCustomers(companyId: number): Promise<schema.Customer[]> {
     return await db.select().from(schema.customers)
-      .where(eq(schema.customers.companyId, companyId))
+      .where(and(eq(schema.customers.companyId, companyId), isNull(schema.customers.deletedAt)))
       .orderBy(schema.customers.legalName);
   }
 
