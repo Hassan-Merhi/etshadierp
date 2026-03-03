@@ -200,6 +200,11 @@ export function AppSidebar({ user }: { user?: any }) {
       if (!isFactoryCompany) return false;
     }
 
+    // Chat is always visible to all non-POS users
+    if (item.url === "/chat") {
+      return !isPOSUser;
+    }
+
     if (isAdmin || myErpPages?.fullAccess) return true;
 
     if (isPOSUser) {
