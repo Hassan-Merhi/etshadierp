@@ -802,23 +802,37 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // Simpler approach: find entries where the amount appears exactly twice (a pair),
       // and pick based on account type priority (bank > ledger > supplier > employee)
       if (voucherToEdit.voucherType === "Payment") {
-        // Payment: payment account has CR (asset) or DR (liability)
+        // Payment: Pay From is the account money leaves from.
+        // Standard case: non-liability (cash/bank/ledger) with CR > 0.
+        // Fallback: liability (supplier/employee) with DR > 0 (paying down a liability).
         paymentEntry = allEntries.find((entry: any) => {
           const cr = parseFloat(entry.creditAmount || "0");
-          const dr = parseFloat(entry.debitAmount || "0");
           const isLiability = entry.supplierId || entry.employeeId;
-          if (isLiability) return dr > 0;
-          return cr > 0;
+          return !isLiability && cr > 0;
         });
+        if (!paymentEntry) {
+          paymentEntry = allEntries.find((entry: any) => {
+            const dr = parseFloat(entry.debitAmount || "0");
+            const isLiability = entry.supplierId || entry.employeeId;
+            return isLiability && dr > 0;
+          });
+        }
       } else if (voucherToEdit.voucherType === "Receipt") {
-        // Receipt: payment account has DR (asset) or CR (liability)
+        // Receipt: Pay Into is the account money arrives in.
+        // Standard case: non-liability (cash/bank/ledger) with DR > 0.
+        // Fallback: liability (supplier/employee) with CR > 0.
         paymentEntry = allEntries.find((entry: any) => {
-          const cr = parseFloat(entry.creditAmount || "0");
           const dr = parseFloat(entry.debitAmount || "0");
           const isLiability = entry.supplierId || entry.employeeId;
-          if (isLiability) return cr > 0;
-          return dr > 0;
+          return !isLiability && dr > 0;
         });
+        if (!paymentEntry) {
+          paymentEntry = allEntries.find((entry: any) => {
+            const cr = parseFloat(entry.creditAmount || "0");
+            const isLiability = entry.supplierId || entry.employeeId;
+            return isLiability && cr > 0;
+          });
+        }
       }
 
       if (!paymentEntry) return;
@@ -855,9 +869,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentName = asset?.name || "";
       }
 
-      // Convert contra entries (all entries except payment entry) to form format
+      // Identify the Pay From account's identity to filter duplicate Pay From entries
+      const payFromLedgerId = paymentEntry.ledgerAccountId || null;
+      const payFromBankId = paymentEntry.bankAccountId || null;
+      const payFromSupplierId = paymentEntry.supplierId || null;
+      const payFromEmployeeId = paymentEntry.employeeId || null;
+
+      // Convert contra entries (all entries except payment entry and duplicate Pay From entries) to form format
       const formEntries = voucherToEdit.entries
-        .filter((entry: any) => entry !== paymentEntry)
+        .filter((entry: any) => {
+          if (entry === paymentEntry) return false;
+          // Exclude duplicate Pay From entries (same account, same side as paymentEntry)
+          if (payFromLedgerId && entry.ledgerAccountId === payFromLedgerId) return false;
+          if (payFromBankId && entry.bankAccountId === payFromBankId) return false;
+          if (payFromSupplierId && entry.supplierId === payFromSupplierId) return false;
+          if (payFromEmployeeId && entry.employeeId === payFromEmployeeId) return false;
+          return true;
+        })
         .map((entry: any) => {
         let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
         let accountId = 0;
@@ -907,7 +935,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountName,
           amount,
         };
-      });
+      })
+      .filter((entry: any) => parseFloat(entry.amount || "0") > 0); // exclude zero-amount entries
 
       // Reset form with voucher data
       form.reset({
