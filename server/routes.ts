@@ -3431,6 +3431,28 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/employees/:id/balance", requireAuth, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+      const employees = await storage.getAllEmployees(req.session.currentCompanyId);
+      const employee = employees.find((e: any) => e.id === employeeId);
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      const balance = parseFloat((employee as any).currentBalance || "0").toFixed(2);
+      res.json({ balance });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/employees", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const parsed = insertEmployeeSchema.parse(req.body);

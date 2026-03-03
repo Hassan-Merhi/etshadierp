@@ -234,6 +234,7 @@ interface ViewVoucherEntry {
   stockItemName?: string;
   ledgerAccountId?: number;
   bankAccountId?: number;
+  employeeId?: number;
   isPurchaseItem?: boolean;
   quantity?: string;
   rate?: string;
@@ -511,6 +512,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [cashAccountId, viewDialogOpen]);
 
   // Fetch balances for all displayed entries in Payment/Receipt/Journal vouchers
+  // Keyed by entry.id to avoid collisions between ledger/bank/employee numeric IDs
   useEffect(() => {
     if (!viewDialogOpen || !selectedVoucher) {
       setEntryBalances({});
@@ -532,13 +534,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
       const results: Record<number, string> = {};
       await Promise.all(
         displayEntries.map(async (entry: ViewVoucherEntry) => {
-          const accountId = entry.ledgerAccountId || entry.bankAccountId;
-          if (!accountId) return;
           try {
-            const res = await fetch(`/api/accounts/ledger/${accountId}/balance`, { credentials: "include" });
+            let url: string | null = null;
+            if (entry.ledgerAccountId) {
+              url = `/api/accounts/ledger/${entry.ledgerAccountId}/balance`;
+            } else if (entry.bankAccountId) {
+              url = `/api/accounts/ledger/${entry.bankAccountId}/balance`;
+            } else if (entry.employeeId) {
+              url = `/api/employees/${entry.employeeId}/balance`;
+            }
+            if (!url) return;
+            const res = await fetch(url, { credentials: "include" });
             if (res.ok) {
               const data = await res.json();
-              results[accountId] = data.balance?.toString() || "0";
+              results[entry.id] = data.balance?.toString() || "0";
             }
           } catch {
             // ignore individual failures
@@ -2345,7 +2354,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   selectedVoucher.voucherType === "Receipt" ||
                                   selectedVoucher.voucherType === "Journal") && (
                                   <div className="text-xs text-muted-foreground mt-0.5">
-                                    Balance: {formatAmount(entryBalances[entry.ledgerAccountId! || entry.bankAccountId!] ?? "0")}
+                                    Balance: {formatAmount(entryBalances[entry.id] ?? "0")}
                                   </div>
                                 )}
                               </TableCell>
