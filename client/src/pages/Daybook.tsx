@@ -226,6 +226,7 @@ interface OffloadListItem {
   totalBales: string;
   additionalCostPerBale: string;
   offloadedAt: string;
+  itemsTotal: string;
 }
 
 interface OffloadDetail extends OffloadListItem {
@@ -1528,7 +1529,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           Offload
                         </Badge>
                         <span className="font-mono font-medium text-sm whitespace-nowrap">
-                          {formatAmount(o.totalCharges)}
+                          {formatAmount(Number(o.itemsTotal) + Number(o.totalCharges))}
                         </span>
                       </div>
                       <div className="text-sm text-muted-foreground">
@@ -1666,7 +1667,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             {o.containerNumber}{o.locationName ? ` — ${o.locationName}` : ""}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {formatAmount(o.totalCharges)}
+                            {formatAmount(Number(o.itemsTotal) + Number(o.totalCharges))}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">

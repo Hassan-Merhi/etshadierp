@@ -23787,6 +23787,7 @@ if (asOfDate) {
           totalBales: containerOffloads.totalBales,
           additionalCostPerBale: containerOffloads.additionalCostPerBale,
           offloadedAt: containerOffloads.offloadedAt,
+          itemsTotal: sql<string>`coalesce((select sum(coi.total_value) from container_offload_items coi where coi.offload_id = ${containerOffloads.id}), 0)`,
         })
         .from(containerOffloads)
         .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
