@@ -23756,6 +23756,102 @@ if (asOfDate) {
     }
   });
 
+  // List offloads for daybook view (filtered by date range and company)
+  app.get("/api/offloads", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { startDate, endDate } = req.query;
+      const conditions: any[] = [eq(containers.companyId, companyId)];
+
+      if (startDate) {
+        conditions.push(gte(containerOffloads.offloadedAt, new Date((startDate as string) + "T00:00:00")));
+      }
+      if (endDate) {
+        conditions.push(lte(containerOffloads.offloadedAt, new Date((endDate as string) + "T23:59:59")));
+      }
+
+      const offloads = await db
+        .select({
+          id: containerOffloads.id,
+          containerId: containerOffloads.containerId,
+          containerNumber: containers.containerNumber,
+          locationId: containerOffloads.locationId,
+          locationName: locations.name,
+          duties: containerOffloads.duties,
+          officeCharges: containerOffloads.officeCharges,
+          transferCharges: containerOffloads.transferCharges,
+          transportFees: containerOffloads.transportFees,
+          totalCharges: containerOffloads.totalCharges,
+          totalBales: containerOffloads.totalBales,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+          offloadedAt: containerOffloads.offloadedAt,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .leftJoin(locations, eq(containerOffloads.locationId, locations.id))
+        .where(and(...conditions))
+        .orderBy(desc(containerOffloads.offloadedAt))
+        .execute();
+
+      res.json(offloads);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get full offload detail with items for daybook view
+  app.get("/api/offloads/:id", requireAuth, async (req, res) => {
+    try {
+      const offloadId = parseInt(req.params.id);
+      if (isNaN(offloadId)) return res.status(400).json({ message: "Invalid offload ID" });
+
+      const [offload] = await db
+        .select({
+          id: containerOffloads.id,
+          containerId: containerOffloads.containerId,
+          containerNumber: containers.containerNumber,
+          locationId: containerOffloads.locationId,
+          locationName: locations.name,
+          duties: containerOffloads.duties,
+          officeCharges: containerOffloads.officeCharges,
+          transferCharges: containerOffloads.transferCharges,
+          transportFees: containerOffloads.transportFees,
+          totalCharges: containerOffloads.totalCharges,
+          totalBales: containerOffloads.totalBales,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+          offloadedAt: containerOffloads.offloadedAt,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .leftJoin(locations, eq(containerOffloads.locationId, locations.id))
+        .where(eq(containerOffloads.id, offloadId))
+        .execute();
+
+      if (!offload) return res.status(404).json({ message: "Offload not found" });
+
+      const items = await db
+        .select({
+          id: containerOffloadItems.id,
+          stockItemId: containerOffloadItems.stockItemId,
+          stockItemName: stockItems.name,
+          stockItemCode: stockItems.code,
+          quantity: containerOffloadItems.quantity,
+          rate: containerOffloadItems.rate,
+          totalValue: containerOffloadItems.totalValue,
+        })
+        .from(containerOffloadItems)
+        .leftJoin(stockItems, eq(containerOffloadItems.stockItemId, stockItems.id))
+        .where(eq(containerOffloadItems.offloadId, offloadId))
+        .execute();
+
+      res.json({ ...offload, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Container Offload Diagnostics - Analyze PO line items for potential issues
   app.get("/api/containers/:id/offload-diagnostics", requireAuth, async (req, res) => {
     try {

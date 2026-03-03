@@ -93,6 +93,8 @@ import {
   Check,
   ChevronsUpDown,
   FileDown,
+  Package,
+  ExternalLink,
 } from "lucide-react";
 import { format, parseISO, isToday, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -209,6 +211,38 @@ interface Voucher {
   createdAt: string;
   locationName?: string;
 }
+
+interface OffloadListItem {
+  id: number;
+  containerId: number;
+  containerNumber: string;
+  locationId: number;
+  locationName: string | null;
+  duties: string;
+  officeCharges: string;
+  transferCharges: string;
+  transportFees: string;
+  totalCharges: string;
+  totalBales: string;
+  additionalCostPerBale: string;
+  offloadedAt: string;
+}
+
+interface OffloadDetail extends OffloadListItem {
+  items: Array<{
+    id: number;
+    stockItemId: number;
+    stockItemName: string | null;
+    stockItemCode: string | null;
+    quantity: string;
+    rate: string;
+    totalValue: string;
+  }>;
+}
+
+type DaybookRow =
+  | { _type: "voucher"; data: Voucher }
+  | { _type: "offload"; data: OffloadListItem };
 
 interface VoucherEntry {
   id: number;
@@ -371,6 +405,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [editFormInitialized, setEditFormInitialized] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
+  const [offloadViewOpen, setOffloadViewOpen] = useState(false);
+  const [selectedOffload, setSelectedOffload] = useState<OffloadListItem | null>(null);
 
   // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -649,6 +685,27 @@ export default function Daybook({ user }: { user?: any } = {}) {
     enabled: !!selectedCompany,
   });
 
+  // Fetch offloads for the same date range
+  const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
+    queryKey: ["/api/offloads", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
+      const url = `/api/offloads${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch offloads");
+      return res.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch full offload detail when viewing
+  const { data: offloadDetail, isLoading: offloadDetailLoading } = useQuery<OffloadDetail>({
+    queryKey: selectedOffload ? [`/api/offloads/${selectedOffload.id}`] : [],
+    enabled: !!selectedOffload && offloadViewOpen,
+  });
+
   // Fetch account names for Payment/Receipt/Journal vouchers
   useEffect(() => {
     const paymentVouchers = vouchers.filter(
@@ -716,6 +773,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Apply filters (date filtering is now done server-side via periodFilter)
   const filteredVouchers = useMemo(() => {
+    if (filters.voucherType === "Offload") return [];
     return vouchers
       .filter((voucher) => {
         // Voucher type filter
@@ -765,6 +823,28 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return a.voucherNumber.localeCompare(b.voucherNumber);
       });
   }, [vouchers, filters]);
+
+  // Filtered offloads
+  const filteredOffloads = useMemo(() => {
+    if (filters.voucherType !== "all" && filters.voucherType !== "Offload") return [];
+    const query = (filters.searchQuery || "").toLowerCase();
+    return offloads.filter((o) => {
+      if (!query) return true;
+      return o.containerNumber.toLowerCase().includes(query);
+    });
+  }, [offloads, filters]);
+
+  // Combined rows for display (vouchers + offloads), sorted by date desc
+  const allRows = useMemo((): DaybookRow[] => {
+    const voucherRows: DaybookRow[] = filteredVouchers.map((v) => ({ _type: "voucher", data: v }));
+    const offloadRows: DaybookRow[] = filteredOffloads.map((o) => ({ _type: "offload", data: o }));
+    return [...voucherRows, ...offloadRows].sort((a, b) => {
+      const dateA = a._type === "voucher" ? a.data.voucherDate : a.data.offloadedAt.slice(0, 10);
+      const dateB = b._type === "voucher" ? b.data.voucherDate : b.data.offloadedAt.slice(0, 10);
+      const cmp = dateA.localeCompare(dateB);
+      return filters.sortOrder === "desc" ? -cmp : cmp;
+    });
+  }, [filteredVouchers, filteredOffloads, filters.sortOrder]);
 
   // Check if user can edit a voucher based on role and date
   const canEdit = (voucher: Voucher): boolean => {
@@ -1364,6 +1444,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <SelectItem value="Receipt">Receipt</SelectItem>
                   <SelectItem value="Journal">Journal</SelectItem>
                   <SelectItem value="Contra">Contra</SelectItem>
+                  <SelectItem value="Offload">Offload</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1388,10 +1469,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
         <CardHeader>
           <CardTitle>
             Transactions
-            {filteredVouchers.length > 0 && (
+            {allRows.length > 0 && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({filteredVouchers.length}{" "}
-                {filteredVouchers.length === 1 ? "entry" : "entries"})
+                ({allRows.length}{" "}
+                {allRows.length === 1 ? "entry" : "entries"})
               </span>
             )}
           </CardTitle>
