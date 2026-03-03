@@ -698,7 +698,8 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       eq(schema.vouchers.companyId, companyId),
       isNull(schema.vouchers.deletedAt)
     ))
-    .orderBy(desc(schema.vouchers.voucherDate));
+    .orderBy(desc(schema.vouchers.voucherDate))
+    .limit(500);
 
   const recentSalesHistory = allSalesData.map(sale => {
     const item = stockItems.find(i => i.id === sale.stockItemId);
@@ -861,28 +862,26 @@ ${context.recentTransactions.slice(0, 10).map(t =>
 - Open POs: ${context.purchaseOrders.filter(po => po.status === 'Open').length}
 - Recent POs: ${context.purchaseOrders.slice(0, 5).map(po => `${po.poNumber} ($${po.itemsTotal})`).join(', ') || 'None'}
 
-### 🏷️ COMPLETE STOCK ITEMS WITH INVENTORY (${context.stockItemsWithInventory.length} items):
-Search through ALL items below to answer questions about stock, quantities, locations, and prices.
-${JSON.stringify(context.stockItemsWithInventory, null, 1)}
+### 🏷️ STOCK ITEMS WITH INVENTORY (${context.stockItemsWithInventory.length} items total, showing up to 300 with stock):
+Format: CODE | NAME | GROUP | QTY | VALUE | LOCATIONS(name:qty:rate)
+${context.stockItemsWithInventory
+  .filter(i => i.totalQuantity > 0)
+  .slice(0, 300)
+  .map(i => `${i.code}|${i.name}|${i.groupName}|${i.totalQuantity.toFixed(0)}|$${i.totalValue.toFixed(0)}|${i.locations.map((l: any) => `${l.locationName}:${l.quantity.toFixed(0)}:$${l.averageRate.toFixed(2)}`).join(',')}`)
+  .join('\n')}
 
-### 💵 COMPLETE SALES HISTORY (${context.recentSalesHistory.length} transactions):
-Use this data to answer questions like "what price did this item sell at?" or "when was this item last sold?" The data is sorted by date (newest first), so the first occurrence of an item is its most recent sale.
-${JSON.stringify(context.recentSalesHistory, null, 1)}
+### 💵 RECENT SALES HISTORY (last ${context.recentSalesHistory.length} transactions, newest first):
+Format: DATE | VOUCHER | CODE | NAME | LOC | QTY | PRICE | PROFIT
+${context.recentSalesHistory
+  .slice(0, 300)
+  .map(s => `${s.date}|${s.voucherNumber}|${s.itemCode}|${s.itemName}|${s.locationName}|${s.quantity}|$${s.sellingPrice}|$${s.profit}`)
+  .join('\n')}
 
 ### 👥 ALL SUPPLIERS (${context.suppliers.length}):
-${JSON.stringify(context.suppliers.map(s => ({
-  code: s.code,
-  name: s.legalName,
-  phone: s.phone,
-  email: s.email,
-})), null, 1)}
+${context.suppliers.map(s => `${s.code}|${s.legalName}|${s.phone || ''}|${s.email || ''}`).join('\n')}
 
 ### 👤 ALL CUSTOMERS (${context.customers.length}):
-${JSON.stringify(context.customers.map(c => ({
-  code: c.code,
-  name: c.legalName,
-  phone: c.phone,
-})), null, 1)}
+${context.customers.map(c => `${c.code}|${c.legalName}|${c.phone || ''}`).join('\n')}
 
 ## RESPONSE GUIDELINES:
 
