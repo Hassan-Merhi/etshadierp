@@ -107,6 +107,7 @@ interface QuantityPickerState {
 }
 
 const STORAGE_KEY = "stockTransferOrder_selectedLocations";
+const SESSION_STATE_KEY = "stockTransferOrder_session_state";
 
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
@@ -122,11 +123,26 @@ export default function StockTransferOrder() {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
   });
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  // Restore state from sessionStorage once (when navigating back from history view, only for new transfers)
+  const _sessionSnapshot = (() => {
+    if (editVoucherId !== null) return null; // don't restore when editing existing voucher
+    try {
+      const ss = sessionStorage.getItem(SESSION_STATE_KEY);
+      if (ss) { sessionStorage.removeItem(SESSION_STATE_KEY); return JSON.parse(ss); }
+    } catch {}
+    return null;
+  })();
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(
+    () => new Set<number>(_sessionSnapshot?.expandedGroups || [])
+  );
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
-  const [destinationLocationId, setDestinationLocationId] = useState<number | null>(null);
-  
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [destinationLocationId, setDestinationLocationId] = useState<number | null>(
+    () => _sessionSnapshot?.destinationLocationId ?? null
+  );
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(
+    () => _sessionSnapshot?.orderItems || []
+  );
   
   const [quantityPicker, setQuantityPicker] = useState<QuantityPickerState>({
     open: false,
@@ -330,7 +346,13 @@ export default function StockTransferOrder() {
       const item = flatItems[focusedCell.row];
       const loc = selectedLocations[focusedCell.col];
       if (item && loc) {
-        navigate(`/locations/${loc.id}/stock-items/${item.stockItemId}/history`);
+        // Save current order state so it survives the navigation round-trip
+        sessionStorage.setItem(SESSION_STATE_KEY, JSON.stringify({
+          orderItems,
+          destinationLocationId,
+          expandedGroups: [...expandedGroups],
+        }));
+        navigate(`/locations/${loc.id}/stock-items/${item.id}/history`);
       }
       return;
     }
