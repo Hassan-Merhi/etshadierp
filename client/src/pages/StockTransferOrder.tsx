@@ -781,17 +781,6 @@ export default function StockTransferOrder() {
         </div>
       </div>
 
-      <div
-        className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
-        style={{ visibility: isOptional ? "visible" : "hidden" }}
-        data-testid="banner-draft-mode"
-      >
-        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-        <span>
-          <strong>Draft mode</strong> — stock will NOT move until this transfer is confirmed. Items remain at source locations.
-        </span>
-      </div>
-
       {validationErrors.length > 0 && (
         <Card className="border-destructive bg-destructive/5">
           <CardContent className="py-3">

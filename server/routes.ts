@@ -16555,7 +16555,7 @@ if (asOfDate) {
         await db.transaction(async (tx) => {
           // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
           // Note: Database stores as "StockTransfer" (no space), but some code uses "Stock Transfer"
-          if ((voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") && !voucher.optional) {
+          if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
             // Get the stock transfer record
             const [transferVoucher] = await tx
               .select()
@@ -16563,7 +16563,12 @@ if (asOfDate) {
               .where(eq(stockTransferVouchers.voucherId, id))
               .limit(1);
 
-            if (transferVoucher) {
+            // Reverse inventory if: inventory was explicitly applied (inventoryApplied=true)
+            // OR voucher is non-optional (legacy behaviour before inventoryApplied column existed).
+            // This ensures optional transfers that incorrectly applied inventory (old bug) are
+            // also reversed on delete, while correctly-optional transfers (inventoryApplied=false)
+            // are left alone.
+            if (transferVoucher && (transferVoucher.inventoryApplied || !voucher.optional)) {
               // Get the transfer items
               const transferItemsList = await tx
                 .select()
@@ -16580,14 +16585,18 @@ if (asOfDate) {
               for (const item of transferItemsList) {
                 const qty = parseFloat(item.quantity);
                 const transferRate = parseFloat(item.rate);
+                // Use per-item sourceLocationId (multi-source transfers may have different sources per item)
+                const itemSourceId = item.sourceLocationId || transferVoucher.sourceLocationId!;
 
                 // Add back to source location (reverse the deduction)
-                await adjustInventory(tx, transferVoucher.sourceLocationId!, item.stockItemId, qty, req.session.currentCompanyId!, transferRate);
+                await adjustInventory(tx, itemSourceId, item.stockItemId, qty, req.session.currentCompanyId!, transferRate);
 
                 // Remove from destination location (reverse the addition)
                 await adjustInventory(tx, transferVoucher.destinationLocationId!, item.stockItemId, -qty, req.session.currentCompanyId!);
               }
+            }
 
+            if (transferVoucher) {
               // Delete stock transfer items
               await tx
                 .delete(stockTransferItems)
@@ -16820,14 +16829,16 @@ if (asOfDate) {
           // Use the same transaction-wrapped deletion logic as the single delete endpoint
           await db.transaction(async (tx) => {
             // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
-            if ((voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") && !voucher.optional) {
+            if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
               const [transferVoucher] = await tx
                 .select()
                 .from(stockTransferVouchers)
                 .where(eq(stockTransferVouchers.voucherId, id))
                 .limit(1);
 
-              if (transferVoucher) {
+              // Reverse inventory if: inventory was explicitly applied (inventoryApplied=true)
+              // OR voucher is non-optional (legacy behaviour before inventoryApplied column existed).
+              if (transferVoucher && (transferVoucher.inventoryApplied || !voucher.optional)) {
                 const transferItemsList = await tx
                   .select()
                   .from(stockTransferItems)
@@ -16836,14 +16847,18 @@ if (asOfDate) {
                 for (const item of transferItemsList) {
                   const qty = parseFloat(item.quantity);
                   const transferRate = parseFloat(item.rate);
+                  // Use per-item sourceLocationId (multi-source transfers may differ per item)
+                  const itemSourceId = item.sourceLocationId || transferVoucher.sourceLocationId!;
 
                   // Add back to source location (reverse the deduction)
-                  await adjustInventory(tx, transferVoucher.sourceLocationId!, item.stockItemId, qty, currentCompanyId, transferRate);
+                  await adjustInventory(tx, itemSourceId, item.stockItemId, qty, currentCompanyId, transferRate);
 
                   // Remove from destination location (reverse the addition)
                   await adjustInventory(tx, transferVoucher.destinationLocationId!, item.stockItemId, -qty, currentCompanyId);
                 }
+              }
 
+              if (transferVoucher) {
                 await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferVoucher.id));
                 await tx.delete(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferVoucher.id));
               }
