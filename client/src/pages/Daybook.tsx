@@ -94,7 +94,7 @@ import {
   ChevronsUpDown,
   FileDown,
 } from "lucide-react";
-import { format, parseISO, isToday } from "date-fns";
+import { format, parseISO, isToday, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
@@ -633,6 +633,32 @@ export default function Daybook({ user }: { user?: any } = {}) {
       fetchAccountNames();
     }
   }, [vouchers, accountNameCache]);
+
+  // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const fmt = "yyyy-MM-dd";
+      if (e.key === "-") {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate), -1), fmt),
+          toDate: format(addDays(new Date(prev.toDate), -1), fmt),
+          preset: "custom",
+        }));
+      } else if (e.key === "+" && e.shiftKey) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate), 1), fmt),
+          toDate: format(addDays(new Date(prev.toDate), 1), fmt),
+          preset: "custom",
+        }));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Apply filters (date filtering is now done server-side via periodFilter)
   const filteredVouchers = useMemo(() => {
