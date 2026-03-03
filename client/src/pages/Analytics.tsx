@@ -74,6 +74,7 @@ interface ProfitData {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
+  netPosition: number;
 }
 
 interface FinancialRatiosData {
@@ -2000,9 +2001,9 @@ export default function Analytics() {
                     {/* Net Profit */}
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
-                      <span className={`font-mono ${netProfitData.netPosition >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(Math.abs(netProfitData.netPosition))}
-                        {netProfitData.netPosition < 0 && ' (Loss)'}
+                      <span className={`font-mono ${(profitData?.netPosition ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(Math.abs(profitData?.netPosition ?? 0))}
+                        {(profitData?.netPosition ?? 0) < 0 && ' (Loss)'}
                       </span>
                     </div>
                   </div>
@@ -2116,9 +2117,9 @@ export default function Analytics() {
                     {/* Net Profit (display only - matches left pane) */}
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
-                      <span className={`font-mono ${netProfitData.netPosition >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(Math.abs(netProfitData.netPosition))}
-                        {netProfitData.netPosition < 0 && ' (Loss)'}
+                      <span className={`font-mono ${(profitData?.netPosition ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(Math.abs(profitData?.netPosition ?? 0))}
+                        {(profitData?.netPosition ?? 0) < 0 && ' (Loss)'}
                       </span>
                     </div>
                   </div>
