@@ -854,6 +854,7 @@ export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
   sourceLocationId: integer("source_location_id"), // Nullable for multi-source transfers
   destinationLocationId: integer("destination_location_id").notNull(),
   notes: text("notes"),
+  inventoryApplied: boolean("inventory_applied").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

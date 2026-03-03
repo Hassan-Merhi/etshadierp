@@ -18646,6 +18646,7 @@ if (asOfDate) {
                 sourceLocationId: resolvedHeaderSourceId,
                 destinationLocationId,
                 notes: notes || null,
+                inventoryApplied: optional !== true,
               })
               .returning();
 
@@ -33662,6 +33663,11 @@ if (asOfDate) {
                 await adjustInventory(tx, transferRecord.destinationLocationId, item.stockItemId, qty, companyId, rate);
               }
             }
+
+            await tx
+              .update(stockTransferVouchers)
+              .set({ inventoryApplied: true })
+              .where(eq(stockTransferVouchers.id, transferRecord.id));
           }
         }
 

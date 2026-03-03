@@ -3778,6 +3778,7 @@ export class DbStorage implements IStorage {
         sourceLocationId: items[0].sourceLocationId, // Store first item's source for legacy compatibility
         destinationLocationId,
         notes,
+        inventoryApplied: !isOptional,
       }).returning();
 
       // Process each item
@@ -4248,8 +4249,8 @@ export class DbStorage implements IStorage {
         );
       }
 
-      // Step 2: REVERSE inventory changes for each OLD item (only if not optional)
-      if (!isOptional) {
+      // Step 2: REVERSE inventory changes for each OLD item (only if inventory was actually applied)
+      if (existingTransfer.inventoryApplied) {
         for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
@@ -4350,6 +4351,7 @@ export class DbStorage implements IStorage {
           sourceLocationId: items[0].sourceLocationId, // Store first item's source for legacy compatibility
           destinationLocationId,
           notes,
+          inventoryApplied: !isOptional,
         })
         .where(eq(schema.stockTransferVouchers.id, id))
         .returning();

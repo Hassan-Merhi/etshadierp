@@ -1394,11 +1394,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       </Badge>
                       {voucher.optional && (
                         <Badge
-                          variant="outline"
+                          variant="secondary"
                           data-testid={`badge-optional-${voucher.id}`}
                           className="text-xs"
                         >
-                          Optional
+                          Draft
                         </Badge>
                       )}
                     </div>
@@ -1488,11 +1488,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           </Badge>
                           {voucher.optional && (
                             <Badge
-                              variant="outline"
+                              variant="secondary"
                               data-testid={`badge-optional-${voucher.id}`}
                               className="text-xs"
                             >
-                              Optional
+                              Draft
                             </Badge>
                           )}
                         </div>
@@ -1575,8 +1575,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       {selectedVoucher.voucherType}
                     </Badge>
                     {selectedVoucher.optional && (
-                      <Badge variant="outline" className="text-xs">
-                        Optional
+                      <Badge variant="secondary" className="text-xs">
+                        Draft
                       </Badge>
                     )}
                   </div>
