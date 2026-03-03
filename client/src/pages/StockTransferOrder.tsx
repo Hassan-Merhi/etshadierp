@@ -322,9 +322,18 @@ export default function StockTransferOrder() {
     if (flatItems.length === 0 || selectedLocations.length === 0) return;
 
     const { key } = e;
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(key)) return;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(key)) return;
 
     e.preventDefault();
+
+    if (key === 'Enter' && focusedCell !== null) {
+      const item = flatItems[focusedCell.row];
+      const loc = selectedLocations[focusedCell.col];
+      if (item && loc) {
+        navigate(`/locations/${loc.id}/stock-items/${item.stockItemId}/history`);
+      }
+      return;
+    }
 
     setFocusedCell((current) => {
       const maxRow = flatItems.length - 1;
@@ -364,7 +373,7 @@ export default function StockTransferOrder() {
 
       return { row, col };
     });
-  }, [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker]);
+  }, [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]);
 
   const handleCellClick = (
     item: StockItemData,
@@ -807,7 +816,7 @@ export default function StockTransferOrder() {
                 <MapPin className="h-5 w-5" />
                 <CardTitle className="text-base">Inventory Matrix</CardTitle>
               </div>
-              <p className="text-xs text-muted-foreground">Click to focus, then use arrow keys + spacebar</p>
+              <p className="text-xs text-muted-foreground">Click to focus, then use arrow keys + spacebar to add / Enter to view history</p>
             </div>
           </CardHeader>
           <CardContent>
@@ -965,7 +974,7 @@ export default function StockTransferOrder() {
               {orderItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Click on quantities or use arrow keys + spacebar</p>
+                  <p className="text-sm">Click on quantities or use arrow keys + spacebar to add / Enter to view history</p>
                 </div>
               ) : (
                 <>
