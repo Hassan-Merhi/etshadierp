@@ -5093,6 +5093,31 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/suppliers/:id/balance", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+      const supplier = await storage.getSupplierById(supplierId);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      const entries = await storage.getVoucherEntriesBySupplier(supplierId);
+      const openingBalance = parseFloat(supplier.openingBalance || "0");
+      const balance = entries.reduce((sum, entry) => {
+        const credit = parseFloat(entry.creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        if (credit > 0 && debit === 0) return sum + credit;
+        if (debit > 0 && credit === 0) return sum - debit;
+        return sum;
+      }, openingBalance);
+      res.json({ balance });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/suppliers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const parsed = insertSupplierSchema.parse(req.body);

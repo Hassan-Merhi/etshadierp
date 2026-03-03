@@ -542,6 +542,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
               url = `/api/accounts/ledger/${entry.bankAccountId}/balance`;
             } else if (entry.employeeId) {
               url = `/api/employees/${entry.employeeId}/balance`;
+            } else if (entry.supplierId) {
+              url = `/api/suppliers/${entry.supplierId}/balance`;
             }
             if (!url) return;
             const res = await fetch(url, { credentials: "include" });
