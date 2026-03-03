@@ -3145,6 +3145,55 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 )}
               </div>
 
+              {offloadDetailLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : offloadDetail?.items && offloadDetail.items.length > 0 ? (
+                <div>
+                  <p className="text-sm font-medium mb-2">Stock Items</p>
+                  <div className="border rounded-md overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40">
+                          <th className="text-left p-3 font-medium">Item</th>
+                          <th className="text-right p-3 font-medium">Qty</th>
+                          <th className="text-right p-3 font-medium">Rate</th>
+                          <th className="text-right p-3 font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {offloadDetail.items.map((item) => (
+                          <tr key={item.id} className="border-b last:border-0">
+                            <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.quantity))}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
+                          </tr>
+                        ))}
+                        <tr className="border-t-2 bg-muted/20 font-medium">
+                          <td className="p-3">Total</td>
+                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.quantity), 0))}</td>
+                          <td></td>
+                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.totalValue), 0))}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                    <div>
+                      <p className="text-muted-foreground">Total Bales</p>
+                      <p className="font-medium font-mono">BL {formatNumber(Number(selectedOffload.totalBales))}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Additional Cost / Bale</p>
+                      <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.additionalCostPerBale))}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="border rounded-md">
                 <table className="w-full text-sm">
                   <thead>
@@ -3185,55 +3234,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </tbody>
                 </table>
               </div>
-
-              {offloadDetailLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              ) : offloadDetail?.items && offloadDetail.items.length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium mb-2">Stock Items</p>
-                  <div className="border rounded-md overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/40">
-                          <th className="text-left p-3 font-medium">Item</th>
-                          <th className="text-right p-3 font-medium">Qty</th>
-                          <th className="text-right p-3 font-medium">Rate</th>
-                          <th className="text-right p-3 font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {offloadDetail.items.map((item) => (
-                          <tr key={item.id} className="border-b last:border-0">
-                            <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.quantity))}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
-                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
-                          </tr>
-                        ))}
-                        <tr className="border-t-2 bg-muted/20 font-medium">
-                          <td className="p-3">Total</td>
-                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.quantity), 0))}</td>
-                          <td></td>
-                          <td className="p-3 text-right font-mono">{formatAmount(offloadDetail.items.reduce((s, i) => s + Number(i.totalValue), 0))}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mt-3">
-                    <div>
-                      <p className="text-muted-foreground">Total Bales</p>
-                      <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.totalBales))}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Additional Cost / Bale</p>
-                      <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.additionalCostPerBale))}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button
