@@ -1430,6 +1430,8 @@ export class DbStorage implements IStorage {
       .select({
         id: schema.purchaseOrders.id,
         poNumber: schema.purchaseOrders.poNumber,
+        companyId: schema.purchaseOrders.companyId,
+        containerId: schema.purchaseOrders.containerId,
         containerNumber: schema.containers.containerNumber,
         importDate: schema.containers.importDate,
         itemsTotal: schema.purchaseOrders.itemsTotal,

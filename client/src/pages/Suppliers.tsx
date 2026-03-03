@@ -202,6 +202,18 @@ export default function Suppliers() {
     navigate(`/purchase-orders/${po.id}/edit`);
   };
 
+  // Handle clicking on a container number to navigate to it
+  const handleContainerClick = async (po: any) => {
+    if (!po.containerId) return;
+    const targetCompany = companies.find((c: any) => c.id === po.companyId);
+    if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
+      await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
+      selectCompany(targetCompany);
+    }
+    setSelectedSupplier(null);
+    navigate(`/containers/${po.containerId}`);
+  };
+
   const handleExportToExcel = () => {
     if (!selectedSupplier || unifiedLedger.length === 0) return;
 
@@ -531,6 +543,8 @@ export default function Suppliers() {
                           <TableHead>Company</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -564,6 +578,12 @@ export default function Suppliers() {
                                       <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                     </button>
                                   )}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {txn.debit > 0 ? formatAmount(txn.debit) : "—"}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {txn.credit > 0 ? formatAmount(txn.credit) : "—"}
                                 </TableCell>
                                 <TableCell className="text-right font-mono font-semibold">
                                   {formatAmount(txn.balance)}
@@ -601,9 +621,13 @@ export default function Suppliers() {
                                   <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                 </button>
                               )}
-                              <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
-                                <span className="font-mono font-semibold">{formatAmount(txn.balance)}</span>
+                                <div className="flex items-center gap-3 font-mono text-xs">
+                                  {txn.debit > 0 && <span className="text-muted-foreground">Dr: {formatAmount(txn.debit)}</span>}
+                                  {txn.credit > 0 && <span className="text-muted-foreground">Cr: {formatAmount(txn.credit)}</span>}
+                                  <span className="font-semibold">{formatAmount(txn.balance)}</span>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -653,7 +677,6 @@ export default function Suppliers() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Container</TableHead>
-                          <TableHead>PO Number</TableHead>
                           <TableHead>Import Date</TableHead>
                           <TableHead>Company</TableHead>
                           <TableHead className="text-right">Total Amount</TableHead>
@@ -674,18 +697,19 @@ export default function Suppliers() {
                             
                             return (
                               <TableRow key={po.id}>
-                                <TableCell className="font-mono font-semibold">
-                                  {po.containerNumber || "-"}
-                                </TableCell>
                                 <TableCell>
-                                  <button
-                                    onClick={() => handlePOClick(po)}
-                                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
-                                    data-testid={`link-po-${idx}`}
-                                  >
-                                    {po.poNumber || `PO-${po.id}`}
-                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                  </button>
+                                  {po.containerId ? (
+                                    <button
+                                      onClick={() => handleContainerClick(po)}
+                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-mono font-semibold"
+                                      data-testid={`link-container-${idx}`}
+                                    >
+                                      {po.containerNumber || "-"}
+                                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                    </button>
+                                  ) : (
+                                    <span className="font-mono font-semibold">{po.containerNumber || "-"}</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">
                                   {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
@@ -718,19 +742,22 @@ export default function Suppliers() {
                           <Card key={po.id}>
                             <CardContent className="p-3 space-y-2">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono font-semibold text-sm">{po.containerNumber || "-"}</span>
+                                {po.containerId ? (
+                                  <button
+                                    onClick={() => handleContainerClick(po)}
+                                    className="flex items-center gap-1 text-primary hover:underline cursor-pointer font-mono font-semibold text-sm"
+                                    data-testid={`link-container-mobile-${idx}`}
+                                  >
+                                    {po.containerNumber || "-"}
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                  </button>
+                                ) : (
+                                  <span className="font-mono font-semibold text-sm">{po.containerNumber || "-"}</span>
+                                )}
                                 <span className="font-mono text-xs text-muted-foreground">
                                   {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
                                 </span>
                               </div>
-                              <button
-                                onClick={() => handlePOClick(po)}
-                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium text-sm"
-                                data-testid={`link-po-${idx}`}
-                              >
-                                {po.poNumber || `PO-${po.id}`}
-                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                              </button>
                               <div className="flex items-center justify-between gap-2">
                                 <Badge variant="secondary" className="text-xs">{po.companyName}</Badge>
                                 <span className="font-mono font-semibold">{formatAmount(totalAmount)}</span>
