@@ -20017,6 +20017,32 @@ if (asOfDate) {
         return totalBalance;
       };
 
+      // Helper: transaction-only balance (no opening balances) for an account type
+      // isLiability=true → returns Cr - Dr (positive = net credit/liability)
+      const getTransactionOnlyBalance = async (accountType: string, isLiability: boolean = true) => {
+        const result = await db
+          .select({
+            totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
+            totalDebit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0)`,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.accountType, accountType),
+              isNull(ledgerAccounts.deletedAt),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          );
+        const totalCredit = parseFloat(result[0]?.totalCredit || "0");
+        const totalDebit = parseFloat(result[0]?.totalDebit || "0");
+        return isLiability ? totalCredit - totalDebit : totalDebit - totalCredit;
+      };
+
       // 1. Supplier Balance - calculated from voucher entries + opening balances
       // Credits to suppliers increase what we owe (liability), debits decrease it
       const supplierEntries = await db
@@ -20439,6 +20465,15 @@ if (asOfDate) {
       // 20. Profit/Equity accounts (retained earnings - credit side)
       const profitBalance = await getAccountTypeBalance("Profit", true);
 
+      // 20a. Equity account transactions (e.g. capital injections DR Cash CR Equity)
+      // Opening balances for Equity are already handled by openingBalanceEquity offset
+      // Only ongoing voucher transactions need to be captured here
+      const equityTransactionBalance = await getTransactionOnlyBalance("Equity", true);
+
+      // 20b. Accounts Payable transactions (AP credits = liability increase)
+      // Opening balances for AP are handled by openingBalanceEquity offset
+      const apTransactionBalance = await getTransactionOnlyBalance("Accounts Payable", true);
+
       // 21. Opening Balance Equity - automatically balance opening entries
       // When opening balances are added without matching entries (e.g., cash opening balance without 
       // corresponding capital), this creates an imbalance. We calculate the net of all opening balances
@@ -20564,6 +20599,8 @@ if (asOfDate) {
         loansBalance +              // Liability (loans/borrowings - includes office charges)
         liabilityBalance +          // Other Liability accounts
         profitBalance +             // Profit/Equity (retained earnings)
+        equityTransactionBalance +  // Equity account transactions (capital injections, etc.)
+        apTransactionBalance +      // Accounts Payable transactions
         incomeBalance +             // Income (sales revenue - credit)
         payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
         openingBalanceEquity);      // Opening Balance Equity (implicit capital from opening balances)
@@ -20629,7 +20666,7 @@ if (asOfDate) {
       const traceExpenseTotal = indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance;
       // liabilitiesBeforeEquity is the raw sum, then we subtract openingBalanceEquity
       const traceLiabilitiesRaw = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + 
-        liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
+        liabilityBalance + profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance;
       const traceNetLiabilities = traceLiabilitiesRaw - openingBalanceEquity;
       
       // Verify: our trace matches the netImportCycleBalance exactly
@@ -20651,7 +20688,8 @@ if (asOfDate) {
             value: traceNetLiabilities,
             breakdown: { 
               supplierBalance, dutyAgentBalance, transporterAgentBalance, loansBalance, 
-              liabilityBalance, profitBalance, incomeBalance, payrollLiabilitiesBalance,
+              liabilityBalance, profitBalance, equityTransactionBalance, apTransactionBalance,
+              incomeBalance, payrollLiabilitiesBalance,
               openingBalanceEquityOffset: openingBalanceEquity // positive value that reduces liabilities
             }
           },
@@ -20685,6 +20723,8 @@ if (asOfDate) {
           incomeBalance,
           liabilityBalance,
           profitBalance,
+          equityTransactionBalance,
+          apTransactionBalance,
           stockOnFloorValue,
           cogsBalance,
           consumptionBalance,
@@ -20942,6 +20982,56 @@ if (asOfDate) {
           howToFix: "These balances are normal and represent wages owed. Pay employees through Payroll to reduce these liabilities.",
           category: "Liabilities"
         });
+      }
+
+      // Check for Loans accounts with a net DEBIT balance (more debits than credits)
+      // This is a sign that office charges were posted with the Loans account on the wrong side
+      const loansAccounts = await db
+        .select({
+          id: ledgerAccounts.id,
+          name: ledgerAccounts.name,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Loans"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      for (const loanAcct of loansAccounts) {
+        const loanEntries = await db
+          .select({
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, loanAcct.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          );
+
+        const netVoucherBalance = loanEntries.reduce((sum, e) => {
+          return sum + parseFloat(e.creditAmount || "0") - parseFloat(e.debitAmount || "0");
+        }, 0);
+
+        if (netVoucherBalance < -0.01) {
+          issues.push({
+            id: `loans-net-debit-${loanAcct.id}`,
+            severity: "warning",
+            title: `Loans Account "${loanAcct.name}" Has Net Debit Balance — Office Charges May Be Posted Backwards`,
+            description: `The Loans account "${loanAcct.name}" has been debited more than credited (net: $${netVoucherBalance.toFixed(2)}). This usually means office charges were recorded with the Loans account on the DEBIT side instead of the CREDIT side in the Offload dialog.`,
+            impact: Math.abs(netVoucherBalance),
+            howToFix: `In the Offload dialog, the Loans/credit account should go in the "Cash Account" field (credit side). An expense or import account should go in the "Office Account" field (debit side). Reversing the direction will fix the import cycle balance.`,
+            category: "Office Charges"
+          });
+        }
       }
 
       // Sort issues by impact (highest first), then by severity
@@ -22832,6 +22922,30 @@ if (asOfDate) {
         return totalBalance;
       };
 
+      const getTransactionOnlyBalance = async (accountType: string, isLiability: boolean = true) => {
+        const result = await db
+          .select({
+            totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
+            totalDebit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0)`,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.accountType, accountType),
+              isNull(ledgerAccounts.deletedAt),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          );
+        const totalCredit = parseFloat(result[0]?.totalCredit || "0");
+        const totalDebit = parseFloat(result[0]?.totalDebit || "0");
+        return isLiability ? totalCredit - totalDebit : totalDebit - totalCredit;
+      };
+
       // Calculate all components
       const supplierEntries = await db
         .select({
@@ -22937,6 +23051,8 @@ if (asOfDate) {
       const payrollExpenseBalance = await getAccountTypeBalance("Payroll Expense", false);
       const salaryAdvancesBalance = await getAccountTypeBalance("Salary Advances", false);
       const generalExpenseBalance = await getAccountTypeBalance("Expense", false);
+      const equityTransactionBalance = await getTransactionOnlyBalance("Equity", true);
+      const apTransactionBalance = await getTransactionOnlyBalance("Accounts Payable", true);
 
       // Stock on floor (excluding orphaned)
       const inventoryItems = await db
@@ -23016,7 +23132,7 @@ if (asOfDate) {
       const totalExpenses = round2(indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance);
       
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability + Profit + Income + Payroll Liabilities - Opening Balance Equity
-      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance - openingBalanceEquity);
+      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance - openingBalanceEquity);
       
       const netImportCycleBalance = round2((totalAssets + totalExpenses) - totalLiabilities);
 
@@ -23413,6 +23529,8 @@ if (asOfDate) {
           loansBalance: round2(loansBalance),
           liabilityBalance: round2(liabilityBalance),
           profitBalance: round2(profitBalance),
+          equityTransactionBalance: round2(equityTransactionBalance),
+          apTransactionBalance: round2(apTransactionBalance),
           incomeBalance: round2(incomeBalance),
           payrollLiabilitiesBalance: round2(payrollLiabilitiesBalance),
           openingBalanceEquity: round2(openingBalanceEquity),

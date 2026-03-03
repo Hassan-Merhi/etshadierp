@@ -538,7 +538,24 @@ export default function Accounts() {
       : openingBalance;
 
   const handleVoucherClick = (voucher: GroupedVoucher) => {
-    navigate(`/vouchers/${voucher.voucherId}/edit`);
+    const voucherTypeMap: Record<string, string> = {
+      Payment: "payment",
+      Receipt: "receipt",
+      Journal: "journal",
+      Consumption: "adjustment",
+      Production: "adjustment",
+      Mixed: "adjustment",
+      StockTransfer: "transfer",
+      "Stock Transfer": "transfer",
+      "Credit Note": "credit-note",
+      "Debit Note": "credit-note",
+    };
+    const tabName = voucherTypeMap[voucher.voucherType];
+    if (tabName) {
+      navigate(`/vouchers?edit=${voucher.voucherId}&tab=${tabName}`);
+    } else {
+      navigate(`/vouchers/${voucher.voucherId}/edit`);
+    }
   };
 
   const form = useForm<InsertLedgerAccount>({

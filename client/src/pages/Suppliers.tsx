@@ -112,8 +112,25 @@ export default function Suppliers() {
     // Close the dialog
     setSelectedSupplier(null);
 
-    // Navigate to voucher edit page - it will load all data based on voucherId and voucherType
-    navigate(`/vouchers/${txn.voucherId}/edit`);
+    // Navigate to the voucher page with the correct tab for editing
+    const voucherTypeMap: Record<string, string> = {
+      Payment: "payment",
+      Receipt: "receipt",
+      Journal: "journal",
+      Consumption: "adjustment",
+      Production: "adjustment",
+      Mixed: "adjustment",
+      StockTransfer: "transfer",
+      "Stock Transfer": "transfer",
+      "Credit Note": "credit-note",
+      "Debit Note": "credit-note",
+    };
+    const tabName = voucherTypeMap[txn.voucherType];
+    if (tabName) {
+      navigate(`/vouchers?edit=${txn.voucherId}&tab=${tabName}`);
+    } else {
+      navigate(`/vouchers/${txn.voucherId}/edit`);
+    }
   };
   
   // Fetch global supplier statistics (no company filter)

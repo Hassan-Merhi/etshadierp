@@ -65,6 +65,8 @@ interface ImportCycleData {
     incomeBalance: number;
     liabilityBalance: number;
     profitBalance: number;
+    equityTransactionBalance: number;
+    apTransactionBalance: number;
     stockOnFloorValue: number;
     cogsBalance: number;
     consumptionBalance: number;
@@ -175,6 +177,8 @@ const componentConfig: ComponentInfo[] = [
   { key: "loansBalance", label: "Loans", category: "liability", inFormula: true, sign: "-" },
   { key: "liabilityBalance", label: "Other Liabilities", category: "liability", inFormula: true, sign: "-" },
   { key: "profitBalance", label: "Profit/Retained Earnings", category: "liability", inFormula: true, sign: "-" },
+  { key: "equityTransactionBalance", label: "Equity Transfers (Retained Earnings)", category: "liability", inFormula: true, sign: "-" },
+  { key: "apTransactionBalance", label: "Accounts Payable", category: "liability", inFormula: true, sign: "-" },
   { key: "incomeBalance", label: "Income", category: "liability", inFormula: true, sign: "-" },
   { key: "payrollLiabilitiesBalance", label: "Payroll Liabilities", category: "liability", inFormula: true, sign: "-" },
   { key: "openingBalanceEquity", label: "Opening Balance Equity", category: "liability", inFormula: true, sign: "+" },
@@ -316,6 +320,7 @@ export default function ImportCycleDiagnostics() {
   const liabilityTotal = (components.supplierBalance || 0) + (components.dutyAgentBalance || 0) + 
     (components.transporterAgentBalance || 0) + (components.loansBalance || 0) + 
     (components.liabilityBalance || 0) + (components.profitBalance || 0) + 
+    (components.equityTransactionBalance || 0) + (components.apTransactionBalance || 0) +
     (components.incomeBalance || 0) + (components.payrollLiabilitiesBalance || 0) - 
     (components.openingBalanceEquity || 0);
 
