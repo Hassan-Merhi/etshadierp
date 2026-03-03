@@ -33,7 +33,8 @@ export function formatCurrencyWithLabel(num: number | string, currency: Currency
   if (isNaN(numValue)) return "";
   
   if (currency === "USD") {
-    return `$ ${numValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const isWhole = Math.abs(numValue) % 1 === 0;
+    return `$ ${numValue.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
   } else {
     return `CFA ${numValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }

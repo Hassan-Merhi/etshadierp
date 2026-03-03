@@ -29,7 +29,8 @@ export function useCurrency(): CurrencyInfo {
     if (isNaN(numAmount)) return "";
     
     if (currency === "USD") {
-      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const isWhole = Math.abs(numAmount) % 1 === 0;
+      return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     } else {
       return `CFA ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }

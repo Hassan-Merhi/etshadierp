@@ -435,7 +435,7 @@ export default function ImportCycleDiagnostics() {
               <div className="text-center mt-4 pt-4 border-t">
                 <div className="text-xs text-muted-foreground mb-1">= Raw Balance (before adjustment)</div>
                 <div className={`text-xl font-bold ${data.precisionTrace.rawNetBalance === 0 ? 'text-green-600' : 'text-destructive'}`}>
-                  ${data.precisionTrace.rawNetBalance.toFixed(2)}
+                  ${data.precisionTrace.rawNetBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
@@ -448,8 +448,8 @@ export default function ImportCycleDiagnostics() {
                   <div>
                     <h4 className="font-semibold text-purple-800 dark:text-purple-200">Equity Adjustment Applied</h4>
                     <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
-                      An equity adjustment of <span className="font-mono font-bold">${data.precisionTrace.storedEquityAdjustment.toFixed(2)}</span> was 
-                      applied to zero out the raw balance of <span className="font-mono">${data.precisionTrace.rawNetBalance.toFixed(2)}</span>.
+                      An equity adjustment of <span className="font-mono font-bold">${data.precisionTrace.storedEquityAdjustment.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span> was 
+                      applied to zero out the raw balance of <span className="font-mono">${data.precisionTrace.rawNetBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>.
                     </p>
                     <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
                       This adjustment was made via "Recalculate Opening Balance Equity" in Settings.

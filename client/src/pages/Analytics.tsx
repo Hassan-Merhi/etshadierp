@@ -718,10 +718,12 @@ export default function Analytics() {
   };
 
   const formatCurrency = (value: number) => {
+    const isWhole = Math.abs(value) % 1 === 0;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 2,
+      minimumFractionDigits: isWhole ? 0 : 2,
+      maximumFractionDigits: 2,
     }).format(Math.abs(value));
   };
 

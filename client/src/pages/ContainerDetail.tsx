@@ -901,7 +901,7 @@ export default function ContainerDetail() {
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div>
                       <p className="text-sm font-medium">{fr.vendorName || "Unnamed vendor"}</p>
-                      <p className="text-lg font-bold">{fr.currency} {Number(fr.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-lg font-bold">{fr.currency} {Number(fr.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={fr.computedStatus === "PAID" ? "default" : fr.computedStatus === "PARTIAL" ? "secondary" : "destructive"} data-testid={`badge-freight-status-${fr.id}`}>
@@ -924,7 +924,7 @@ export default function ContainerDetail() {
                         <div key={p.id} className="flex items-center justify-between text-sm" data-testid={`payment-row-${p.id}`}>
                           <span>{new Date(p.paymentDate).toLocaleDateString()} - {p.method || "Cash"} {p.reference ? `(${p.reference})` : ""}</span>
                           <div className="flex items-center gap-1">
-                            <span className="font-mono">{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span className="font-mono">{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate({ freightId: fr.id, paymentId: p.id }); }} data-testid={`button-delete-payment-${p.id}`}>
                               <XCircle className="h-3 w-3" />
                             </Button>
@@ -933,7 +933,7 @@ export default function ContainerDetail() {
                       ))}
                       <div className="flex justify-between text-sm font-medium pt-1 border-t">
                         <span>Balance remaining</span>
-                        <span className="font-mono">{(Number(fr.freightAmount) - fr.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span className="font-mono">{(Number(fr.freightAmount) - fr.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   )}

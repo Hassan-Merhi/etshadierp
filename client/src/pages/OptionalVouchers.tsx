@@ -214,7 +214,7 @@ export default function OptionalVouchers() {
                           {v.locationName || "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -251,7 +251,7 @@ export default function OptionalVouchers() {
                     <TableRow className="font-semibold">
                       <TableCell colSpan={4}>Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})</TableCell>
                       <TableCell className="text-right font-mono" data-testid="text-optional-grand-total">
-                        {vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>

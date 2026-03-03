@@ -38,10 +38,12 @@ interface CashflowData {
 const PERIOD_OPTIONS = [30, 60, 90] as const;
 
 function formatCurrency(value: number): string {
+  const isWhole = Math.abs(value) % 1 === 0;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 2,
+    minimumFractionDigits: isWhole ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

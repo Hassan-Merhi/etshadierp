@@ -4328,7 +4328,7 @@ function LoginHistoryTab() {
                           disabled={!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0 || isFixingOrphanedCharges}
                           onClick={async () => {
                             if (!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0) return;
-                            if (!confirm(`Delete ${orphanedChargesDiagnostic.count} orphaned vouchers with impact of $${orphanedChargesDiagnostic.impact.toFixed(2)}? This cannot be undone.`)) {
+                            if (!confirm(`Delete ${orphanedChargesDiagnostic.count} orphaned vouchers with impact of $${orphanedChargesDiagnostic.impact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}? This cannot be undone.`)) {
                               return;
                             }
                             try {
@@ -4372,7 +4372,7 @@ function LoginHistoryTab() {
                     {orphanedChargesDiagnostic && orphanedChargesDiagnostic.count > 0 && (
                       <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
                         <p className="font-medium text-destructive">
-                          Found {orphanedChargesDiagnostic.count} orphaned vouchers (Impact: ${orphanedChargesDiagnostic.impact.toFixed(2)})
+                          Found {orphanedChargesDiagnostic.count} orphaned vouchers (Impact: ${orphanedChargesDiagnostic.impact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
                         </p>
                         <div className="max-h-32 overflow-y-auto text-sm">
                           {orphanedChargesDiagnostic.vouchers.map((v: any, i: number) => (
@@ -4451,7 +4451,7 @@ function LoginHistoryTab() {
                           disabled={!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0 || isFixingOrphanedPosSales}
                           onClick={async () => {
                             if (!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0) return;
-                            if (!confirm(`Delete ${orphanedPosSalesDiagnostic.count} orphaned POS vouchers with impact of $${orphanedPosSalesDiagnostic.totalImpact.toFixed(2)}? This cannot be undone.`)) {
+                            if (!confirm(`Delete ${orphanedPosSalesDiagnostic.count} orphaned POS vouchers with impact of $${orphanedPosSalesDiagnostic.totalImpact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}? This cannot be undone.`)) {
                               return;
                             }
                             try {
@@ -4494,7 +4494,7 @@ function LoginHistoryTab() {
                     {orphanedPosSalesDiagnostic && orphanedPosSalesDiagnostic.count > 0 && (
                       <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
                         <p className="font-medium text-destructive">
-                          Found {orphanedPosSalesDiagnostic.count} orphaned POS vouchers (Impact: ${orphanedPosSalesDiagnostic.totalImpact.toFixed(2)})
+                          Found {orphanedPosSalesDiagnostic.count} orphaned POS vouchers (Impact: ${orphanedPosSalesDiagnostic.totalImpact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
                         </p>
                         <div className="max-h-32 overflow-y-auto text-sm">
                           {orphanedPosSalesDiagnostic.vouchers.slice(0, 20).map((v: any, i: number) => (

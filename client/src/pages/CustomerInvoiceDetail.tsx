@@ -228,16 +228,16 @@ export default function CustomerInvoiceDetail() {
                     {line.qty}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-weight-per-bale-${idx}`}>
-                    {Number(line.weightPerBale || 0).toFixed(2)}
+                    {Number(line.weightPerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-total-weight-${idx}`}>
-                    {Number(line.totalWeight || 0).toFixed(2)}
+                    {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-price-per-bale-${idx}`}>
-                    {Number(line.pricePerBale || 0).toFixed(2)}
+                    {Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-price-${idx}`}>
-                    {Number(line.totalPrice || 0).toFixed(2)}
+                    {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
                 </TableRow>
               ))
@@ -254,7 +254,7 @@ export default function CustomerInvoiceDetail() {
               <div key={`freight-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-freight-amount-${idx}`}>
-                  {Number(charge.amount || 0).toFixed(2)}
+                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}
@@ -262,7 +262,7 @@ export default function CustomerInvoiceDetail() {
               <div key={`other-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-other-charge-${idx}`}>
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-other-amount-${idx}`}>
-                  {Number(charge.amount || 0).toFixed(2)}
+                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}
@@ -274,15 +274,15 @@ export default function CustomerInvoiceDetail() {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Subtotal (Bales)</span>
-            <span className="font-mono" data-testid="text-subtotal">{subtotal.toFixed(2)}</span>
+            <span className="font-mono" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Total Charges</span>
-            <span className="font-mono" data-testid="text-total-charges">{totalCharges.toFixed(2)}</span>
+            <span className="font-mono" data-testid="text-total-charges">{totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="border-t pt-2 flex items-center justify-between gap-2">
             <span className="font-semibold">Grand Total</span>
-            <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toFixed(2)}</span>
+            <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>Total Bales Qty</span>

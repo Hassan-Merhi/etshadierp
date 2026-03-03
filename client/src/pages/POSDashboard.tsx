@@ -136,10 +136,10 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
     const salesVouchers = todayVouchers?.filter((v: any) => v.voucherType === "Sales") || [];
     return {
       count: salesVouchers.length,
-      total: salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toFixed(2),
+      total: salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
       average: salesVouchers.length > 0 
-        ? (salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0) / salesVouchers.length).toFixed(2)
-        : "0.00",
+        ? (salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0) / salesVouchers.length).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+        : "0",
     };
   })();
 
@@ -507,7 +507,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                 id="openingCash"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder="0"
                 value={openingCash}
                 onChange={(e) => setOpeningCash(e.target.value)}
                 data-testid="input-opening-cash"
@@ -557,7 +557,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                 id="closingCash"
                 type="number"
                 step="0.01"
-                placeholder="0.00"
+                placeholder="0"
                 value={closingCash}
                 onChange={(e) => setClosingCash(e.target.value)}
                 data-testid="input-closing-cash"

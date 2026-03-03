@@ -815,7 +815,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     if (activeCurrency === "CFA") {
       return `CFA ${Math.round(amount).toLocaleString()}`;
     }
-    return `$ ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const isWhole = Math.abs(amount) % 1 === 0; return `$ ${amount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
   };
 
   const columns = [

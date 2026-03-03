@@ -389,7 +389,7 @@ export default function BaleTransfers() {
                                         <TableRow key={item.id} data-testid={`row-transfer-item-${item.id}`}>
                                           <TableCell className="font-mono text-xs">{item.baleCode}</TableCell>
                                           <TableCell>{item.productName || "-"}</TableCell>
-                                          <TableCell className="text-right font-mono">{parseFloat(item.weightKg).toFixed(2)}</TableCell>
+                                          <TableCell className="text-right font-mono">{parseFloat(item.weightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
                                           <TableCell className="text-right font-mono">{parseFloat(item.costPerKg).toFixed(4)}</TableCell>
                                         </TableRow>
                                       ))}
@@ -514,7 +514,7 @@ export default function BaleTransfers() {
                           </TableCell>
                           <TableCell className="font-mono text-xs">{row.bale.baleCode}</TableCell>
                           <TableCell>{row.product?.name || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">{parseFloat(row.bale.weightKg).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">{parseFloat(row.bale.weightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-right font-mono">{parseFloat(row.bale.costPerKg).toFixed(4)}</TableCell>
                         </TableRow>
                       ))}

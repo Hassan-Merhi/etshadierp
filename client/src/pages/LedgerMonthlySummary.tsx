@@ -73,8 +73,9 @@ function formatSmartNumber(value: number): string {
 }
 
 function formatFullNumber(value: number): string {
+  const isWhole = Math.abs(value) % 1 === 0;
   return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: isWhole ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(value);
 }

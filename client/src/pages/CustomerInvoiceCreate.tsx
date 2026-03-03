@@ -317,9 +317,9 @@ export default function CustomerInvoiceCreate() {
                         </div>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span>Qty: {group.bales.length}</span>
-                          <span>Wt: {group.totalWeight.toFixed(2)}</span>
-                          <span className="font-mono">@{group.pricePerBale.toFixed(2)}</span>
-                          <span className="font-mono font-semibold text-foreground">{group.totalPrice.toFixed(2)}</span>
+                          <span>Wt: {group.totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <span className="font-mono">@{group.pricePerBale.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <span className="font-mono font-semibold text-foreground">{group.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                         </div>
                       </div>
                       <Table>
@@ -330,10 +330,10 @@ export default function CustomerInvoiceCreate() {
                                 {bale.referenceNumber}
                               </TableCell>
                               <TableCell className="text-right text-sm text-muted-foreground">
-                                {parseFloat(bale.weight || "0").toFixed(2)} kg
+                                {parseFloat(bale.weight || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm" data-testid={`text-bale-price-${bale.id}`}>
-                                {parseFloat(bale.totalPrice || "0").toFixed(2)}
+                                {parseFloat(bale.totalPrice || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                               </TableCell>
                               <TableCell className="w-[40px]">
                                 <Button
@@ -359,7 +359,7 @@ export default function CustomerInvoiceCreate() {
             {bales.length > 0 && (
               <div className="border-t pt-3 mt-3 flex items-center justify-between gap-2">
                 <span className="font-medium">Subtotal</span>
-                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">{subtotal.toFixed(2)}</span>
+                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
               </div>
             )}
           </Card>
@@ -462,7 +462,7 @@ export default function CustomerInvoiceCreate() {
                   <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
                     <span className="text-sm">{charge.name}</span>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
+                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -523,19 +523,19 @@ export default function CustomerInvoiceCreate() {
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Subtotal</span>
-              <span className="font-mono" data-testid="text-summary-subtotal">{subtotal.toFixed(2)}</span>
+              <span className="font-mono" data-testid="text-summary-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Freight</span>
-              <span className="font-mono" data-testid="text-summary-freight">{freightCharges.toFixed(2)}</span>
+              <span className="font-mono" data-testid="text-summary-freight">{freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Other Charges</span>
-              <span className="font-mono" data-testid="text-summary-other">{otherCharges.toFixed(2)}</span>
+              <span className="font-mono" data-testid="text-summary-other">{otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between gap-2">
               <span className="font-semibold">Grand Total</span>
-              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toFixed(2)}</span>
+              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>Total Bales</span>
@@ -579,7 +579,7 @@ export default function CustomerInvoiceCreate() {
               </div>
               <div className="flex justify-between gap-2">
                 <span>Grand Total</span>
-                <span className="font-mono font-semibold" data-testid="text-confirm-total">{grandTotal.toFixed(2)}</span>
+                <span className="font-mono font-semibold" data-testid="text-confirm-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
             <div className="flex justify-end gap-2">

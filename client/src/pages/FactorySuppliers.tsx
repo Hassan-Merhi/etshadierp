@@ -174,7 +174,7 @@ export default function FactorySuppliers() {
 
   const formatNum = (val: string | null | undefined) => {
     if (!val || val === "0" || val === "0.00" || val === "0.000") return "-";
-    return parseFloat(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const n = parseFloat(val); return n.toLocaleString(undefined, { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
   };
 
   const formatKg = (val: string | null | undefined) => {
@@ -492,7 +492,7 @@ export default function FactorySuppliers() {
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground">Total Balance</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-balance">
-              ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: totalBalance % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>

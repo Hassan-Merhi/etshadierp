@@ -352,13 +352,13 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                     </TableCell>
                     <TableCell data-testid={`text-total-income-${closure.id}`}>
                       ${parseFloat(closure.totalIncome || "0").toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
+                        minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
                     <TableCell data-testid={`text-total-expense-${closure.id}`}>
                       ${parseFloat(closure.totalExpense || "0").toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
+                        minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
@@ -367,7 +367,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                       data-testid={`text-net-income-${closure.id}`}
                     >
                       {isProfit ? "+" : ""}${netIncome.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
+                        minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
