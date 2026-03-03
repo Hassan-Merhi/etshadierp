@@ -7,6 +7,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
@@ -515,6 +516,7 @@ function AuthenticatedApp() {
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                     <LogOut className="h-4 w-4" />
                   </Button>
+                  <CurrencyToggle />
                   <CompanySelector />
                   <ThemeToggle />
                 </div>
@@ -605,6 +607,7 @@ function AuthenticatedApp() {
                 <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="h-4 w-4" />
                 </Button>
+                <CurrencyToggle />
                 <CompanySelector />
                 <ThemeToggle />
               </div>
