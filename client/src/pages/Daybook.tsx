@@ -1481,13 +1481,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || offloadsLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : filteredVouchers.length === 0 ? (
+          ) : allRows.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               {hasActiveFilters ? (
                 <div>
@@ -1513,78 +1513,124 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {filteredVouchers.map((voucher) => (
-                <div
-                  key={voucher.id}
-                  className="border rounded-md p-3 space-y-2"
-                  data-testid={`card-voucher-${voucher.id}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        {...getVoucherTypeBadge(voucher.voucherType)}
-                        data-testid={`badge-type-${voucher.id}`}
-                      >
-                        {voucher.voucherType}
-                      </Badge>
-                      {voucher.optional && (
-                        <Badge
-                          variant="outline"
-                          data-testid={`badge-optional-${voucher.id}`}
-                          className="text-xs"
-                        >
-                          Optional
+              {allRows.map((row) => {
+                if (row._type === "offload") {
+                  const o = row.data;
+                  return (
+                    <div
+                      key={`offload-${o.id}`}
+                      className="border rounded-md p-3 space-y-2"
+                      data-testid={`card-offload-${o.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                          <Package className="w-3 h-3 mr-1" />
+                          Offload
                         </Badge>
+                        <span className="font-mono font-medium text-sm whitespace-nowrap">
+                          {formatAmount(o.totalCharges)}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDisplayDate(parseISO(o.offloadedAt.slice(0, 10)))}
+                      </div>
+                      <p className="text-sm font-medium">{o.containerNumber}</p>
+                      {o.locationName && <p className="text-xs text-muted-foreground">{o.locationName}</p>}
+                      <div className="flex items-center gap-1 pt-1 border-t">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => { setSelectedOffload(o); setOffloadViewOpen(true); }}
+                          data-testid={`button-view-offload-${o.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/containers/${o.containerId}`)}
+                          data-testid={`button-edit-offload-${o.id}`}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+                const voucher = row.data as Voucher;
+                return (
+                  <div
+                    key={`voucher-${voucher.id}`}
+                    className="border rounded-md p-3 space-y-2"
+                    data-testid={`card-voucher-${voucher.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          {...getVoucherTypeBadge(voucher.voucherType)}
+                          data-testid={`badge-type-${voucher.id}`}
+                        >
+                          {voucher.voucherType}
+                        </Badge>
+                        {voucher.optional && (
+                          <Badge
+                            variant="outline"
+                            data-testid={`badge-optional-${voucher.id}`}
+                            className="text-xs"
+                          >
+                            Optional
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="font-mono font-medium text-sm whitespace-nowrap">
+                        {formatAmount(voucher.totalAmount)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatDisplayDate(parseISO(voucher.voucherDate))}
+                      <span className="ml-2 text-xs">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                    </div>
+                    <p className="text-sm truncate">
+                      {voucher.description ||
+                        (voucher.voucherType === "Payment" ||
+                        voucher.voucherType === "Receipt" ||
+                        voucher.voucherType === "Journal"
+                          ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
+                          : "-")}
+                    </p>
+                    <div className="flex items-center gap-1 pt-1 border-t">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(voucher)}
+                        data-testid={`button-view-${voucher.id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {canEdit(voucher) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(voucher)}
+                          data-testid={`button-edit-${voucher.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {canDelete() && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(voucher)}
+                          data-testid={`button-delete-${voucher.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
-                    <span className="font-mono font-medium text-sm whitespace-nowrap">
-                      {formatAmount(voucher.totalAmount)}
-                    </span>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatDisplayDate(parseISO(voucher.voucherDate))}
-                    <span className="ml-2 text-xs">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
-                  </div>
-                  <p className="text-sm truncate">
-                    {voucher.description ||
-                      (voucher.voucherType === "Payment" ||
-                      voucher.voucherType === "Receipt" ||
-                      voucher.voucherType === "Journal"
-                        ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
-                        : "-")}
-                  </p>
-                  <div className="flex items-center gap-1 pt-1 border-t">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleView(voucher)}
-                      data-testid={`button-view-${voucher.id}`}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    {canEdit(voucher) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(voucher)}
-                        data-testid={`button-edit-${voucher.id}`}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    )}
-                    {canDelete() && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(voucher)}
-                        data-testid={`button-delete-${voucher.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Desktop Table View */}
@@ -1602,81 +1648,126 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredVouchers.map((voucher) => (
-                    <TableRow
-                      key={voucher.id}
-                      data-testid={`row-voucher-${voucher.id}`}
-                    >
-                      <TableCell className="font-medium sticky left-0 bg-background z-10">
-                        <div className="flex flex-col">
-                          <span>{formatDisplayDate(parseISO(voucher.voucherDate))}</span>
-                          <span className="text-xs text-muted-foreground">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            {...getVoucherTypeBadge(voucher.voucherType)}
-                            data-testid={`badge-type-${voucher.id}`}
-                          >
-                            {voucher.voucherType}
-                          </Badge>
-                          {voucher.optional && (
-                            <Badge
-                              variant="outline"
-                              data-testid={`badge-optional-${voucher.id}`}
-                              className="text-xs"
-                            >
-                              Optional
+                  {allRows.map((row) => {
+                    if (row._type === "offload") {
+                      const o = row.data;
+                      return (
+                        <TableRow key={`offload-${o.id}`} data-testid={`row-offload-${o.id}`}>
+                          <TableCell className="font-medium sticky left-0 bg-background z-10">
+                            {formatDisplayDate(parseISO(o.offloadedAt.slice(0, 10)))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                              <Package className="w-3 h-3 mr-1" />
+                              Offload
                             </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-md truncate">
-                        {voucher.description ||
-                          (voucher.voucherType === "Payment" ||
-                          voucher.voucherType === "Receipt" ||
-                          voucher.voucherType === "Journal"
-                            ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
-                            : "-")}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {formatAmount(voucher.totalAmount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleView(voucher)}
-                            data-testid={`button-view-${voucher.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {canEdit(voucher) && (
+                          </TableCell>
+                          <TableCell className="max-w-md truncate">
+                            {o.containerNumber}{o.locationName ? ` — ${o.locationName}` : ""}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {formatAmount(o.totalCharges)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => { setSelectedOffload(o); setOffloadViewOpen(true); }}
+                                data-testid={`button-view-offload-${o.id}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => navigate(`/containers/${o.containerId}`)}
+                                data-testid={`button-goto-container-${o.id}`}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    const voucher = row.data as Voucher;
+                    return (
+                      <TableRow
+                        key={`voucher-${voucher.id}`}
+                        data-testid={`row-voucher-${voucher.id}`}
+                      >
+                        <TableCell className="font-medium sticky left-0 bg-background z-10">
+                          <div className="flex flex-col">
+                            <span>{formatDisplayDate(parseISO(voucher.voucherDate))}</span>
+                            <span className="text-xs text-muted-foreground">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              {...getVoucherTypeBadge(voucher.voucherType)}
+                              data-testid={`badge-type-${voucher.id}`}
+                            >
+                              {voucher.voucherType}
+                            </Badge>
+                            {voucher.optional && (
+                              <Badge
+                                variant="outline"
+                                data-testid={`badge-optional-${voucher.id}`}
+                                className="text-xs"
+                              >
+                                Optional
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-md truncate">
+                          {voucher.description ||
+                            (voucher.voucherType === "Payment" ||
+                            voucher.voucherType === "Receipt" ||
+                            voucher.voucherType === "Journal"
+                              ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
+                              : "-")}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {formatAmount(voucher.totalAmount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleEdit(voucher)}
-                              data-testid={`button-edit-${voucher.id}`}
+                              onClick={() => handleView(voucher)}
+                              data-testid={`button-view-${voucher.id}`}
                             >
-                              <Edit className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </Button>
-                          )}
-                          {canDelete() && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(voucher)}
-                              data-testid={`button-delete-${voucher.id}`}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {canEdit(voucher) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(voucher)}
+                                data-testid={`button-edit-${voucher.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete() && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(voucher)}
+                                data-testid={`button-delete-${voucher.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -3021,6 +3112,134 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <div className="space-y-2">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Offload View Dialog */}
+      <Dialog open={offloadViewOpen} onOpenChange={setOffloadViewOpen}>
+        <DialogContent className="w-full max-w-[95vw] md:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Offload Details</DialogTitle>
+            <DialogDescription>
+              {selectedOffload ? `Container ${selectedOffload.containerNumber}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedOffload && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{formatDisplayDate(parseISO(selectedOffload.offloadedAt.slice(0, 10)))}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Container</p>
+                  <p className="font-medium">{selectedOffload.containerNumber}</p>
+                </div>
+                {selectedOffload.locationName && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{selectedOffload.locationName}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-md">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40">
+                      <th className="text-left p-3 font-medium">Charge</th>
+                      <th className="text-right p-3 font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Number(selectedOffload.duties) !== 0 && (
+                      <tr className="border-b">
+                        <td className="p-3">Duties</td>
+                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.duties))}</td>
+                      </tr>
+                    )}
+                    {Number(selectedOffload.officeCharges) !== 0 && (
+                      <tr className="border-b">
+                        <td className="p-3">Office Charges</td>
+                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.officeCharges))}</td>
+                      </tr>
+                    )}
+                    {Number(selectedOffload.transferCharges) !== 0 && (
+                      <tr className="border-b">
+                        <td className="p-3">Transfer Charges</td>
+                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.transferCharges))}</td>
+                      </tr>
+                    )}
+                    {Number(selectedOffload.transportFees) !== 0 && (
+                      <tr className="border-b">
+                        <td className="p-3">Transport Fees</td>
+                        <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.transportFees))}</td>
+                      </tr>
+                    )}
+                    <tr className="bg-muted/20 font-medium">
+                      <td className="p-3">Total Charges</td>
+                      <td className="p-3 text-right font-mono">{formatAmount(Number(selectedOffload.totalCharges))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Total Bales</p>
+                  <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.totalBales))}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Additional Cost / Bale</p>
+                  <p className="font-medium font-mono">{formatAmount(Number(selectedOffload.additionalCostPerBale))}</p>
+                </div>
+              </div>
+
+              {offloadDetailLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : offloadDetail?.items && offloadDetail.items.length > 0 ? (
+                <div>
+                  <p className="text-sm font-medium mb-2">Stock Items</p>
+                  <div className="border rounded-md overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40">
+                          <th className="text-left p-3 font-medium">Item</th>
+                          <th className="text-right p-3 font-medium">Qty</th>
+                          <th className="text-right p-3 font-medium">Rate</th>
+                          <th className="text-right p-3 font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {offloadDetail.items.map((item) => (
+                          <tr key={item.id} className="border-b last:border-0">
+                            <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.quantity))}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
+                            <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setOffloadViewOpen(false); navigate(`/containers/${selectedOffload.containerId}`); }}
+                  data-testid="button-goto-container-dialog"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Container
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
