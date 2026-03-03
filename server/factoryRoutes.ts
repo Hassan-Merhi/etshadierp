@@ -7160,7 +7160,13 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             eq(directMessages.receiverId, currentUserId),
             sql`${directMessages.readAt} IS NULL`
           ));
-        return { ...u, unreadCount: unreadResult?.count || 0 };
+        const [msgResult] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(directMessages)
+          .where(or(
+            and(eq(directMessages.senderId, u.id), eq(directMessages.receiverId, currentUserId)),
+            and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, u.id))
+          ));
+        return { ...u, unreadCount: unreadResult?.count || 0, hasMessages: (msgResult?.count || 0) > 0 };
       }));
 
       res.json(usersWithUnread);

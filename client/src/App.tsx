@@ -4,7 +4,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ChatWidget } from "@/components/ChatWidget";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
@@ -390,102 +390,78 @@ function AuthenticatedApp() {
     const isOnInventory = currentLocation === "/location-inventory";
     const isOnDaybook = currentLocation === "/pos-daybook";
     const isOnImport = currentLocation === "/pos-import";
-    
+    const isOnCustomers = currentLocation === "/pos-customers";
+    const isOnTransfer = currentLocation.startsWith("/vouchers");
+
+    const posNavItems = [
+      { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
+      { label: "Daybook", icon: BookOpen, active: isOnDaybook, testId: "button-daybook-tab", onClick: () => setLocation("/pos-daybook") },
+      { label: "Inventory", icon: MapPin, active: isOnInventory, testId: "button-inventory-tab", onClick: () => setLocation("/location-inventory") },
+      { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
+      ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
+      ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
+    ];
+
+    const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
+
     return (
       <>
-      <div className="flex flex-col h-screen w-full">
-        {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
-        <header className="flex flex-col border-b">
-          <div className="flex items-center justify-between p-2 sm:p-4 min-h-14 sm:h-16 gap-2 sm:gap-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={handleGoBack} data-testid="button-pos-back">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-base sm:text-lg font-semibold truncate">POS {user.posStation || ""}</h1>
+        <SidebarProvider style={posStyle as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
+            <Sidebar>
+              <SidebarHeader className="p-3 border-b">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" onClick={handleGoBack} data-testid="button-pos-back">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="font-semibold text-sm truncate">POS {user.posStation || ""}</span>
+                </div>
+              </SidebarHeader>
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {posNavItems.map((item) => (
+                        <SidebarMenuItem key={item.label}>
+                          <SidebarMenuButton
+                            isActive={item.active}
+                            onClick={item.onClick}
+                            data-testid={item.testId}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </SidebarContent>
+              <SidebarFooter className="p-2 border-t space-y-1">
+                <div className="text-xs text-muted-foreground px-2 truncate">{user.username}</div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <CompanySelector />
+                  <ThemeToggle />
+                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
+              </SidebarFooter>
+            </Sidebar>
+            <div className="flex flex-col flex-1 min-w-0">
+              <header className="flex items-center gap-2 p-2 border-b h-12">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+              </header>
+              <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+                <div className="w-full">
+                  <Router user={user} posImportEnabled={posImportEnabled} />
+                </div>
+              </main>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2 ml-auto">
-              <span className="hidden sm:inline text-sm text-muted-foreground">{user.username}</span>
-              <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-                <LogOut className="h-4 w-4" />
-              </Button>
-              <CompanySelector />
-              <ThemeToggle />
-            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 pb-2 overflow-x-auto">
-            <Button
-              variant={isOnPOS ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setLocation("/")}
-              data-testid="button-pos-tab"
-              className="shrink-0"
-            >
-              <ShoppingCart className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Point of Sale</span>
-            </Button>
-            <Button
-              variant={isOnDaybook ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setLocation("/pos-daybook")}
-              data-testid="button-daybook-tab"
-              className="shrink-0"
-            >
-              <BookOpen className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Daybook</span>
-            </Button>
-            <Button
-              variant={isOnInventory ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setLocation("/location-inventory")}
-              data-testid="button-inventory-tab"
-              className="shrink-0"
-            >
-              <MapPin className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Inventory</span>
-            </Button>
-            <Button
-              variant={currentLocation.startsWith("/vouchers") ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setLocation("/vouchers?tab=transfer")}
-              data-testid="button-stock-transfer-tab"
-              className="shrink-0"
-            >
-              <Package className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Transfer</span>
-            </Button>
-            {user.canAccessCustomers && (
-              <Button
-                variant={currentLocation === "/pos-customers" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setLocation("/pos-customers")}
-                data-testid="button-customers-tab"
-                className="shrink-0"
-              >
-                <Users className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Customers</span>
-              </Button>
-            )}
-            {posImportEnabled && (
-              <Button
-                variant={isOnImport ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setLocation("/pos-import")}
-                data-testid="button-pos-import-tab"
-                className="shrink-0"
-              >
-                <Upload className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Import</span>
-              </Button>
-            )}
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-          <div className="w-full">
-            <Router user={user} posImportEnabled={posImportEnabled} />
-          </div>
-        </main>
-      </div>
-      {leaveConfirmDialog}
+        </SidebarProvider>
+        {leaveConfirmDialog}
       </>
     );
   }

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, MessageCircle, Check, CheckCheck } from "lucide-react";
+import { Send, MessageCircle, Check, CheckCheck, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -18,11 +19,14 @@ interface ChatUser {
   username: string;
   active: boolean;
   unreadCount: number;
+  hasMessages: boolean;
 }
 
 export default function Chat() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const appMode = useAppMode();
@@ -96,37 +100,56 @@ export default function Chat() {
     }
   };
 
-  const selectedUser = chatUsers.find((u) => u.id === selectedUserId);
-
-  const getInitials = (username: string) => {
-    return username.slice(0, 2).toUpperCase();
+  const handleSelectNewUser = (userId: string) => {
+    setSelectedUserId(userId);
+    setNewChatOpen(false);
+    setSearchQuery("");
   };
+
+  const getInitials = (username: string) => username.slice(0, 2).toUpperCase();
 
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
-    if (isToday) {
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    }
+    if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const selectedUser = chatUsers.find((u) => u.id === selectedUserId);
+  const conversationUsers = chatUsers.filter((u) => u.hasMessages || u.unreadCount > 0 || u.id === selectedUserId);
+  const filteredAllUsers = chatUsers.filter((u) =>
+    u.username.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="h-[calc(100vh-6rem)] flex gap-3" data-testid="chat-page">
+      {/* Left panel: conversations */}
       <Card className="w-64 shrink-0 flex flex-col">
-        <div className="p-3 border-b">
-          <h3 className="font-semibold text-sm">Conversations</h3>
+        <div className="p-3 border-b flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm">Messages</h3>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setNewChatOpen(true)}
+            data-testid="button-new-chat"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {usersLoading ? (
             <div className="p-3 space-y-2">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : chatUsers.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">No users available</div>
+          ) : conversationUsers.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No conversations yet.
+              <br />
+              Click <strong>+</strong> to start one.
+            </div>
           ) : (
-            chatUsers.map((user) => (
+            conversationUsers.map((user) => (
               <button
                 key={user.id}
                 className={`w-full flex items-center gap-3 p-3 text-left hover-elevate transition-colors ${selectedUserId === user.id ? "bg-accent" : ""}`}
@@ -150,13 +173,14 @@ export default function Chat() {
         </div>
       </Card>
 
+      {/* Main chat area */}
       <Card className="flex-1 flex flex-col">
         {!selectedUserId ? (
           <CardContent className="flex-1 flex items-center justify-center">
             <div className="text-center text-muted-foreground">
               <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">Select a conversation</p>
-              <p className="text-sm mt-1">Choose a user from the list to start chatting</p>
+              <p className="text-sm mt-1">Choose from the list or click + to start a new chat</p>
             </div>
           </CardContent>
         ) : (
@@ -188,9 +212,7 @@ export default function Chat() {
                     >
                       <div
                         className={`max-w-[70%] rounded-lg px-3 py-2 ${
-                          isMine
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
+                          isMine ? "bg-primary text-primary-foreground" : "bg-muted"
                         }`}
                       >
                         <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
@@ -236,6 +258,49 @@ export default function Chat() {
           </>
         )}
       </Card>
+
+      {/* New chat dialog */}
+      <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New Message</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-user-search"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y rounded-md border">
+              {filteredAllUsers.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">No users found</div>
+              ) : (
+                filteredAllUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    className="w-full flex items-center gap-3 p-3 text-left hover-elevate"
+                    onClick={() => handleSelectNewUser(user.id)}
+                    data-testid={`button-select-user-${user.id}`}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">{getInitials(user.username)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">{user.username}</span>
+                    {user.unreadCount > 0 && (
+                      <Badge variant="default" className="ml-auto text-xs min-w-5 justify-center">{user.unreadCount}</Badge>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
