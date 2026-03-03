@@ -37,6 +37,7 @@ import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -67,6 +68,8 @@ interface SalesItem {
 
 interface VoucherWithItems extends Voucher {
   salesItems?: SalesItem[];
+  exchangeRate?: string | null;
+  isCreditSale?: boolean;
 }
 
 interface InventoryItem {
@@ -81,6 +84,8 @@ interface InventoryItem {
 export default function POSDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
+  const isMaliCompany = selectedCompany?.name?.toLowerCase().includes('mali');
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
@@ -842,15 +847,30 @@ export default function POSDaybook() {
               </>
             ) : (
               <>
-                {/* Hidden print template for reprint */}
+                {/* Hidden print template for reprint — matches POS invoice exactly */}
                 <div className="hidden">
                   <div ref={reprintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
                     <style dangerouslySetInnerHTML={{ __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }` }} />
+                    {/* Title */}
                     <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>POS INVOICE</div>
+                    {/* Date + User row */}
                     <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                       <span>Date: {voucherDetails?.voucherDate}</span>
-                      <span>#{voucherDetails?.voucherNumber}</span>
+                      <span>User: {currentUser?.username}</span>
                     </div>
+                    {/* Daily Rate — Mali company only */}
+                    {isMaliCompany && voucherDetails?.exchangeRate && (
+                      <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
+                        <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(parseFloat(String(voucherDetails.exchangeRate)))} CFA
+                      </div>
+                    )}
+                    {/* Credit Sale */}
+                    {voucherDetails?.isCreditSale && (
+                      <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
+                        <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+                      </div>
+                    )}
+                    {/* Items table */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
                       <thead>
                         <tr style={{ borderBottom: '2px solid black' }}>
@@ -866,10 +886,10 @@ export default function POSDaybook() {
                           const qty = parseFloat(item.quantity || "0");
                           return (
                             <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
-                              <td style={{ padding: '4px 3px', fontWeight: '600' }}>{item.stockItemName}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(qty)}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(rate, "$")}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 3px', fontWeight: '600' }}>{fmtPrint(qty * rate, "$")}</td>
+                              <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, "$")}</td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, "$")}</td>
                             </tr>
                           );
                         })}
@@ -878,20 +898,26 @@ export default function POSDaybook() {
                         <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
                           <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
                           <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
-                          <td></td>
+                          <td style={{ padding: '5px 3px' }}></td>
                           <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
                         </tr>
                       </tfoot>
                     </table>
+                    {/* Total Paid */}
                     <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
                       <span>TOTAL PAID:</span>
                       <span>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
                     </div>
+                    {/* Notes */}
                     {voucherDetails?.description && (
                       <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
                         <span style={{ fontWeight: '900' }}>Note:</span> {voucherDetails.description}
                       </div>
                     )}
+                    {/* Footer */}
+                    <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+                      <div>Thank you for your business!</div>
+                    </div>
                   </div>
                 </div>
 

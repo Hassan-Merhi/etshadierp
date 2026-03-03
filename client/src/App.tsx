@@ -442,6 +442,7 @@ function AuthenticatedApp() {
               <SidebarFooter className="p-2 border-t space-y-1">
                 <div className="text-xs text-muted-foreground px-2 truncate">{user.username}</div>
                 <div className="flex items-center gap-1 flex-wrap">
+                  <CurrencyToggle />
                   <CompanySelector />
                   <ThemeToggle />
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
