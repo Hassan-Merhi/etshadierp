@@ -24290,6 +24290,20 @@ if (asOfDate) {
       // - Then we add indirect incomes and subtract indirect expenses
       const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
+      // 10. Net Position = Assets − Liabilities (same logic as /api/stats/net-profit dashboard)
+      // Each account's net balance: positive = asset (owed to us), negative = liability (we owe)
+      let netPositionAssets = 0;
+      let netPositionLiabilities = 0;
+      for (const acc of companyAccounts) {
+        const opening = parseFloat(acc.openingBalance || "0");
+        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (net >= 0) netPositionAssets += net;
+        else netPositionLiabilities += Math.abs(net);
+      }
+      const netPositionValue = Math.round((netPositionAssets - netPositionLiabilities) * 100) / 100;
+
       // Calculate totals for panes (Tally Trading Account format)
       // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
       // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
@@ -24310,6 +24324,7 @@ if (asOfDate) {
           startDate: startDate ? startDate.toISOString().split('T')[0] : null,
           endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
+        netPosition: netPositionValue,
         // TALLY PRIME TRADING ACCOUNT STRUCTURE
         // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
         // Right pane (Credit side): Sales + Closing Stock + Direct Incomes

@@ -244,6 +244,7 @@ interface NetProfitAccount {
 }
 
 interface NetProfitStatementData {
+  netPosition: number;
   leftPane: {
     openingStock: {
       value: number;
@@ -1790,11 +1791,11 @@ export default function Analytics() {
                       {profitLoading ? "..." : formatAmount(profitData?.totalExpenses || 0)}
                     </p>
                   </div>
-                  <div className={`border-2 rounded-lg p-4 text-center ${(profitData?.netProfit || 0) >= 0 ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-red-500 bg-red-50 dark:bg-red-950/20'}`}>
+                  <div className={`border-2 rounded-lg p-4 text-center ${(profitData?.netPosition || 0) >= 0 ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-red-500 bg-red-50 dark:bg-red-950/20'}`}>
                     <p className="text-sm text-muted-foreground mb-1">Net Profit</p>
-                    <p className={`text-xl font-bold font-mono ${(profitData?.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {profitLoading ? "..." : formatAmount(Math.abs(profitData?.netProfit || 0))}
-                      {(profitData?.netProfit || 0) < 0 && ' (Loss)'}
+                    <p className={`text-xl font-bold font-mono ${(profitData?.netPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {profitLoading ? "..." : formatAmount(Math.abs(profitData?.netPosition || 0))}
+                      {(profitData?.netPosition || 0) < 0 && ' (Loss)'}
                     </p>
                   </div>
                 </div>
@@ -1999,9 +2000,9 @@ export default function Analytics() {
                     {/* Net Profit */}
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
-                      <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(Math.abs(netProfitData.leftPane.netProfit))}
-                        {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
+                      <span className={`font-mono ${netProfitData.netPosition >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(Math.abs(netProfitData.netPosition))}
+                        {netProfitData.netPosition < 0 && ' (Loss)'}
                       </span>
                     </div>
                   </div>
@@ -2115,9 +2116,9 @@ export default function Analytics() {
                     {/* Net Profit (display only - matches left pane) */}
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
-                      <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(Math.abs(netProfitData.leftPane.netProfit))}
-                        {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
+                      <span className={`font-mono ${netProfitData.netPosition >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(Math.abs(netProfitData.netPosition))}
+                        {netProfitData.netPosition < 0 && ' (Loss)'}
                       </span>
                     </div>
                   </div>
