@@ -138,7 +138,7 @@ export default function NetProfitDetails() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card data-testid="card-income">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -173,24 +173,6 @@ export default function NetProfitDetails() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-net-profit">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Net Profit
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${isProfit ? "text-green-600" : "text-red-600"}`}
-            >
-              {formatAmount(netProfit)}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isProfit ? "Profit" : "Loss"}
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card data-testid="card-formula">
