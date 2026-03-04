@@ -145,6 +145,8 @@ export default function FactoryLocationInventory() {
     queryKey: ["/api/factory/my-access"],
   });
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
+  const hideAvgRate = hiddenCost.includes("inventory_avg_rate");
+  const hideTotalValue = hiddenCost.includes("inventory_total_value");
 
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: selectedLocation
@@ -919,8 +921,8 @@ export default function FactoryLocationInventory() {
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
                         <div className="text-right"><span className="text-muted-foreground">KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-                        <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>
-                        <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>
+                        {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>}
+                        {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
                       </div>
                     </Card>
                   ))}
@@ -929,8 +931,8 @@ export default function FactoryLocationInventory() {
                       <span>Total ({sorted.length} items, {gTotalBales.toLocaleString()} bales)</span>
                       <span className="font-mono">{fmt(gTotalKg)} KG</span>
                     </div>
-                    <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(gTotalCost)}</div>
-                    <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(gTotalSellCost)} sell</div>
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(gTotalCost)}</div>}
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(gTotalSellCost)} sell</div>}
                   </Card>
                 </div>
 
@@ -952,8 +954,8 @@ export default function FactoryLocationInventory() {
                         <th className="text-left px-3 font-medium">Bale Name</th>
                         <th className="text-right px-3 font-medium">Bales</th>
                         <th className="text-right px-3 font-medium">Total KG</th>
-                        <th className="text-right px-3 font-medium">Cost/Total Value</th>
-                        <th className="text-right px-3 font-medium">Sell/Total Value</th>
+                        {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                        {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -964,16 +966,16 @@ export default function FactoryLocationInventory() {
                           <td className="px-3 font-medium">{prod.productName}</td>
                           <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                          <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>
-                          <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>
+                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                         </tr>
                       ))}
                       <tr className="border-t bg-muted/50 h-12 font-bold">
                         <td className="px-3" colSpan={3}>Total ({sorted.length} items)</td>
                         <td className="text-right px-3 font-mono">{gTotalBales.toLocaleString()}</td>
                         <td className="text-right px-3 font-mono">{fmt(gTotalKg)}</td>
-                        <td className="text-right px-3 font-mono">{formatAmount(gTotalCost)}</td>
-                        <td className="text-right px-3 font-mono text-primary">{formatAmount(gTotalSellCost)}</td>
+                        {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(gTotalCost)}</td>}
+                        {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(gTotalSellCost)}</td>}
                       </tr>
                     </tbody>
                   </table>
@@ -1000,8 +1002,8 @@ export default function FactoryLocationInventory() {
                       <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
                       <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
                       <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                      <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono">{formatAmount(cat.totalCost)}</span></div>
-                      <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>
+                      {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono">{formatAmount(cat.totalCost)}</span></div>}
+                      {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
                     </div>
                   </Card>
                 ))}
@@ -1011,8 +1013,8 @@ export default function FactoryLocationInventory() {
                       <span>Total ({totalProducts} products, {totalBales.toLocaleString()} bales)</span>
                       <span className="font-mono">{fmt(totalKg)} KG</span>
                     </div>
-                    <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalValue)}</div>
-                    <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalValue)}</div>}
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
                   </Card>
                 )}
               </div>
@@ -1033,14 +1035,14 @@ export default function FactoryLocationInventory() {
                       <th className="text-right px-3 font-medium">Products</th>
                       <th className="text-right px-3 font-medium">Bales</th>
                       <th className="text-right px-3 font-medium">Total KG</th>
-                      <th className="text-right px-3 font-medium">Cost/Total Value</th>
-                      <th className="text-right px-3 font-medium">Sell/Total Value</th>
+                      {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                      {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCategories.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-muted-foreground">No categories found matching your search</td>
+                        <td colSpan={hideTotalValue ? 4 : 6} className="text-center py-8 text-muted-foreground">No categories found matching your search</td>
                       </tr>
                     ) : (
                       <>
@@ -1060,8 +1062,8 @@ export default function FactoryLocationInventory() {
                             <td className="text-right px-3 font-mono">{cat.productCount}</td>
                             <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
                             <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
-                            <td className="text-right px-3 font-mono">{formatAmount(cat.totalCost)}</td>
-                            <td className="text-right px-3 font-mono text-primary">{formatAmount(cat.totalSellValue)}</td>
+                            {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(cat.totalCost)}</td>}
+                            {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(cat.totalSellValue)}</td>}
                           </tr>
                         ))}
                         <tr className="border-t bg-muted/50 h-12 font-bold">
@@ -1069,8 +1071,8 @@ export default function FactoryLocationInventory() {
                           <td className="text-right px-3 font-mono">{totalProducts}</td>
                           <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
                           <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                          <td className="text-right px-3 font-mono">{formatAmount(totalValue)}</td>
-                          <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>
+                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalValue)}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
                         </tr>
                       </>
                     )}
@@ -1094,8 +1096,6 @@ export default function FactoryLocationInventory() {
   const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
   const totalSellValue = filteredProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-  const hideAvgRate = hiddenCost.includes("inventory_avg_rate");
-  const hideTotalValue = hiddenCost.includes("inventory_total_value");
   const colSpanAll = (isAllItems ? (proformaMode ? 13 : 10) : (proformaMode ? 12 : 9)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 2 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
