@@ -64,6 +64,7 @@ interface ReceiptVoucherTabProps {
   onAutoCreateAccount?: (name: string) => Promise<Account | null>;
   isAutoCreating?: boolean;
   isEditMode?: boolean;
+  originalTotal?: number;
 }
 
 export function ReceiptVoucherTab({

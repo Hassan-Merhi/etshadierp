@@ -64,6 +64,7 @@ interface PaymentVoucherTabProps {
   onAutoCreateAccount?: (name: string) => Promise<Account | null>;
   isAutoCreating?: boolean;
   isEditMode?: boolean;
+  originalTotal?: number;
 }
 
 export function PaymentVoucherTab({
@@ -97,6 +98,7 @@ export function PaymentVoucherTab({
   onAutoCreateAccount,
   isAutoCreating = false,
   isEditMode = false,
+  originalTotal = 0,
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
@@ -160,16 +162,25 @@ export function PaymentVoucherTab({
                             />
                           </div>
                         </FormControl>
-                        {paymentAccountId > 0 && (
-                          <p className={cn("text-sm mt-1.5 font-mono", (() => {
-                            const live = isEditMode ? accountBalance : (total > 0 ? accountBalance - total : accountBalance);
-                            if (live < 0) return "text-red-600 dark:text-red-400";
-                            if (live > 0) return "text-emerald-600 dark:text-emerald-400";
-                            return "text-muted-foreground";
-                          })())}>
-                            Balance: {formatAmount(isEditMode ? accountBalance : (total > 0 ? accountBalance - total : accountBalance))}
-                          </p>
-                        )}
+                        {paymentAccountId > 0 && (() => {
+                          const projected = isEditMode
+                            ? accountBalance + originalTotal - total
+                            : accountBalance - total;
+                          const balColor = (v: number) => v < 0 ? "text-red-600 dark:text-red-400" : v > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground";
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
+                              <span className="text-muted-foreground text-xs">Bal:</span>
+                              <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
+                              {total > 0 && (
+                                <>
+                                  <span className="text-muted-foreground">→</span>
+                                  <span className={cn("font-semibold", balColor(projected))}>{formatAmount(projected)}</span>
+                                  <span className="text-muted-foreground text-xs">after</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <FormMessage />
                       </FormItem>
                     )}
