@@ -13541,6 +13541,36 @@ if (asOfDate) {
           );
         }
 
+        // Write to factory daybook if this is a factory company
+        try {
+          const cid = req.session.currentCompanyId!;
+          const co = await storage.getCompanyById(cid);
+          if (co?.companyType === "factory") {
+            const { factoryDaybookEntries: fde } = await import("@shared/schema");
+            const vType = result.voucher.voucherType;
+            const txType = vType === "Payment" ? "PAYMENT" : vType === "Receipt" ? "RECEIPT" : "JOURNAL";
+            const currency = result.voucher.currency || "USD";
+            const fxRate = parseFloat(result.voucher.exchangeRate || "1") || 1;
+            const amtCurrency = parseFloat(result.voucher.totalAmount || "0");
+            const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+            await db.insert(fde).values({
+              companyId: cid,
+              txDate: result.voucher.voucherDate,
+              txType,
+              referenceId: result.voucher.id,
+              referenceTable: "vouchers",
+              description: result.voucher.description || `${vType} voucher #${result.voucher.voucherNumber}`,
+              currencyCode: currency,
+              amountCurrency: String(amtCurrency),
+              fxRateToUsd: String(fxRate),
+              amountUsd: String(amtUsd),
+              createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+            });
+          }
+        } catch (dbErr) {
+          console.error("Factory daybook write failed (non-fatal):", dbErr);
+        }
+
         res.json(result);
       } catch (error: any) {
         console.error("Error creating payment/receipt voucher:", error);
@@ -13891,6 +13921,34 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
+        }
+
+        // Write to factory daybook if this is a factory company
+        try {
+          const cid = req.session.currentCompanyId!;
+          const co = await storage.getCompanyById(cid);
+          if (co?.companyType === "factory") {
+            const { factoryDaybookEntries: fde } = await import("@shared/schema");
+            const currency = result.voucher.currency || "USD";
+            const fxRate = parseFloat(result.voucher.exchangeRate || "1") || 1;
+            const amtCurrency = parseFloat(result.voucher.totalAmount || "0");
+            const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+            await db.insert(fde).values({
+              companyId: cid,
+              txDate: result.voucher.voucherDate,
+              txType: "JOURNAL",
+              referenceId: result.voucher.id,
+              referenceTable: "vouchers",
+              description: result.voucher.description || `Journal voucher #${result.voucher.voucherNumber}`,
+              currencyCode: currency,
+              amountCurrency: String(amtCurrency),
+              fxRateToUsd: String(fxRate),
+              amountUsd: String(amtUsd),
+              createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+            });
+          }
+        } catch (dbErr) {
+          console.error("Factory daybook write failed (non-fatal):", dbErr);
         }
 
         res.json(result);
@@ -28614,6 +28672,30 @@ if (asOfDate) {
 
         return transfer;
       });
+
+      // Write to factory daybook if this is a factory company
+      try {
+        const co = await storage.getCompanyById(companyId);
+        if (co?.companyType === "factory") {
+          const { factoryDaybookEntries: fde } = await import("@shared/schema");
+          const totalCost = items.reduce((s: number, it: any) => s + parseFloat(it.totalCost || "0"), 0);
+          await db.insert(fde).values({
+            companyId,
+            txDate: transferDate,
+            txType: "BALE_TRANSFER",
+            referenceId: result.id,
+            referenceTable: "bale_transfers",
+            description: notes || `Bale transfer #${result.id}`,
+            currencyCode: "USD",
+            amountCurrency: String(totalCost),
+            fxRateToUsd: "1",
+            amountUsd: String(totalCost),
+            createdBy: null,
+          });
+        }
+      } catch (dbErr) {
+        console.error("Factory daybook write failed (non-fatal):", dbErr);
+      }
 
       res.json({ success: true, transferId: result.id, transfer: result });
     } catch (error: any) {

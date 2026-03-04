@@ -53,9 +53,12 @@ const TX_TYPE_LABELS: Record<string, string> = {
   BALE_FINALIZE: "Bale Finalize",
   BALE_STOCK_ENTRY: "Bale Stock Entry",
   BALE_REMOVAL: "Bale Removal",
+  BALE_TRANSFER: "Bale Transfer",
   OPENING_BALANCE_RAW: "Opening Balance Raw",
   INVOICE: "Invoice",
   PAYMENT: "Payment",
+  RECEIPT: "Receipt",
+  JOURNAL: "Journal",
   DOC_UPLOAD: "Doc Upload",
   DOC_DELETE: "Doc Delete",
   FREIGHT_ADD: "Freight Add",
@@ -78,6 +81,7 @@ function formatTxType(type: string): string {
 const VOUCHER_TX_TYPES: Record<string, string> = {
   PAYMENT: "payment",
   RECEIPT: "receipt",
+  JOURNAL: "journal",
   INVOICE: "receipt",
   FREIGHT_PAYMENT: "payment",
 };
@@ -169,6 +173,10 @@ export default function FactoryDaybook() {
 
   const handleEntryClick = (entry: DaybookEntry, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
+    if (entry.txType === "BALE_TRANSFER") {
+      navigate("/factory/bale-transfers");
+      return;
+    }
     const tab = VOUCHER_TX_TYPES[entry.txType];
     if (tab && entry.referenceId) {
       navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
@@ -228,13 +236,16 @@ export default function FactoryDaybook() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Types</SelectItem>
+                  <SelectItem value="PAYMENT">Payment</SelectItem>
+                  <SelectItem value="RECEIPT">Receipt</SelectItem>
+                  <SelectItem value="JOURNAL">Journal</SelectItem>
+                  <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
+                  <SelectItem value="INVOICE">Invoice</SelectItem>
                   <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
                   <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
                   <SelectItem value="COMMISSION">Commission</SelectItem>
                   <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
                   <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
-                  <SelectItem value="INVOICE">Invoice</SelectItem>
-                  <SelectItem value="PAYMENT">Payment</SelectItem>
                   <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
                   <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
                   <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
