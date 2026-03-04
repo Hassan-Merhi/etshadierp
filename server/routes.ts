@@ -14681,6 +14681,14 @@ if (asOfDate) {
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 }
               }
+
+              // CRITICAL: sync inventoryApplied on the transfer record so that
+              // a subsequent updateStockTransfer call knows the correct state and
+              // does not double-apply or double-reverse inventory.
+              await tx
+                .update(stockTransferVouchers)
+                .set({ inventoryApplied: !willBeOptional })
+                .where(eq(stockTransferVouchers.id, transfer.id));
           }
 
           if (hasStockAdjustment.length > 0) {
