@@ -248,7 +248,6 @@ export default function NetProfitDetails() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Code</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -259,9 +258,6 @@ export default function NetProfitDetails() {
                       data-testid={`income-account-${index}`}
                     >
                       <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {acc.code}
-                      </TableCell>
                       <TableCell
                         className={`text-right ${acc.value >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
@@ -270,7 +266,7 @@ export default function NetProfitDetails() {
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={2}>Total Income</TableCell>
+                    <TableCell colSpan={1}>Total Income</TableCell>
                     <TableCell className="text-right text-green-600">
                       {formatAmount(data?.incomeTotal || 0)}
                     </TableCell>
@@ -301,7 +297,6 @@ export default function NetProfitDetails() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Code</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -312,9 +307,6 @@ export default function NetProfitDetails() {
                       data-testid={`expense-account-${index}`}
                     >
                       <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {acc.code}
-                      </TableCell>
                       <TableCell
                         className={`text-right ${acc.value >= 0 ? "text-red-600" : "text-green-600"}`}
                       >
@@ -323,7 +315,7 @@ export default function NetProfitDetails() {
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={2}>Total Expenses</TableCell>
+                    <TableCell colSpan={1}>Total Expenses</TableCell>
                     <TableCell className="text-right text-red-600">
                       {formatAmount(data?.expensesTotal || 0)}
                     </TableCell>
@@ -356,7 +348,6 @@ export default function NetProfitDetails() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Code</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
@@ -368,9 +359,6 @@ export default function NetProfitDetails() {
                       data-testid={`asset-account-${index}`}
                     >
                       <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {acc.code}
-                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {acc.category}
@@ -382,7 +370,7 @@ export default function NetProfitDetails() {
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={3}>Total Assets</TableCell>
+                    <TableCell colSpan={2}>Total Assets</TableCell>
                     <TableCell className="text-right text-green-600">
                       {formatAmount(data?.forUsTotal || 0)}
                     </TableCell>
@@ -413,7 +401,6 @@ export default function NetProfitDetails() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Account</TableHead>
-                    <TableHead>Code</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
@@ -425,9 +412,6 @@ export default function NetProfitDetails() {
                       data-testid={`liability-account-${index}`}
                     >
                       <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {acc.code}
-                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {acc.category}
@@ -439,7 +423,7 @@ export default function NetProfitDetails() {
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
-                    <TableCell colSpan={3}>Total Liabilities</TableCell>
+                    <TableCell colSpan={2}>Total Liabilities</TableCell>
                     <TableCell className="text-right text-red-600">
                       {formatAmount(data?.onUsTotal || 0)}
                     </TableCell>
