@@ -193,7 +193,6 @@ const allMenuGroups: MenuGroup[] = [
     icon: Upload,
     items: [
       { title: "Import Data", url: "/factory/import", icon: Upload },
-      { title: "Users", url: "/factory/users", icon: Users },
       { title: "Chat", url: "/factory/chat", icon: MessageCircle },
       { title: "Settings", url: "/factory/settings", icon: Settings, adminOnly: true },
     ],

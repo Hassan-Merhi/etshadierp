@@ -566,7 +566,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
-                    <Route path="/factory/users" component={FactoryUsers} />
+                    <Route path="/factory/users"><Redirect to="/factory/settings" /></Route>
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
                     <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
                     <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
