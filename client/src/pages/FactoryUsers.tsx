@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Users, Plus, Pencil, Shield, Check, X, Trash2 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,10 +84,36 @@ const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
 
 const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
 
+const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
+  { key: "dashboard", label: "Dashboard", group: "Overview" },
+  { key: "pos", label: "Point of Sale", group: "Sales & POS" },
+  { key: "pos_daybook", label: "POS Daybook", group: "Sales & POS" },
+  { key: "stock_items", label: "Stock Items", group: "Inventory" },
+  { key: "location_inventory", label: "Location Inventory", group: "Inventory" },
+  { key: "containers", label: "Containers", group: "Inventory" },
+  { key: "stock_otw", label: "Stock OTW", group: "Inventory" },
+  { key: "stock_query", label: "Stock Query", group: "Inventory" },
+  { key: "location_summary", label: "Location Summary", group: "Inventory" },
+  { key: "accounts", label: "Accounts", group: "Accounting" },
+  { key: "suppliers", label: "Suppliers", group: "Accounting" },
+  { key: "customers", label: "Customers", group: "Accounting" },
+  { key: "daybook", label: "Daybook", group: "Accounting" },
+  { key: "payroll", label: "Payroll", group: "Accounting" },
+  { key: "vouchers", label: "Vouchers", group: "Vouchers" },
+  { key: "optional_vouchers", label: "Optional Vouchers", group: "Vouchers" },
+  { key: "create", label: "Create Voucher", group: "Vouchers" },
+  { key: "analytics", label: "Analytics", group: "Analytics" },
+  { key: "sales_report", label: "Sales Report", group: "Analytics" },
+  { key: "factory_production", label: "Factory Production", group: "Analytics" },
+  { key: "settings", label: "Settings", group: "System" },
+];
+const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
+
 export default function FactoryUsers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<FactoryUser | null>(null);
+  const [pageTab, setPageTab] = useState<"factory" | "erp">("factory");
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -146,6 +173,7 @@ export default function FactoryUsers() {
     setFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
     setSelectedPages(new Set());
     setHiddenCostFields([]);
+    setPageTab("factory");
   };
 
   const openEdit = (user: FactoryUser) => {
@@ -159,6 +187,7 @@ export default function FactoryUsers() {
     });
     setSelectedPages(new Set(user.pageAccess));
     setHiddenCostFields(user.hiddenCostFields ?? []);
+    setPageTab("factory");
   };
 
   const toggleCostField = (key: string) => {
@@ -246,8 +275,11 @@ export default function FactoryUsers() {
     });
   };
 
+  const activePages = pageTab === "factory" ? ALL_FACTORY_PAGES : ALL_ERP_PAGES;
+  const activeGroups = pageTab === "factory" ? PAGE_GROUPS : ERP_PAGE_GROUPS;
+
   const toggleGroup = (group: string) => {
-    const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group).map(p => p.key);
+    const groupPages = activePages.filter(p => p.group === group).map(p => p.key);
     const allSelected = groupPages.every(k => selectedPages.has(k));
     setSelectedPages(prev => {
       const next = new Set(prev);
@@ -260,11 +292,19 @@ export default function FactoryUsers() {
   };
 
   const selectAll = () => {
-    setSelectedPages(new Set(ALL_FACTORY_PAGES.map(p => p.key)));
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      activePages.forEach(p => next.add(p.key));
+      return next;
+    });
   };
 
   const selectNone = () => {
-    setSelectedPages(new Set());
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      activePages.forEach(p => next.delete(p.key));
+      return next;
+    });
   };
 
   if (isLoading) {
@@ -506,9 +546,20 @@ export default function FactoryUsers() {
                 Select which pages this user can see. If no pages are selected, the user gets full access.
               </p>
 
+              <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as "factory" | "erp")}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="factory" className="flex-1" data-testid="tab-factory-pages">
+                    Factory Pages
+                  </TabsTrigger>
+                  <TabsTrigger value="erp" className="flex-1" data-testid="tab-erp-pages">
+                    ERP Pages
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               <div className="space-y-4 border rounded-md p-4 max-h-80 overflow-y-auto">
-                {PAGE_GROUPS.map(group => {
-                  const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group);
+                {activeGroups.map(group => {
+                  const groupPages = activePages.filter(p => p.group === group);
                   const allGroupSelected = groupPages.every(p => selectedPages.has(p.key));
                   const someGroupSelected = groupPages.some(p => selectedPages.has(p.key));
 
@@ -547,7 +598,7 @@ export default function FactoryUsers() {
 
               {selectedPages.size > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {selectedPages.size} of {ALL_FACTORY_PAGES.length} pages selected
+                  {selectedPages.size} pages selected
                 </p>
               )}
             </div>
