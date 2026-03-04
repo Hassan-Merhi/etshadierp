@@ -4255,8 +4255,10 @@ export class DbStorage implements IStorage {
         );
       }
 
-      // Step 2: REVERSE inventory changes for each OLD item (only if inventory was actually applied)
-      if (existingTransfer.inventoryApplied) {
+      // Step 2: REVERSE inventory changes for each OLD item (only if inventory was actually applied).
+      // Use same guard as the delete route: reverse if explicitly applied OR if voucher is non-optional
+      // (legacy transfers have inventoryApplied=false by default even though they were applied).
+      if (existingTransfer.inventoryApplied || !isOptional) {
         for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
