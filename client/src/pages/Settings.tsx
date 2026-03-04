@@ -57,7 +57,8 @@
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { queryClient, apiRequest } from "@/lib/queryClient";
   import { useAppMode } from "@/contexts/AppModeContext";
-  import { getApiRequest } from "@/lib/factoryApi";
+  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
   import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
@@ -1724,6 +1725,51 @@ function BulkRenameTab() {
   );
 }
 
+const ALL_FACTORY_PAGES_SETTINGS: { key: string; label: string; group: string }[] = [
+  { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
+  { key: "factory/daybook", label: "Daybook", group: "Overview" },
+  { key: "factory/suppliers", label: "Suppliers", group: "Master Data" },
+  { key: "factory/customers", label: "Customers", group: "Master Data" },
+  { key: "factory/containers", label: "Containers", group: "Master Data" },
+  { key: "factory/bale-products", label: "Bale Products", group: "Master Data" },
+  { key: "factory/workers", label: "Workers", group: "Master Data" },
+  { key: "factory/raw-stock", label: "Raw Stock", group: "Raw Materials" },
+  { key: "factory/mix-batches", label: "Mix Batches", group: "Raw Materials" },
+  { key: "factory/stock-entry", label: "Stock Entry", group: "Production" },
+  { key: "factory/bales-history", label: "Bales History", group: "Production" },
+  { key: "factory/sales/new", label: "New Invoice", group: "Sales" },
+  { key: "factory/sales/loading/new", label: "Container Loading", group: "Sales" },
+  { key: "factory/sales/loading/pending", label: "Pending Loadings", group: "Sales" },
+  { key: "factory/sales/pending-invoices", label: "Pending Invoices", group: "Sales" },
+  { key: "factory/sales/invoices", label: "Invoices", group: "Sales" },
+  { key: "factory/sales/proformas", label: "Proformas", group: "Sales" },
+  { key: "factory/bale-transfers", label: "Bale Transfers", group: "Logistics" },
+  { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
+  { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
+  { key: "factory/stock-query", label: "Stock Query", group: "Inventory" },
+  { key: "factory/accounts", label: "Accounts", group: "Accounting" },
+  { key: "factory/vouchers", label: "Vouchers", group: "Accounting" },
+  { key: "factory/create", label: "Create Voucher", group: "Accounting" },
+  { key: "factory/analytics", label: "Analytics", group: "Finance" },
+  { key: "factory/production-summary", label: "Production Summary", group: "Finance" },
+  { key: "factory/supplier-report", label: "Supplier Report", group: "Reports" },
+  { key: "factory/intelligence/dashboard", label: "Factory Dashboard", group: "Intelligence" },
+  { key: "factory/intelligence/kpis", label: "KPIs", group: "Intelligence" },
+  { key: "factory/intelligence/profitability", label: "Profitability", group: "Intelligence" },
+  { key: "factory/intelligence/waste", label: "Waste Tracking", group: "Intelligence" },
+  { key: "factory/intelligence/alerts", label: "Alerts", group: "Intelligence" },
+  { key: "factory/intelligence/supplier-scores", label: "Supplier Scores", group: "Intelligence" },
+  { key: "factory/intelligence/mix-optimizer", label: "Mix Optimizer", group: "Intelligence" },
+  { key: "factory/intelligence/cashflow", label: "Cash Flow", group: "Intelligence" },
+  { key: "factory/intelligence/settings", label: "Intelligence Settings", group: "Intelligence" },
+  { key: "factory/barcode-lookup", label: "Barcode Lookup", group: "Traceability" },
+  { key: "factory/import", label: "Import Data", group: "Data" },
+  { key: "factory/users", label: "User Management", group: "Data" },
+  { key: "factory/chat", label: "Chat", group: "Data" },
+  { key: "factory/settings", label: "Settings", group: "Data" },
+];
+const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map(p => p.group)));
+
 const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
   { key: "dashboard", label: "Dashboard", group: "Overview" },
   { key: "pos", label: "Point of Sale", group: "Sales & POS" },
@@ -1761,7 +1807,9 @@ const ERP_COST_FIELDS = [
 
 function PageAccessSection({ users, companies, selectedCompany, featureLabels, toast }: any) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [pageTab, setPageTab] = useState<"erp" | "factory">("erp");
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [factorySelectedPages, setFactorySelectedPages] = useState<Set<string>>(new Set());
   const [hiddenCostFields, setHiddenCostFields] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -1785,6 +1833,16 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     },
   });
 
+  const { data: factoryUsers } = useQuery<any[]>({
+    queryKey: ["/api/factory/users", selectedCompany?.id],
+    enabled: !!selectedUserId && !!selectedCompany,
+    queryFn: async () => {
+      const res = await factoryApiRequest("GET", "/api/factory/users");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const { data: hiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/erp-user-hidden-costs", selectedUserId],
     enabled: !!selectedUserId,
@@ -1802,6 +1860,13 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
   }, [pageAccess]);
 
   useEffect(() => {
+    if (factoryUsers && selectedUserId) {
+      const factoryUser = factoryUsers.find((u: any) => u.id === selectedUserId);
+      setFactorySelectedPages(new Set(factoryUser?.pageAccess || []));
+    }
+  }, [factoryUsers, selectedUserId]);
+
+  useEffect(() => {
     if (hiddenCostData) {
       setHiddenCostFields(hiddenCostData.hiddenCostFields);
     }
@@ -1814,7 +1879,22 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/erp-user-page-access", selectedUserId] });
-      toast({ title: "Page Access Updated", description: "User page access has been saved." });
+      toast({ title: "ERP Page Access Updated", description: "User ERP page access has been saved." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const saveFactoryMutation = useMutation({
+    mutationFn: async (pageKeys: string[]) => {
+      const res = await factoryApiRequest("PUT", `/api/factory/users/${selectedUserId}`, { pageAccess: pageKeys });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed to save"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users", selectedCompany?.id] });
+      toast({ title: "Factory Page Access Updated", description: "User factory page access has been saved." });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1835,8 +1915,13 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     },
   });
 
+  const activePageList = pageTab === "erp" ? ALL_ERP_PAGES : ALL_FACTORY_PAGES_SETTINGS;
+  const activePageGroups = pageTab === "erp" ? ERP_PAGE_GROUPS : FACTORY_PAGE_GROUPS_SETTINGS;
+  const activeSelected = pageTab === "erp" ? selectedPages : factorySelectedPages;
+  const setActiveSelected = pageTab === "erp" ? setSelectedPages : setFactorySelectedPages;
+
   const togglePage = (key: string) => {
-    setSelectedPages(prev => {
+    setActiveSelected(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -1845,9 +1930,9 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
   };
 
   const toggleGroup = (group: string) => {
-    const groupPages = ALL_ERP_PAGES.filter(p => p.group === group).map(p => p.key);
-    const allSelected = groupPages.every(k => selectedPages.has(k));
-    setSelectedPages(prev => {
+    const groupPages = activePageList.filter(p => p.group === group).map(p => p.key);
+    const allSelected = groupPages.every(k => activeSelected.has(k));
+    setActiveSelected(prev => {
       const next = new Set(prev);
       groupPages.forEach(k => allSelected ? next.delete(k) : next.add(k));
       return next;
@@ -1860,8 +1945,8 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     );
   };
 
-  const selectAll = () => setSelectedPages(new Set(ALL_ERP_PAGES.map(p => p.key)));
-  const selectNone = () => setSelectedPages(new Set());
+  const selectAll = () => setActiveSelected(new Set(activePageList.map(p => p.key)));
+  const selectNone = () => setActiveSelected(new Set());
 
   const selectedUser = users.find((u: any) => u.id === selectedUserId);
   const isAdmin = selectedUser && users.length > 0;
@@ -1911,20 +1996,31 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                   {isLoadingAccess && <Loader2 className="h-4 w-4 animate-spin" />}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-erp-select-all">
+                  <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-page-select-all">
                     All
                   </Button>
-                  <Button variant="outline" size="sm" onClick={selectNone} data-testid="button-erp-select-none">
+                  <Button variant="outline" size="sm" onClick={selectNone} data-testid="button-page-select-none">
                     None
                   </Button>
                 </div>
               </div>
 
+              <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as "erp" | "factory")}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="erp" className="flex-1" data-testid="tab-erp-pages">
+                    ERP Pages
+                  </TabsTrigger>
+                  <TabsTrigger value="factory" className="flex-1" data-testid="tab-factory-pages">
+                    Factory Pages
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               <div className="space-y-4 border rounded-md p-4 max-h-96 overflow-y-auto">
-                {ERP_PAGE_GROUPS.map(group => {
-                  const groupPages = ALL_ERP_PAGES.filter(p => p.group === group);
-                  const allGroupSelected = groupPages.every(p => selectedPages.has(p.key));
-                  const someGroupSelected = groupPages.some(p => selectedPages.has(p.key));
+                {activePageGroups.map(group => {
+                  const groupPages = activePageList.filter(p => p.group === group);
+                  const allGroupSelected = groupPages.every(p => activeSelected.has(p.key));
+                  const someGroupSelected = groupPages.some(p => activeSelected.has(p.key));
 
                   return (
                     <div key={group} className="space-y-2">
@@ -1932,7 +2028,7 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                         <Checkbox
                           checked={allGroupSelected}
                           onCheckedChange={() => toggleGroup(group)}
-                          data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
+                          data-testid={`checkbox-page-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
                         />
                         <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                           {group}
@@ -1945,9 +2041,9 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                         {groupPages.map(page => (
                           <div key={page.key} className="flex items-center gap-2">
                             <Checkbox
-                              checked={selectedPages.has(page.key)}
+                              checked={activeSelected.has(page.key)}
                               onCheckedChange={() => togglePage(page.key)}
-                              data-testid={`checkbox-erp-page-${page.key}`}
+                              data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`}
                             />
                             <span className="text-sm">{page.label}</span>
                           </div>
@@ -1958,25 +2054,31 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                 })}
               </div>
 
-              {selectedPages.size > 0 && (
+              {activeSelected.size > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {selectedPages.size} of {ALL_ERP_PAGES.length} pages selected
+                  {activeSelected.size} of {activePageList.length} pages selected
                 </p>
               )}
 
               <div className="flex justify-end">
                 <Button
-                  onClick={() => saveMutation.mutate(Array.from(selectedPages))}
-                  disabled={saveMutation.isPending}
+                  onClick={() => {
+                    if (pageTab === "erp") {
+                      saveMutation.mutate(Array.from(selectedPages));
+                    } else {
+                      saveFactoryMutation.mutate(Array.from(factorySelectedPages));
+                    }
+                  }}
+                  disabled={saveMutation.isPending || saveFactoryMutation.isPending}
                   data-testid="button-save-page-access"
                 >
-                  {saveMutation.isPending ? (
+                  {(saveMutation.isPending || saveFactoryMutation.isPending) ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Saving...
                     </>
                   ) : (
-                    "Save Page Access"
+                    `Save ${pageTab === "erp" ? "ERP" : "Factory"} Page Access`
                   )}
                 </Button>
               </div>
@@ -2934,9 +3036,9 @@ function LoginHistoryTab() {
       },
       {
         label: "POS",
-        items: [
+        items: appMode !== "factory" ? [
           { key: "pos-settings", label: "POS Settings", icon: ShoppingCart },
-        ],
+        ] : [],
       },
       {
         label: "System",
