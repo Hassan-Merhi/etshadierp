@@ -7823,6 +7823,22 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           ];
           tables.forEach(initRemap);
 
+          const dateFieldNames = new Set([
+            "createdAt", "updatedAt", "deletedAt", "offloadedAt", "pressedAt",
+            "finalizedAt", "paidAt", "generatedAt", "approvedAt", "uploadedAt",
+            "editedAt", "readAt", "logoUpdatedAt", "verifiedAt",
+            "loadingStartedAt", "loadingFinalizedAt", "lastUpdated",
+          ]);
+          function fixDates(rec: any) {
+            for (const key of Object.keys(rec)) {
+              if (rec[key] == null) continue;
+              if (dateFieldNames.has(key) && typeof rec[key] === "string") {
+                rec[key] = new Date(rec[key]);
+              }
+            }
+            return rec;
+          }
+
           await db.transaction(async (tx: any) => {
 
             async function insertAndMap(tableName: string, drizzleTable: any, rows: any[], fkRemaps: Record<string, string>, opts?: { hasCompanyId?: boolean, nullifyFields?: string[] }) {
@@ -7831,7 +7847,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
               let count = 0;
               for (const row of rows) {
                 const oldId = row.id;
-                const rec: any = { ...row };
+                const rec: any = fixDates({ ...row });
                 delete rec.id;
                 if (hasCompanyId) rec.companyId = targetCompanyId;
                 for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
@@ -7858,7 +7874,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
               for (const row of roots) {
                 const oldId = row.id;
-                const rec: any = { ...row };
+                const rec: any = fixDates({ ...row });
                 delete rec.id;
                 if (hasCompanyId) rec.companyId = targetCompanyId;
                 rec[parentField] = null;
@@ -7878,7 +7894,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
                   const parentMapped = r(tableName, row[parentField]);
                   if (parentMapped != null) {
                     const oldId = row.id;
-                    const rec: any = { ...row };
+                    const rec: any = fixDates({ ...row });
                     delete rec.id;
                     if (hasCompanyId) rec.companyId = targetCompanyId;
                     rec[parentField] = parentMapped;
@@ -7899,7 +7915,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
               if (remaining.length > 0) {
                 for (const row of remaining) {
                   const oldId = row.id;
-                  const rec: any = { ...row };
+                  const rec: any = fixDates({ ...row });
                   delete rec.id;
                   if (hasCompanyId) rec.companyId = targetCompanyId;
                   rec[parentField] = null;
@@ -7919,7 +7935,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             if (t.locations?.length) {
               for (const row of t.locations) {
                 const oldId = row.id;
-                const rec: any = { ...row };
+                const rec: any = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.code = await makeUniqueCode(tx, locations, locations.code, rec.code);
@@ -7937,7 +7953,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             if (t.bank_accounts?.length) {
               for (const row of t.bank_accounts) {
                 const oldId = row.id;
-                const rec: any = { ...row };
+                const rec: any = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.linkedLedgerId = r("ledger_accounts", rec.linkedLedgerId);
@@ -8156,7 +8172,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             if (t.vouchers?.length) {
               for (const row of t.vouchers) {
                 const oldId = row.id;
-                const rec: any = { ...row };
+                const rec: any = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.locationId = r("locations", rec.locationId);
