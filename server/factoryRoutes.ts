@@ -63,6 +63,21 @@ import {
   factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
   companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -7619,6 +7634,587 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         ));
       res.json({ count: result?.count || 0 });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/export-company-data", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const byCompany = (table: any) => eq(table.companyId, companyId);
+
+      const data: Record<string, any[]> = {};
+
+      data.locations = await db.select().from(locations).where(byCompany(locations));
+      data.ledger_accounts = await db.select().from(ledgerAccounts).where(byCompany(ledgerAccounts));
+      data.bank_accounts = await db.select().from(bankAccounts).where(byCompany(bankAccounts));
+      data.stock_groups = await db.select().from(stockGroups).where(byCompany(stockGroups));
+      data.stock_items = await db.select().from(stockItems).where(byCompany(stockItems));
+      data.inventory = await db.select().from(inventory).where(byCompany(inventory));
+      data.company_settings = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId));
+      data.exchange_rates = await db.select().from(exchangeRates).where(byCompany(exchangeRates));
+      data.customers = await db.select().from(customers).where(byCompany(customers));
+      data.customer_balances = await db.select().from(customerBalances).where(byCompany(customerBalances));
+      data.vouchers = await db.select().from(vouchers).where(byCompany(vouchers));
+
+      const voucherIds = data.vouchers.map((v: any) => v.id);
+      if (voucherIds.length > 0) {
+        data.voucher_entries = await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
+      } else {
+        data.voucher_entries = [];
+      }
+
+      data.factory_settings = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
+      data.factory_suppliers = await db.select().from(factorySuppliers).where(byCompany(factorySuppliers));
+      data.factory_categories = await db.select().from(factoryCategories).where(byCompany(factoryCategories));
+      data.factory_bale_products = await db.select().from(factoryBaleProducts).where(byCompany(factoryBaleProducts));
+      data.factory_fx_rates = await db.select().from(factoryFxRates).where(byCompany(factoryFxRates));
+      data.factory_bale_sequences = await db.select().from(factoryBaleSequences).where(eq(factoryBaleSequences.companyId, companyId));
+      data.factory_containers = await db.select().from(factoryContainers).where(byCompany(factoryContainers));
+      data.factory_raw_stock = await db.select().from(factoryRawStock).where(byCompany(factoryRawStock));
+      data.factory_container_commissions = await db.select().from(factoryContainerCommissions).where(byCompany(factoryContainerCommissions));
+      data.factory_offload_additional_charges = await db.select().from(factoryOffloadAdditionalCharges).where(byCompany(factoryOffloadAdditionalCharges));
+      data.factory_duty_audit_log = await db.select().from(factoryDutyAuditLog).where(byCompany(factoryDutyAuditLog));
+      data.factory_mix_batches = await db.select().from(factoryMixBatches).where(byCompany(factoryMixBatches));
+
+      const mixBatchIds = data.factory_mix_batches.map((b: any) => b.id);
+      if (mixBatchIds.length > 0) {
+        data.factory_mix_batch_sources = await db.select().from(factoryMixBatchSources).where(inArray(factoryMixBatchSources.mixBatchId, mixBatchIds));
+      } else {
+        data.factory_mix_batch_sources = [];
+      }
+
+      data.factory_pressing_batches = await db.select().from(factoryPressingBatches).where(byCompany(factoryPressingBatches));
+      data.factory_bales = await db.select().from(factoryBales).where(byCompany(factoryBales));
+      data.factory_workers = await db.select().from(factoryWorkers).where(byCompany(factoryWorkers));
+      data.factory_payrolls = await db.select().from(factoryPayrolls).where(byCompany(factoryPayrolls));
+      data.factory_worker_documents = await db.select().from(factoryWorkerDocuments).where(byCompany(factoryWorkerDocuments));
+      data.factory_daybook_entries = await db.select().from(factoryDaybookEntries).where(byCompany(factoryDaybookEntries));
+
+      const daybookIds = data.factory_daybook_entries.map((e: any) => e.id);
+      if (daybookIds.length > 0) {
+        data.factory_daybook_entry_edits = await db.select().from(factoryDaybookEntryEdits).where(inArray(factoryDaybookEntryEdits.daybookEntryId, daybookIds));
+      } else {
+        data.factory_daybook_entry_edits = [];
+      }
+
+      data.factory_waste_entries = await db.select().from(factoryWasteEntries).where(byCompany(factoryWasteEntries));
+      data.factory_bale_photos = await db.select().from(factoryBalePhotos).where(byCompany(factoryBalePhotos));
+      data.factory_alerts = await db.select().from(factoryAlerts).where(byCompany(factoryAlerts));
+      data.factory_daily_kpi_snapshots = await db.select().from(factoryDailyKpiSnapshots).where(byCompany(factoryDailyKpiSnapshots));
+      data.factory_supplier_score_snapshots = await db.select().from(factorySupplierScoreSnapshots).where(byCompany(factorySupplierScoreSnapshots));
+      data.factory_bale_cost_snapshots = await db.select().from(factoryBaleCostSnapshots).where(byCompany(factoryBaleCostSnapshots));
+      data.factory_container_profit_snapshots = await db.select().from(factoryContainerProfitSnapshots).where(byCompany(factoryContainerProfitSnapshots));
+
+      data.customer_proformas = await db.select().from(customerProformas).where(byCompany(customerProformas));
+      const proformaIds = data.customer_proformas.map((p: any) => p.id);
+      if (proformaIds.length > 0) {
+        data.customer_proforma_lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+      } else {
+        data.customer_proforma_lines = [];
+      }
+
+      data.customer_invoice_sequences = await db.select().from(customerInvoiceSequences).where(eq(customerInvoiceSequences.companyId, companyId));
+      data.customer_orders = await db.select().from(customerOrders).where(byCompany(customerOrders));
+      const orderIds = data.customer_orders.map((o: any) => o.id);
+      if (orderIds.length > 0) {
+        data.customer_order_lines = await db.select().from(customerOrderLines).where(inArray(customerOrderLines.orderId, orderIds));
+        data.customer_order_bales = await db.select().from(customerOrderBales).where(inArray(customerOrderBales.orderId, orderIds));
+        data.customer_order_charges = await db.select().from(customerOrderCharges).where(inArray(customerOrderCharges.orderId, orderIds));
+      } else {
+        data.customer_order_lines = [];
+        data.customer_order_bales = [];
+        data.customer_order_charges = [];
+      }
+
+      const exportPayload = {
+        version: 1,
+        sourceCompanyId: companyId,
+        exportedAt: new Date().toISOString(),
+        tables: data,
+      };
+
+      const jsonStr = JSON.stringify(exportPayload, null, 2);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="company_${companyId}_export_${new Date().toISOString().slice(0, 10)}.json"`);
+      res.send(jsonStr);
+    } catch (error: any) {
+      console.error("Export company data error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/import-company-data", requireAuth, async (req: any, res: any) => {
+    try {
+      const multer = (await import("multer")).default;
+      const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+      upload.single("file")(req, res, async (err: any) => {
+        if (err) return res.status(400).json({ message: "File upload error: " + err.message });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+        try {
+          const targetCompanyId = (req.session as any).currentCompanyId;
+          if (!targetCompanyId) return res.status(400).json({ message: "No company selected" });
+
+          const jsonStr = req.file.buffer.toString("utf-8");
+          const payload = JSON.parse(jsonStr);
+
+          if (!payload.tables || !payload.sourceCompanyId) {
+            return res.status(400).json({ message: "Invalid export file format" });
+          }
+
+          if (payload.sourceCompanyId === targetCompanyId) {
+            return res.status(400).json({ message: "Cannot import into the same company that was exported. Switch to a different company first." });
+          }
+
+          const [existingBales] = await db.select({ count: sql<number>`count(*)::int` }).from(factoryBales).where(eq(factoryBales.companyId, targetCompanyId));
+          const [existingContainers] = await db.select({ count: sql<number>`count(*)::int` }).from(factoryContainers).where(eq(factoryContainers.companyId, targetCompanyId));
+          const [existingVouchers] = await db.select({ count: sql<number>`count(*)::int` }).from(vouchers).where(eq(vouchers.companyId, targetCompanyId));
+          if ((existingBales?.count || 0) > 0 || (existingContainers?.count || 0) > 0 || (existingVouchers?.count || 0) > 0) {
+            return res.status(400).json({ message: "Target company already has data (bales, containers, or vouchers). Import should only be done on a new/empty company to avoid duplicates." });
+          }
+
+          const t = payload.tables;
+          const summary: Record<string, number> = {};
+          let totalRecords = 0;
+          const importSuffix = `_C${targetCompanyId}`;
+
+          const remap: Record<string, Map<number, number>> = {};
+          const initRemap = (key: string) => { remap[key] = new Map(); };
+          const r = (key: string, oldId: number | null | undefined): number | null => {
+            if (oldId == null) return null;
+            const mapped = remap[key]?.get(oldId);
+            return mapped ?? null;
+          };
+
+          async function makeUniqueCode(tx: any, table: any, field: any, baseValue: string): Promise<string> {
+            const [existing] = await tx.select({ id: table.id }).from(table).where(eq(field, baseValue)).limit(1);
+            if (!existing) return baseValue;
+            let attempt = baseValue + importSuffix;
+            const [existing2] = await tx.select({ id: table.id }).from(table).where(eq(field, attempt)).limit(1);
+            if (!existing2) return attempt;
+            let counter = 2;
+            while (counter < 1000) {
+              const val = `${baseValue}${importSuffix}_${counter}`;
+              const [ex] = await tx.select({ id: table.id }).from(table).where(eq(field, val)).limit(1);
+              if (!ex) return val;
+              counter++;
+            }
+            return baseValue + importSuffix + "_" + Date.now();
+          }
+
+          const tables = [
+            "locations", "ledger_accounts", "bank_accounts", "stock_groups", "stock_items",
+            "inventory", "company_settings", "exchange_rates", "customers", "customer_balances",
+            "factory_settings", "factory_suppliers", "factory_categories", "factory_bale_products",
+            "factory_fx_rates", "factory_bale_sequences", "factory_containers", "factory_raw_stock",
+            "factory_container_commissions", "factory_offload_additional_charges", "factory_duty_audit_log",
+            "factory_mix_batches", "factory_mix_batch_sources", "factory_pressing_batches",
+            "factory_bales", "factory_workers", "factory_payrolls", "factory_worker_documents",
+            "factory_daybook_entries", "factory_daybook_entry_edits", "factory_waste_entries",
+            "factory_bale_photos", "factory_alerts", "factory_daily_kpi_snapshots",
+            "factory_supplier_score_snapshots", "factory_bale_cost_snapshots",
+            "factory_container_profit_snapshots", "customer_proformas", "customer_proforma_lines",
+            "customer_invoice_sequences", "customer_orders", "customer_order_lines",
+            "customer_order_bales", "customer_order_charges", "vouchers", "voucher_entries"
+          ];
+          tables.forEach(initRemap);
+
+          await db.transaction(async (tx: any) => {
+
+            async function insertAndMap(tableName: string, drizzleTable: any, rows: any[], fkRemaps: Record<string, string>, opts?: { hasCompanyId?: boolean, nullifyFields?: string[] }) {
+              const hasCompanyId = opts?.hasCompanyId !== false;
+              const nullifyFields = opts?.nullifyFields || [];
+              let count = 0;
+              for (const row of rows) {
+                const oldId = row.id;
+                const rec: any = { ...row };
+                delete rec.id;
+                if (hasCompanyId) rec.companyId = targetCompanyId;
+                for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
+                  rec[fkField] = r(remapKey, rec[fkField]);
+                }
+                for (const field of nullifyFields) {
+                  rec[field] = null;
+                }
+                const [inserted] = await tx.insert(drizzleTable).values(rec).returning({ id: drizzleTable.id });
+                if (inserted && oldId != null) {
+                  remap[tableName].set(oldId, inserted.id);
+                }
+                count++;
+              }
+              summary[tableName] = count;
+              totalRecords += count;
+            }
+
+            async function insertSelfReferencing(tableName: string, drizzleTable: any, rows: any[], parentField: string, fkRemaps: Record<string, string>, opts?: { hasCompanyId?: boolean }) {
+              const hasCompanyId = opts?.hasCompanyId !== false;
+              const roots = rows.filter((r: any) => r[parentField] == null);
+              const children = rows.filter((r: any) => r[parentField] != null);
+              let count = 0;
+
+              for (const row of roots) {
+                const oldId = row.id;
+                const rec: any = { ...row };
+                delete rec.id;
+                if (hasCompanyId) rec.companyId = targetCompanyId;
+                rec[parentField] = null;
+                for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
+                  rec[fkField] = r(remapKey, rec[fkField]);
+                }
+                const [inserted] = await tx.insert(drizzleTable).values(rec).returning({ id: drizzleTable.id });
+                if (inserted && oldId != null) remap[tableName].set(oldId, inserted.id);
+                count++;
+              }
+
+              let remaining = [...children];
+              let maxPasses = 20;
+              while (remaining.length > 0 && maxPasses > 0) {
+                const nextRemaining: any[] = [];
+                for (const row of remaining) {
+                  const parentMapped = r(tableName, row[parentField]);
+                  if (parentMapped != null) {
+                    const oldId = row.id;
+                    const rec: any = { ...row };
+                    delete rec.id;
+                    if (hasCompanyId) rec.companyId = targetCompanyId;
+                    rec[parentField] = parentMapped;
+                    for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
+                      rec[fkField] = r(remapKey, rec[fkField]);
+                    }
+                    const [inserted] = await tx.insert(drizzleTable).values(rec).returning({ id: drizzleTable.id });
+                    if (inserted && oldId != null) remap[tableName].set(oldId, inserted.id);
+                    count++;
+                  } else {
+                    nextRemaining.push(row);
+                  }
+                }
+                remaining = nextRemaining;
+                maxPasses--;
+              }
+
+              if (remaining.length > 0) {
+                for (const row of remaining) {
+                  const oldId = row.id;
+                  const rec: any = { ...row };
+                  delete rec.id;
+                  if (hasCompanyId) rec.companyId = targetCompanyId;
+                  rec[parentField] = null;
+                  for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
+                    rec[fkField] = r(remapKey, rec[fkField]);
+                  }
+                  const [inserted] = await tx.insert(drizzleTable).values(rec).returning({ id: drizzleTable.id });
+                  if (inserted && oldId != null) remap[tableName].set(oldId, inserted.id);
+                  count++;
+                }
+              }
+
+              summary[tableName] = count;
+              totalRecords += count;
+            }
+
+            if (t.locations?.length) {
+              for (const row of t.locations) {
+                const oldId = row.id;
+                const rec: any = { ...row };
+                delete rec.id;
+                rec.companyId = targetCompanyId;
+                rec.code = await makeUniqueCode(tx, locations, locations.code, rec.code);
+                const [inserted] = await tx.insert(locations).values(rec).returning({ id: locations.id });
+                if (inserted && oldId != null) remap["locations"].set(oldId, inserted.id);
+              }
+              summary["locations"] = t.locations.length;
+              totalRecords += t.locations.length;
+            }
+
+            if (t.ledger_accounts?.length) {
+              await insertSelfReferencing("ledger_accounts", ledgerAccounts, t.ledger_accounts, "parentId", {});
+            }
+
+            if (t.bank_accounts?.length) {
+              for (const row of t.bank_accounts) {
+                const oldId = row.id;
+                const rec: any = { ...row };
+                delete rec.id;
+                rec.companyId = targetCompanyId;
+                rec.linkedLedgerId = r("ledger_accounts", rec.linkedLedgerId);
+                rec.code = await makeUniqueCode(tx, bankAccounts, bankAccounts.code, rec.code);
+                const [inserted] = await tx.insert(bankAccounts).values(rec).returning({ id: bankAccounts.id });
+                if (inserted && oldId != null) remap["bank_accounts"].set(oldId, inserted.id);
+              }
+              summary["bank_accounts"] = t.bank_accounts.length;
+              totalRecords += t.bank_accounts.length;
+            }
+
+            if (t.stock_groups?.length) {
+              await insertSelfReferencing("stock_groups", stockGroups, t.stock_groups, "parentId", {});
+            }
+
+            if (t.stock_items?.length) {
+              await insertAndMap("stock_items", stockItems, t.stock_items, { stockGroupId: "stock_groups" });
+            }
+
+            if (t.inventory?.length) {
+              await insertAndMap("inventory", inventory, t.inventory, { locationId: "locations", stockItemId: "stock_items" });
+            }
+
+            if (t.company_settings?.length) {
+              await insertAndMap("company_settings", companySettings, t.company_settings, { parentCreditAccountId: "ledger_accounts" });
+            }
+
+            if (t.exchange_rates?.length) {
+              await insertAndMap("exchange_rates", exchangeRates, t.exchange_rates, {});
+            }
+
+            if (t.customers?.length) {
+              await insertAndMap("customers", customers, t.customers, { ledgerAccountId: "ledger_accounts" });
+            }
+
+            if (t.customer_balances?.length) {
+              await insertAndMap("customer_balances", customerBalances, t.customer_balances, { customerId: "customers" });
+            }
+
+            if (t.factory_settings?.length) {
+              await insertAndMap("factory_settings", factorySettings, t.factory_settings, {});
+            }
+
+            if (t.factory_suppliers?.length) {
+              await insertAndMap("factory_suppliers", factorySuppliers, t.factory_suppliers, {});
+            }
+
+            if (t.factory_categories?.length) {
+              await insertAndMap("factory_categories", factoryCategories, t.factory_categories, {});
+            }
+
+            if (t.factory_bale_products?.length) {
+              await insertAndMap("factory_bale_products", factoryBaleProducts, t.factory_bale_products, { categoryId: "factory_categories" });
+            }
+
+            if (t.factory_fx_rates?.length) {
+              await insertAndMap("factory_fx_rates", factoryFxRates, t.factory_fx_rates, {});
+            }
+
+            if (t.factory_bale_sequences?.length) {
+              await insertAndMap("factory_bale_sequences", factoryBaleSequences, t.factory_bale_sequences, {});
+            }
+
+            if (t.factory_containers?.length) {
+              await insertAndMap("factory_containers", factoryContainers, t.factory_containers, {
+                supplierId: "factory_suppliers",
+                freightAccountId: "ledger_accounts",
+                otherChargesAccountId: "ledger_accounts",
+                dutyAccountId: "ledger_accounts",
+              });
+            }
+
+            if (t.factory_raw_stock?.length) {
+              await insertAndMap("factory_raw_stock", factoryRawStock, t.factory_raw_stock, { containerId: "factory_containers" });
+            }
+
+            if (t.factory_container_commissions?.length) {
+              await insertAndMap("factory_container_commissions", factoryContainerCommissions, t.factory_container_commissions, {
+                containerId: "factory_containers",
+                ledgerAccountId: "ledger_accounts",
+              });
+            }
+
+            if (t.factory_offload_additional_charges?.length) {
+              await insertAndMap("factory_offload_additional_charges", factoryOffloadAdditionalCharges, t.factory_offload_additional_charges, {
+                containerId: "factory_containers",
+                ledgerAccountId: "ledger_accounts",
+              });
+            }
+
+            if (t.factory_duty_audit_log?.length) {
+              await insertAndMap("factory_duty_audit_log", factoryDutyAuditLog, t.factory_duty_audit_log, {
+                containerId: "factory_containers",
+              }, { nullifyFields: ["updatedByUserId"] });
+            }
+
+            if (t.factory_mix_batches?.length) {
+              await insertAndMap("factory_mix_batches", factoryMixBatches, t.factory_mix_batches, {});
+            }
+
+            if (t.factory_mix_batch_sources?.length) {
+              await insertAndMap("factory_mix_batch_sources", factoryMixBatchSources, t.factory_mix_batch_sources, {
+                mixBatchId: "factory_mix_batches",
+                containerId: "factory_containers",
+                supplierId: "factory_suppliers",
+                sourceBatchId: "factory_mix_batches",
+              }, { hasCompanyId: false });
+            }
+
+            if (t.factory_pressing_batches?.length) {
+              await insertAndMap("factory_pressing_batches", factoryPressingBatches, t.factory_pressing_batches, {
+                mixBatchId: "factory_mix_batches",
+                productId: "factory_bale_products",
+                finalizedLocationId: "locations",
+              }, { nullifyFields: ["createdBy"] });
+            }
+
+            if (t.factory_bales?.length) {
+              await insertAndMap("factory_bales", factoryBales, t.factory_bales, {
+                mixBatchId: "factory_mix_batches",
+                productId: "factory_bale_products",
+                pressingBatchId: "factory_pressing_batches",
+                erpLocationId: "locations",
+              }, { nullifyFields: ["finalizedBy"] });
+            }
+
+            if (t.factory_workers?.length) {
+              await insertAndMap("factory_workers", factoryWorkers, t.factory_workers, {});
+            }
+
+            if (t.factory_payrolls?.length) {
+              await insertAndMap("factory_payrolls", factoryPayrolls, t.factory_payrolls, {
+                workerId: "factory_workers",
+                cashAccountId: "ledger_accounts",
+              }, { nullifyFields: ["approvedBy"] });
+            }
+
+            if (t.factory_worker_documents?.length) {
+              await insertAndMap("factory_worker_documents", factoryWorkerDocuments, t.factory_worker_documents, {
+                workerId: "factory_workers",
+              });
+            }
+
+            if (t.factory_daybook_entries?.length) {
+              await insertAndMap("factory_daybook_entries", factoryDaybookEntries, t.factory_daybook_entries, {}, { nullifyFields: ["createdBy"] });
+            }
+
+            if (t.factory_daybook_entry_edits?.length) {
+              await insertAndMap("factory_daybook_entry_edits", factoryDaybookEntryEdits, t.factory_daybook_entry_edits, {
+                daybookEntryId: "factory_daybook_entries",
+              }, { hasCompanyId: false, nullifyFields: ["editedBy"] });
+            }
+
+            if (t.factory_waste_entries?.length) {
+              await insertAndMap("factory_waste_entries", factoryWasteEntries, t.factory_waste_entries, {
+                mixBatchId: "factory_mix_batches",
+                supplierId: "factory_suppliers",
+                containerId: "factory_containers",
+              }, { nullifyFields: ["createdBy"] });
+            }
+
+            if (t.factory_bale_photos?.length) {
+              await insertAndMap("factory_bale_photos", factoryBalePhotos, t.factory_bale_photos, {
+                baleId: "factory_bales",
+              }, { nullifyFields: ["uploadedBy"] });
+            }
+
+            if (t.factory_alerts?.length) {
+              await insertAndMap("factory_alerts", factoryAlerts, t.factory_alerts, {});
+            }
+
+            if (t.customer_proformas?.length) {
+              await insertAndMap("customer_proformas", customerProformas, t.customer_proformas, {
+                customerId: "customers",
+              });
+            }
+
+            if (t.customer_proforma_lines?.length) {
+              await insertAndMap("customer_proforma_lines", customerProformaLines, t.customer_proforma_lines, {
+                proformaId: "customer_proformas",
+              }, { hasCompanyId: false });
+            }
+
+            if (t.customer_invoice_sequences?.length) {
+              await insertAndMap("customer_invoice_sequences", customerInvoiceSequences, t.customer_invoice_sequences, {});
+            }
+
+            if (t.customer_orders?.length) {
+              await insertAndMap("customer_orders", customerOrders, t.customer_orders, {
+                customerId: "customers",
+                proformaIdUsed: "customer_proformas",
+                locationId: "locations",
+              }, { nullifyFields: ["verifiedByUserId"] });
+            }
+
+            if (t.customer_order_lines?.length) {
+              await insertAndMap("customer_order_lines", customerOrderLines, t.customer_order_lines, {
+                orderId: "customer_orders",
+              }, { hasCompanyId: false });
+            }
+
+            if (t.customer_order_bales?.length) {
+              await insertAndMap("customer_order_bales", customerOrderBales, t.customer_order_bales, {
+                orderId: "customer_orders",
+                baleId: "factory_bales",
+                locationId: "locations",
+              }, { hasCompanyId: false });
+            }
+
+            if (t.customer_order_charges?.length) {
+              await insertAndMap("customer_order_charges", customerOrderCharges, t.customer_order_charges, {
+                orderId: "customer_orders",
+              }, { hasCompanyId: false });
+            }
+
+            if (t.vouchers?.length) {
+              for (const row of t.vouchers) {
+                const oldId = row.id;
+                const rec: any = { ...row };
+                delete rec.id;
+                rec.companyId = targetCompanyId;
+                rec.locationId = r("locations", rec.locationId);
+                rec.voucherNumber = await makeUniqueCode(tx, vouchers, vouchers.voucherNumber, rec.voucherNumber);
+                const [inserted] = await tx.insert(vouchers).values(rec).returning({ id: vouchers.id });
+                if (inserted && oldId != null) remap["vouchers"].set(oldId, inserted.id);
+              }
+              summary["vouchers"] = t.vouchers.length;
+              totalRecords += t.vouchers.length;
+            }
+
+            if (t.voucher_entries?.length) {
+              await insertAndMap("voucher_entries", voucherEntries, t.voucher_entries, {
+                voucherId: "vouchers",
+                ledgerAccountId: "ledger_accounts",
+                bankAccountId: "bank_accounts",
+              }, { hasCompanyId: false, nullifyFields: ["supplierId", "employeeId", "fixedAssetId"] });
+            }
+
+            if (t.factory_daily_kpi_snapshots?.length) {
+              await insertAndMap("factory_daily_kpi_snapshots", factoryDailyKpiSnapshots, t.factory_daily_kpi_snapshots, {
+                topWorkerId: "factory_workers",
+              });
+            }
+
+            if (t.factory_supplier_score_snapshots?.length) {
+              await insertAndMap("factory_supplier_score_snapshots", factorySupplierScoreSnapshots, t.factory_supplier_score_snapshots, {
+                supplierId: "factory_suppliers",
+              });
+            }
+
+            if (t.factory_bale_cost_snapshots?.length) {
+              await insertAndMap("factory_bale_cost_snapshots", factoryBaleCostSnapshots, t.factory_bale_cost_snapshots, {
+                baleId: "factory_bales",
+              });
+            }
+
+            if (t.factory_container_profit_snapshots?.length) {
+              await insertAndMap("factory_container_profit_snapshots", factoryContainerProfitSnapshots, t.factory_container_profit_snapshots, {
+                containerId: "factory_containers",
+              });
+            }
+
+          });
+
+          res.json({
+            success: true,
+            message: `Successfully imported ${totalRecords} records across ${Object.keys(summary).length} tables`,
+            totalRecords,
+            details: summary,
+          });
+        } catch (importError: any) {
+          console.error("Import company data error:", importError);
+          res.status(500).json({ message: "Import failed: " + importError.message });
+        }
+      });
+    } catch (error: any) {
+      console.error("Import company data error:", error);
       res.status(500).json({ message: error.message });
     }
   });

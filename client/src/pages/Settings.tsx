@@ -2275,6 +2275,9 @@ function LoginHistoryTab() {
     const [selectedContainerForDiag, setSelectedContainerForDiag] = useState<string>("");
     const [containerDiagResult, setContainerDiagResult] = useState<any>(null);
     const [isLoadingContainerDiag, setIsLoadingContainerDiag] = useState(false);
+    const [isExportingCompanyData, setIsExportingCompanyData] = useState(false);
+    const [isImportingCompanyData, setIsImportingCompanyData] = useState(false);
+    const [importCompanyResult, setImportCompanyResult] = useState<any>(null);
 
     // Factory user management state
     const [factoryCreateOpen, setFactoryCreateOpen] = useState(false);
@@ -4407,6 +4410,125 @@ function LoginHistoryTab() {
                     </div>
                   </Card>
                 </Link>
+
+                <Card className="p-6">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-500/10 rounded-lg">
+                        <Database className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-company-clone-title">Company Data Export / Import</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Export all data from this company to a file, or import data from another company's export
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        data-testid="button-export-company-data"
+                        disabled={isExportingCompanyData}
+                        onClick={async () => {
+                          setIsExportingCompanyData(true);
+                          try {
+                            const resp = await fetch("/api/factory/export-company-data", { credentials: "include" });
+                            if (!resp.ok) {
+                              const err = await resp.json();
+                              throw new Error(err.message || "Export failed");
+                            }
+                            const blob = await resp.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            const disp = resp.headers.get("content-disposition");
+                            const match = disp?.match(/filename="(.+)"/);
+                            a.download = match?.[1] || "company_export.json";
+                            a.href = url;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            URL.revokeObjectURL(url);
+                            toast({ title: "Export complete", description: "Company data downloaded successfully" });
+                          } catch (err: any) {
+                            toast({ title: "Export failed", description: err.message, variant: "destructive" });
+                          } finally {
+                            setIsExportingCompanyData(false);
+                          }
+                        }}
+                      >
+                        {isExportingCompanyData ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exporting...</>
+                        ) : (
+                          <><Download className="h-4 w-4 mr-2" />Export Company Data</>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        data-testid="button-import-company-data"
+                        disabled={isImportingCompanyData}
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".json";
+                          input.onchange = async (e: any) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setIsImportingCompanyData(true);
+                            setImportCompanyResult(null);
+                            try {
+                              const formData = new FormData();
+                              formData.append("file", file);
+                              const resp = await fetch("/api/factory/import-company-data", {
+                                method: "POST",
+                                body: formData,
+                                credentials: "include",
+                              });
+                              const result = await resp.json();
+                              if (!resp.ok) throw new Error(result.message || "Import failed");
+                              setImportCompanyResult(result);
+                              toast({ title: "Import complete", description: result.message });
+                            } catch (err: any) {
+                              toast({ title: "Import failed", description: err.message, variant: "destructive" });
+                              setImportCompanyResult({ error: err.message });
+                            } finally {
+                              setIsImportingCompanyData(false);
+                            }
+                          };
+                          input.click();
+                        }}
+                      >
+                        {isImportingCompanyData ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
+                        ) : (
+                          <><Upload className="h-4 w-4 mr-2" />Import Company Data</>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Import should only be done on a new/empty company to avoid duplicate data. All records will be recreated with correct references.
+                    </p>
+                    {importCompanyResult && !importCompanyResult.error && (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-md p-3">
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">{importCompanyResult.message}</p>
+                        {importCompanyResult.details && (
+                          <div className="mt-2 text-xs text-muted-foreground max-h-40 overflow-y-auto">
+                            {Object.entries(importCompanyResult.details).map(([table, count]: [string, any]) => (
+                              <div key={table} className="flex justify-between py-0.5">
+                                <span>{table.replace(/_/g, " ")}</span>
+                                <span className="font-mono">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {importCompanyResult?.error && (
+                      <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                        <p className="text-sm text-destructive">{importCompanyResult.error}</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
