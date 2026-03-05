@@ -834,7 +834,9 @@
     const [printWorkerIdSelected, setPrintWorkerIdSelected] = useState<string>("");
     const [assigningWorker, setAssigningWorker] = useState(false);
     const [importingNames, setImportingNames] = useState(false);
+    const [reimporting, setReimporting] = useState(false);
     const namesFileRef = useRef<HTMLInputElement>(null);
+    const reimportFileRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
@@ -867,6 +869,35 @@
         toast({ title: "Import failed", description: err.message, variant: "destructive" });
       },
       onSettled: () => setImportingNames(false),
+    });
+
+    const reimportMutation = useMutation({
+      mutationFn: async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/factory/bales/reimport", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || "Reimport failed");
+        }
+        return res.json();
+      },
+      onSuccess: (data) => {
+        toast({
+          title: "Bales reimported",
+          description: `Successfully reimported ${data.imported} bale(s) (${parseFloat(data.totalWeight).toFixed(1)} kg) with original reference numbers.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
+      },
+      onError: (err: Error) => {
+        toast({ title: "Reimport failed", description: err.message, variant: "destructive" });
+      },
+      onSettled: () => setReimporting(false),
     });
 
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
@@ -1126,6 +1157,45 @@
                 <LayoutList className="h-4 w-4" />
               </Button>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const exportDate = dateFilter || new Date().toISOString().split("T")[0];
+                window.open(`/api/factory/bales/export-full.xlsx?date=${exportDate}`, "_blank");
+              }}
+              data-testid="button-export-bales-full"
+              title={`Export all bale data for ${dateFilter || "today"} as Excel (for backup/reimport)`}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
+              Export Bales ({dateFilter || "Today"})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reimportFileRef.current?.click()}
+              disabled={reimportMutation.isPending || reimporting}
+              data-testid="button-reimport-bales"
+              title="Reimport bales from exported Excel with original reference numbers"
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              {reimportMutation.isPending ? "Reimporting..." : "Reimport Bales"}
+            </Button>
+            <input
+              ref={reimportFileRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setReimporting(true);
+                  reimportMutation.mutate(file);
+                  e.target.value = "";
+                }
+              }}
+              data-testid="input-reimport-bales"
+            />
             <Button
               variant="outline"
               size="sm"

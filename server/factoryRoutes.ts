@@ -3934,6 +3934,347 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // 10. Factory Bales queries
   // ───────────────────────────────────────────────
 
+  app.get("/api/factory/bales/export-full.xlsx", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { date } = req.query;
+      if (!date) return res.status(400).json({ message: "date query parameter is required (YYYY-MM-DD)" });
+
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        sql`${factoryBales.finalizedAt}::date = ${date}`,
+      ];
+
+      const bales = await db
+        .select()
+        .from(factoryBales)
+        .where(and(...conditions))
+        .orderBy(factoryBales.id);
+
+      if (bales.length === 0) {
+        return res.status(404).json({ message: `No bales found for date ${date}` });
+      }
+
+      const locIds = [...new Set(bales.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locs = locIds.length > 0
+        ? await db.select().from(locations).where(inArray(locations.id, locIds))
+        : [];
+      const locMap = new Map(locs.map((l: any) => [l.id, l]));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Bales");
+
+      sheet.columns = [
+        { header: "Reference Number", key: "referenceNumber", width: 22 },
+        { header: "Article Code", key: "articleCode", width: 20 },
+        { header: "Product Name", key: "productName", width: 30 },
+        { header: "Category", key: "category", width: 18 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Cost Per Kg", key: "costPerKg", width: 14 },
+        { header: "Total Cost", key: "totalCost", width: 14 },
+        { header: "Location Code", key: "locationCode", width: 16 },
+        { header: "Location ID", key: "locationId", width: 12 },
+        { header: "Status", key: "status", width: 14 },
+        { header: "Mix Batch ID", key: "mixBatchId", width: 14 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Finalized At", key: "finalizedAt", width: 22 },
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+      });
+
+      for (const bale of bales) {
+        const loc = locMap.get(bale.erpLocationId);
+        sheet.addRow({
+          referenceNumber: bale.referenceNumber,
+          articleCode: bale.articleCode ?? "",
+          productName: bale.productName ?? "",
+          category: bale.category ?? "",
+          weightKg: parseFloat(bale.weightKg || "0"),
+          costPerKg: parseFloat(bale.costPerKg || "0"),
+          totalCost: parseFloat(bale.totalCost || "0"),
+          locationCode: loc ? `${loc.code} - ${loc.name}` : "",
+          locationId: bale.erpLocationId ?? "",
+          status: bale.status ?? "IN_STOCK",
+          mixBatchId: bale.mixBatchId ?? "",
+          baleCode: bale.baleCode ?? "",
+          grade: bale.grade ?? "",
+          finalizedAt: bale.finalizedAt ? new Date(bale.finalizedAt).toISOString() : "",
+        });
+      }
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="bales_export_${date}.xlsx"`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting full bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/bales/reimport", requireAuth, async (req: any, res: any) => {
+    const multer = (await import("multer")).default;
+    const upload = multer({ storage: multer.memoryStorage() });
+    upload.single("file")(req, res, async (err: any) => {
+      if (err) return res.status(400).json({ message: "File upload error" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      try {
+        const companyId = (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const ExcelJS = (await import("exceljs")).default;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const sheet = workbook.getWorksheet(1);
+        if (!sheet) return res.status(400).json({ message: "No worksheet found in file" });
+
+        const headers: string[] = [];
+        sheet.getRow(1).eachCell((cell, colNumber) => {
+          headers[colNumber] = String(cell.value || "").trim().toLowerCase();
+        });
+
+        const refIdx = headers.findIndex(h => h.includes("reference"));
+        const articleIdx = headers.findIndex(h => h.includes("article"));
+        const nameIdx = headers.findIndex(h => h.includes("product name"));
+        const catIdx = headers.findIndex(h => h.includes("category"));
+        const weightIdx = headers.findIndex(h => h.includes("weight"));
+        const costPerKgIdx = headers.findIndex(h => h.includes("cost per kg"));
+        const totalCostIdx = headers.findIndex(h => h.includes("total cost"));
+        const locIdIdx = headers.findIndex(h => h.includes("location id"));
+        const statusIdx = headers.findIndex(h => h.includes("status"));
+        const mixBatchIdx = headers.findIndex(h => h.includes("mix batch"));
+        const baleCodeIdx = headers.findIndex(h => h.includes("bale code"));
+        const gradeIdx = headers.findIndex(h => h.includes("grade"));
+        const finalizedIdx = headers.findIndex(h => h.includes("finalized"));
+
+        if (refIdx < 0 || nameIdx < 0 || weightIdx < 0) {
+          return res.status(400).json({ message: "Excel must have at least: Reference Number, Product Name, Weight (kg) columns" });
+        }
+
+        const rows: any[] = [];
+        const fileRefSet = new Set<string>();
+        const fileDuplicates: string[] = [];
+
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const refNum = String(row.getCell(refIdx + 1).value || "").trim();
+          if (!refNum) return;
+
+          if (fileRefSet.has(refNum)) {
+            fileDuplicates.push(refNum);
+          }
+          fileRefSet.add(refNum);
+
+          rows.push({
+            referenceNumber: refNum,
+            articleCode: articleIdx >= 0 ? String(row.getCell(articleIdx + 1).value || "").trim() : "",
+            productName: nameIdx >= 0 ? String(row.getCell(nameIdx + 1).value || "").trim() : "",
+            category: catIdx >= 0 ? String(row.getCell(catIdx + 1).value || "").trim() : "",
+            weightKg: weightIdx >= 0 ? String(parseFloat(String(row.getCell(weightIdx + 1).value || "0")) || "0") : "0",
+            costPerKg: costPerKgIdx >= 0 ? String(parseFloat(String(row.getCell(costPerKgIdx + 1).value || "0")) || "0") : "0",
+            totalCost: totalCostIdx >= 0 ? String(parseFloat(String(row.getCell(totalCostIdx + 1).value || "0")) || "0") : "0",
+            erpLocationId: locIdIdx >= 0 ? parseInt(String(row.getCell(locIdIdx + 1).value || "0")) || null : null,
+            status: statusIdx >= 0 ? String(row.getCell(statusIdx + 1).value || "IN_STOCK").trim() : "IN_STOCK",
+            mixBatchId: mixBatchIdx >= 0 ? parseInt(String(row.getCell(mixBatchIdx + 1).value || "0")) || null : null,
+            baleCode: baleCodeIdx >= 0 ? String(row.getCell(baleCodeIdx + 1).value || "").trim() : "",
+            grade: gradeIdx >= 0 ? String(row.getCell(gradeIdx + 1).value || "").trim() : "",
+            finalizedAt: finalizedIdx >= 0 ? String(row.getCell(finalizedIdx + 1).value || "").trim() : "",
+          });
+        });
+
+        if (rows.length === 0) {
+          return res.status(400).json({ message: "No bale rows found in Excel" });
+        }
+
+        if (fileDuplicates.length > 0) {
+          return res.status(400).json({ message: `Duplicate reference numbers within the file: ${fileDuplicates.slice(0, 10).join(", ")}` });
+        }
+
+        const result = await db.transaction(async (tx: any) => {
+          const existingBarcodes = await tx
+            .select({ referenceNumber: factoryBales.referenceNumber })
+            .from(factoryBales)
+            .where(eq(factoryBales.companyId, companyId));
+          const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+
+          const duplicates = rows.filter(r => existingRefSet.has(r.referenceNumber));
+          if (duplicates.length > 0) {
+            throw new Error(`These reference numbers already exist: ${duplicates.slice(0, 10).map(d => d.referenceNumber).join(", ")}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ""}`);
+          }
+
+          const validLocIds = new Set<number>();
+          const allLocs = await tx.select({ id: locations.id }).from(locations).where(eq(locations.companyId, companyId));
+          allLocs.forEach((l: any) => validLocIds.add(l.id));
+
+          const invalidLocRows = rows.filter(r => r.erpLocationId && !validLocIds.has(r.erpLocationId));
+          if (invalidLocRows.length > 0) {
+            throw new Error(`Invalid location IDs found: ${invalidLocRows.map(r => `${r.referenceNumber} (loc ${r.erpLocationId})`).slice(0, 5).join(", ")}`);
+          }
+
+          const allProducts = await tx
+            .select()
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.companyId, companyId));
+          const productByName = new Map(allProducts.map((p: any) => [p.name.toLowerCase(), p]));
+          const productByArticle = new Map(allProducts.map((p: any) => [p.articleCode?.toLowerCase(), p]));
+
+          const allCategories = await tx.select().from(factoryCategories).where(eq(factoryCategories.companyId, companyId));
+          const categoryByName = new Map(allCategories.map((c: any) => [c.name?.toLowerCase(), c]));
+
+          const createdBales: any[] = [];
+          let totalWeight = 0;
+
+          for (const row of rows) {
+            let product = (row.articleCode ? productByArticle.get(row.articleCode.toLowerCase()) : null) || productByName.get(row.productName.toLowerCase());
+            if (!product) {
+              const autoCode = row.articleCode || ("IMP-" + row.productName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 20) + "-" + Date.now().toString(36).slice(-4).toUpperCase());
+              const categoryObj = row.category ? categoryByName.get(row.category.toLowerCase()) : null;
+              const [newProduct] = await tx.insert(factoryBaleProducts).values({
+                companyId,
+                code: autoCode,
+                articleCode: row.articleCode || autoCode,
+                name: row.productName,
+                active: true,
+                ...(categoryObj ? { categoryId: categoryObj.id } : {}),
+              }).returning();
+              product = newProduct;
+              productByName.set(row.productName.toLowerCase(), product);
+              if (row.articleCode) productByArticle.set(row.articleCode.toLowerCase(), product);
+            }
+
+            let finalizedAt: Date | null = null;
+            if (row.finalizedAt) {
+              const parsed = new Date(row.finalizedAt);
+              if (!isNaN(parsed.getTime())) finalizedAt = parsed;
+            }
+            if (!finalizedAt) finalizedAt = new Date();
+
+            const originalStatus = row.status || "IN_STOCK";
+
+            const [bale] = await tx
+              .insert(factoryBales)
+              .values({
+                companyId,
+                productId: product.id,
+                erpLocationId: row.erpLocationId,
+                baleCode: row.baleCode || product.code,
+                referenceNumber: row.referenceNumber,
+                articleCode: row.articleCode || product.articleCode,
+                productName: row.productName,
+                category: row.category || null,
+                grade: row.grade || null,
+                weightKg: row.weightKg,
+                costPerKg: row.costPerKg,
+                totalCost: row.totalCost,
+                status: originalStatus,
+                mixBatchId: row.mixBatchId,
+                finalizedAt,
+              })
+              .returning();
+
+            createdBales.push({ ...bale, _product: product });
+            totalWeight += parseFloat(row.weightKg);
+          }
+
+          const stockGroupCache = new Map<string, number>();
+          const stockItemCache = new Map<string, number>();
+
+          for (const bale of createdBales) {
+            if (bale.status === "REMOVED") continue;
+
+            const itemCode: string = bale.articleCode || bale.baleCode;
+            if (!itemCode) continue;
+            const locId = bale.erpLocationId;
+            if (!locId) continue;
+
+            const product = bale._product;
+            let stockGroupId: number | null = null;
+            if (bale.category) {
+              const catName = bale.category as string;
+              const cached = stockGroupCache.get(catName);
+              if (cached) {
+                stockGroupId = cached;
+              } else {
+                const [existingGroup] = await tx
+                  .select({ id: stockGroups.id })
+                  .from(stockGroups)
+                  .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.name, catName)));
+                if (existingGroup) {
+                  stockGroupId = existingGroup.id;
+                } else {
+                  const groupCode = "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  const [created] = await tx
+                    .insert(stockGroups)
+                    .values({ companyId, name: catName, code: groupCode })
+                    .returning({ id: stockGroups.id });
+                  stockGroupId = created.id;
+                }
+                stockGroupCache.set(catName, stockGroupId!);
+              }
+            }
+
+            let erpStockItemId = stockItemCache.get(itemCode);
+            if (!erpStockItemId) {
+              const [existing] = await tx
+                .select({ id: stockItems.id, stockGroupId: stockItems.stockGroupId })
+                .from(stockItems)
+                .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+
+              if (existing) {
+                erpStockItemId = existing.id;
+                if (stockGroupId && !existing.stockGroupId) {
+                  await tx.update(stockItems).set({ stockGroupId }).where(eq(stockItems.id, existing.id));
+                }
+              } else {
+                const [created] = await tx
+                  .insert(stockItems)
+                  .values({
+                    companyId,
+                    code: itemCode,
+                    name: bale.productName as string,
+                    uom: "BALE",
+                    active: true,
+                    ...(stockGroupId ? { stockGroupId } : {}),
+                  })
+                  .returning({ id: stockItems.id });
+                erpStockItemId = created.id;
+              }
+              stockItemCache.set(itemCode, erpStockItemId!);
+            }
+
+            const costPerKg = parseFloat(bale.costPerKg || "0");
+            const weight = parseFloat(bale.weightKg || "0");
+            await adjustInventory(tx, locId, erpStockItemId!, 1, companyId, weight * costPerKg);
+          }
+
+          return { count: createdBales.length, totalWeight };
+        });
+
+        const today = new Date().toISOString().split("T")[0];
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "BALE_REIMPORT",
+          description: `Reimported ${result.count} bale(s) with original reference numbers (${result.totalWeight.toFixed(1)} kg)`,
+        });
+
+        res.json({ imported: result.count, totalWeight: result.totalWeight });
+      } catch (error: any) {
+        console.error("Error reimporting bales:", error);
+        res.status(400).json({ message: error.message });
+      }
+    });
+  });
+
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
   app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: any, res: any) => {
     try {
