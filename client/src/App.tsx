@@ -93,6 +93,7 @@ import FactoryContainers from "@/pages/FactoryContainers";
 import BarcodeManager from "@/pages/BarcodeManager";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
+import InventoryRepair from "@/pages/InventoryRepair";
 import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
@@ -237,6 +238,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {user?.role === "Admin" && <Route path="/chatbot-settings" component={ChatbotSettings} />}
       {user?.role === "Admin" && <Route path="/test-data-import" component={TestDataImport} />}
       {user?.role === "Admin" && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
+      {user?.role === "Admin" && <Route path="/inventory-repair" component={InventoryRepair} />}
       {user?.role === "Admin" && <Route path="/net-profit-details" component={NetProfitDetails} />}
       {user?.role === "Admin" && <Route path="/company-data-reset" component={CompanyDataReset} />}
       <Route component={NotFound} />

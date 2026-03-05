@@ -4350,6 +4350,25 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
 
+                <Link href="/inventory-repair">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-orange-500/10 rounded-lg">
+                          <Wrench className="h-6 w-6 text-orange-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-inventory-repair">Inventory Repair Tool</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Detect and fix inventory discrepancies by replaying all voucher-backed operations
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
                 <Link href="/net-profit-details">
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">

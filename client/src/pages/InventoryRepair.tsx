@@ -1,0 +1,268 @@
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, CheckCircle, Search, Wrench } from "lucide-react";
+
+interface Discrepancy {
+  locationId: number;
+  stockItemId: number;
+  locationName: string;
+  stockItemName: string;
+  stockItemCode: string;
+  currentQty: number;
+  expectedQty: number;
+  difference: number;
+  currentValue: number;
+  expectedValue: number;
+}
+
+interface RebuildResult {
+  success: boolean;
+  dryRun: boolean;
+  staleFlagsFound: number;
+  staleFlagsFixed: number;
+  totalInventoryRecords: number;
+  discrepanciesFound: number;
+  fixesApplied: number;
+  discrepancies: Discrepancy[];
+  warnings: string[];
+}
+
+export default function InventoryRepair() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<RebuildResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"idle" | "preview" | "applied">("idle");
+
+  async function runRebuild(dryRun: boolean) {
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/rebuild-inventory", { dryRun });
+      const data: RebuildResult = await res.json();
+      setResult(data);
+      setMode(dryRun ? "preview" : "applied");
+      toast({
+        title: dryRun ? "Preview Complete" : "Fixes Applied",
+        description: dryRun
+          ? `Found ${data.discrepanciesFound} discrepancies across ${data.totalInventoryRecords} inventory records.`
+          : `Applied ${data.fixesApplied} fixes. Inventory has been corrected.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to run inventory rebuild",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold" data-testid="text-page-title">Inventory Repair Tool</h1>
+        <p className="text-muted-foreground mt-1">
+          Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels.
+        </p>
+      </div>
+
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          Quick adjustments (manual add/subtract) are not backed by vouchers and cannot be replayed.
+          If you have used quick adjustments, those quantities may appear as discrepancies — review carefully before applying fixes.
+        </AlertDescription>
+      </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Run Inventory Audit</CardTitle>
+          <CardDescription>
+            Preview discrepancies first, then apply fixes if needed. The tool also detects and corrects stale transfer flags that could cause future issues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button
+            onClick={() => runRebuild(true)}
+            disabled={loading}
+            variant="outline"
+            data-testid="button-preview-discrepancies"
+          >
+            {loading && mode !== "applied" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
+            )}
+            Preview Discrepancies
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                disabled={loading || !result || result.discrepanciesFound === 0}
+                variant="default"
+                data-testid="button-apply-fixes"
+              >
+                <Wrench className="mr-2 h-4 w-4" />
+                Apply Fixes
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Inventory Fix</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will update {result?.discrepanciesFound || 0} inventory records to match the expected quantities
+                  calculated from all voucher-backed operations. This action cannot be automatically undone.
+                  {result && result.staleFlagsFound > 0 && (
+                    <span className="block mt-2 font-medium">
+                      Additionally, {result.staleFlagsFound} stale transfer flags will be corrected to prevent future issues.
+                    </span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-fix">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => runRebuild(false)}
+                  data-testid="button-confirm-fix"
+                >
+                  Yes, Apply Fixes
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
+
+      {result && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-total-records">Total Records Checked</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-records">{result.totalInventoryRecords}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-discrepancies">Discrepancies Found</p>
+                  <p className="text-2xl font-bold" data-testid="text-discrepancies-count">
+                    {result.discrepanciesFound}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-stale-flags">Stale Transfer Flags</p>
+                  <p className="text-2xl font-bold" data-testid="text-stale-flags">{result.staleFlagsFound}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-fixes">Fixes Applied</p>
+                  <p className="text-2xl font-bold" data-testid="text-fixes-applied">{result.fixesApplied}</p>
+                </div>
+              </div>
+
+              {mode === "applied" && result.fixesApplied > 0 && (
+                <Alert className="mt-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Successfully applied {result.fixesApplied} inventory corrections and fixed {result.staleFlagsFixed} stale transfer flags.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {result.discrepancies.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {mode === "applied" ? "Corrections Made" : "Discrepancies"}
+                  <Badge variant="secondary" className="ml-2">{result.discrepancies.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Stock Item</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead className="text-right">Current Qty</TableHead>
+                        <TableHead className="text-right">Expected Qty</TableHead>
+                        <TableHead className="text-right">Qty Diff</TableHead>
+                        <TableHead className="text-right">Current Value</TableHead>
+                        <TableHead className="text-right">Expected Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.discrepancies.map((d, i) => (
+                        <TableRow key={`${d.locationId}-${d.stockItemId}`} data-testid={`row-discrepancy-${i}`}>
+                          <TableCell data-testid={`text-location-${i}`}>{d.locationName}</TableCell>
+                          <TableCell data-testid={`text-item-${i}`}>{d.stockItemName}</TableCell>
+                          <TableCell data-testid={`text-code-${i}`}>{d.stockItemCode}</TableCell>
+                          <TableCell className="text-right" data-testid={`text-current-qty-${i}`}>
+                            {d.currentQty.toFixed(3)}
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-expected-qty-${i}`}>
+                            {d.expectedQty.toFixed(3)}
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-difference-${i}`}>
+                            <span className={d.difference > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                              {d.difference > 0 ? "+" : ""}{d.difference.toFixed(3)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-current-value-${i}`}>
+                            {d.currentValue.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-expected-value-${i}`}>
+                            {d.expectedValue.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {result.discrepancies.length === 0 && (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
+                <p className="text-lg font-medium" data-testid="text-no-discrepancies">No discrepancies found</p>
+                <p className="text-muted-foreground mt-1">Inventory quantities match expected values from all voucher-backed operations.</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
