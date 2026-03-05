@@ -1,0 +1,714 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useLocation, useParams } from "wouter";
+import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ComparisonItem {
+  articleCode: string;
+  productName: string;
+  loadedQty: number;
+  expectedQty: number;
+  diff: number;
+  totalWeight: number;
+  totalPrice: number;
+  pricePerBale: string;
+  inProforma: boolean;
+  status: "LOADED_NOT_IN_PROFORMA" | "MISSING_FROM_LOADED" | "UNDER_LOADED" | "OVER_LOADED" | "MATCH";
+}
+
+interface ProformaLine {
+  articleCode: string;
+  productName: string;
+  expectedQty: number;
+  pricePerBale: string;
+}
+
+interface LoadedGroup {
+  articleCode: string;
+  productName: string;
+  qty: number;
+  totalWeight: number;
+  totalPrice: number;
+  pricePerBale: string;
+}
+
+interface VerificationSummary {
+  order: any;
+  proformaLines: ProformaLine[];
+  loadedItems: LoadedGroup[];
+  comparison: ComparisonItem[];
+  totalLoadedBales: number;
+  totalLoadedWeight: number;
+}
+
+interface OrderCharge {
+  id: number;
+  name: string;
+  amount: string;
+  chargeType: string;
+}
+
+interface OrderDetail {
+  id: number;
+  customerId: number;
+  companyId: number;
+  orderDate: string;
+  status: string;
+  invoiceNumber?: string;
+  subtotalBales: string;
+  freightAmount: string;
+  otherChargesTotal: string;
+  grandTotal: string;
+  totalQtyBales: number;
+  charges: OrderCharge[];
+  containerNumber?: string;
+  shippingCompany?: string;
+  containerNotes?: string;
+}
+
+export default function FactoryPendingInvoiceVerify() {
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const [, navigate] = useLocation();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+  const params = useParams<{ id: string }>();
+  const orderId = params.id;
+
+  const [containerNumber, setContainerNumber] = useState("");
+  const [shippingCompany, setShippingCompany] = useState("");
+  const [containerNotes, setContainerNotes] = useState("");
+  const [containerInitialized, setContainerInitialized] = useState(false);
+
+  const [chargeName, setChargeName] = useState("");
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [chargeType, setChargeType] = useState("FREIGHT");
+
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [approveNotes, setApproveNotes] = useState("");
+
+  const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
+    queryKey: ["/api/factory/customer-orders", orderId, "verification"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch verification summary");
+      return res.json();
+    },
+    enabled: !!orderId,
+  });
+
+  const { data: orderDetail, isLoading: orderLoading } = useQuery<OrderDetail>({
+    queryKey: ["/api/factory/customer-orders", orderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customer-orders/${orderId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch order detail");
+      return res.json();
+    },
+    enabled: !!orderId,
+  });
+
+  useEffect(() => {
+    if (orderDetail && !containerInitialized) {
+      setContainerNumber(orderDetail.containerNumber || "");
+      setShippingCompany(orderDetail.shippingCompany || "");
+      setContainerNotes(orderDetail.containerNotes || "");
+      setContainerInitialized(true);
+    }
+  }, [orderDetail, containerInitialized]);
+
+  const verifyMutation = useMutation({
+    mutationFn: async (data: { approved: boolean; notes?: string }) => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/verify`, data);
+    },
+    onSuccess: () => {
+      toast({ title: "Order verified", description: "The order has been approved and verified" });
+      navigate("/factory/sales/pending-invoices");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const returnToLoadingMutation = useMutation({
+    mutationFn: async () => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/return-to-loading`);
+    },
+    onSuccess: () => {
+      toast({ title: "Returned to loading", description: "The order has been returned for further loading" });
+      navigate("/factory/sales/pending-invoices");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const assignContainerMutation = useMutation({
+    mutationFn: async (data: { containerNumber: string; shippingCompany: string; containerNotes: string }) => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      toast({ title: "Container info saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addChargeMutation = useMutation({
+    mutationFn: async (data: { name: string; amount: number; chargeType: string }) => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      setChargeName("");
+      setChargeAmount("");
+      toast({ title: "Charge added" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeChargeMutation = useMutation({
+    mutationFn: async (chargeId: number) => {
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      toast({ title: "Charge removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize`);
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice finalized", description: "Invoice has been created successfully" });
+      navigate(`/factory/sales/invoices/${orderId}`);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleAddCharge = () => {
+    if (!chargeAmount || !orderId) return;
+    const name = chargeType === "FREIGHT" ? "Freight" : chargeName.trim();
+    if (!name) return;
+    addChargeMutation.mutate({
+      name,
+      amount: parseFloat(chargeAmount),
+      chargeType,
+    });
+  };
+
+  const getComparisonRowClass = (status: ComparisonItem["status"]) => {
+    switch (status) {
+      case "LOADED_NOT_IN_PROFORMA":
+      case "MISSING_FROM_LOADED":
+        return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+      case "UNDER_LOADED":
+        return "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800";
+      case "OVER_LOADED":
+        return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+      case "MATCH":
+      default:
+        return "";
+    }
+  };
+
+  const getStatusBadge = (status: ComparisonItem["status"]) => {
+    switch (status) {
+      case "LOADED_NOT_IN_PROFORMA":
+        return <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">Not in Proforma</Badge>;
+      case "MISSING_FROM_LOADED":
+        return <Badge variant="destructive" data-testid="badge-missing-from-loaded">Missing</Badge>;
+      case "UNDER_LOADED":
+        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-under-loaded">Under Loaded</Badge>;
+      case "OVER_LOADED":
+        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-over-loaded">Over Loaded</Badge>;
+      case "MATCH":
+        return <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const isLoading = verificationLoading || orderLoading;
+  const charges = orderDetail?.charges || [];
+  const orderStatus = verification?.order?.status || orderDetail?.status || "";
+  const isPending = orderStatus === "PENDING_VERIFICATION";
+  const isVerified = orderStatus === "VERIFIED";
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full p-6">
+        <Skeleton className="h-10 w-64 mb-4" />
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full p-4 lg:p-6 overflow-y-auto">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/factory/sales/pending-invoices")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Verify Order #{orderId}</h1>
+            <p className="text-muted-foreground text-sm">Review loaded bales against proforma</p>
+          </div>
+        </div>
+        <div>
+          {isPending && (
+            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-order-status">
+              Pending Verification
+            </Badge>
+          )}
+          {isVerified && (
+            <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-order-status">
+              Verified
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Loaded Bales</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-loaded-bales">
+              {verification?.totalLoadedBales ?? 0} bales
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Weight</CardTitle>
+            <Truck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-weight">
+              {(verification?.totalLoadedWeight ?? 0).toFixed(2)} kg
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const comparisonMap = new Map<string, ComparisonItem>();
+            (verification?.comparison || []).forEach((c) => comparisonMap.set(c.articleCode, c));
+            const filteredProformaLines = (verification?.proformaLines || []).filter((line) => {
+              const cmp = comparisonMap.get(line.articleCode);
+              return !cmp || cmp.status !== "MATCH";
+            });
+            const getProformaRowClass = (articleCode: string) => {
+              const cmp = comparisonMap.get(articleCode);
+              if (!cmp) return "";
+              if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
+                return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+              if (cmp.status === "OVER_LOADED")
+                return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+              return "";
+            };
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
+                  {filteredProformaLines.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Article</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Expected</TableHead>
+                          <TableHead className="text-right">Loaded</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProformaLines.map((line, i) => {
+                          const cmp = comparisonMap.get(line.articleCode);
+                          return (
+                            <TableRow key={i} className={getProformaRowClass(line.articleCode)} data-testid={`row-proforma-${line.articleCode}`}>
+                              <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
+                                {line.articleCode}
+                              </TableCell>
+                              <TableCell className="text-sm">{line.productName}</TableCell>
+                              <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
+                              <TableCell className="text-right font-mono">{cmp?.loadedQty ?? 0}</TableCell>
+                              <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">All proforma items matched - no mismatches</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
+                  {verification?.loadedItems && verification.loadedItems.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Article</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Weight</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {verification.loadedItems.map((group, i) => (
+                          <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
+                            <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
+                              {group.articleCode}
+                            </TableCell>
+                            <TableCell className="text-sm">{group.productName}</TableCell>
+                            <TableCell className="text-right font-mono">{group.qty}</TableCell>
+                            <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">No loaded bales</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      {(() => {
+        const comparison = verification?.comparison || [];
+        const overloadedItems = comparison.filter((c) => c.status === "OVER_LOADED");
+        const lessLoadedItems = comparison.filter((c) => c.status === "UNDER_LOADED" || c.status === "MISSING_FROM_LOADED");
+        const loadedNotRequestedItems = comparison.filter((c) => c.status === "LOADED_NOT_IN_PROFORMA");
+        const formatTotal = (item: ComparisonItem) => {
+          const w = Number(item.totalWeight) || 0;
+          const p = Number(item.totalPrice) || 0;
+          if (w > 0 && p > 0) return <><div>{w.toFixed(2)} kg</div><div className="text-muted-foreground text-xs">${p.toFixed(2)}</div></>;
+          if (w > 0) return <>{w.toFixed(2)} kg</>;
+          if (p > 0) return <>${p.toFixed(2)}</>;
+          return <>-</>;
+        };
+
+        const renderSummaryTable = (title: string, items: ComparisonItem[], colorClass: string, testId: string) => (
+          <Card className="mb-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">{title} ({items.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {items.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item, i) => (
+                      <TableRow key={i} className={colorClass} data-testid={`row-${testId}-${item.articleCode}`}>
+                        <TableCell>
+                          <div className="text-sm font-medium">{item.productName}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{item.articleCode}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          <div>{item.loadedQty}</div>
+                          {item.expectedQty > 0 && (
+                            <div className="text-xs text-muted-foreground">(exp: {item.expectedQty})</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatTotal(item)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid={`text-none-${testId}`}>None</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+        return (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Summary
+            </h2>
+            {renderSummaryTable("Overloaded", overloadedItems, "bg-green-50 dark:bg-green-950", "overloaded")}
+            {renderSummaryTable("Less Loaded", lessLoadedItems, "bg-red-50 dark:bg-red-950", "less-loaded")}
+            {renderSummaryTable("Loaded Not Requested", loadedNotRequestedItems, "bg-red-50 dark:bg-red-950", "not-requested")}
+          </div>
+        );
+      })()}
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Ship className="h-5 w-5" />
+            Container / Shipping
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Container Number</label>
+              <Input
+                value={containerNumber}
+                onChange={(e) => setContainerNumber(e.target.value)}
+                placeholder="e.g. MSCU1234567"
+                data-testid="input-container-number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Shipping Company</label>
+              <Input
+                value={shippingCompany}
+                onChange={(e) => setShippingCompany(e.target.value)}
+                placeholder="e.g. MSC, Maersk"
+                data-testid="input-shipping-company"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Container Notes</label>
+            <Textarea
+              value={containerNotes}
+              onChange={(e) => setContainerNotes(e.target.value)}
+              placeholder="Additional notes..."
+              data-testid="input-container-notes"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => assignContainerMutation.mutate({ containerNumber, shippingCompany, containerNotes })}
+            disabled={assignContainerMutation.isPending}
+            data-testid="button-save-container"
+          >
+            <Ship className="mr-2 h-4 w-4" />
+            Save Container Info
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-sm">Charges</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {charges.length > 0 && (
+            <div className="space-y-1">
+              {charges.map((charge) => (
+                <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                  <span className="text-sm">{charge.name}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeChargeMutation.mutate(charge.id)}
+                      disabled={removeChargeMutation.isPending}
+                      data-testid={`button-remove-charge-${charge.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Select value={chargeType} onValueChange={setChargeType}>
+              <SelectTrigger data-testid="select-charge-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FREIGHT">Freight</SelectItem>
+                <SelectItem value="OTHER">Other</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {chargeType === "OTHER" && (
+              <Input
+                value={chargeName}
+                onChange={(e) => setChargeName(e.target.value)}
+                placeholder="Charge name..."
+                data-testid="input-charge-name"
+              />
+            )}
+
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                value={chargeAmount}
+                onChange={(e) => setChargeAmount(e.target.value)}
+                placeholder="Amount"
+                data-testid="input-charge-amount"
+              />
+              <Button
+                variant="outline"
+                onClick={handleAddCharge}
+                disabled={!chargeAmount || addChargeMutation.isPending}
+                data-testid="button-add-charge"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <Button
+          variant="outline"
+          onClick={() => setShowReturnDialog(true)}
+          disabled={returnToLoadingMutation.isPending}
+          data-testid="button-return-to-loading"
+        >
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Return to Loading
+        </Button>
+
+        <div className="flex items-center gap-2">
+          {isPending && (
+            <Button
+              onClick={() => setShowApproveDialog(true)}
+              disabled={verifyMutation.isPending}
+              data-testid="button-approve-verify"
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Approve & Verify
+            </Button>
+          )}
+          {isVerified && (
+            <Button
+              onClick={() => finalizeMutation.mutate()}
+              disabled={finalizeMutation.isPending}
+              data-testid="button-finalize-invoice"
+            >
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Finalize Invoice
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Approve & Verify Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will mark the order as VERIFIED. You can add optional notes below.
+            </p>
+            <Textarea
+              value={approveNotes}
+              onChange={(e) => setApproveNotes(e.target.value)}
+              placeholder="Optional notes..."
+              data-testid="input-approve-notes"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowApproveDialog(false)} data-testid="button-cancel-approve">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  verifyMutation.mutate({ approved: true, notes: approveNotes || undefined });
+                  setShowApproveDialog(false);
+                }}
+                disabled={verifyMutation.isPending}
+                data-testid="button-confirm-approve"
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Return to Loading</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This will return the order back to the loading stage. Are you sure?
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowReturnDialog(false)} data-testid="button-cancel-return">
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  returnToLoadingMutation.mutate();
+                  setShowReturnDialog(false);
+                }}
+                disabled={returnToLoadingMutation.isPending}
+                data-testid="button-confirm-return"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Confirm Return
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

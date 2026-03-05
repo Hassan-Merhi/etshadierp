@@ -105,15 +105,15 @@ import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
 import FactorySupplierReport from "@/pages/FactorySupplierReport";
-import CustomerProformas from "@/pages/CustomerProformas";
 import FactoryCustomers from "@/pages/FactoryCustomers";
-import CustomerInvoiceCreate from "@/pages/CustomerInvoiceCreate";
-import CustomerInvoices from "@/pages/CustomerInvoices";
-import CustomerInvoiceDetail from "@/pages/CustomerInvoiceDetail";
-import ContainerLoadingScan from "@/pages/ContainerLoadingScan";
-import PendingLoadings from "@/pages/PendingLoadings";
-import PendingInvoices from "@/pages/PendingInvoices";
-import PendingInvoiceVerify from "@/pages/PendingInvoiceVerify";
+import FactoryInvoices from "@/pages/FactoryInvoices";
+import FactoryInvoiceCreate from "@/pages/FactoryInvoiceCreate";
+import FactoryInvoiceDetail from "@/pages/FactoryInvoiceDetail";
+import FactoryProformas from "@/pages/FactoryProformas";
+import FactoryPendingInvoices from "@/pages/FactoryPendingInvoices";
+import FactoryPendingInvoiceVerify from "@/pages/FactoryPendingInvoiceVerify";
+import FactoryPendingLoadings from "@/pages/FactoryPendingLoadings";
+import FactoryContainerLoadingScan from "@/pages/FactoryContainerLoadingScan";
 import FactoryDashboardIntel from "@/pages/FactoryDashboard";
 import FactoryKpis from "@/pages/FactoryKpis";
 import FactoryProfitability from "@/pages/FactoryProfitability";
@@ -553,14 +553,14 @@ function AuthenticatedApp() {
                     <Route path="/factory/payroll" component={Payroll} />
                     <Route path="/factory/analytics" component={Analytics} />
                     <Route path="/factory/production-summary" component={ProductionSummary} />
-                    <Route path="/factory/sales/new" component={CustomerInvoiceCreate} />
-                    <Route path="/factory/sales/loading/pending" component={PendingLoadings} />
-                    <Route path="/factory/sales/loading/new" component={ContainerLoadingScan} />
-                    <Route path="/factory/sales/pending-invoices/:id/verify" component={PendingInvoiceVerify} />
-                    <Route path="/factory/sales/pending-invoices" component={PendingInvoices} />
-                    <Route path="/factory/sales/invoices/:id" component={CustomerInvoiceDetail} />
-                    <Route path="/factory/sales/invoices" component={CustomerInvoices} />
-                    <Route path="/factory/sales/proformas" component={CustomerProformas} />
+                    <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
+                    <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
+                    <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
+                    <Route path="/factory/sales/pending-invoices/:id/verify" component={FactoryPendingInvoiceVerify} />
+                    <Route path="/factory/sales/pending-invoices" component={FactoryPendingInvoices} />
+                    <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
+                    <Route path="/factory/sales/invoices" component={FactoryInvoices} />
+                    <Route path="/factory/sales/proformas" component={FactoryProformas} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers" component={FactoryWorkersHub} />
