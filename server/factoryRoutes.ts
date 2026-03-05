@@ -7777,6 +7777,11 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             return res.status(400).json({ message: "Target company already has data (bales, containers, or vouchers). Import should only be done on a new/empty company to avoid duplicates." });
           }
 
+          await db.delete(factorySettings).where(eq(factorySettings.companyId, targetCompanyId));
+          await db.delete(factoryBaleSequences).where(eq(factoryBaleSequences.companyId, targetCompanyId));
+          await db.delete(customerInvoiceSequences).where(eq(customerInvoiceSequences.companyId, targetCompanyId));
+          await db.delete(companySettings).where(eq(companySettings.companyId, targetCompanyId));
+
           const t = payload.tables;
           const summary: Record<string, number> = {};
           let totalRecords = 0;
