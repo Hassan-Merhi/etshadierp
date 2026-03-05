@@ -92,9 +92,9 @@ export default function FactoryWorkerDetail() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const { formatDisplayDate } = useDateFormat();
-  const formatDate = (val: string | null | undefined) => {
+  const formatDate = (val: string | Date | null | undefined) => {
     if (!val) return "—";
-    try { return formatDisplayDate(new Date(val)); } catch { return "—"; }
+    try { return formatDisplayDate(val instanceof Date ? val : new Date(val)); } catch { return "—"; }
   };
 
   const [endStep, setEndStep] = useState<1 | 2>(1);
@@ -582,7 +582,7 @@ export default function FactoryWorkerDetail() {
                                   <Badge variant="outline" className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">
-                                  {p.paidAt ? new Date(p.paidAt).toLocaleDateString("en-GB") : "—"}
+                                  {p.paidAt ? formatDate(p.paidAt) : "—"}
                                 </TableCell>
                                 <TableCell>
                                   {p.status !== "PAID" && (
@@ -656,7 +656,7 @@ export default function FactoryWorkerDetail() {
                         const Icon = isImage ? FileImage : isPdf ? FileText : File;
                         const sizeKb = doc.fileSize ? (doc.fileSize / 1024).toFixed(1) : null;
                         const uploadDate = doc.uploadedAt
-                          ? new Date(doc.uploadedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                          ? formatDate(doc.uploadedAt)
                           : "—";
                         return (
                           <div key={doc.id} className="flex items-center gap-3 p-3" data-testid={`row-doc-${doc.id}`}>

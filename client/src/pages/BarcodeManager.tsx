@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Upload, Printer, Trash2, Barcode, Check, FileSpreadsheet } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
@@ -34,6 +35,7 @@ interface PendingBarcode {
 export default function BarcodeManager() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [manualBarcode, setManualBarcode] = useState("");
@@ -373,7 +375,7 @@ export default function BarcodeManager() {
                       <Badge variant="outline">Not Printed</Badge>
                     )}
                   </TableCell>
-                  <TableCell>{new Date(barcode.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDisplayDate(barcode.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -418,7 +420,7 @@ export default function BarcodeManager() {
                       ) : (
                         <Badge variant="outline">Not Printed</Badge>
                       )}
-                      <span className="text-xs text-muted-foreground">{new Date(barcode.createdAt).toLocaleDateString()}</span>
+                      <span className="text-xs text-muted-foreground">{formatDisplayDate(barcode.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -453,7 +455,7 @@ export default function BarcodeManager() {
                       In Inventory
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(barcode.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDisplayDate(barcode.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

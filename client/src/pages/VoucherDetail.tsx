@@ -1,8 +1,8 @@
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
   ArrowLeft,
   FileText,
@@ -84,6 +84,7 @@ export default function VoucherDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/voucher-detail/:voucherId");
   const { formatAmount } = useCurrencyContext();
+  const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   
@@ -147,7 +148,7 @@ export default function VoucherDetail() {
           <div className="text-right">
             {data?.date && (
               <p className="text-lg font-medium">
-                {format(parseISO(data.date), "d/MMM/yy")}
+                {formatShortDate(data.date)}
               </p>
             )}
           </div>
@@ -179,7 +180,7 @@ export default function VoucherDetail() {
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Date:</span>
                     <span className="font-medium">
-                      {format(parseISO(data.date), "d/MMM/yy")}
+                      {formatShortDate(data.date)}
                     </span>
                   </div>
                 </div>

@@ -45,7 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarRange, AlertTriangle, CheckCircle } from "lucide-react";
-import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 const fiscalCloseSchema = z.object({
   periodStartDate: z.string().min(1, "Start date is required"),
@@ -73,6 +73,7 @@ interface FiscalPeriodTabProps {
 
 export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabProps) {
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<FiscalCloseFormData | null>(null);
 
@@ -344,11 +345,11 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                 return (
                   <TableRow key={closure.id} data-testid={`row-closure-${closure.id}`}>
                     <TableCell data-testid={`text-period-${closure.id}`}>
-                      {format(new Date(closure.periodStartDate), "MMM d, yyyy")} -{" "}
-                      {format(new Date(closure.periodEndDate), "MMM d, yyyy")}
+                      {formatDisplayDate(closure.periodStartDate)} -{" "}
+                      {formatDisplayDate(closure.periodEndDate)}
                     </TableCell>
                     <TableCell data-testid={`text-closed-date-${closure.id}`}>
-                      {format(new Date(closure.createdAt), "MMM d, yyyy")}
+                      {formatDisplayDate(closure.createdAt)}
                     </TableCell>
                     <TableCell data-testid={`text-total-income-${closure.id}`}>
                       ${parseFloat(closure.totalIncome || "0").toLocaleString(undefined, {
@@ -404,8 +405,8 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                 <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
                   <div>
                     <span className="font-medium">Period:</span>{" "}
-                    {format(new Date(pendingFormData.periodStartDate), "MMM d, yyyy")} to{" "}
-                    {format(new Date(pendingFormData.periodEndDate), "MMM d, yyyy")}
+                    {formatDisplayDate(pendingFormData.periodStartDate)} to{" "}
+                    {formatDisplayDate(pendingFormData.periodEndDate)}
                   </div>
                   <div>
                     <span className="font-medium">Retained Earnings Account:</span>{" "}

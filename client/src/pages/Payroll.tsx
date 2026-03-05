@@ -4130,7 +4130,7 @@ export default function Payroll() {
                       .map((txn: any) => (
                         <TableRow key={txn.id || `${txn.voucherId}-${txn.date}`}>
                           <TableCell className="font-mono text-sm">
-                            {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                            {txn.date ? formatDisplayDate(txn.date) : "-"}
                           </TableCell>
                           <TableCell className="font-mono font-medium">
                             {txn.voucherNumber || "-"}
@@ -4161,7 +4161,7 @@ export default function Payroll() {
                       <Card key={txn.id || `${txn.voucherId}-${txn.date}`}>
                         <CardContent className="p-3 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-sm">{txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}</span>
+                            <span className="font-mono text-sm">{txn.date ? formatDisplayDate(txn.date) : "-"}</span>
                             <Badge variant={txn.isDebit ? "secondary" : "default"}>
                               {txn.isDebit ? "Dr" : "Cr"}
                             </Badge>

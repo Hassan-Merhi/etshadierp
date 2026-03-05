@@ -28,6 +28,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RefreshCw, Plus, TrendingUp } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 const exchangeRateFormSchema = z.object({
   rate: z.string().min(1, "Rate is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
@@ -41,6 +42,7 @@ type ExchangeRateFormData = z.infer<typeof exchangeRateFormSchema>;
 export function ExchangeRateSettings() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { formatDisplayDate } = useDateFormat();
   const [showForm, setShowForm] = useState(false);
 
   const form = useForm<ExchangeRateFormData>({
@@ -155,7 +157,7 @@ export function ExchangeRateSettings() {
                 </p>
               </div>
               <Badge variant="secondary">
-                Effective: {format(new Date(latestRate.effectiveDate), "MMM d, yyyy")}
+                Effective: {formatDisplayDate(latestRate.effectiveDate)}
               </Badge>
             </div>
           </div>
@@ -242,7 +244,7 @@ export function ExchangeRateSettings() {
               <TableBody>
                 {exchangeRates.slice(0, 10).map((rate: any) => (
                   <TableRow key={rate.id} data-testid={`row-exchange-rate-${rate.id}`}>
-                    <TableCell>{format(new Date(rate.effectiveDate), "MMM d, yyyy")}</TableCell>
+                    <TableCell>{formatDisplayDate(rate.effectiveDate)}</TableCell>
                     <TableCell className="font-mono">{parseFloat(rate.rate).toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">
                       $1 {rate.fromCurrency} = {parseFloat(rate.rate).toLocaleString()} {rate.toCurrency}

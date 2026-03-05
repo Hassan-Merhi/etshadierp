@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import type { FactoryMixBatch, FactoryMixBatchSource } from "@shared/schema";
 
 interface BatchDetailProps {
@@ -31,6 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
+  const { formatDisplayDate } = useDateFormat();
   const { data: batch, isLoading: batchLoading } = useQuery<FactoryMixBatch>({
     queryKey: ["/api/factory/mix-batches", batchId],
   });
@@ -139,7 +141,7 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
               </Badge>
             </div>
             <span className="text-sm text-muted-foreground" data-testid="text-batch-date">
-              {new Date(batch.createdAt).toLocaleDateString()}
+              {formatDisplayDate(batch.createdAt)}
             </span>
           </div>
         </CardHeader>
@@ -298,7 +300,7 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
                             {location?.name || bale.warehouseLocation || "-"}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {new Date(bale.createdAt).toLocaleDateString()}
+                            {formatDisplayDate(bale.createdAt)}
                           </TableCell>
                         </TableRow>
                       );

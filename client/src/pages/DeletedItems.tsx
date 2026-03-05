@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
   Card,
   CardContent,
@@ -119,6 +120,7 @@ const typeIcons: Record<string, any> = {
 
 export default function DeletedItems() {
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const [filterType, setFilterType] = useState<string>("all");
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -346,7 +348,7 @@ export default function DeletedItems() {
                       </TableCell>
                       <TableCell>
                         {item.deletedAt
-                          ? format(new Date(item.deletedAt), "MMM d, yyyy h:mm a")
+                          ? `${formatDisplayDate(item.deletedAt)} ${format(new Date(item.deletedAt), "h:mm a")}`
                           : "-"}
                       </TableCell>
                       <TableCell className="text-right">
@@ -411,7 +413,7 @@ export default function DeletedItems() {
                     <p className="font-medium text-sm">{item.name}</p>
                     {item.accountType && <p className="text-xs text-muted-foreground">{item.accountType}</p>}
                     <p className="text-xs text-muted-foreground mt-1">
-                      {item.deletedAt ? format(new Date(item.deletedAt), "MMM d, yyyy h:mm a") : "-"}
+                      {item.deletedAt ? `${formatDisplayDate(item.deletedAt)} ${format(new Date(item.deletedAt), "h:mm a")}` : "-"}
                     </p>
                     <div className="flex flex-wrap gap-2 mt-3">
                       {item.type !== "orphanedPosSale" && (
@@ -556,7 +558,7 @@ export default function DeletedItems() {
               {detailItem.date && (
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">{format(new Date(detailItem.date), "MMM d, yyyy")}</p>
+                  <p className="font-medium">{formatDisplayDate(detailItem.date)}</p>
                 </div>
               )}
               {detailItem.locationName && (
@@ -570,7 +572,7 @@ export default function DeletedItems() {
                 <p className="text-sm text-muted-foreground">Deleted At</p>
                 <p className="font-medium">
                   {detailItem.deletedAt
-                    ? format(new Date(detailItem.deletedAt), "MMM d, yyyy h:mm a")
+                    ? `${formatDisplayDate(detailItem.deletedAt)} ${format(new Date(detailItem.deletedAt), "h:mm a")}`
                     : "-"}
                 </p>
               </div>

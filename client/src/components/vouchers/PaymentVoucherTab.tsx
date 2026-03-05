@@ -1,5 +1,5 @@
 import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
-import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -101,6 +101,7 @@ export function PaymentVoucherTab({
   originalTotal = 0,
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
+  const { formatDisplayDate } = useDateFormat();
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
@@ -207,7 +208,7 @@ export function PaymentVoucherTab({
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 <span className="truncate">
                                   {field.value
-                                    ? format(field.value, "PPP")
+                                    ? formatDisplayDate(field.value)
                                     : "Pick a date"}
                                 </span>
                               </Button>

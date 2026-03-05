@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Voucher } from "@shared/schema";
@@ -118,6 +119,7 @@ type VoucherFormData = z.infer<typeof voucherSchema>;
 export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEditDialogProps) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const { formatDisplayDate } = useDateFormat();
   const [showOptionalWarning, setShowOptionalWarning] = useState(false);
 
   // Fetch reference data
@@ -380,7 +382,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                               )}
                               data-testid="button-select-date"
                             >
-                              {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>

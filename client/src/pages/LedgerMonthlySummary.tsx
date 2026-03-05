@@ -5,6 +5,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO } from "date-fns";
 import {
   ArrowLeft,
@@ -82,6 +83,7 @@ function formatFullNumber(value: number): string {
 
 export default function LedgerMonthlySummary() {
   const { formatAmount } = useCurrencyContext();
+  const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
@@ -152,7 +154,7 @@ export default function LedgerMonthlySummary() {
           <div className="text-right">
             <p className="text-sm opacity-80">
               {startDate && endDate
-                ? `${format(parseISO(startDate), "d/MMM/yy")} to ${format(parseISO(endDate), "d/MMM/yy")}`
+                ? `${formatShortDate(startDate)} to ${formatShortDate(endDate)}`
                 : ""}
             </p>
           </div>
@@ -185,8 +187,8 @@ export default function LedgerMonthlySummary() {
                       {data.account.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {format(parseISO(data.dateRange.startDate), "d/MMM/yy")} to{" "}
-                      {format(parseISO(data.dateRange.endDate), "d/MMM/yy")}
+                      {formatShortDate(data.dateRange.startDate)} to{" "}
+                      {formatShortDate(data.dateRange.endDate)}
                     </p>
                   </div>
                   <div className="text-right">

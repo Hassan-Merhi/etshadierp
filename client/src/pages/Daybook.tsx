@@ -1082,7 +1082,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
     const exportData = filteredVouchers.map((voucher) => ({
       "Voucher Number": voucher.voucherNumber,
-      Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+      Date: formatDisplayDate(voucher.voucherDate),
       Type: voucher.voucherType,
       Description: voucher.description || "",
       "Total Amount": formatAmount(voucher.totalAmount),
@@ -1151,7 +1151,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
               // Voucher with no entries - still add a row
               detailedData.push({
                 "Voucher Number": voucher.voucherNumber,
-                Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                Date: formatDisplayDate(voucher.voucherDate),
                 Type: voucher.voucherType,
                 Description: voucher.description || "",
                 Location: (voucher as any).locationName || "",
@@ -1190,7 +1190,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
                 detailedData.push({
                   "Voucher Number": voucher.voucherNumber,
-                  Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                  Date: formatDisplayDate(voucher.voucherDate),
                   Type: voucher.voucherType,
                   Description: voucher.description || "",
                   Location: (voucher as any).locationName || "",

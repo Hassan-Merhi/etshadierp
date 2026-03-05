@@ -20,6 +20,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 type POLineItem = {
   stockItemCode: string;
@@ -106,6 +107,7 @@ type DashboardData = {
 export default function ContainerDashboard() {
   const { selectCompany, companies } = useCompany();
   const { formatAmount } = useCurrencyContext();
+  const { formatShortDate } = useDateFormat();
   const [, navigate] = useLocation();
   const [filterAgent, setFilterAgent] = useState<string>("all");
   const [filterCompany, setFilterCompany] = useState<string[]>([]);
@@ -300,7 +302,7 @@ export default function ContainerDashboard() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
     try {
-      return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+      return formatShortDate(dateStr);
     } catch {
       return dateStr;
     }

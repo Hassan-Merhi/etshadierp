@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Eye, Trash2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -51,6 +52,7 @@ export default function CustomerInvoices() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -198,7 +200,7 @@ export default function CustomerInvoices() {
                       {order.customerName}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
-                      {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "-"}
+                      {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(order.status)}

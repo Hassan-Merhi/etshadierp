@@ -7,6 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { ClipboardCheck, Eye, Package, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -42,6 +43,7 @@ interface CustomerOrder {
 export default function PendingInvoices() {
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -186,7 +188,7 @@ export default function PendingInvoices() {
                       {order.customerName}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
-                      {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "-"}
+                      {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
                       {order.totalQtyBales ?? "-"}

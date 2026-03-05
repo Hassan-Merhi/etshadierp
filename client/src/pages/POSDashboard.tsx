@@ -39,6 +39,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -89,6 +90,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const { formatDisplayDate } = useDateFormat();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [openShiftDialog, setOpenShiftDialog] = useState(false);
   const [closeShiftDialog, setCloseShiftDialog] = useState(false);
@@ -269,7 +271,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                 <div>
                   <Badge variant="default" className="mb-2">Active Shift</Badge>
                   <p className="text-sm text-muted-foreground">
-                    Started: {format(new Date(currentShift.openedAt), "MMM dd, yyyy 'at' hh:mm a")}
+                    Started: {formatDisplayDate(currentShift.openedAt)} at {format(new Date(currentShift.openedAt), "hh:mm a")}
                   </p>
                   <p className="text-sm">
                     Opening Cash: <span className="font-medium">{formatAmount(parseFloat(currentShift.openingCash))}</span>
@@ -445,7 +447,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                   return (
                     <TableRow key={shift.id} data-testid={`row-shift-${shift.id}`}>
                       <TableCell>
-                        {format(new Date(shift.openedAt), "MMM dd, yyyy")}
+                        {formatDisplayDate(shift.openedAt)}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         {shift.closedAt ? (

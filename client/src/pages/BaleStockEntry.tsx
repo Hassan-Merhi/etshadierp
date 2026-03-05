@@ -24,6 +24,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { formatNumber } from "@/lib/formatNumber";
+  import { useDateFormat } from "@/contexts/DateFormatContext";
   import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
   import { buildZplBatch } from "@/lib/zplBuilder";
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
@@ -840,6 +841,7 @@
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
+    const { formatDisplayDate } = useDateFormat();
 
     const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
 
@@ -1356,7 +1358,7 @@
                             <Badge variant="outline" className="text-xs">{bale.status}</Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString() : "-"}
+                            {bale.finalizedAt ? formatDisplayDate(bale.finalizedAt) : "-"}
                           </TableCell>
                         </TableRow>
                       );

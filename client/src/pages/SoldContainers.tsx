@@ -9,6 +9,7 @@ import { HandCoins, Search, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface SoldContainer {
   containerId: number;
@@ -33,6 +34,7 @@ interface SoldContainer {
 export default function SoldContainers() {
   const [searchTerm, setSearchTerm] = useState("");
   const { selectedCompany } = useCompany();
+  const { formatDisplayDate } = useDateFormat();
   
   const { data: soldContainers = [], isLoading } = useQuery<SoldContainer[]>({
     queryKey: ["/api/containers/sold", selectedCompany?.id],
@@ -120,7 +122,7 @@ export default function SoldContainers() {
                       {sale.customerName}
                     </TableCell>
                     <TableCell className="font-mono" data-testid={`text-sale-date-${sale.saleId}`}>
-                      {new Date(sale.saleDate).toLocaleDateString()}
+                      {formatDisplayDate(sale.saleDate)}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
                       ${formatNumber(parseFloat(sale.containerCost))}
