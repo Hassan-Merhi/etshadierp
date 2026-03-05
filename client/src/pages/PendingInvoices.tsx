@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,22 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
-import { ClipboardCheck, Eye, Package } from "lucide-react";
+import { ClipboardCheck, Eye, Package, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface CustomerOrder {
   id: number;
@@ -32,6 +45,7 @@ export default function PendingInvoices() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const { toast } = useToast();
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
     queryKey: ["/api/factory/customer-orders", "pending-verification"],
@@ -51,6 +65,24 @@ export default function PendingInvoices() {
       return res.json();
     },
     enabled: !!selectedCompany?.id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Invoice deleted successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const allOrders = [...pendingOrders, ...verifiedOrders];
@@ -175,6 +207,35 @@ export default function PendingInvoices() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-delete-order-${order.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
+                                Any bales assigned to this order will be returned to stock. This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(order.id)}
+                                data-testid={`button-confirm-delete-${order.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

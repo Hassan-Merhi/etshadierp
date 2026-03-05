@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,19 @@ import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
-import { Eye } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Customer {
   id: number;
@@ -57,6 +69,24 @@ export default function CustomerInvoices() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery<CustomerOrder[]>({
     queryKey: [`/api/factory/customer-orders?${queryString}`, statusFilter, customerFilter],
     enabled: !!selectedCompany?.id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Invoice deleted successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const getStatusBadge = (status: string) => {
@@ -189,6 +219,37 @@ export default function CustomerInvoices() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {order.status !== "FINALIZED" && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-delete-order-${order.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
+                                  Any bales assigned to this order will be returned to stock. This cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteMutation.mutate(order.id)}
+                                  data-testid={`button-confirm-delete-${order.id}`}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

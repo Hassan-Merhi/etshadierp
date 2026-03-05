@@ -5863,6 +5863,40 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+
+      await db.transaction(async (tx: any) => {
+        const [order] = await tx.select().from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) throw new Error("Order not found");
+
+        if (order.status === "FINALIZED") {
+          throw new Error("Cannot delete a finalized invoice. Cancel it first if needed.");
+        }
+
+        const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        for (const b of bales) {
+          await tx.update(factoryBales).set({ status: "FINALIZED", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
+        }
+
+        await tx.delete(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        await tx.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+        await tx.delete(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+        await tx.delete(customerOrders).where(eq(customerOrders.id, orderId));
+      });
+
+      res.json({ success: true, message: "Invoice deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting customer order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
