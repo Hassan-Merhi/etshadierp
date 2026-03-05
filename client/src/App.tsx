@@ -582,6 +582,12 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
+                    {user?.role === "Admin" && <Route path="/factory/deleted-items" component={DeletedItems} />}
+                    {user?.role === "Admin" && <Route path="/factory/orphaned-records" component={OrphanedRecords} />}
+                    {user?.role === "Admin" && <Route path="/factory/chatbot-settings" component={ChatbotSettings} />}
+                    {user?.role === "Admin" && <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
+                    {user?.role === "Admin" && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
+                    {user?.role === "Admin" && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
                     <Route path="/factory/net-profit-details" component={NetProfitDetails} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>

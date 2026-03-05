@@ -4274,7 +4274,7 @@ function LoginHistoryTab() {
               </div>
   
               <div className="grid gap-4 md:grid-cols-2">
-                <Link href="/deleted-items">
+                <Link href={appMode === "factory" ? "/factory/deleted-items" : "/deleted-items"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4293,7 +4293,7 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
   
-                <Link href="/orphaned-records">
+                <Link href={appMode === "factory" ? "/factory/orphaned-records" : "/orphaned-records"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4312,7 +4312,7 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
   
-                <Link href="/chatbot-settings">
+                <Link href={appMode === "factory" ? "/factory/chatbot-settings" : "/chatbot-settings"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4331,7 +4331,7 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
 
-                <Link href="/import-cycle-diagnostics">
+                <Link href={appMode === "factory" ? "/factory/import-cycle-diagnostics" : "/import-cycle-diagnostics"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4350,7 +4350,7 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
 
-                <Link href="/inventory-repair">
+                <Link href={appMode === "factory" ? "/factory/inventory-repair" : "/inventory-repair"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4369,7 +4369,7 @@ function LoginHistoryTab() {
                   </Card>
                 </Link>
 
-                <Link href="/net-profit-details">
+                <Link href={appMode === "factory" ? "/factory/net-profit-details" : "/net-profit-details"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -4389,7 +4389,7 @@ function LoginHistoryTab() {
                 </Link>
 
 
-                <Link href="/company-data-reset">
+                <Link href={appMode === "factory" ? "/factory/company-data-reset" : "/company-data-reset"}>
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
