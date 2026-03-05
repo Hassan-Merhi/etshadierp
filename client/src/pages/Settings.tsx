@@ -1798,39 +1798,43 @@ const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
 const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
 
 const ERP_COST_FIELDS = [
-  { key: "daybook_amounts",      label: "Daybook: Transaction Amounts" },
-  { key: "accounts_balances",    label: "Accounts: Account Balances" },
-  { key: "container_costs",      label: "Containers: Cost & Fee Columns" },
-  { key: "stock_rates",          label: "Stock Items: Rate / Price Columns" },
-  { key: "analytics_financials", label: "Analytics & P&L: Revenue & Profit" },
-  { key: "voucher_amounts",      label: "Vouchers: Amount Columns" },
+  { key: "daybook_amounts",      label: "Transaction Amounts" },
+  { key: "accounts_balances",    label: "Account Balances" },
+  { key: "container_costs",      label: "Cost & Fee Columns" },
+  { key: "stock_rates",          label: "Rate / Price Columns" },
+  { key: "analytics_financials", label: "Revenue & Profit" },
+  { key: "voucher_amounts",      label: "Amount Columns" },
 ];
 
 const FACTORY_COST_FIELDS = [
-  { key: "inventory_avg_rate",      label: "Location Inventory: Avg Rate" },
-  { key: "inventory_total_value",   label: "Location Inventory: Total Value" },
-  { key: "bale_history_cost_per_kg", label: "Bale History: Cost/KG" },
-  { key: "bale_history_total_cost", label: "Bale History: Total Cost" },
-  { key: "bales_list_cost_per_kg",  label: "Bales List: Cost/kg" },
+  { key: "inventory_avg_rate",      label: "Avg Rate Column" },
+  { key: "inventory_total_value",   label: "Total Value Column" },
+  { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
+  { key: "bale_history_total_cost", label: "Total Cost Column" },
+  { key: "bales_list_cost_per_kg",  label: "Cost/kg Column" },
 ];
+
+const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
+  daybook: [ERP_COST_FIELDS[0]],
+  accounts: [ERP_COST_FIELDS[1]],
+  containers: [ERP_COST_FIELDS[2]],
+  stock_items: [ERP_COST_FIELDS[3]],
+  analytics: [ERP_COST_FIELDS[4]],
+  vouchers: [ERP_COST_FIELDS[5]],
+  "factory/location-inventory": [FACTORY_COST_FIELDS[0], FACTORY_COST_FIELDS[1]],
+  "factory/bales-history": [FACTORY_COST_FIELDS[2], FACTORY_COST_FIELDS[3]],
+  "factory/stock-entry": [FACTORY_COST_FIELDS[4]],
+};
 
 function PageAccessSection({ users, companies, selectedCompany, featureLabels, toast }: any) {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [pageTab, setPageTab] = useState<"erp" | "factory">("erp");
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [factorySelectedPages, setFactorySelectedPages] = useState<Set<string>>(new Set());
-  const [hiddenCostFields, setHiddenCostFields] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { data: userCompanyRoles = [] } = useQuery<any[]>({
-    queryKey: ["/api/users", selectedCompany?.id],
-    enabled: !!selectedCompany,
-    queryFn: async () => {
-      const res = await fetch("/api/users", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
+  const [erpHiddenCostFields, setErpHiddenCostFields] = useState<string[]>([]);
+  const [factoryHiddenCostFields, setFactoryHiddenCostFields] = useState<string[]>([]);
+  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: pageAccess, isLoading: isLoadingAccess } = useQuery<{ pageKeys: string[] }>({
     queryKey: ["/api/erp-user-page-access", selectedUserId, selectedCompany?.id],
@@ -1852,7 +1856,7 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     },
   });
 
-  const { data: hiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
+  const { data: erpHiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/erp-user-hidden-costs", selectedUserId],
     enabled: !!selectedUserId,
     queryFn: async () => {
@@ -1863,66 +1867,31 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
   });
 
   useEffect(() => {
-    if (pageAccess) {
-      setSelectedPages(new Set(pageAccess.pageKeys));
-    }
+    if (pageAccess) setSelectedPages(new Set(pageAccess.pageKeys));
   }, [pageAccess]);
 
   useEffect(() => {
     if (factoryUsers && selectedUserId) {
-      const factoryUser = factoryUsers.find((u: any) => u.id === selectedUserId);
-      setFactorySelectedPages(new Set(factoryUser?.pageAccess || []));
+      const fu = factoryUsers.find((u: any) => u.id === selectedUserId);
+      setFactorySelectedPages(new Set(fu?.pageAccess || []));
+      setFactoryHiddenCostFields(fu?.hiddenCostFields || []);
     }
   }, [factoryUsers, selectedUserId]);
 
   useEffect(() => {
-    if (hiddenCostData) {
-      setHiddenCostFields(hiddenCostData.hiddenCostFields);
+    if (erpHiddenCostData) setErpHiddenCostFields(erpHiddenCostData.hiddenCostFields);
+  }, [erpHiddenCostData]);
+
+  const allHiddenCostFields = [...erpHiddenCostFields, ...factoryHiddenCostFields];
+
+  const toggleCostField = (key: string) => {
+    const isErp = ERP_COST_FIELDS.some(f => f.key === key);
+    if (isErp) {
+      setErpHiddenCostFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    } else {
+      setFactoryHiddenCostFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
     }
-  }, [hiddenCostData]);
-
-  const saveMutation = useMutation({
-    mutationFn: async (pageKeys: string[]) => {
-      const res = await apiRequest("PUT", `/api/erp-user-page-access/${selectedUserId}`, { pageKeys });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-page-access", selectedUserId] });
-      toast({ title: "ERP Page Access Updated", description: "User ERP page access has been saved." });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const saveFactoryMutation = useMutation({
-    mutationFn: async (pageKeys: string[]) => {
-      const res = await factoryApiRequest("PUT", `/api/factory/users/${selectedUserId}`, { pageAccess: pageKeys });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed to save"); }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/users", selectedCompany?.id] });
-      toast({ title: "Factory Page Access Updated", description: "User factory page access has been saved." });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const saveCostMutation = useMutation({
-    mutationFn: async (fields: string[]) => {
-      const res = await apiRequest("PUT", `/api/erp-user-hidden-costs/${selectedUserId}`, { hiddenCostFields: fields });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-hidden-costs", selectedUserId] });
-      toast({ title: "Cost Visibility Updated", description: "User cost visibility has been saved." });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
+  };
 
   const activePageList = pageTab === "erp" ? ALL_ERP_PAGES : ALL_FACTORY_PAGES_SETTINGS;
   const activePageGroups = pageTab === "erp" ? ERP_PAGE_GROUPS : FACTORY_PAGE_GROUPS_SETTINGS;
@@ -1932,8 +1901,7 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
   const togglePage = (key: string) => {
     setActiveSelected(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
@@ -1948,27 +1916,52 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
     });
   };
 
-  const toggleCostField = (key: string) => {
-    setHiddenCostFields(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-  };
-
   const selectAll = () => setActiveSelected(new Set(activePageList.map(p => p.key)));
   const selectNone = () => setActiveSelected(new Set());
 
+  const toggleExpand = (key: string) => {
+    setExpandedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    try {
+      await apiRequest("PUT", `/api/erp-user-page-access/${selectedUserId}`, { pageKeys: Array.from(selectedPages) });
+      await apiRequest("PUT", `/api/erp-user-hidden-costs/${selectedUserId}`, { hiddenCostFields: erpHiddenCostFields });
+      const fRes = await factoryApiRequest("PUT", `/api/factory/users/${selectedUserId}`, {
+        pageAccess: Array.from(factorySelectedPages),
+        hiddenCostFields: factoryHiddenCostFields,
+      });
+      if (!fRes.ok) {
+        const e = await fRes.json();
+        throw new Error(e.message || "Failed to save factory access");
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-page-access", selectedUserId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-hidden-costs", selectedUserId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/users", selectedCompany?.id] });
+      toast({ title: "Access Saved", description: "All page access and visibility settings have been saved." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const selectedUser = users.find((u: any) => u.id === selectedUserId);
-  const isAdmin = selectedUser && users.length > 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Shield className="h-5 w-5" />
-        <h2 className="text-2xl font-semibold" data-testid="text-page-access-title">Page Access</h2>
+        <h2 className="text-2xl font-semibold" data-testid="text-page-access-title">User Access Management</h2>
       </div>
 
       <p className="text-muted-foreground">
-        Configure which pages each user can access. Admin users always have full access. Select a user to manage their page access for the current company.
+        Configure page access and cost visibility for each user. Admin users always have full access.
       </p>
 
       {!selectedCompany ? (
@@ -2025,7 +2018,7 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                 </TabsList>
               </Tabs>
 
-              <div className="space-y-4 border rounded-md p-4 max-h-96 overflow-y-auto">
+              <div className="space-y-4 border rounded-md p-4 max-h-[32rem] overflow-y-auto">
                 {activePageGroups.map(group => {
                   const groupPages = activePageList.filter(p => p.group === group);
                   const allGroupSelected = groupPages.every(p => activeSelected.has(p.key));
@@ -2046,17 +2039,52 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
                           <span className="text-xs text-muted-foreground">(partial)</span>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-1 ml-6">
-                        {groupPages.map(page => (
-                          <div key={page.key} className="flex items-center gap-2">
-                            <Checkbox
-                              checked={activeSelected.has(page.key)}
-                              onCheckedChange={() => togglePage(page.key)}
-                              data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`}
-                            />
-                            <span className="text-sm">{page.label}</span>
-                          </div>
-                        ))}
+                      <div className="ml-6 space-y-1">
+                        {groupPages.map(page => {
+                          const costFields = PAGE_COST_FIELD_MAP[page.key];
+                          const hasCostFields = costFields && costFields.length > 0;
+                          const isExpanded = expandedPages.has(page.key);
+
+                          return (
+                            <div key={page.key}>
+                              <div className="flex items-center gap-2 py-0.5">
+                                <Checkbox
+                                  checked={activeSelected.has(page.key)}
+                                  onCheckedChange={() => togglePage(page.key)}
+                                  data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`}
+                                />
+                                <span className="text-sm flex-1">{page.label}</span>
+                                {hasCostFields && (
+                                  <button
+                                    type="button"
+                                    className="p-1 rounded hover-elevate text-muted-foreground"
+                                    onClick={() => toggleExpand(page.key)}
+                                    data-testid={`button-expand-${page.key.replace(/\//g, '-')}`}
+                                  >
+                                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                  </button>
+                                )}
+                              </div>
+                              {hasCostFields && isExpanded && (
+                                <div className="ml-8 mb-2 border rounded-md bg-muted/30 divide-y">
+                                  <div className="px-3 py-1.5">
+                                    <span className="text-xs font-medium text-muted-foreground">Hide/Show Fields</span>
+                                  </div>
+                                  {costFields.map(field => (
+                                    <div key={field.key} className="flex items-center justify-between px-3 py-2">
+                                      <span className="text-xs">{field.label}</span>
+                                      <Switch
+                                        checked={!allHiddenCostFields.includes(field.key)}
+                                        onCheckedChange={() => toggleCostField(field.key)}
+                                        data-testid={`switch-cost-${field.key}`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -2071,62 +2099,19 @@ function PageAccessSection({ users, companies, selectedCompany, featureLabels, t
 
               <div className="flex justify-end">
                 <Button
-                  onClick={() => {
-                    if (pageTab === "erp") {
-                      saveMutation.mutate(Array.from(selectedPages));
-                    } else {
-                      saveFactoryMutation.mutate(Array.from(factorySelectedPages));
-                    }
-                  }}
-                  disabled={saveMutation.isPending || saveFactoryMutation.isPending}
+                  onClick={handleSaveAll}
+                  disabled={isSaving}
                   data-testid="button-save-page-access"
                 >
-                  {(saveMutation.isPending || saveFactoryMutation.isPending) ? (
+                  {isSaving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Saving...
                     </>
                   ) : (
-                    `Save ${pageTab === "erp" ? "ERP" : "Factory"} Page Access`
+                    "Save All Access Settings"
                   )}
                 </Button>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t">
-                <div>
-                  <Label className="text-base font-semibold">Cost &amp; Pricing Visibility</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Toggle off to hide financial/cost data from this user. On = visible, Off = hidden.
-                  </p>
-                </div>
-                <div className="border rounded-md divide-y">
-                  {ERP_COST_FIELDS.map(field => (
-                    <div key={field.key} className="flex items-center justify-between px-4 py-3">
-                      <span className="text-sm">{field.label}</span>
-                      <Switch
-                        checked={!hiddenCostFields.includes(field.key)}
-                        onCheckedChange={() => toggleCostField(field.key)}
-                        data-testid={`switch-erp-cost-${field.key}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => saveCostMutation.mutate(hiddenCostFields)}
-                    disabled={saveCostMutation.isPending}
-                    data-testid="button-save-cost-visibility"
-                  >
-                    {saveCostMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Cost Visibility"
-                    )}
-                  </Button>
-                </div>
               </div>
             </Card>
           )}

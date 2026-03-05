@@ -13589,7 +13589,7 @@ if (asOfDate) {
               amountCurrency: String(amtCurrency),
               fxRateToUsd: String(fxRate),
               amountUsd: String(amtUsd),
-              createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+              createdBy: null,
             });
           }
         } catch (dbErr) {
@@ -13969,7 +13969,7 @@ if (asOfDate) {
               amountCurrency: String(amtCurrency),
               fxRateToUsd: String(fxRate),
               amountUsd: String(amtUsd),
-              createdBy: (req.session as any).userId ? Number((req.session as any).userId) : null,
+              createdBy: null,
             });
           }
         } catch (dbErr) {
