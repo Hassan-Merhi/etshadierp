@@ -10868,16 +10868,36 @@ if (asOfDate) {
             .limit(1);
 
           if (existingOffload) {
-            // Reverse inventory changes + delete old records atomically
-            const pos = await storage.getPurchaseOrdersByContainer(containerId);
-            const allLineItems: any[] = [];
-            for (const po of pos) {
-              const lineItems = await storage.getLineItemsByPO(po.id);
-              allLineItems.push(...lineItems);
+            // Reverse inventory changes + delete old records atomically.
+            // Prefer stored containerOffloadItems (exact quantities that were actually offloaded)
+            // to avoid discrepancies when PO line items were edited after the original offload.
+            const storedOffloadItems = await db
+              .select()
+              .from(containerOffloadItems)
+              .where(eq(containerOffloadItems.offloadId, existingOffload.id));
+
+            // Fall back to PO line items only when no stored offload items exist (legacy containers)
+            let itemsToReverse: Array<{ stockItemId: number; quantity: string }>;
+            if (storedOffloadItems.length > 0) {
+              itemsToReverse = storedOffloadItems.map(i => ({
+                stockItemId: i.stockItemId,
+                quantity: i.quantity,
+              }));
+            } else {
+              const pos = await storage.getPurchaseOrdersByContainer(containerId);
+              const allLineItems: any[] = [];
+              for (const po of pos) {
+                const lineItems = await storage.getLineItemsByPO(po.id);
+                allLineItems.push(...lineItems);
+              }
+              itemsToReverse = allLineItems.map(i => ({
+                stockItemId: i.stockItemId,
+                quantity: i.quantity,
+              }));
             }
 
             await db.transaction(async (tx) => {
-              for (const item of allLineItems) {
+              for (const item of itemsToReverse) {
                 await adjustInventory(
                   tx,
                   existingOffload.locationId,
@@ -10886,6 +10906,11 @@ if (asOfDate) {
                   container.companyId,
                 );
               }
+
+              // Delete stored offload items so they don't persist after reversal
+              await tx
+                .delete(containerOffloadItems)
+                .where(eq(containerOffloadItems.offloadId, existingOffload.id));
 
               const containerDescPattern = `%container ${container.containerNumber}%`;
               const oldVouchers = await tx
@@ -14526,6 +14551,14 @@ if (asOfDate) {
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 }
               }
+
+              // CRITICAL: sync inventoryApplied so that a subsequent PUT /api/stock-transfers/:id
+              // call (e.g. from StockTransferOrder edit) does not double-apply or double-reverse
+              // inventory. This mirrors the same update in PATCH /api/vouchers/:id/optional.
+              await tx
+                .update(stockTransferVouchers)
+                .set({ inventoryApplied: !willBeOptional })
+                .where(eq(stockTransferVouchers.id, transfer.id));
             }
 
             if (hasStockAdjustment.length > 0) {
