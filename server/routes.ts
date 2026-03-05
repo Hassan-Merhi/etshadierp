@@ -17876,8 +17876,7 @@ if (asOfDate) {
             .where(eq(stockItems.id, item.stockItemId));
 
           const qty = parseFloat(item.quantity);
-          const configuredPrice = stockItem?.sellingPrice ? parseFloat(stockItem.sellingPrice) : 0;
-          const sellingPrice = configuredPrice > 0 ? configuredPrice : parseFloat(item.rate);
+          const sellingPrice = parseFloat(item.rate) || 0;
           const costPrice = currentRate;
           const totalSales = qty * sellingPrice;
           const totalCost = qty * costPrice;
