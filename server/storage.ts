@@ -471,178 +471,160 @@ export class DbStorage implements IStorage {
   }
 
   async deleteCompany(id: number): Promise<void> {
-    // Delete all company-related data in the correct order to avoid foreign key issues
-    // Use raw SQL execute for subqueries since Drizzle's where() doesn't work well with sql template subqueries
-    
-    // Delete voucher entries first (references vouchers)
+    const safe = async (query: any) => {
+      try { await db.execute(query); } catch (e: any) {
+        if (e.code === '42P01' || e.message?.includes('does not exist')) return;
+        throw e;
+      }
+    };
+
+    // === CUSTOMER ORDER CHAIN ===
+    await safe(sql`DELETE FROM customer_order_charges WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM customer_order_bales WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM customer_order_lines WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM customer_orders WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM customer_proformas WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM customer_invoice_sequences WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM credit_note_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+
+    // === VOUCHER CHAIN ===
     await db.execute(sql`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
-    
-    // Delete sales items (must be before vouchers)
     await db.execute(sql`DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
-    
-    // Delete stock transfer items (through vouchers -> stock_transfer_vouchers)
     await db.execute(sql`DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${id})`);
-    
-    // Delete stock transfer vouchers (through vouchers)
     await db.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
-    
-    // Delete stock adjustment items (through vouchers -> stock_adjustment_vouchers)
     await db.execute(sql`DELETE FROM stock_adjustment_items WHERE adjustment_id IN (SELECT sav.id FROM stock_adjustment_vouchers sav JOIN vouchers v ON sav.voucher_id = v.id WHERE v.company_id = ${id})`);
-    
-    // Delete stock adjustment vouchers (through vouchers)
     await db.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
-    
-    // Delete vouchers
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, id));
-    
-    // Delete draft POS sale items (through locations -> draft_pos_sales)
+
+    // === FACTORY SNAPSHOT / LEAF TABLES ===
+    await safe(sql`DELETE FROM factory_bale_cost_snapshots WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_bale_photos WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_container_profit_snapshots WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_supplier_score_snapshots WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_daily_kpi_snapshots WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_alerts WHERE company_id = ${id}`);
+
+    // === FACTORY OPERATIONAL TABLES ===
+    await safe(sql`DELETE FROM factory_waste_entries WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_daybook_entry_edits WHERE entry_id IN (SELECT id FROM factory_daybook_entries WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_daybook_entries WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_worker_documents WHERE worker_id IN (SELECT id FROM factory_workers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_payrolls WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_workers WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_bales WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_pressing_batches WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_mix_batches WHERE company_id = ${id}`);
+
+    // === FACTORY CONTAINER CHAIN ===
+    await safe(sql`DELETE FROM factory_offload_additional_charges WHERE container_id IN (SELECT id FROM factory_containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_container_commissions WHERE container_id IN (SELECT id FROM factory_containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_duty_audit_log WHERE container_id IN (SELECT id FROM factory_containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_raw_stock WHERE container_id IN (SELECT id FROM factory_containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM factory_containers WHERE company_id = ${id}`);
+
+    // === FACTORY BASE TABLES ===
+    await safe(sql`DELETE FROM factory_bale_sequences WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_bale_products WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_categories WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_fx_rates WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_suppliers WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_settings WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_user_profiles WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM factory_user_page_access WHERE company_id = ${id}`);
+
+    // === POS TABLES ===
     await db.execute(sql`DELETE FROM draft_pos_sale_items WHERE draft_id IN (SELECT dps.id FROM draft_pos_sales dps JOIN locations l ON dps.location_id = l.id WHERE l.company_id = ${id})`);
-    
-    // Delete draft POS sales (through locations)
     await db.execute(sql`DELETE FROM draft_pos_sales WHERE location_id IN (SELECT id FROM locations WHERE company_id = ${id})`);
-    
-    // Delete PO line items
+    await safe(sql`DELETE FROM pos_offline_queue WHERE shift_id IN (SELECT id FROM pos_shifts WHERE location_id IN (SELECT id FROM locations WHERE company_id = ${id}))`);
+    await safe(sql`DELETE FROM pos_shifts WHERE location_id IN (SELECT id FROM locations WHERE company_id = ${id})`);
+
+    // === PURCHASE ORDER / CONTAINER CHAIN ===
     await db.execute(sql`DELETE FROM po_line_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE company_id = ${id})`);
-    
-    // Delete purchase orders
     await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, id));
-    
-    // Delete container charges
+    await safe(sql`DELETE FROM supplier_container_loaded_items WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM container_offload_items WHERE offload_id IN (SELECT co.id FROM container_offloads co WHERE co.container_id IN (SELECT id FROM containers WHERE company_id = ${id}))`);
     await db.execute(sql`DELETE FROM container_charges WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
-    
-    // Delete container offloads
     await db.execute(sql`DELETE FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
-    
-    // Delete containers
+    await safe(sql`DELETE FROM container_freight_payments WHERE freight_id IN (SELECT cf.id FROM container_freight cf WHERE cf.container_id IN (SELECT id FROM containers WHERE company_id = ${id}))`);
+    await safe(sql`DELETE FROM container_freight WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM container_documents WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
     await db.delete(schema.containers).where(eq(schema.containers.companyId, id));
-    
-    // Delete inventory
+
+    // === INVENTORY / STOCK ===
     await db.delete(schema.inventory).where(eq(schema.inventory.companyId, id));
-    
-    // Delete stock item code aliases
     await db.delete(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.companyId, id));
-    
-    // Delete stock item location prices
     await db.execute(sql`DELETE FROM stock_item_location_prices WHERE stock_item_id IN (SELECT id FROM stock_items WHERE company_id = ${id})`);
-    
-    // Delete stock items
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, id));
-    
-    // Delete stock groups
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, id));
-    
-    // Delete mix batch sources (ignore if table doesn't exist)
-    try {
-      await db.execute(sql`DELETE FROM mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete mix batches (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.mixBatches).where(eq(schema.mixBatches.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete production bales (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.productionBales).where(eq(schema.productionBales.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete bale transfer items (ignore if table doesn't exist)
-    try {
-      await db.execute(sql`DELETE FROM bale_transfer_items WHERE transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete bale transfers (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete bale products (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.baleProducts).where(eq(schema.baleProducts.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete bale sequences (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.baleSequences).where(eq(schema.baleSequences.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete bales (ignore if table doesn't exist)
-    try {
-      await db.delete(schema.bales).where(eq(schema.bales.companyId, id));
-    } catch (e: any) {
-      if (!e.message?.includes('does not exist')) throw e;
-    }
-    
-    // Delete salary advances
+    await safe(sql`DELETE FROM stock_group_location_archive_items WHERE archive_id IN (SELECT id FROM stock_group_location_archives WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM stock_group_location_archives WHERE company_id = ${id}`);
+
+    // === ERP BALE TABLES ===
+    await safe(sql`DELETE FROM mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM mix_batches WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM pressing_batches WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM production_raw_stock WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM production_bales WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bale_label_prints WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bale_transfer_items WHERE transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM bale_transfers WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bale_product_categories WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bale_products WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bale_sequences WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM bales WHERE company_id = ${id}`);
+
+    // === SALARY / EMPLOYEES ===
+    await safe(sql`DELETE FROM salary_advance_deductions WHERE advance_id IN (SELECT id FROM salary_advances WHERE company_id = ${id})`);
     await db.delete(schema.salaryAdvances).where(eq(schema.salaryAdvances.companyId, id));
-    
-    // Delete employee group members
     await db.execute(sql`DELETE FROM employee_group_members WHERE employee_group_id IN (SELECT id FROM employee_groups WHERE company_id = ${id})`);
-    
-    // Delete employee groups
     await db.delete(schema.employeeGroups).where(eq(schema.employeeGroups.companyId, id));
-    
-    // Delete employees
     await db.delete(schema.employees).where(eq(schema.employees.companyId, id));
-    
-    // Delete customer balances
+
+    // === CUSTOMERS ===
     await db.delete(schema.customerBalances).where(eq(schema.customerBalances.companyId, id));
-    
-    // Delete customers
     await db.delete(schema.customers).where(eq(schema.customers.companyId, id));
-    
-    // Delete container sales
     await db.delete(schema.containerSales).where(eq(schema.containerSales.companyId, id));
-    
-    // Delete inter-company transfers (ignore if table doesn't exist)
+
+    // === SUPPLIER PROFORMAS ===
+    await safe(sql`DELETE FROM supplier_proforma_lines WHERE proforma_id IN (SELECT id FROM supplier_proformas WHERE company_id = ${id})`);
+    await safe(sql`DELETE FROM supplier_proformas WHERE company_id = ${id}`);
+
+    // === INTER-COMPANY ===
     try {
       await db.delete(schema.interCompanyTransfers).where(or(eq(schema.interCompanyTransfers.fromCompanyId, id), eq(schema.interCompanyTransfers.toCompanyId, id)));
     } catch (e: any) {
       if (!e.message?.includes('does not exist')) throw e;
     }
-    
-    // Delete bank accounts
-    await db.delete(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, id));
-    
-    // Delete fixed assets
-    await db.delete(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, id));
-    
-    // Delete ledger accounts
-    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, id));
-    
-    // Delete locations
-    await db.delete(schema.locations).where(eq(schema.locations.companyId, id));
-    
-    // Delete fiscal period closures
-    await db.delete(schema.fiscalPeriodClosures).where(eq(schema.fiscalPeriodClosures.companyId, id));
-    
-    // Delete dashboard cash accounts
-    await db.delete(schema.dashboardCashAccounts).where(eq(schema.dashboardCashAccounts.companyId, id));
-    
-    // Delete dashboard payable accounts
-    await db.delete(schema.dashboardPayableAccounts).where(eq(schema.dashboardPayableAccounts.companyId, id));
-    
-    // Delete company settings
-    await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, id));
-    
-    // Delete user company roles
+
+    // === USER ROLES & LOCATIONS (before locations/ledger_accounts) ===
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, id));
-    
-    // Finally delete the company
+    await safe(sql`DELETE FROM user_locations WHERE company_id = ${id}`);
+
+    // === ACCOUNTS / LOCATIONS / SETTINGS ===
+    await db.delete(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, id));
+    await db.delete(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, id));
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, id));
+    await db.delete(schema.locations).where(eq(schema.locations.companyId, id));
+    await db.delete(schema.fiscalPeriodClosures).where(eq(schema.fiscalPeriodClosures.companyId, id));
+    await db.delete(schema.dashboardCashAccounts).where(eq(schema.dashboardCashAccounts.companyId, id));
+    await db.delete(schema.dashboardPayableAccounts).where(eq(schema.dashboardPayableAccounts.companyId, id));
+    await safe(sql`DELETE FROM dashboard_account_selections WHERE company_id = ${id}`);
+    await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, id));
+
+    // === REMAINING COMPANY-SCOPED TABLES ===
+    await safe(sql`DELETE FROM pending_barcodes WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM exchange_rates WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM reference_sequences WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM role_feature_permissions WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM login_history WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM stored_files WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM erp_user_page_access WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM audit_log WHERE company_id = ${id}`);
+    await safe(sql`DELETE FROM user_presence WHERE company_id = ${id}`);
+
+    // === FINALLY DELETE COMPANY ===
     await db.delete(schema.companies).where(eq(schema.companies.id, id));
   }
 
