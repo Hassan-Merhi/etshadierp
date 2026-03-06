@@ -18,7 +18,7 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,6 +52,7 @@ import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import POSDashboard from "@/pages/POSDashboard";
 import POSCustomers from "@/pages/POSCustomers";
+import POSSettings from "@/pages/POSSettings";
 import EditSupplier from "@/pages/EditSupplier";
 import SupplierProformas from "@/pages/SupplierProformas";
 import ContainerVerification from "@/pages/ContainerVerification";
@@ -171,6 +172,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         <Route path="/pos-customers">{() => <POSCustomers />}</Route>
         <Route path="/pos-import">{() => posImportEnabled ? <POSImport /> : <Redirect to="/" />}</Route>
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
+        <Route path="/pos-chat" component={Chat} />
+        <Route path="/pos-settings" component={POSSettings} />
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -397,6 +400,8 @@ function AuthenticatedApp() {
     const isOnImport = currentLocation === "/pos-import";
     const isOnCustomers = currentLocation === "/pos-customers";
     const isOnTransfer = currentLocation.startsWith("/vouchers");
+    const isOnChat = currentLocation === "/pos-chat";
+    const isOnSettings = currentLocation === "/pos-settings";
 
     const posNavItems = [
       { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
@@ -405,6 +410,8 @@ function AuthenticatedApp() {
       { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
       ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
+      { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat") },
+      { label: "Settings", icon: Cog, active: isOnSettings, testId: "button-settings-tab", onClick: () => setLocation("/pos-settings") },
     ];
 
     const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
