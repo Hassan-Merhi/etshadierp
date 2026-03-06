@@ -34,6 +34,8 @@ import {
   Clock,
   Save,
   AlertTriangle,
+  Rows3,
+  AlignJustify,
 } from "lucide-react";
 import {
   Dialog,
@@ -107,6 +109,10 @@ export default function FactoryContainerLoadingScan() {
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
+  const [groupOrder, setGroupOrder] = useState<string[]>([]);
+  const [lastScannedRef, setLastScannedRef] = useState<string | null>(null);
+  const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
@@ -161,14 +167,31 @@ export default function FactoryContainerLoadingScan() {
     refetchInterval: 5000,
   });
 
-  // When resuming: restore customer/location from loaded order
+  // When resuming: restore customer/location and show last scanned popup
   useEffect(() => {
     if (isResuming && orderDetail && !selectedCustomerId) {
       setSelectedCustomerId(String(orderDetail.customerId));
       setSelectedLocationId(String(orderDetail.locationId || ""));
+      const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
+      if (stored) {
+        setLastScannedRef(stored);
+        setShowLastScannedPopup(true);
+      }
       setTimeout(() => scannerRef.current?.focus(), 200);
     }
   }, [isResuming, orderDetail, selectedCustomerId]);
+
+  // Keep groupOrder in sync when new article groups appear (server refetch)
+  useEffect(() => {
+    if (!orderDetail?.bales) return;
+    setGroupOrder((prev) => {
+      const newCodes = orderDetail.bales
+        .map((b) => b.articleCode)
+        .filter((c) => !prev.includes(c));
+      if (newCodes.length === 0) return prev;
+      return [...newCodes, ...prev];
+    });
+  }, [orderDetail?.bales]);
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: {
@@ -210,9 +233,26 @@ export default function FactoryContainerLoadingScan() {
       );
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables: { scanCode: string; locationId: number }) => {
       setScanFlash("success");
       setTimeout(() => setScanFlash(null), 500);
+      if (orderId) {
+        const scanned = variables.scanCode;
+        localStorage.setItem(`lastScannedBale_${orderId}`, scanned);
+        setLastScannedRef(scanned);
+      }
+      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      if (newest?.articleCode) {
+        setGroupOrder((prev) => {
+          const filtered = prev.filter((c) => c !== newest.articleCode);
+          return [newest.articleCode, ...filtered];
+        });
+        setExpandedGroups((prev) => {
+          const next = new Set(prev);
+          next.add(newest.articleCode);
+          return next;
+        });
+      }
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/customer-orders", orderId],
       });
@@ -326,6 +366,10 @@ export default function FactoryContainerLoadingScan() {
   );
 
   const toggleGroup = useCallback((articleCode: string) => {
+    setGroupOrder((prev) => {
+      const filtered = prev.filter((c) => c !== articleCode);
+      return [articleCode, ...filtered];
+    });
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(articleCode)) next.delete(articleCode);
@@ -336,7 +380,7 @@ export default function FactoryContainerLoadingScan() {
 
   const bales = orderDetail?.bales || [];
 
-  const groupedBales = bales.reduce<
+  const groupedBalesMap = bales.reduce<
     Record<
       string,
       {
@@ -360,6 +404,11 @@ export default function FactoryContainerLoadingScan() {
     acc[key].totalWeight += parseFloat(bale.weight || "0");
     return acc;
   }, {});
+
+  const orderedGroups = [
+    ...groupOrder.filter((c) => groupedBalesMap[c]),
+    ...Object.keys(groupedBalesMap).filter((c) => !groupOrder.includes(c)),
+  ].map((c) => groupedBalesMap[c]);
 
   const totalWeight = bales.reduce(
     (sum, b) => sum + parseFloat(b.weight || "0"),
@@ -454,20 +503,53 @@ export default function FactoryContainerLoadingScan() {
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
           <Card className="flex-1 flex flex-col min-h-0 p-4">
-            <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <h2
                 className="font-semibold text-lg"
                 data-testid="text-bales-header"
               >
                 Scanned Bales
               </h2>
-              <Badge variant="secondary" data-testid="badge-bale-count">
-                {bales.length} bales
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" data-testid="badge-bale-count">
+                  {bales.length} bales
+                </Badge>
+                <Button
+                  size="icon"
+                  variant={viewMode === "detailed" ? "secondary" : "ghost"}
+                  onClick={() => setViewMode(viewMode === "detailed" ? "condensed" : "detailed")}
+                  title={viewMode === "detailed" ? "Switch to condensed view" : "Switch to detailed view"}
+                  data-testid="button-toggle-view-mode"
+                >
+                  {viewMode === "detailed" ? <Rows3 className="h-4 w-4" /> : <AlignJustify className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
+            {orderId && (
+              <div className="mb-3">
+                <label className="text-sm font-medium mb-1 block">
+                  <ScanLine className="inline h-4 w-4 mr-1" />
+                  Scan Bale
+                </label>
+                <Input
+                  ref={scannerRef}
+                  value={scanCode}
+                  onChange={(e) => setScanCode(e.target.value)}
+                  onKeyDown={handleScan}
+                  placeholder="Scan barcode, ref number, or article code…"
+                  disabled={
+                    !orderId || !selectedLocationId || addBaleMutation.isPending
+                  }
+                  className={`text-lg h-12 font-mono ${scanInputClass}`}
+                  autoFocus
+                  data-testid="input-scan-code"
+                />
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
-              {Object.keys(groupedBales).length === 0 ? (
+              {orderedGroups.length === 0 ? (
                 <div
                   className="flex flex-col items-center justify-center py-12 text-muted-foreground"
                   data-testid="text-no-bales"
@@ -477,12 +559,12 @@ export default function FactoryContainerLoadingScan() {
                   <p className="text-sm mt-1">
                     {!orderId
                       ? "Set up the loading order first, then scan bales"
-                      : "Scan bales using the scanner below"}
+                      : "Scan bales using the scanner above"}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {Object.values(groupedBales).map((group) => (
+                  {orderedGroups.map((group) => (
                     <div
                       key={group.articleCode}
                       data-testid={`group-article-${group.articleCode}`}
@@ -509,7 +591,7 @@ export default function FactoryContainerLoadingScan() {
                           <span>Wt: {group.totalWeight.toFixed(2)} kg</span>
                         </div>
                       </button>
-                      {expandedGroups.has(group.articleCode) && (
+                      {viewMode === "detailed" && expandedGroups.has(group.articleCode) && (
                         <Table>
                           <TableBody>
                             {group.bales.map((bale) => (
@@ -552,28 +634,6 @@ export default function FactoryContainerLoadingScan() {
                 </div>
               )}
             </div>
-
-            {orderId && (
-              <div className="border-t pt-3 mt-3">
-                <label className="text-sm font-medium mb-1 block">
-                  <ScanLine className="inline h-4 w-4 mr-1" />
-                  Scan Bale
-                </label>
-                <Input
-                  ref={scannerRef}
-                  value={scanCode}
-                  onChange={(e) => setScanCode(e.target.value)}
-                  onKeyDown={handleScan}
-                  placeholder="Scan barcode, ref number, or article code…"
-                  disabled={
-                    !orderId || !selectedLocationId || addBaleMutation.isPending
-                  }
-                  className={`text-lg h-12 font-mono ${scanInputClass}`}
-                  autoFocus
-                  data-testid="input-scan-code"
-                />
-              </div>
-            )}
           </Card>
         </div>
 
@@ -1083,6 +1143,23 @@ export default function FactoryContainerLoadingScan() {
                   : "Confirm Finalize"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLastScannedPopup} onOpenChange={setShowLastScannedPopup}>
+        <DialogContent className="max-w-sm" data-testid="dialog-last-scanned">
+          <DialogHeader>
+            <DialogTitle className="text-base">Resuming Loading</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
+            <div className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center" data-testid="text-last-scanned-ref">
+              {lastScannedRef}
+            </div>
+            <Button className="w-full" onClick={() => setShowLastScannedPopup(false)} data-testid="button-dismiss-last-scanned">
+              Continue Scanning
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
