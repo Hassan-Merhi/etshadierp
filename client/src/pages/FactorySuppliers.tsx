@@ -533,6 +533,7 @@ export default function FactorySuppliers() {
                           {s.name}
                         </button>
                         {!s.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                        {(s as any).isErpOnly && <Badge variant="outline" className="text-xs">ERP</Badge>}
                         {s.pendingContainers > 0 && (
                           <Badge variant="outline" className="text-xs">
                             {s.pendingContainers} pending
@@ -608,6 +609,7 @@ export default function FactorySuppliers() {
                           ${formatNum(s.totalValue)}
                         </div>
                       </div>
+                      {!(s as any).isErpOnly && (
                       <div className="flex flex-col gap-1">
                         <Button
                           variant="ghost"
@@ -628,14 +630,17 @@ export default function FactorySuppliers() {
                           </Button>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setStatementSupplierId(s.id)}
-                        data-testid={`button-view-statement-${s.id}`}
-                      >
-                        <ChevronRight className="h-5 w-5" />
-                      </Button>
+                      )}
+                      {!(s as any).isErpOnly && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setStatementSupplierId(s.id)}
+                          data-testid={`button-view-statement-${s.id}`}
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

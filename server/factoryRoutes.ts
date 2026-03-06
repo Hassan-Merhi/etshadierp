@@ -1081,11 +1081,52 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      // Fetch ERP suppliers for name+id display
-      const erpSuppliers = await db
-        .select({ id: suppliers.id, name: suppliers.legalName })
-        .from(suppliers)
-        .where(eq(suppliers.companyId, companyId));
+      // Fetch ALL ERP suppliers (suppliers table has no company_id; identify relevant ones via vouchers)
+      // First, collect all supplier IDs that have voucher entries for this company
+      const allCompanyVoucherEntries = await db
+        .select({ supplierId: voucherEntries.supplierId })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} IS NULL`));
+
+      const allCompanySupplierIds = [...new Set(
+        allCompanyVoucherEntries.map((e: any) => e.supplierId).filter(Boolean)
+      )] as number[];
+
+      // Populate voucherEntryMap for unlinked ERP supplier IDs not already fetched above
+      const alreadyMapped = new Set(linkedSupplierIds);
+      const unlinkdErpIdsToFetch = allCompanySupplierIds.filter((id: number) => !alreadyMapped.has(id));
+      if (unlinkdErpIdsToFetch.length > 0) {
+        const allEntries = await db
+          .select({
+            supplierId: voucherEntries.supplierId,
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              inArray(voucherEntries.supplierId, unlinkdErpIdsToFetch),
+              sql`${vouchers.deletedAt} IS NULL`
+            )
+          );
+        for (const e of allEntries) {
+          if (!e.supplierId) continue;
+          if (!voucherEntryMap[e.supplierId]) voucherEntryMap[e.supplierId] = { credits: 0, debits: 0 };
+          voucherEntryMap[e.supplierId].credits += parseFloat(e.creditAmount || "0");
+          voucherEntryMap[e.supplierId].debits += parseFloat(e.debitAmount || "0");
+        }
+      }
+
+      // Fetch ERP supplier details for company-relevant supplier IDs
+      const erpSuppliers = allCompanySupplierIds.length > 0
+        ? await db
+            .select({ id: suppliers.id, name: suppliers.legalName, phone: suppliers.phone, email: suppliers.email, address: suppliers.address, openingBalance: suppliers.openingBalance, active: suppliers.active })
+            .from(suppliers)
+            .where(and(inArray(suppliers.id, allCompanySupplierIds), sql`${suppliers.deletedAt} IS NULL`))
+        : [];
 
       const suppliersWithBalances = suppliersList.map((s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
@@ -1129,10 +1170,44 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           receivedContainers,
           lastContainerDate,
           linkedErpSupplierName,
+          isErpOnly: false,
         };
       });
 
-      res.json(suppliersWithBalances);
+      // ── Merge unlinked ERP suppliers ──────────────────────────────────────────
+      // Show ERP suppliers that are not already linked to any factory supplier entry
+      const linkedErpIds = new Set(suppliersList.map((s: any) => s.linkedSupplierId).filter(Boolean));
+      const erpOnlyEntries = erpSuppliers
+        .filter((e: any) => !linkedErpIds.has(e.id) && e.active !== false)
+        .map((e: any) => {
+          const vm = voucherEntryMap[e.id];
+          const balance = parseFloat(e.openingBalance || "0") + (vm ? vm.credits - vm.debits : 0);
+          return {
+            id: -(e.id),              // negative id signals ERP-only entry
+            companyId,
+            name: e.name,
+            contactPerson: null,
+            phone: e.phone || null,
+            email: e.email || null,
+            address: e.address || null,
+            notes: null,
+            openingBalance: e.openingBalance || "0",
+            linkedSupplierId: e.id,
+            isActive: true,
+            createdAt: null,
+            updatedAt: null,
+            totalContainers: 0,
+            totalKg: "0.000",
+            totalValue: balance.toFixed(2),
+            pendingContainers: 0,
+            receivedContainers: 0,
+            lastContainerDate: null,
+            linkedErpSupplierName: e.name,
+            isErpOnly: true,           // flag for frontend to show badge/disable edit
+          };
+        });
+
+      res.json([...suppliersWithBalances, ...erpOnlyEntries].sort((a: any, b: any) => a.name.localeCompare(b.name)));
     } catch (error: any) {
       console.error("Error fetching factory suppliers with balances:", error);
       res.status(500).json({ message: error.message });
