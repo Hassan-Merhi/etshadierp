@@ -18,23 +18,48 @@ interface StockItem {
   active: boolean;
 }
 
+interface FactoryBaleProduct {
+  id: number;
+  code: string;
+  name: string;
+  articleCode: string | null;
+  active: boolean;
+}
+
 export default function StockQuery() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const isFactory = appMode === "factory";
   const [searchTerm, setSearchTerm] = useState("");
   const [_location, navigate] = useLocation();
 
-  const { data: stockItems = [], isLoading: stockItemsLoading } = useQuery<StockItem[]>({
+  const { data: stockItems = [], isLoading: erpLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
+    enabled: !isFactory,
   });
 
-  const filteredItems = stockItems.filter(item =>
+  const { data: factoryProducts = [], isLoading: factoryLoading } = useQuery<FactoryBaleProduct[]>({
+    queryKey: ["/api/factory/bale-products"],
+    enabled: isFactory,
+  });
+
+  const stockItemsLoading = isFactory ? factoryLoading : erpLoading;
+
+  const items = isFactory
+    ? factoryProducts.map(p => ({ id: p.id, code: p.articleCode || p.code, name: p.name, active: p.active }))
+    : stockItems.map(p => ({ id: p.id, code: p.code, name: p.name, active: p.active }));
+
+  const filteredItems = items.filter(item =>
     item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleItemClick = (item: StockItem) => {
-    navigate(`/stock-query/${item.id}`);
+  const handleItemClick = (item: { id: number }) => {
+    if (isFactory) {
+      navigate(`/factory/stock-query/${item.id}`);
+    } else {
+      navigate(`/stock-query/${item.id}`);
+    }
   };
 
   return (

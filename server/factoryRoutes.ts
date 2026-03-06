@@ -1386,6 +1386,114 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const productId = parseInt(req.params.productId);
+      if (!productId) return res.status(400).json({ message: "Invalid product ID" });
+
+      const [product] = await db.select().from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+      if (!product) return res.status(404).json({ message: "Product not found" });
+
+      const articleCode = product.articleCode;
+
+      // 1. Pressed/Printed: bales grouped by entry date
+      const allBales = await db.select({
+        createdAt: factoryBales.createdAt,
+        pressedAt: factoryBales.pressedAt,
+        weightKg: factoryBales.weightKg,
+        totalCost: factoryBales.totalCost,
+        status: factoryBales.status,
+      }).from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.productId, productId),
+          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED'])
+        ))
+        .orderBy(factoryBales.createdAt);
+
+      const pressedMap = new Map<string, { date: string; qty: number; totalWeight: number; totalCost: number }>();
+      for (const bale of allBales) {
+        const dateKey = ((bale.pressedAt || bale.createdAt) as Date).toISOString().split('T')[0];
+        const existing = pressedMap.get(dateKey) || { date: dateKey, qty: 0, totalWeight: 0, totalCost: 0 };
+        existing.qty += 1;
+        existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
+        existing.totalCost += parseFloat(bale.totalCost as any) || 0;
+        pressedMap.set(dateKey, existing);
+      }
+      const pressed = Array.from(pressedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
+      // 2. Sales: finalized orders for this article code
+      const sales: any[] = [];
+      // 3. Loaded/OTW: loading-status orders for this article code
+      const loaded: any[] = [];
+
+      if (articleCode) {
+        const orderBalesForProduct = await db.select({
+          orderId: customerOrderBales.orderId,
+          weight: customerOrderBales.weight,
+          priceUsed: customerOrderBales.priceUsed,
+        }).from(customerOrderBales)
+          .where(eq(customerOrderBales.articleCode, articleCode));
+
+        if (orderBalesForProduct.length > 0) {
+          const orderIds = [...new Set(orderBalesForProduct.map((b: any) => b.orderId))];
+
+          const allRelevantOrders = await db.select({
+            id: customerOrders.id,
+            invoiceNumber: customerOrders.invoiceNumber,
+            orderDate: customerOrders.orderDate,
+            customerId: customerOrders.customerId,
+            status: customerOrders.status,
+            containerNumber: customerOrders.containerNumber,
+          }).from(customerOrders)
+            .where(and(
+              eq(customerOrders.companyId, companyId),
+              inArray(customerOrders.id, orderIds)
+            ));
+
+          for (const order of allRelevantOrders) {
+            const balesInOrder = orderBalesForProduct.filter((b: any) => b.orderId === order.id);
+            const qty = balesInOrder.length;
+            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || '0'), 0);
+            const pricePerBale = qty > 0 ? total / qty : 0;
+
+            const [customer] = await db.select({ name: customers.name }).from(customers)
+              .where(eq(customers.id, order.customerId));
+
+            const entry = {
+              orderId: order.id,
+              invoiceNumber: order.invoiceNumber || `Order #${order.id}`,
+              orderDate: order.orderDate,
+              containerNumber: order.containerNumber,
+              customerName: customer?.name || 'Unknown',
+              qty,
+              pricePerBale: pricePerBale.toFixed(2),
+              total: total.toFixed(2),
+              status: order.status,
+            };
+
+            if (order.status === 'FINALIZED') {
+              sales.push(entry);
+            } else if (['LOADING', 'PENDING_VERIFICATION', 'VERIFIED'].includes(order.status)) {
+              loaded.push(entry);
+            }
+          }
+
+          sales.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
+          loaded.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
+        }
+      }
+
+      return res.json({ product, pressed, sales, loaded });
+    } catch (error: any) {
+      console.error("Error fetching bale product detail:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bale-products", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;

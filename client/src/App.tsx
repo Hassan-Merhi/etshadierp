@@ -47,6 +47,7 @@ import Payroll from "@/pages/Payroll";
 import ImportStockItems from "@/pages/ImportStockItems";
 import StockQuery from "@/pages/StockQuery";
 import StockItemDetail from "@/pages/StockItemDetail";
+import FactoryStockItemDetail from "@/pages/FactoryStockItemDetail";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import POSDashboard from "@/pages/POSDashboard";
@@ -540,7 +541,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
                     <Route path="/factory/stock-otw" component={StockOTW} />
-                    <Route path="/factory/stock-query/:id" component={StockItemDetail} />
+                    <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
                     <Route path="/factory/accounts" component={Accounts} />
                     <Route path="/factory/vouchers">{() => <Vouchers />}</Route>
