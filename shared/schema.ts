@@ -756,6 +756,7 @@ export const voucherEntries = pgTable("voucher_entries", {
   fixedAssetId: integer("fixed_asset_id"),
   supplierId: integer("supplier_id"),
   employeeId: integer("employee_id"),
+  customerId: integer("customer_id"),
   debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).default("0"),
   creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).default("0"),
   narration: text("narration"),
@@ -772,6 +773,7 @@ export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit(
   fixedAssetId: z.number().optional(),
   supplierId: z.number().optional(),
   employeeId: z.number().optional(),
+  customerId: z.number().optional(),
   debitAmount: z.string().optional(),
   creditAmount: z.string().optional(),
 });

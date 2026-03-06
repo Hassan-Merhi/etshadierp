@@ -13315,6 +13315,7 @@ if (asOfDate) {
                 fixedAssetId: entry.fixedAssetId || null,
                 supplierId: entry.supplierId || null,
                 employeeId: entry.employeeId || null,
+                customerId: entry.customerId || null,
                 debitAmount: entry.debitAmount || "0",
                 creditAmount: entry.creditAmount || "0",
                 narration: entry.narration || null,
@@ -13447,6 +13448,8 @@ if (asOfDate) {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               entryAccountField.fixedAssetId = entry.accountId;
+            } else if (entry.accountType === "customer") {
+              entryAccountField.customerId = entry.accountId;
             }
 
             // Determine account field for payment account
@@ -13461,6 +13464,8 @@ if (asOfDate) {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
               paymentAccountField.fixedAssetId = paymentAccountId;
+            } else if (paymentAccountType === "customer") {
+              paymentAccountField.customerId = paymentAccountId;
             }
 
             const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
@@ -13704,6 +13709,8 @@ if (asOfDate) {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               entryAccountField.fixedAssetId = entry.accountId;
+            } else if (entry.accountType === "customer") {
+              entryAccountField.customerId = entry.accountId;
             }
 
             // Determine account field for payment account
@@ -13718,6 +13725,8 @@ if (asOfDate) {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
               paymentAccountField.fixedAssetId = paymentAccountId;
+            } else if (paymentAccountType === "customer") {
+              paymentAccountField.customerId = paymentAccountId;
             }
 
             const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
@@ -13915,6 +13924,8 @@ if (asOfDate) {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               accountField.fixedAssetId = entry.accountId;
+            } else if (entry.accountType === "customer") {
+              accountField.customerId = entry.accountId;
             }
 
             voucherEntriesToCreate.push({
@@ -14089,6 +14100,8 @@ if (asOfDate) {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               accountField.fixedAssetId = entry.accountId;
+            } else if (entry.accountType === "customer") {
+              accountField.customerId = entry.accountId;
             }
 
             voucherEntriesToCreate.push({
@@ -16231,7 +16244,7 @@ if (asOfDate) {
       
       // Transform entries to include accountType for the Daybook editor
       const transformedEntries = entries.map(entry => {
-        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" = "ledger";
         let accountId = entry.ledgerAccountId;
         
         if (entry.bankAccountId) {
@@ -16246,6 +16259,9 @@ if (asOfDate) {
         } else if (entry.fixedAssetId) {
           accountType = "fixedAsset";
           accountId = entry.fixedAssetId;
+        } else if (entry.customerId) {
+          accountType = "customer";
+          accountId = entry.customerId;
         }
         
         return {

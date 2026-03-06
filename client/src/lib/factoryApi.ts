@@ -23,6 +23,7 @@ const ALLOWED_SHARED_PREFIXES = [
   "/api/stock-transfer-import",
   "/api/containers",
   "/api/suppliers",
+  "/api/customers",
   "/api/employees",
   "/api/employee-groups",
   "/api/worker-groups",

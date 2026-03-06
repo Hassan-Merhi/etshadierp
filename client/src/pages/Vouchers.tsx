@@ -127,6 +127,12 @@ interface Supplier {
   legalName: string;
 }
 
+interface Customer {
+  id: number;
+  code: string;
+  name: string;
+}
+
 interface Employee {
   id: number;
   code: string;
@@ -143,7 +149,7 @@ interface FixedAsset {
 }
 
 interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -151,7 +157,7 @@ interface VoucherEntry {
 
 interface JournalEntry {
   type: "DR" | "CR";
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -189,7 +195,7 @@ interface StockAdjustmentEntry {
 }
 
 const voucherEntrySchema = z.object({
-  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -201,7 +207,7 @@ const voucherEntrySchema = z.object({
 
 const journalEntrySchema = z.object({
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -212,7 +218,7 @@ const journalEntrySchema = z.object({
 });
 
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -281,10 +287,11 @@ function AccountCombobox({
   testIdPrefix = "button-account",
 }: {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "customer", id: number, name: string) => void;
   ledgerAccounts: LedgerAccount[];
   bankAccounts: BankAccount[];
   suppliers: Supplier[];
+  customers: Customer[];
   rowIndex: number;
   onFocus?: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
@@ -307,6 +314,11 @@ function AccountCombobox({
       type: "supplier" as const,
       id: s.id,
       name: s.legalName,
+    })),
+    ...customers.map((c) => ({
+      type: "customer" as const,
+      id: c.id,
+      name: c.name,
     })),
   ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
@@ -651,6 +663,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/suppliers", selectedCompany?.id],
   });
 
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers", selectedCompany?.id],
+  });
+
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items", selectedCompany?.id],
   });
@@ -746,9 +762,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         code: f.code,
         openingBalance: f.openingBalance,
       })),
+      ...customers.map((c: any) => ({
+        type: "customer" as const,
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        openingBalance: c.openingBalance,
+      })),
     ];
     return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
+  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets, customers]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -872,6 +895,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
 
       // Identify the Pay From account's identity to filter duplicate Pay From entries
+      const payFromCustomerId = paymentEntry.customerId || null;
       const payFromLedgerId = paymentEntry.ledgerAccountId || null;
       const payFromBankId = paymentEntry.bankAccountId || null;
       const payFromSupplierId = paymentEntry.supplierId || null;
@@ -886,6 +910,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           if (payFromBankId && entry.bankAccountId === payFromBankId) return false;
           if (payFromSupplierId && entry.supplierId === payFromSupplierId) return false;
           if (payFromEmployeeId && entry.employeeId === payFromEmployeeId) return false;
+          if (payFromCustomerId && entry.customerId === payFromCustomerId) return false;
           return true;
         })
         .map((entry: any) => {
@@ -919,12 +944,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.fixedAssetId;
           const asset = fixedAssets.find(f => f.id === accountId);
           accountName = asset?.name || "";
+        } else if (entry.customerId) {
+          accountType = "customer";
+          accountId = entry.customerId;
+          const customer = customers.find(c => c.id === accountId);
+          accountName = customer?.name || "";
         }
 
         // Extract the amount from the contra entry
         // For asset payment accounts: Payment contra=DR, Receipt contra=CR
         // For liability payment accounts: Payment contra=CR, Receipt contra=DR
-        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId;
+        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.customerId;
         if (voucherToEdit.voucherType === "Payment") {
           amount = isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0");
         } else if (voucherToEdit.voucherType === "Receipt") {
@@ -961,7 +991,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         setTransactionRate(parseFloat(voucherToEdit.exchangeRate));
       }
     }
-  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, form]);
+  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, form]);
 
   // Get selected payment account - moved up to use in filtered accounts
   const paymentAccountType = form.watch("paymentAccountType");
@@ -1110,6 +1140,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         
         // Sum transactions starting from opening balance
         // Debits increase asset value, Credits decrease (depreciation)
+        const balance = transactions.reduce((sum: number, t: any) => {
+          const debit = parseFloat(t.debitAmount || "0");
+          const credit = parseFloat(t.creditAmount || "0");
+          return sum + debit - credit;
+        }, openingBalance);
+        return balance;
+      } else if (paymentAccountType === "customer") {
+        const customerRes = await fetch(`/api/customers/${paymentAccountId}`);
+        const customer = await customerRes.json();
+        const transRes = await fetch(`/api/accounts/customer/${paymentAccountId}/transactions`);
+        const transactions = await transRes.json();
+        const openingBalance = parseFloat(customer.openingBalance || "0");
         const balance = transactions.reduce((sum: number, t: any) => {
           const debit = parseFloat(t.debitAmount || "0");
           const credit = parseFloat(t.creditAmount || "0");

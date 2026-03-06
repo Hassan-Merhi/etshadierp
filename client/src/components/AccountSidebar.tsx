@@ -8,7 +8,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface Account {
   id: number;
-  type: "bank" | "ledger" | "supplier" | "employee" | "fixedAsset";
+  type: "bank" | "ledger" | "supplier" | "employee" | "fixedAsset" | "customer";
   name: string;
   code: string;
   balance?: number;
