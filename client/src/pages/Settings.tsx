@@ -234,6 +234,140 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     );
   }
 
+  function NetPositionAdjustmentCard() {
+    const { toast } = useToast();
+    const { selectedCompany } = useCompany();
+    const appMode = useAppMode();
+    const modeApiRequest = getApiRequest(appMode);
+    const [adjustmentValue, setAdjustmentValue] = useState<string>("");
+    const [isEditing, setIsEditing] = useState(false);
+
+    const { data: currentUser } = useQuery<{ role?: string }>({
+      queryKey: ["/api/auth/me"],
+    });
+
+    const { data: companySettings } = useQuery<any>({
+      queryKey: ["/api/company-settings", selectedCompany?.id],
+      enabled: !!selectedCompany?.id,
+      queryFn: async () => {
+        try {
+          const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
+          if (res.status === 404) return { companyId: selectedCompany?.id, netPositionAdjustment: "0" };
+          if (!res.ok) throw new Error("Failed to fetch settings");
+          return res.json();
+        } catch {
+          return { companyId: selectedCompany?.id, netPositionAdjustment: "0" };
+        }
+      },
+    });
+
+    const currentAdjustment = parseFloat(companySettings?.netPositionAdjustment || "0");
+
+    const updateAdjustmentMutation = useMutation({
+      mutationFn: async (value: string) => {
+        const res = await modeApiRequest("POST", "/api/company-settings", {
+          companyId: selectedCompany?.id,
+          netPositionAdjustment: value,
+        });
+        return res.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Updated",
+          description: "Net Position Adjustment has been updated.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/stats/profit"] });
+        setIsEditing(false);
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to update adjustment",
+          variant: "destructive",
+        });
+      },
+    });
+
+    if (!selectedCompany) {
+      return (
+        <Card className="p-6">
+          <p className="text-muted-foreground">Select a company to set Net Position Adjustment.</p>
+        </Card>
+      );
+    }
+
+    return (
+      <Card className="p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/10 rounded-lg">
+              <Calculator className="h-6 w-6 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold" data-testid="text-net-position-adjustment-title">Net Position Adjustment</h3>
+              <p className="text-sm text-muted-foreground">
+                Reduce the Net Position by a fixed amount (for {selectedCompany.name}). This does not affect Import Cycle Balance.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <Input
+                  type="number"
+                  value={adjustmentValue}
+                  onChange={(e) => setAdjustmentValue(e.target.value)}
+                  placeholder="0"
+                  className="w-32"
+                  data-testid="input-net-position-adjustment"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => updateAdjustmentMutation.mutate(adjustmentValue)}
+                  disabled={updateAdjustmentMutation.isPending}
+                  data-testid="button-save-adjustment"
+                >
+                  {updateAdjustmentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditing(false)}
+                  data-testid="button-cancel-adjustment"
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-lg" data-testid="text-current-adjustment">
+                  ${formatNumber(currentAdjustment)}
+                </span>
+                {currentUser?.role === "Admin" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setAdjustmentValue(currentAdjustment.toString());
+                      setIsEditing(true);
+                    }}
+                    data-testid="button-edit-adjustment"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
+            )}
+            {currentUser?.role !== "Admin" && !isEditing && (
+              <span className="text-xs text-muted-foreground">(Admin only)</span>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   function ActiveUsersSection() {
     const { data: presenceData, isLoading } = useQuery<any[]>({
       queryKey: ["/api/user-presence"],
@@ -3469,63 +3603,859 @@ function LoginHistoryTab() {
           )}
 
           {activeSection === "system" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-semibold flex items-center gap-2"><Wrench className="h-5 w-5" />System Tools</h2>
-                <p className="text-muted-foreground text-sm mt-1">Administrative tools for data maintenance and company configuration.</p>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">System Tools</h2>
               </div>
 
-              {/* Parent Company */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Parent Company</CardTitle>
-                  <CardDescription>Set which company is the parent/holding entity. Used for inter-company accounting.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap items-center gap-3">
-                  <Select
-                    value={parentCompanyData?.parentCompanyId?.toString() ?? "none"}
-                    onValueChange={(val) => setParentCompanyMutation.mutate(val === "none" ? null : parseInt(val))}
-                    data-testid="select-parent-company"
-                  >
-                    <SelectTrigger className="w-64" data-testid="trigger-parent-company">
-                      <SelectValue placeholder="No parent company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No parent company</SelectItem>
-                      {(companies || []).map((c: any) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {setParentCompanyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                </CardContent>
-              </Card>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link href="/deleted-items">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-destructive/10 rounded-lg">
+                          <Trash2 className="h-6 w-6 text-destructive" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-deleted-items">Deleted Items</h3>
+                          <p className="text-sm text-muted-foreground">
+                            View and restore deleted records or permanently remove them
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
 
-              {/* Data maintenance actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Data Maintenance</CardTitle>
-                  <CardDescription>Advanced tools for fixing or resetting accounting data. Use with caution.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={() => setIsInitBalancesDialogOpen(true)} data-testid="button-init-balances">
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Initialize Accounting Balances
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsZeroBalanceDialogOpen(true)} data-testid="button-zero-balances">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Zero Account Balances
-                  </Button>
-                  <Button variant="outline" onClick={() => { setFixPOCreditsResult(null); setReversePOCreditsResult(null); setIsFixPOCreditsDialogOpen(true); }} data-testid="button-fix-po-credits">
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Fix PO Credits
-                  </Button>
-                  <Button variant="destructive" onClick={() => { setResetDataResult(null); setIsResetDataDialogOpen(true); }} data-testid="button-reset-data">
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Reset Company Data
-                  </Button>
-                </CardContent>
-              </Card>
+                <Link href="/orphaned-records">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-orange-500/10 rounded-lg">
+                          <MapPin className="h-6 w-6 text-orange-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-orphaned-records">Orphaned Records</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Find and reassign records that reference deleted locations
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/chatbot-settings">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-lg">
+                          <Bot className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Manage AI assistant access and view conversation history
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/import-cycle-diagnostics">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-yellow-500/10 rounded-lg">
+                          <AlertTriangle className="h-6 w-6 text-yellow-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-import-diagnostics">Import Cycle Diagnostics</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Detect and diagnose issues causing import cycle imbalance
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/inventory-repair">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-orange-500/10 rounded-lg">
+                          <Wrench className="h-6 w-6 text-orange-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-inventory-repair">Inventory Repair Tool</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Detect and fix inventory discrepancies by replaying all voucher-backed operations
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/net-profit-details">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-purple-500/10 rounded-lg">
+                          <PieChart className="h-6 w-6 text-purple-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-net-profit-details">Net Profit Details</h3>
+                          <p className="text-sm text-muted-foreground">
+                            View detailed breakdown of income, expenses, and net position
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/company-data-reset">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-lg">
+                          <Trash2 className="h-6 w-6 text-red-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-company-data-reset">Company Data Reset</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Clear vouchers and opening balances for selected accounts
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-500/10 rounded-lg">
+                        <Calculator className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-init-balances-title">Initialize Accounting Balances</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create Owner's Capital accounts to balance the Import Cycle for all companies
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setInitBalancesResult(null);
+                        setIsInitBalancesDialogOpen(true);
+                      }}
+                      disabled={initializeBalancesMutation.isPending}
+                      data-testid="button-init-accounting"
+                    >
+                      {initializeBalancesMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Initialize"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-po-credits-title">Fix Old PO Inter-Company Credits</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create "Lubumbashi Credit" entries for old POs that were imported before this feature existed
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setFixPOCreditsResult(null);
+                        setIsFixPOCreditsDialogOpen(true);
+                      }}
+                      disabled={fixPOCreditsMutation.isPending}
+                      data-testid="button-fix-po-credits"
+                    >
+                      {fixPOCreditsMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Fix Credits"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-parent-po-title">Fix Parent Company PO Supplier Entries</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Add missing supplier entries to POs imported directly to the parent company
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => fixParentPOSupplierMutation.mutate()}
+                      disabled={fixParentPOSupplierMutation.isPending}
+                      data-testid="button-fix-parent-po-supplier"
+                    >
+                      {fixParentPOSupplierMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Fix Supplier Entries"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-teal-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-teal-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-sales-inventory-title">Fix Sales Inventory</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Clean up orphaned negative inventory from POS sales edited with wrong locations
+                        </p>
+                      </div>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button data-testid="button-fix-sales-inventory">
+                          Fix Inventory
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Fix Sales Inventory</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will find and reset orphaned negative inventory records that were caused by editing POS sales with incorrect locations. Are you sure you want to proceed?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={async () => {
+                              try {
+                                const response = await fetch("/api/admin/fix-sales-inventory", {
+                                  method: "POST",
+                                  credentials: "include",
+                                });
+                                const result = await response.json();
+                                if (response.ok) {
+                                  toast({
+                                    title: "Inventory Fixed",
+                                    description: `Fixed ${result.cleaned?.length || 0} orphaned records. ${result.negativeInventoryFound || 0} negative inventory items found total.`,
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+                                } else {
+                                  toast({
+                                    title: "Error",
+                                    description: result.message,
+                                    variant: "destructive",
+                                  });
+                                }
+                              } catch (error: any) {
+                                toast({
+                                  title: "Error",
+                                  description: error.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            Fix Inventory
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <Trash2 className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-reset-company-title">Reset Company Data</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Delete Payment/Receipt/Journal vouchers for a company (keeps POS, inventory, containers, POs)
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setResetDataResult(null);
+                        setSelectedCompanyForReset("");
+                        setIsResetDataDialogOpen(true);
+                      }}
+                      disabled={resetCompanyDataMutation.isPending}
+                      data-testid="button-reset-company-data"
+                    >
+                      {resetCompanyDataMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Resetting...</>
+                      ) : (
+                        "Reset Data"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-red-500/10 rounded-lg">
+                        <Calculator className="h-6 w-6 text-red-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-zero-balances-title">Zero Account Balances</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Reset opening balances to zero for selected accounts (fresh start for new period)
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setSelectedAccountsToZero([]);
+                        setIsZeroBalanceDialogOpen(true);
+                      }}
+                      disabled={!selectedCompany}
+                      data-testid="button-zero-balances"
+                    >
+                      Zero Balances
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-cyan-500/10 rounded-lg">
+                        <Trash2 className="h-6 w-6 text-cyan-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-orphaned-pos-title">Fix Orphaned POS Data</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Clean up orphaned sales items and voucher entries that may cause Import Cycle imbalance
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch("/api/admin/fix-orphaned-pos-data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            toast({
+                              title: "Cleanup Complete",
+                              description: result.message,
+                            });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: result.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid="button-fix-orphaned-pos"
+                    >
+                      Fix Orphaned
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-recalc-equity-title">Recalculate Equity Adjustment</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Zero out the Import Cycle Balance by adjusting the opening balance equity offset
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const balanceRes = await fetch("/api/stats/import-cycle-balance", {
+                            credentials: "include",
+                          });
+                          if (!balanceRes.ok) {
+                            throw new Error("Failed to fetch current balance");
+                          }
+                          const balanceData = await balanceRes.json();
+                          const currentBalance = balanceData.netImportCycleBalance;
+
+                          const response = await fetch("/api/admin/recalculate-equity-adjustment", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ currentBalance }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            toast({
+                              title: "Equity Adjusted",
+                              description: result.message,
+                            });
+                            queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: result.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid="button-recalc-equity"
+                    >
+                      Recalculate
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-amber-500/10 rounded-lg">
+                          <AlertTriangle className="h-6 w-6 text-amber-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-fix-orphaned-charges-title">Fix Orphaned Charge Vouchers</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Delete charge vouchers (DUTY, TRANS, etc.) that shouldn't exist for OTW containers
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              setOrphanedChargesDiagnostic(null);
+                              const response = await fetch("/api/debug/orphaned-charge-vouchers", {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setOrphanedChargesDiagnostic({
+                                  count: result.orphanedVoucherCount,
+                                  impact: result.totalImpact,
+                                  vouchers: result.orphanedVouchers || [],
+                                });
+                                if (result.orphanedVoucherCount === 0) {
+                                  toast({
+                                    title: "No Orphaned Vouchers",
+                                    description: "All OTW containers have no leftover charge vouchers.",
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          data-testid="button-diagnose-orphaned-charges"
+                        >
+                          Diagnose
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0 || isFixingOrphanedCharges}
+                          onClick={async () => {
+                            if (!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0) return;
+                            if (!confirm(`Delete ${orphanedChargesDiagnostic.count} orphaned vouchers with impact of $${orphanedChargesDiagnostic.impact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}? This cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              setIsFixingOrphanedCharges(true);
+                              const response = await fetch("/api/admin/fix-orphaned-charge-vouchers", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                toast({
+                                  title: "Cleanup Complete",
+                                  description: result.message,
+                                });
+                                setOrphanedChargesDiagnostic(null);
+                                queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsFixingOrphanedCharges(false);
+                            }
+                          }}
+                          data-testid="button-fix-orphaned-charges"
+                        >
+                          {isFixingOrphanedCharges ? "Deleting..." : "Delete Orphaned"}
+                        </Button>
+                      </div>
+                    </div>
+                    {orphanedChargesDiagnostic && orphanedChargesDiagnostic.count > 0 && (
+                      <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
+                        <p className="font-medium text-destructive">
+                          Found {orphanedChargesDiagnostic.count} orphaned vouchers (Impact: ${orphanedChargesDiagnostic.impact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-sm">
+                          {orphanedChargesDiagnostic.vouchers.map((v: any, i: number) => (
+                            <div key={i} className="flex justify-between text-muted-foreground py-1 border-b last:border-0">
+                              <span>{v.voucherNumber}</span>
+                              <span>Container: {v.containerNumber}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-lg">
+                          <Trash2 className="h-6 w-6 text-red-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-orphaned-pos-sales-title">Orphaned POS Sales at Deleted Locations</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Find and delete POS sale vouchers linked to deleted locations
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          disabled={isLoadingOrphanedPosSales}
+                          onClick={async () => {
+                            try {
+                              setIsLoadingOrphanedPosSales(true);
+                              const response = await fetch("/api/admin/orphaned-pos-sales", {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setOrphanedPosSalesDiagnostic({
+                                  count: result.count,
+                                  totalImpact: result.totalImpact,
+                                  vouchers: result.vouchers || [],
+                                });
+                                if (result.count === 0) {
+                                  toast({
+                                    title: "No Orphaned Sales Found",
+                                    description: "All POS sales are linked to valid locations.",
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsLoadingOrphanedPosSales(false);
+                            }
+                          }}
+                          data-testid="button-diagnose-orphaned-pos-sales"
+                        >
+                          {isLoadingOrphanedPosSales ? "Checking..." : "Diagnose"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0 || isFixingOrphanedPosSales}
+                          onClick={async () => {
+                            if (!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0) return;
+                            if (!confirm(`Delete ${orphanedPosSalesDiagnostic.count} orphaned POS vouchers with impact of $${orphanedPosSalesDiagnostic.totalImpact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}? This cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              setIsFixingOrphanedPosSales(true);
+                              const response = await fetch("/api/admin/delete-orphaned-pos-sales", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                toast({
+                                  title: "Cleanup Complete",
+                                  description: result.message,
+                                });
+                                setOrphanedPosSalesDiagnostic(null);
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsFixingOrphanedPosSales(false);
+                            }
+                          }}
+                          data-testid="button-delete-orphaned-pos-sales"
+                        >
+                          {isFixingOrphanedPosSales ? "Deleting..." : "Delete Orphaned"}
+                        </Button>
+                      </div>
+                    </div>
+                    {orphanedPosSalesDiagnostic && orphanedPosSalesDiagnostic.count > 0 && (
+                      <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
+                        <p className="font-medium text-destructive">
+                          Found {orphanedPosSalesDiagnostic.count} orphaned POS vouchers (Impact: ${orphanedPosSalesDiagnostic.totalImpact.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-sm">
+                          {orphanedPosSalesDiagnostic.vouchers.slice(0, 20).map((v: any, i: number) => (
+                            <div key={i} className="flex justify-between text-muted-foreground py-1 border-b last:border-0">
+                              <span>{v.voucherNumber}</span>
+                              <span>Location ID: {v.locationId} (deleted)</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6 md:col-span-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-lg">
+                          <Package className="h-6 w-6 text-blue-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-container-offload-analysis">Container Offload Analysis</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Analyze PO line items for a container to detect duplicates, blank quantities, and other issues
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={selectedContainerForDiag}
+                          onValueChange={setSelectedContainerForDiag}
+                        >
+                          <SelectTrigger className="w-[200px]" data-testid="select-container-for-diag">
+                            <SelectValue placeholder="Select container" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {containersForDiag.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.containerNumber} ({c.status})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          disabled={!selectedContainerForDiag || isLoadingContainerDiag}
+                          onClick={async () => {
+                            if (!selectedContainerForDiag) return;
+                            try {
+                              setIsLoadingContainerDiag(true);
+                              setContainerDiagResult(null);
+                              const response = await fetch(`/api/containers/${selectedContainerForDiag}/offload-diagnostics`, {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setContainerDiagResult(result);
+                                if (!result.hasIssues) {
+                                  toast({
+                                    title: "No Issues Found",
+                                    description: `Container ${result.containerNumber} has ${result.lineItemCount} valid line items, total ${result.totalQuantity} bales.`,
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsLoadingContainerDiag(false);
+                            }
+                          }}
+                          data-testid="button-analyze-container"
+                        >
+                          {isLoadingContainerDiag ? "Analyzing..." : "Analyze"}
+                        </Button>
+                      </div>
+                    </div>
+                    {containerDiagResult && (
+                      <div className={`p-4 rounded-lg space-y-3 ${containerDiagResult.hasIssues ? 'bg-destructive/10' : 'bg-green-500/10'}`}>
+                        <div className="flex items-center justify-between">
+                          <p className={`font-medium ${containerDiagResult.hasIssues ? 'text-destructive' : 'text-green-600'}`}>
+                            {containerDiagResult.containerNumber} ({containerDiagResult.containerStatus})
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {containerDiagResult.poCount} POs, {containerDiagResult.lineItemCount} line items
+                          </p>
+                        </div>
+                        {containerDiagResult.hasIssues && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-destructive">Issues Found:</p>
+                            <div className="max-h-48 overflow-y-auto text-sm space-y-1">
+                              {containerDiagResult.lineItems
+                                .filter((item: any) => !item.isValid)
+                                .map((item: any, i: number) => (
+                                  <div key={i} className="flex justify-between gap-2 py-1 border-b last:border-0">
+                                    <span className="truncate">
+                                      {item.poNumber} - {item.stockItemCode || 'No stock item'} (Qty: {item.quantity})
+                                    </span>
+                                    <span className="text-destructive whitespace-nowrap">
+                                      {item.issues.join(', ')}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6 md:col-span-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-500/10 rounded-lg">
+                        <Building2 className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-parent-company-title">Parent Company for Net Position</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Set which company is the parent for supplier balance reporting. Suppliers are only counted in the parent company's Net Position.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={parentCompanyData?.parentCompanyId?.toString() || "none"}
+                        onValueChange={(value) => {
+                          const companyId = value === "none" ? null : parseInt(value, 10);
+                          setParentCompanyMutation.mutate(companyId);
+                        }}
+                        disabled={setParentCompanyMutation.isPending || currentUser?.role !== "Admin"}
+                      >
+                        <SelectTrigger className="w-[200px]" data-testid="select-parent-company">
+                          <SelectValue placeholder="Select parent company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Not Set</SelectItem>
+                          {companies.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id.toString()}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {currentUser?.role !== "Admin" && (
+                        <span className="text-xs text-muted-foreground">(Admin only)</span>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                <NetPositionAdjustmentCard />
+              </div>
             </div>
           )}
         </div>
