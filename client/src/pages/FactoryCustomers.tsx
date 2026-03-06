@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -31,7 +30,6 @@ interface Customer {
 export default function FactoryCustomers() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const { selectedCompany } = useCompany();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -44,8 +42,7 @@ export default function FactoryCustomers() {
   });
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customers"],
   });
 
   const createMutation = useMutation({
@@ -54,7 +51,7 @@ export default function FactoryCustomers() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer created" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       setIsCreateOpen(false);
       resetForm();
     },
@@ -69,7 +66,7 @@ export default function FactoryCustomers() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       setEditingCustomer(null);
       resetForm();
     },
@@ -84,7 +81,7 @@ export default function FactoryCustomers() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       setDeletingCustomer(null);
     },
     onError: (error: Error) => {

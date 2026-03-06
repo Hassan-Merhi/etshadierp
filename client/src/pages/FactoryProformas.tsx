@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect } from "react";
@@ -46,7 +45,6 @@ interface Customer {
 export default function FactoryProformas() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
-  const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
@@ -66,8 +64,7 @@ export default function FactoryProformas() {
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customers"],
   });
 
   const { data: proformas = [], isLoading: proformasLoading } = useQuery<Proforma[]>({
@@ -76,7 +73,7 @@ export default function FactoryProformas() {
   });
 
   const createProformaMutation = useMutation({
-    mutationFn: async (data: { customerId: number; companyId: number; name: string; isActive: boolean }) => {
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean }) => {
       return await modeApiRequest("POST", "/api/factory/customer-proformas", data);
     },
     onSuccess: () => {
@@ -181,10 +178,9 @@ export default function FactoryProformas() {
   });
 
   const handleCreateProforma = () => {
-    if (!newProformaName.trim() || !customerId || !selectedCompany?.id) return;
+    if (!newProformaName.trim() || !customerId) return;
     createProformaMutation.mutate({
       customerId,
-      companyId: selectedCompany.id,
       name: newProformaName.trim(),
       isActive: false,
     });
