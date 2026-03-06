@@ -5614,7 +5614,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             return { ...customer, balance: Math.abs(balance), balanceSide: balance >= 0 ? "Dr" : "Cr" };
           }
 
-          const [balRow] = await db.select({ total: sql<string>`COALESCE(SUM(CASE WHEN side = 'Dr' THEN CAST(amount AS numeric) ELSE -CAST(amount AS numeric) END), 0)` })
+          const [balRow] = await db.select({ total: sql<string>`COALESCE(SUM(CAST(debit_amount AS numeric) - CAST(credit_amount AS numeric)), 0)` })
             .from(customerBalances)
             .where(and(eq(customerBalances.customerId, customer.id), eq(customerBalances.companyId, companyId)));
           const customerBal = parseFloat(balRow?.total || "0");
