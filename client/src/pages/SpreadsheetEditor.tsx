@@ -34,27 +34,28 @@ import {
 function xlsxToFortune(workbook: XLSX.WorkBook): FortuneSheet[] {
   return workbook.SheetNames.map((name, order) => {
     const ws = workbook.Sheets[name];
-    const celldata: any[] = [];
     const ref = ws["!ref"];
     const range = ref
       ? XLSX.utils.decode_range(ref)
       : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
 
+    const rows = Math.max(50, range.e.r + 10);
+    const cols = Math.max(26, range.e.c + 5);
+
+    const data: any[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
+
     for (let r = range.s.r; r <= range.e.r; r++) {
       for (let c = range.s.c; c <= range.e.c; c++) {
         const addr = XLSX.utils.encode_cell({ r, c });
         const cell = ws[addr];
-        if (cell !== undefined) {
-          const isNum = cell.t === "n";
-          celldata.push({
-            r,
-            c,
-            v: {
-              v: cell.v,
-              m: cell.w !== undefined ? cell.w : String(cell.v ?? ""),
-              ct: { fa: "General", t: isNum ? "n" : "g" },
-            },
-          });
+        if (cell !== undefined && cell.v !== undefined) {
+          const t = cell.t === "n" ? "n" : cell.t === "b" ? "b" : "s";
+          const display = cell.w !== undefined ? cell.w : String(cell.v ?? "");
+          data[r][c] = {
+            v: cell.v,
+            m: display,
+            ct: { fa: "General", t },
+          };
         }
       }
     }
@@ -64,9 +65,9 @@ function xlsxToFortune(workbook: XLSX.WorkBook): FortuneSheet[] {
       name,
       status: order === 0 ? 1 : 0,
       order,
-      celldata,
-      row: Math.max(50, range.e.r + 10),
-      column: Math.max(26, range.e.c + 5),
+      data,
+      row: rows,
+      column: cols,
     } as FortuneSheet;
   });
 }
@@ -77,20 +78,43 @@ function fortuneToXlsx(sheets: FortuneSheet[]): XLSX.WorkBook {
     const ws: XLSX.WorkSheet = {};
     let maxR = 0;
     let maxC = 0;
-    for (const cell of (sheet.celldata || []) as any[]) {
-      const { r, c, v } = cell;
-      if (v && (v.v !== undefined || v.m !== undefined)) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        const val = v.v ?? v.m;
-        ws[addr] = {
-          v: val,
-          t: typeof val === "number" ? "n" : "s",
-          w: v.m !== undefined ? String(v.m) : String(val),
-        };
-        maxR = Math.max(maxR, r);
-        maxC = Math.max(maxC, c);
+
+    const sheetData = (sheet as any).data as any[][] | undefined;
+    if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
+      for (let r = 0; r < sheetData.length; r++) {
+        if (!sheetData[r]) continue;
+        for (let c = 0; c < sheetData[r].length; c++) {
+          const v = sheetData[r][c];
+          if (v && (v.v !== undefined || v.m !== undefined)) {
+            const addr = XLSX.utils.encode_cell({ r, c });
+            const val = v.v ?? v.m;
+            ws[addr] = {
+              v: val,
+              t: typeof val === "number" ? "n" : "s",
+              w: v.m !== undefined ? String(v.m) : String(val),
+            };
+            maxR = Math.max(maxR, r);
+            maxC = Math.max(maxC, c);
+          }
+        }
+      }
+    } else {
+      for (const cell of (sheet.celldata || []) as any[]) {
+        const { r, c, v } = cell;
+        if (v && (v.v !== undefined || v.m !== undefined)) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const val = v.v ?? v.m;
+          ws[addr] = {
+            v: val,
+            t: typeof val === "number" ? "n" : "s",
+            w: v.m !== undefined ? String(v.m) : String(val),
+          };
+          maxR = Math.max(maxR, r);
+          maxC = Math.max(maxC, c);
+        }
       }
     }
+
     ws["!ref"] = XLSX.utils.encode_range({
       s: { r: 0, c: 0 },
       e: { r: maxR, c: maxC },
