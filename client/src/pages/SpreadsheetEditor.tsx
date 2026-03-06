@@ -159,9 +159,17 @@ export default function SpreadsheetEditor() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDataRef = useRef<FortuneSheet[]>([]);
-  const isFirstChangeRef = useRef(true);
+  const openSheetIdTrackRef = useRef<number | null>(null);
+  const openTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Set synchronously during render (before any effects) so the 200ms guard
+  // is already in place when Fortune Sheet fires its init onChange in its child useEffect.
+  if (openSheetIdTrackRef.current !== openSheetId) {
+    openSheetIdTrackRef.current = openSheetId;
+    openTimeRef.current = Date.now();
+  }
 
   const { data: library = [], isLoading: libraryLoading } = useQuery<any[]>({
     queryKey: ["/api/spreadsheets"],
@@ -184,7 +192,7 @@ export default function SpreadsheetEditor() {
     },
     onSuccess: (sheet) => {
       queryClient.setQueryData(["/api/spreadsheets", sheet.id], sheet);
-      queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
       setOpenSheetId(sheet.id);
       setSheetName(sheet.name);
       setSaveStatus("saved");
@@ -205,7 +213,7 @@ export default function SpreadsheetEditor() {
     },
     onSuccess: () => {
       setSaveStatus("saved");
-      queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
     onError: () => setSaveStatus("unsaved"),
   });
@@ -237,10 +245,10 @@ export default function SpreadsheetEditor() {
 
   const handleChange = useCallback(
     (data: FortuneSheet[]) => {
-      if (isFirstChangeRef.current) {
-        isFirstChangeRef.current = false;
-        return;
-      }
+      // Ignore any onChange fired within 200ms of the sheet opening.
+      // Fortune Sheet always fires its initialization onChange within ~50ms of mount.
+      // A real user action (click a cell then type) always takes > 200ms.
+      if (Date.now() - openTimeRef.current < 200) return;
       currentDataRef.current = data;
       setSaveStatus("unsaved");
       scheduleSave(data);
@@ -250,7 +258,6 @@ export default function SpreadsheetEditor() {
 
   useEffect(() => {
     currentDataRef.current = [];
-    isFirstChangeRef.current = true;
     setSaveStatus("saved");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, [openSheetId]);
