@@ -18,6 +18,8 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { usePresence } from "@/hooks/use-presence";
@@ -126,7 +128,7 @@ import FactoryWaste from "@/pages/FactoryWaste";
 import FactoryIntelSettings from "@/pages/FactorySettings";
 import Chat from "@/pages/Chat";
 import { CommandPalette } from "@/components/CommandPalette";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
   AlertDialog,
@@ -328,6 +330,27 @@ function AuthenticatedApp() {
   }, [isLoading, error, user, setLocation]);
 
   const isPOS = user?.role?.startsWith("POS") ?? false;
+  const { toast } = useToast();
+  const prevUnreadRef = useRef<number>(-1);
+
+  const { data: chatUnread } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-count"],
+    refetchInterval: 10000,
+    enabled: isPOS && !!user,
+  });
+
+  useEffect(() => {
+    if (!isPOS) return;
+    const count = chatUnread?.count || 0;
+    if (prevUnreadRef.current === -1) {
+      prevUnreadRef.current = count;
+      return;
+    }
+    if (count > prevUnreadRef.current) {
+      toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
+    }
+    prevUnreadRef.current = count;
+  }, [chatUnread?.count, isPOS]);
 
   const { data: posCompanySettings } = useQuery<any>({
     queryKey: ["/api/company-settings"],
@@ -410,7 +433,7 @@ function AuthenticatedApp() {
       { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
       ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
-      { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat") },
+      { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 },
       { label: "Settings", icon: Cog, active: isOnSettings, testId: "button-settings-tab", onClick: () => setLocation("/pos-settings") },
     ];
 
@@ -442,7 +465,12 @@ function AuthenticatedApp() {
                             data-testid={item.testId}
                           >
                             <item.icon className="h-4 w-4" />
-                            <span>{item.label}</span>
+                            <span className="flex-1">{item.label}</span>
+                            {"badge" in item && (item as any).badge > 0 && (
+                              <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread-pos">
+                                {(item as any).badge}
+                              </Badge>
+                            )}
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
