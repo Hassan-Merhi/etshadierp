@@ -236,9 +236,31 @@ export default function Payroll() {
   });
 
   // Fetch employee transactions when a statement employee is selected
-  const { data: employeeTransactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
+  const { data: rawEmployeeTransactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
     queryKey: ["/api/accounts/employee", statementEmployee?.id, "transactions"],
+    queryFn: async () => {
+      if (!statementEmployee?.id) return [];
+      const res = await fetch(`/api/accounts/employee/${statementEmployee.id}/transactions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load transactions");
+      return res.json();
+    },
     enabled: !!statementEmployee?.id,
+  });
+
+  // Normalize the transaction format — API returns voucherDate/debitAmount/creditAmount/entryId
+  const employeeTransactions = rawEmployeeTransactions.map((t: any) => {
+    const debit = parseFloat(t.debitAmount || "0");
+    const credit = parseFloat(t.creditAmount || "0");
+    const isDebitTxn = debit > 0;
+    return {
+      ...t,
+      id: t.id ?? t.entryId,
+      date: t.date ?? t.voucherDate,
+      amount: t.amount ?? (isDebitTxn ? t.debitAmount : t.creditAmount),
+      isDebit: t.isDebit !== undefined ? t.isDebit : isDebitTxn,
+      debitAmount: t.debitAmount ?? (isDebitTxn ? t.amount : "0"),
+      creditAmount: t.creditAmount ?? (!isDebitTxn ? t.amount : "0"),
+    };
   });
 
   const { data: employeeGroups = [] } = useQuery<any[]>({
@@ -1472,9 +1494,6 @@ export default function Payroll() {
                               <Receipt className="h-3 w-3 text-muted-foreground" />
                               {employee.firstName} {employee.lastName}
                             </button>
-                            {employee.code && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{employee.code}</p>
-                            )}
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
                             {formatAmount(parseFloat(employee.monthlySalary))}
@@ -1571,9 +1590,6 @@ export default function Payroll() {
                                 <Receipt className="h-3 w-3 text-muted-foreground" />
                                 {employee.firstName} {employee.lastName}
                               </button>
-                              {employee.code && (
-                                <p className="text-xs text-muted-foreground mt-0.5">{employee.code}</p>
-                              )}
                             </div>
                             <Badge variant={employee.active ? "default" : "secondary"}>
                               {employee.active ? "Active" : "Inactive"}

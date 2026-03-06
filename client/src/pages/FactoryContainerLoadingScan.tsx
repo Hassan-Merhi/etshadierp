@@ -8,11 +8,39 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useLocation } from "wouter";
-import { ScanLine, Trash2, Package, MapPin, Play, CheckCircle, Clock, Save, AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  ScanLine,
+  Trash2,
+  Package,
+  MapPin,
+  Play,
+  CheckCircle,
+  Clock,
+  Save,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Customer {
   id: number;
@@ -105,9 +133,15 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+    queryKey: [
+      `/api/factory/customer-proformas?customerId=${customerId}`,
+      customerId,
+    ],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
+      const res = await fetch(
+        `/api/factory/customer-proformas?customerId=${customerId}`,
+        { credentials: "include" },
+      );
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
@@ -117,7 +151,9 @@ export default function FactoryContainerLoadingScan() {
   const { data: orderDetail } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-orders/${orderId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-orders/${orderId}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch order");
       return res.json();
     },
@@ -135,36 +171,62 @@ export default function FactoryContainerLoadingScan() {
   }, [isResuming, orderDetail, selectedCustomerId]);
 
   const createOrderMutation = useMutation({
-    mutationFn: async (data: { customerId: number; proformaIdUsed: number | null; locationId: number; orderDate: string }) => {
-      const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
+    mutationFn: async (data: {
+      customerId: number;
+      proformaIdUsed: number | null;
+      locationId: number;
+      orderDate: string;
+    }) => {
+      const res = await modeApiRequest(
+        "POST",
+        "/api/factory/customer-orders-loading",
+        data,
+      );
       return await res.json();
     },
     onSuccess: (data: any) => {
       setOrderId(data.id);
-      toast({ title: "Loading order created", description: "You can now start scanning bales" });
+      toast({
+        title: "Loading order created",
+        description: "You can now start scanning bales",
+      });
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
   const addBaleMutation = useMutation({
     mutationFn: async (data: { scanCode: string; locationId: number }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-orders/${orderId}/bales`,
+        data,
+      );
       return await res.json();
     },
     onSuccess: () => {
       setScanFlash("success");
       setTimeout(() => setScanFlash(null), 500);
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/customer-orders", orderId],
+      });
       setScanCode("");
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
       setScanFlash("error");
       setTimeout(() => setScanFlash(null), 500);
-      toast({ title: "Scan Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Scan Error",
+        description: error.message,
+        variant: "destructive",
+      });
       setScanCode("");
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
@@ -172,28 +234,47 @@ export default function FactoryContainerLoadingScan() {
 
   const removeBaleMutation = useMutation({
     mutationFn: async (baleId: number) => {
-      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
+      await modeApiRequest(
+        "DELETE",
+        `/api/factory/customer-orders/${orderId}/bales/${baleId}`,
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/customer-orders", orderId],
+      });
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
   const finalizeMutation = useMutation({
     mutationFn: async () => {
-      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`);
+      await modeApiRequest(
+        "POST",
+        `/api/factory/customer-orders/${orderId}/finalize-loading`,
+      );
     },
     onSuccess: () => {
-      toast({ title: "Loading finalized", description: "Loading has been sent for office verification" });
+      toast({
+        title: "Loading finalized",
+        description: "Loading has been sent for office verification",
+      });
       setShowFinalizeDialog(false);
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
       setShowFinalizeDialog(false);
     },
   });
@@ -207,13 +288,31 @@ export default function FactoryContainerLoadingScan() {
       locationId: parseInt(selectedLocationId),
       orderDate,
     });
-  }, [customerId, selectedLocationId, proformas, orderDate, createOrderMutation]);
+  }, [
+    customerId,
+    selectedLocationId,
+    proformas,
+    orderDate,
+    createOrderMutation,
+  ]);
 
-  const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
-    e.preventDefault();
-    addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
-  }, [scanCode, orderId, selectedLocationId, addBaleMutation]);
+  const handleScan = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (
+        e.key !== "Enter" ||
+        !scanCode.trim() ||
+        !orderId ||
+        !selectedLocationId
+      )
+        return;
+      e.preventDefault();
+      addBaleMutation.mutate({
+        scanCode: scanCode.trim().toUpperCase(),
+        locationId: parseInt(selectedLocationId),
+      });
+    },
+    [scanCode, orderId, selectedLocationId, addBaleMutation],
+  );
 
   const toggleGroup = useCallback((articleCode: string) => {
     setExpandedGroups((prev) => {
@@ -226,17 +325,35 @@ export default function FactoryContainerLoadingScan() {
 
   const bales = orderDetail?.bales || [];
 
-  const groupedBales = bales.reduce<Record<string, { articleCode: string; baleName: string; bales: OrderBale[]; totalWeight: number }>>((acc, bale) => {
+  const groupedBales = bales.reduce<
+    Record<
+      string,
+      {
+        articleCode: string;
+        baleName: string;
+        bales: OrderBale[];
+        totalWeight: number;
+      }
+    >
+  >((acc, bale) => {
     const key = bale.articleCode;
     if (!acc[key]) {
-      acc[key] = { articleCode: bale.articleCode, baleName: bale.baleName, bales: [], totalWeight: 0 };
+      acc[key] = {
+        articleCode: bale.articleCode,
+        baleName: bale.baleName,
+        bales: [],
+        totalWeight: 0,
+      };
     }
     acc[key].bales.push(bale);
     acc[key].totalWeight += parseFloat(bale.weight || "0");
     return acc;
   }, {});
 
-  const totalWeight = bales.reduce((sum, b) => sum + parseFloat(b.weight || "0"), 0);
+  const totalWeight = bales.reduce(
+    (sum, b) => sum + parseFloat(b.weight || "0"),
+    0,
+  );
 
   // Linked proforma logic
   const linkedProforma = orderDetail?.proformaIdUsed
@@ -248,29 +365,47 @@ export default function FactoryContainerLoadingScan() {
     return map;
   }, {});
 
-  const proformaProgress = linkedProforma?.lines.map((line) => {
-    const loaded = loadedByArticle[line.articleCode] || 0;
-    const remaining = line.quantity - loaded;
-    const status: "fulfilled" | "overloaded" | "short" | "none" =
-      loaded === 0 ? "none"
-      : loaded > line.quantity ? "overloaded"
-      : loaded === line.quantity ? "fulfilled"
-      : "short";
-    return { ...line, loaded, remaining, fulfilled: loaded >= line.quantity, status, excess: Math.max(0, loaded - line.quantity) };
-  }) || [];
+  const proformaProgress =
+    linkedProforma?.lines.map((line) => {
+      const loaded = loadedByArticle[line.articleCode] || 0;
+      const remaining = line.quantity - loaded;
+      const status: "fulfilled" | "overloaded" | "short" | "none" =
+        loaded === 0
+          ? "none"
+          : loaded > line.quantity
+            ? "overloaded"
+            : loaded === line.quantity
+              ? "fulfilled"
+              : "short";
+      return {
+        ...line,
+        loaded,
+        remaining,
+        fulfilled: loaded >= line.quantity,
+        status,
+        excess: Math.max(0, loaded - line.quantity),
+      };
+    }) || [];
 
-  const fulfilledCount = proformaProgress.filter((l) => l.status === "fulfilled" || l.status === "overloaded").length;
+  const fulfilledCount = proformaProgress.filter(
+    (l) => l.status === "fulfilled" || l.status === "overloaded",
+  ).length;
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
-  const proformaArticleCodes = new Set(linkedProforma?.lines.map((l) => l.articleCode) || []);
-  const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
+  const proformaArticleCodes = new Set(
+    linkedProforma?.lines.map((l) => l.articleCode) || [],
+  );
+  const extraArticles = Object.keys(loadedByArticle).filter(
+    (code) => !proformaArticleCodes.has(code),
+  );
 
-  const scanInputClass = scanFlash === "success"
-    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
-    : scanFlash === "error"
-    ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
-    : "";
+  const scanInputClass =
+    scanFlash === "success"
+      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
+      : scanFlash === "error"
+        ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
+        : "";
 
   const activeProforma = proformas.find((p) => p.isActive) || null;
 
@@ -278,12 +413,20 @@ export default function FactoryContainerLoadingScan() {
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Container Loading</h1>
-          <p className="text-muted-foreground text-sm">Floor loader bale scanning</p>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            Container Loading
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Floor loader bale scanning
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (
-            <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 no-default-hover-elevate no-default-active-elevate" data-testid="badge-resuming">
+            <Badge
+              variant="secondary"
+              className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 no-default-hover-elevate no-default-active-elevate"
+              data-testid="badge-resuming"
+            >
               <Clock className="h-3 w-3 mr-1" />
               Resuming Loading #{orderId}
             </Badge>
@@ -301,23 +444,38 @@ export default function FactoryContainerLoadingScan() {
         <div className="lg:w-[60%] flex flex-col min-h-0">
           <Card className="flex-1 flex flex-col min-h-0 p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
-              <Badge variant="secondary" data-testid="badge-bale-count">{bales.length} bales</Badge>
+              <h2
+                className="font-semibold text-lg"
+                data-testid="text-bales-header"
+              >
+                Scanned Bales
+              </h2>
+              <Badge variant="secondary" data-testid="badge-bale-count">
+                {bales.length} bales
+              </Badge>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {Object.keys(groupedBales).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground" data-testid="text-no-bales">
+                <div
+                  className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+                  data-testid="text-no-bales"
+                >
                   <Package className="h-12 w-12 mb-3 opacity-40" />
                   <p>No bales scanned yet</p>
                   <p className="text-sm mt-1">
-                    {!orderId ? "Set up the loading order first, then scan bales" : "Scan bales using the scanner below"}
+                    {!orderId
+                      ? "Set up the loading order first, then scan bales"
+                      : "Scan bales using the scanner below"}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {Object.values(groupedBales).map((group) => (
-                    <div key={group.articleCode} data-testid={`group-article-${group.articleCode}`}>
+                    <div
+                      key={group.articleCode}
+                      data-testid={`group-article-${group.articleCode}`}
+                    >
                       <button
                         type="button"
                         className="w-full flex flex-wrap items-center justify-between gap-2 mb-1 px-1 cursor-pointer rounded-md p-2 hover-elevate"
@@ -325,8 +483,15 @@ export default function FactoryContainerLoadingScan() {
                         data-testid={`button-toggle-group-${group.articleCode}`}
                       >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>{group.articleCode}</Badge>
-                          <span className="text-sm font-medium">{group.baleName}</span>
+                          <Badge
+                            variant="outline"
+                            data-testid={`badge-article-${group.articleCode}`}
+                          >
+                            {group.articleCode}
+                          </Badge>
+                          <span className="text-sm font-medium">
+                            {group.baleName}
+                          </span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span>Qty: {group.bales.length}</span>
@@ -337,9 +502,19 @@ export default function FactoryContainerLoadingScan() {
                         <Table>
                           <TableBody>
                             {group.bales.map((bale) => (
-                              <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
-                                <TableCell className="font-mono text-sm" data-testid={`text-bale-ref-${bale.id}`}>{bale.baleReference}</TableCell>
-                                <TableCell className="text-sm">{bale.baleName}</TableCell>
+                              <TableRow
+                                key={bale.id}
+                                data-testid={`row-bale-${bale.id}`}
+                              >
+                                <TableCell
+                                  className="font-mono text-sm"
+                                  data-testid={`text-bale-ref-${bale.id}`}
+                                >
+                                  {bale.baleReference}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {bale.baleName}
+                                </TableCell>
                                 <TableCell className="text-right text-sm text-muted-foreground">
                                   {parseFloat(bale.weight || "0").toFixed(2)} kg
                                 </TableCell>
@@ -347,7 +522,9 @@ export default function FactoryContainerLoadingScan() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => removeBaleMutation.mutate(bale.id)}
+                                    onClick={() =>
+                                      removeBaleMutation.mutate(bale.id)
+                                    }
                                     disabled={removeBaleMutation.isPending}
                                     data-testid={`button-remove-bale-${bale.id}`}
                                   >
@@ -377,7 +554,9 @@ export default function FactoryContainerLoadingScan() {
                   onChange={(e) => setScanCode(e.target.value)}
                   onKeyDown={handleScan}
                   placeholder="Scan barcode, ref number, or article code…"
-                  disabled={!orderId || !selectedLocationId || addBaleMutation.isPending}
+                  disabled={
+                    !orderId || !selectedLocationId || addBaleMutation.isPending
+                  }
                   className={`text-lg h-12 font-mono ${scanInputClass}`}
                   autoFocus
                   data-testid="input-scan-code"
@@ -393,13 +572,21 @@ export default function FactoryContainerLoadingScan() {
           <Card className="p-4 space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Customer</label>
-              <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!orderId}>
+              <Select
+                value={selectedCustomerId}
+                onValueChange={setSelectedCustomerId}
+                disabled={!!orderId}
+              >
                 <SelectTrigger data-testid="select-customer">
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                    <SelectItem
+                      key={c.id}
+                      value={c.id.toString()}
+                      data-testid={`select-customer-option-${c.id}`}
+                    >
                       {c.legalName}
                     </SelectItem>
                   ))}
@@ -412,13 +599,21 @@ export default function FactoryContainerLoadingScan() {
                 <MapPin className="inline h-3 w-3 mr-1" />
                 Loading Location
               </label>
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled={!!orderId}>
+              <Select
+                value={selectedLocationId}
+                onValueChange={setSelectedLocationId}
+                disabled={!!orderId}
+              >
                 <SelectTrigger data-testid="select-location">
                   <SelectValue placeholder="Select location..." />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`select-location-option-${loc.id}`}>
+                    <SelectItem
+                      key={loc.id}
+                      value={loc.id.toString()}
+                      data-testid={`select-location-option-${loc.id}`}
+                    >
                       {loc.name}
                     </SelectItem>
                   ))}
@@ -428,45 +623,77 @@ export default function FactoryContainerLoadingScan() {
 
             {customerId && activeProforma && !orderId && (
               <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid="badge-active-proforma">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                  data-testid="badge-active-proforma"
+                >
                   {activeProforma.name}
                 </Badge>
-                <span className="text-sm text-muted-foreground">Active proforma</span>
+                <span className="text-sm text-muted-foreground">
+                  Active proforma
+                </span>
               </div>
             )}
 
-            {customerId && !activeProforma && proformas.length === 0 && !orderId && (
-              <p className="text-sm text-muted-foreground" data-testid="text-no-proforma">
-                No active proforma found. Loading will proceed without price references.
-              </p>
-            )}
+            {customerId &&
+              !activeProforma &&
+              proformas.length === 0 &&
+              !orderId && (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="text-no-proforma"
+                >
+                  No active proforma found. Loading will proceed without price
+                  references.
+                </p>
+              )}
 
             {!orderId && (
               <Button
                 className="w-full"
                 onClick={handleStartLoading}
-                disabled={!customerId || !selectedLocationId || createOrderMutation.isPending}
+                disabled={
+                  !customerId ||
+                  !selectedLocationId ||
+                  createOrderMutation.isPending
+                }
                 data-testid="button-start-loading"
               >
                 <Play className="mr-2 h-4 w-4" />
-                {createOrderMutation.isPending ? "Creating..." : "Start Loading"}
+                {createOrderMutation.isPending
+                  ? "Creating..."
+                  : "Start Loading"}
               </Button>
             )}
           </Card>
 
           {/* Proforma progress panel — shown when order is active and a proforma is linked */}
           {orderId && linkedProforma ? (
-            <Card className="p-4 flex flex-col gap-3" data-testid="card-proforma-progress">
+            <Card
+              className="p-4 flex flex-col gap-3"
+              data-testid="card-proforma-progress"
+            >
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  <h3 className="font-semibold text-sm">{linkedProforma.name}</h3>
+                  <h3 className="font-semibold text-sm">
+                    {linkedProforma.name}
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {fulfilledCount} / {totalLines} lines fulfilled
                   </p>
                 </div>
                 <Badge
-                  variant={fulfilledCount === totalLines && totalLines > 0 ? "default" : "secondary"}
-                  className={fulfilledCount === totalLines && totalLines > 0 ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" : ""}
+                  variant={
+                    fulfilledCount === totalLines && totalLines > 0
+                      ? "default"
+                      : "secondary"
+                  }
+                  className={
+                    fulfilledCount === totalLines && totalLines > 0
+                      ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                      : ""
+                  }
                   data-testid="badge-proforma-progress"
                 >
                   {fulfilledCount}/{totalLines}
@@ -479,7 +706,9 @@ export default function FactoryContainerLoadingScan() {
                     <TableRow>
                       <TableHead className="text-xs">Article</TableHead>
                       <TableHead className="text-xs text-right">Exp</TableHead>
-                      <TableHead className="text-xs text-right">Loaded</TableHead>
+                      <TableHead className="text-xs text-right">
+                        Loaded
+                      </TableHead>
                       <TableHead className="text-xs text-right">Rem</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -488,50 +717,105 @@ export default function FactoryContainerLoadingScan() {
                       <TableRow
                         key={line.id}
                         className={
-                          line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
-                          : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
-                          : ""
+                          line.status === "fulfilled"
+                            ? "bg-green-50 dark:bg-green-950/40"
+                            : line.status === "overloaded"
+                              ? "bg-orange-50 dark:bg-orange-950/30"
+                              : ""
                         }
                         data-testid={`row-progress-${line.articleCode}`}
                       >
                         <TableCell className="text-xs font-mono py-1.5">
                           <div className="flex items-center gap-1">
-                            {line.status === "fulfilled" && <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />}
-                            {line.status === "overloaded" && <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />}
-                            <span className={
-                              line.status === "fulfilled" ? "text-green-700 dark:text-green-400"
-                              : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400"
-                              : ""
-                            }>{line.articleCode}</span>
+                            {line.status === "fulfilled" && (
+                              <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />
+                            )}
+                            {line.status === "overloaded" && (
+                              <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />
+                            )}
+                            <span
+                              className={
+                                line.status === "fulfilled"
+                                  ? "text-green-700 dark:text-green-400"
+                                  : line.status === "overloaded"
+                                    ? "text-orange-600 dark:text-orange-400"
+                                    : ""
+                              }
+                            >
+                              {line.articleCode}
+                            </span>
                           </div>
-                          <div className="text-muted-foreground truncate max-w-[100px]">{line.productName}</div>
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">{line.quantity}</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">
-                          <span className={
-                            line.status === "fulfilled" ? "text-green-600 dark:text-green-400 font-semibold"
-                            : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400 font-semibold"
-                            : ""
-                          }>{line.loaded}</span>
+                          <div className="text-muted-foreground truncate max-w-[100px]">
+                            {line.productName}
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
-                          {line.status === "fulfilled" && <span className="text-green-600 dark:text-green-400">✓</span>}
-                          {line.status === "overloaded" && <span className="text-orange-600 dark:text-orange-400">+{line.excess}</span>}
-                          {line.status === "short" && <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>}
-                          {line.status === "none" && <span className="text-muted-foreground">{line.quantity}</span>}
+                          {line.quantity}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">
+                          <span
+                            className={
+                              line.status === "fulfilled"
+                                ? "text-green-600 dark:text-green-400 font-semibold"
+                                : line.status === "overloaded"
+                                  ? "text-orange-600 dark:text-orange-400 font-semibold"
+                                  : ""
+                            }
+                          >
+                            {line.loaded}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">
+                          {line.status === "fulfilled" && (
+                            <span className="text-green-600 dark:text-green-400">
+                              ✓
+                            </span>
+                          )}
+                          {line.status === "overloaded" && (
+                            <span className="text-orange-600 dark:text-orange-400">
+                              +{line.excess}
+                            </span>
+                          )}
+                          {line.status === "short" && (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              {line.remaining}
+                            </span>
+                          )}
+                          {line.status === "none" && (
+                            <span className="text-muted-foreground">
+                              {line.quantity}
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
                     {extraArticles.map((code) => (
-                      <TableRow key={code} className="bg-red-50 dark:bg-red-950/30" data-testid={`row-extra-${code}`}>
+                      <TableRow
+                        key={code}
+                        className="bg-red-50 dark:bg-red-950/30"
+                        data-testid={`row-extra-${code}`}
+                      >
                         <TableCell className="text-xs font-mono py-1.5">
-                          <div className="text-red-700 dark:text-red-400">{code}</div>
-                          <div className="text-red-500 dark:text-red-500 text-[10px]">Not on proforma</div>
+                          <div className="text-red-700 dark:text-red-400">
+                            {code}
+                          </div>
+                          <div className="text-red-500 dark:text-red-500 text-[10px]">
+                            Not on proforma
+                          </div>
                         </TableCell>
-                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">—</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
+                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">
+                          —
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
+                          {loadedByArticle[code]}
+                        </TableCell>
                         <TableCell className="text-xs text-right py-1.5">
-                          <Badge variant="destructive" className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate">!</Badge>
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate"
+                          >
+                            !
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -540,7 +824,9 @@ export default function FactoryContainerLoadingScan() {
               </div>
 
               <div className="border-t pt-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
-                <span>{bales.length} bales scanned · {totalWeight.toFixed(1)} kg</span>
+                <span>
+                  {bales.length} bales scanned · {totalWeight.toFixed(1)} kg
+                </span>
               </div>
             </Card>
           ) : orderId ? (
@@ -548,15 +834,21 @@ export default function FactoryContainerLoadingScan() {
               <h3 className="font-semibold text-sm">Order Summary</h3>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Bales</span>
-                <span className="font-mono" data-testid="text-total-bales">{bales.length}</span>
+                <span className="font-mono" data-testid="text-total-bales">
+                  {bales.length}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Weight</span>
-                <span className="font-mono" data-testid="text-total-weight">{totalWeight.toFixed(2)} kg</span>
+                <span className="font-mono" data-testid="text-total-weight">
+                  {totalWeight.toFixed(2)} kg
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Article Groups</span>
-                <span className="font-mono" data-testid="text-article-groups">{Object.keys(groupedBales).length}</span>
+                <span className="font-mono" data-testid="text-article-groups">
+                  {Object.keys(groupedBales).length}
+                </span>
               </div>
             </Card>
           ) : null}
@@ -615,20 +907,32 @@ export default function FactoryContainerLoadingScan() {
                         <TableRow
                           key={line.id}
                           className={
-                            line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
-                            : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
-                            : ""
+                            line.status === "fulfilled"
+                              ? "bg-green-50 dark:bg-green-950/40"
+                              : line.status === "overloaded"
+                                ? "bg-orange-50 dark:bg-orange-950/30"
+                                : ""
                           }
                         >
                           <TableCell className="text-sm">
-                            <div className="font-mono text-xs">{line.articleCode}</div>
-                            <div className="text-muted-foreground text-xs">{line.productName}</div>
+                            <div className="font-mono text-xs">
+                              {line.articleCode}
+                            </div>
+                            <div className="text-muted-foreground text-xs">
+                              {line.productName}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">{line.quantity}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{line.loaded}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {line.quantity}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {line.loaded}
+                          </TableCell>
                           <TableCell className="text-right text-sm">
                             {line.status === "fulfilled" && (
-                              <span className="text-green-600 dark:text-green-400 font-semibold">✓ Done</span>
+                              <span className="text-green-600 dark:text-green-400 font-semibold">
+                                ✓ Done
+                              </span>
                             )}
                             {line.status === "overloaded" && (
                               <span className="text-orange-600 dark:text-orange-400 font-semibold flex items-center justify-end gap-1">
@@ -636,7 +940,8 @@ export default function FactoryContainerLoadingScan() {
                                 Over +{line.excess}
                               </span>
                             )}
-                            {(line.status === "short" || line.status === "none") && (
+                            {(line.status === "short" ||
+                              line.status === "none") && (
                               <span className="text-amber-600 dark:text-amber-400 flex items-center justify-end gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 Short {line.remaining}
@@ -646,15 +951,31 @@ export default function FactoryContainerLoadingScan() {
                         </TableRow>
                       ))}
                       {extraArticles.map((code) => (
-                        <TableRow key={code} className="bg-red-50 dark:bg-red-950/30">
+                        <TableRow
+                          key={code}
+                          className="bg-red-50 dark:bg-red-950/30"
+                        >
                           <TableCell className="text-sm">
-                            <div className="font-mono text-xs text-red-700 dark:text-red-400">{code}</div>
-                            <div className="text-red-500 text-xs">Not on proforma</div>
+                            <div className="font-mono text-xs text-red-700 dark:text-red-400">
+                              {code}
+                            </div>
+                            <div className="text-red-500 text-xs">
+                              Not on proforma
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                            —
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">
+                            {loadedByArticle[code]}
+                          </TableCell>
                           <TableCell className="text-right text-sm">
-                            <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">Not on proforma</Badge>
+                            <Badge
+                              variant="destructive"
+                              className="text-xs no-default-hover-elevate no-default-active-elevate"
+                            >
+                              Not on proforma
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -663,39 +984,81 @@ export default function FactoryContainerLoadingScan() {
                 </div>
                 <div className="flex items-center justify-between gap-2 text-sm border-t pt-2 flex-wrap gap-y-1">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-green-600 dark:text-green-400 font-medium">{proformaProgress.filter(l => l.status === "fulfilled").length} fulfilled</span>
-                    {proformaProgress.filter(l => l.status === "overloaded").length > 0 && (
-                      <span className="text-orange-600 dark:text-orange-400 font-medium">{proformaProgress.filter(l => l.status === "overloaded").length} overloaded</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                      {
+                        proformaProgress.filter((l) => l.status === "fulfilled")
+                          .length
+                      }{" "}
+                      fulfilled
+                    </span>
+                    {proformaProgress.filter((l) => l.status === "overloaded")
+                      .length > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400 font-medium">
+                        {
+                          proformaProgress.filter(
+                            (l) => l.status === "overloaded",
+                          ).length
+                        }{" "}
+                        overloaded
+                      </span>
                     )}
-                    {proformaProgress.filter(l => l.status === "short" || l.status === "none").length > 0 && (
-                      <span className="text-amber-600 dark:text-amber-400 font-medium">{proformaProgress.filter(l => l.status === "short" || l.status === "none").length} short</span>
+                    {proformaProgress.filter(
+                      (l) => l.status === "short" || l.status === "none",
+                    ).length > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">
+                        {
+                          proformaProgress.filter(
+                            (l) => l.status === "short" || l.status === "none",
+                          ).length
+                        }{" "}
+                        short
+                      </span>
                     )}
                     {extraArticles.length > 0 && (
-                      <span className="text-red-600 dark:text-red-400 font-medium">{extraArticles.length} not on proforma</span>
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        {extraArticles.length} not on proforma
+                      </span>
                     )}
                   </div>
-                  <span className="text-muted-foreground">{bales.length} bales · {totalWeight.toFixed(1)} kg</span>
+                  <span className="text-muted-foreground">
+                    {bales.length} bales · {totalWeight.toFixed(1)} kg
+                  </span>
                 </div>
               </>
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  This will mark the loading as complete and send it for office verification.
+                  This will mark the loading as complete and send it for office
+                  verification.
                 </p>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Bales:</span>
-                    <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">{bales.length}</span>
+                    <span
+                      className="font-mono font-semibold"
+                      data-testid="text-dialog-total-bales"
+                    >
+                      {bales.length}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Weight:</span>
-                    <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">{totalWeight.toFixed(2)} kg</span>
+                    <span
+                      className="font-mono font-semibold"
+                      data-testid="text-dialog-total-weight"
+                    >
+                      {totalWeight.toFixed(2)} kg
+                    </span>
                   </div>
                 </div>
               </>
             )}
             <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowFinalizeDialog(false)} data-testid="button-cancel-finalize">
+              <Button
+                variant="outline"
+                onClick={() => setShowFinalizeDialog(false)}
+                data-testid="button-cancel-finalize"
+              >
                 Cancel
               </Button>
               <Button
@@ -704,7 +1067,9 @@ export default function FactoryContainerLoadingScan() {
                 data-testid="button-confirm-finalize"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
-                {finalizeMutation.isPending ? "Finalizing..." : "Confirm Finalize"}
+                {finalizeMutation.isPending
+                  ? "Finalizing..."
+                  : "Confirm Finalize"}
               </Button>
             </div>
           </div>
