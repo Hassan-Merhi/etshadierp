@@ -13327,6 +13327,39 @@ if (asOfDate) {
           result.push({ ...t, balance });
         }
 
+        // Extract container numbers from narrations and resolve their IDs so the
+        // frontend can build direct links.  Shipping container numbers follow the
+        // ISO 6346 format: 4 uppercase letters + 7 digits (e.g. HASU5142160).
+        const containerNumRegex = /[A-Z]{4}\d{7}/g;
+        const containerNumberSet = new Set<string>();
+        for (const t of result) {
+          if (t.type !== "opening" && t.description) {
+            const matches = t.description.match(containerNumRegex);
+            if (matches) matches.forEach((m: string) => containerNumberSet.add(m));
+          }
+        }
+
+        const containerIdMap = new Map<string, number>();
+        if (containerNumberSet.size > 0) {
+          const containerRows = await db
+            .select({ id: containers.id, containerNumber: containers.containerNumber })
+            .from(containers)
+            .where(inArray(containers.containerNumber, Array.from(containerNumberSet)));
+          for (const c of containerRows) {
+            containerIdMap.set(c.containerNumber, c.id);
+          }
+        }
+
+        for (const t of result) {
+          if (t.type !== "opening" && t.description) {
+            const matches = t.description.match(containerNumRegex);
+            if (matches && matches.length > 0) {
+              t.containerNumber = matches[0];
+              t.containerId = containerIdMap.get(matches[0]) ?? null;
+            }
+          }
+        }
+
         res.json(result); // Already in chronological order
       } catch (error: any) {
         res.status(500).json({ message: error.message });

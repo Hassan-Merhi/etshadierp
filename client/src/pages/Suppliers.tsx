@@ -234,6 +234,10 @@ export default function Suppliers() {
     writeFile(workbook, fileName);
   };
 
+  const openingEntry = unifiedLedger.find((t: any) => t.type === "opening");
+  const ledgerRows = unifiedLedger.filter((t: any) => t.type !== "opening");
+  const txCount = ledgerRows.length;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -528,124 +532,142 @@ export default function Suppliers() {
                     : ""}.
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {unifiedLedger.length} transaction{unifiedLedger.length !== 1 ? "s" : ""}
-                    {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                      ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                      : " from all companies"}
-                  </div>
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Company</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Debit</TableHead>
-                          <TableHead className="text-right">Credit</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {unifiedLedger.map((txn: any, idx: number) => {
-                            const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
-                            const isOpening = txn.type === "opening";
-                            return (
-                              <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                                <TableCell className="font-mono text-sm">
-                                  {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <Badge variant="secondary">{txn.companyName}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={isOpening ? "secondary" : isPayment ? "default" : "outline"}>
-                                    {isOpening ? "Opening" : isPayment ? "Payment" : txn.voucherType}
+                <div className="space-y-3">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {txCount} transaction{txCount !== 1 ? "s" : ""}
+                        {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter))
+                          ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                          : " from all companies"}
+                      </div>
+
+                      {openingEntry && (
+                        <div className="flex items-center justify-between rounded-md bg-muted/50 border px-4 py-2 text-sm">
+                          <span className="text-muted-foreground font-medium">Opening Balance</span>
+                          <span className="font-mono font-semibold">{formatAmount(openingEntry.balance)}</span>
+                        </div>
+                      )}
+
+                      <div className="hidden md:block">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Company</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Container</TableHead>
+                              <TableHead className="text-right">Debit</TableHead>
+                              <TableHead className="text-right">Credit</TableHead>
+                              <TableHead className="text-right">Balance</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ledgerRows.map((txn: any, idx: number) => {
+                              const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                              return (
+                                <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                                  <TableCell className="font-mono text-sm">
+                                    {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    <Badge variant="secondary">{txn.companyName}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={isPayment ? "default" : "outline"}>
+                                      {isPayment ? "Payment" : txn.voucherType}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {txn.containerNumber ? (
+                                      <button
+                                        onClick={() => handleContainerClick(txn)}
+                                        className="font-mono text-sm text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                        data-testid={`link-container-${idx}`}
+                                      >
+                                        {txn.containerNumber}
+                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleTransactionClick(txn)}
+                                        className="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                        data-testid={`link-transaction-${idx}`}
+                                      >
+                                        {txn.docNumber || "-"}
+                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      </button>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm">
+                                    {txn.debit > 0 ? formatAmount(txn.debit) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm">
+                                    {txn.credit > 0 ? formatAmount(txn.credit) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono font-semibold">
+                                    {formatAmount(txn.balance)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      <div className="md:hidden space-y-3">
+                        {ledgerRows.map((txn: any, idx: number) => {
+                          const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                          return (
+                            <Card key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                              <CardContent className="p-3 space-y-2">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                                  </span>
+                                  <Badge variant={isPayment ? "default" : "outline"}>
+                                    {isPayment ? "Payment" : txn.voucherType}
                                   </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {isOpening ? (
-                                    <span className="text-sm text-muted-foreground">Opening Balance</span>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleTransactionClick(txn)}
-                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                      data-testid={`link-transaction-${idx}`}
-                                    >
-                                      <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
-                                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                    </button>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  {txn.debit > 0 ? formatAmount(txn.debit) : "—"}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  {txn.credit > 0 ? formatAmount(txn.credit) : "—"}
-                                </TableCell>
-                                <TableCell className="text-right font-mono font-semibold">
-                                  {formatAmount(txn.balance)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="md:hidden space-y-3">
-                    {unifiedLedger.map((txn: any, idx: number) => {
-                        const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
-                        const isOpening = txn.type === "opening";
-                        return (
-                          <Card key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                            <CardContent className="p-3 space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                                </span>
-                                <Badge variant={isOpening ? "secondary" : isPayment ? "default" : "outline"}>
-                                  {isOpening ? "Opening" : isPayment ? "Payment" : txn.voucherType}
-                                </Badge>
-                              </div>
-                              {isOpening ? (
-                                <span className="text-sm text-muted-foreground">Opening Balance</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleTransactionClick(txn)}
-                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                  data-testid={`link-transaction-${idx}`}
-                                >
-                                  <span className="truncate">{txn.description || txn.docNumber || "-"}</span>
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                </button>
-                              )}
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
-                                <div className="flex items-center gap-3 font-mono text-xs">
-                                  {txn.debit > 0 && <span className="text-muted-foreground">Dr: {formatAmount(txn.debit)}</span>}
-                                  {txn.credit > 0 && <span className="text-muted-foreground">Cr: {formatAmount(txn.credit)}</span>}
-                                  <span className="font-semibold">{formatAmount(txn.balance)}</span>
                                 </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                  
-                  {/* Summary */}
-                  <div className="border-t pt-4 flex justify-end">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Total Balance: </span>
-                      <span className="font-mono font-semibold text-lg">
-                        {formatAmount(unifiedLedger.length > 0 
-                          ? unifiedLedger[unifiedLedger.length - 1]?.balance 
-                          : 0)}
-                      </span>
-                    </div>
-                  </div>
+                                {txn.containerNumber ? (
+                                  <button
+                                    onClick={() => handleContainerClick(txn)}
+                                    className="font-mono text-sm text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                    data-testid={`link-container-mobile-${idx}`}
+                                  >
+                                    {txn.containerNumber}
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleTransactionClick(txn)}
+                                    className="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                    data-testid={`link-transaction-mobile-${idx}`}
+                                  >
+                                    {txn.docNumber || "-"}
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                  </button>
+                                )}
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
+                                  <div className="flex items-center gap-3 font-mono text-xs">
+                                    {txn.debit > 0 && <span className="text-muted-foreground">Dr: {formatAmount(txn.debit)}</span>}
+                                    {txn.credit > 0 && <span className="text-muted-foreground">Cr: {formatAmount(txn.credit)}</span>}
+                                    <span className="font-semibold">{formatAmount(txn.balance)}</span>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+
+                      <div className="border-t pt-4 flex justify-end">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Total Balance: </span>
+                          <span className="font-mono font-semibold text-lg">
+                            {formatAmount(unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0)}
+                          </span>
+                        </div>
+                      </div>
                 </div>
               )}
             </TabsContent>
