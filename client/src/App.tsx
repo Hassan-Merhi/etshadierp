@@ -529,7 +529,7 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <Switch>
-                    {hasDashboardAccess && <Route path="/factory/dashboard" component={Dashboard} />}
+                    {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers" component={FactoryContainers} />
