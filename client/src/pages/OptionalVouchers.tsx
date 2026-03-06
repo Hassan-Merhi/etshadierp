@@ -193,7 +193,6 @@ export default function OptionalVouchers() {
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Voucher #</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead className="hidden sm:table-cell">Location</TableHead>
                       <TableHead className="text-right">Total</TableHead>
@@ -206,7 +205,6 @@ export default function OptionalVouchers() {
                         <TableCell className="whitespace-nowrap">
                           {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{v.voucherNumber}</TableCell>
                         <TableCell>
                           <Badge variant={getTypeBadgeVariant(v.voucherType)}>{v.voucherType}</Badge>
                         </TableCell>
@@ -221,7 +219,26 @@ export default function OptionalVouchers() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => navigate(`/vouchers/${v.id}/edit`)}
+                              onClick={() => {
+                                const voucherTypeMap: Record<string, string> = {
+                                  Payment: "payment",
+                                  Receipt: "receipt",
+                                  Journal: "journal",
+                                  Consumption: "adjustment",
+                                  Production: "adjustment",
+                                  Mixed: "adjustment",
+                                  StockTransfer: "transfer",
+                                  "Stock Transfer": "transfer",
+                                  "Credit Note": "creditnote",
+                                  "Debit Note": "creditnote",
+                                };
+                                const tab = voucherTypeMap[v.voucherType];
+                                if (tab) {
+                                  navigate(`/vouchers?edit=${v.id}&tab=${tab}`);
+                                } else {
+                                  navigate(`/vouchers/${v.id}/edit`);
+                                }
+                              }}
                               data-testid={`button-edit-voucher-${v.id}`}
                             >
                               <Pencil className="h-4 w-4" />
@@ -249,7 +266,7 @@ export default function OptionalVouchers() {
                   </TableBody>
                   <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
                     <TableRow className="font-semibold">
-                      <TableCell colSpan={4}>Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})</TableCell>
+                      <TableCell colSpan={3}>Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})</TableCell>
                       <TableCell className="text-right font-mono" data-testid="text-optional-grand-total">
                         {vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </TableCell>
