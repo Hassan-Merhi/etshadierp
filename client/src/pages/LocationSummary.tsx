@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -323,13 +324,7 @@ export default function LocationSummary() {
         }
       }
     } else if (e.key === "Escape") {
-      const hasOpenDialog =
-        document.querySelector('[data-state="open"][role="dialog"]') ||
-        document.querySelector('[data-state="open"][role="alertdialog"]') ||
-        document.querySelector('[data-radix-popper-content-wrapper]') ||
-        document.querySelector('[role="listbox"]') ||
-        document.querySelector('[data-state="open"].fixed');
-      if (hasOpenDialog) return;
+      if (hasAnyOpenDialog()) return;
       e.preventDefault();
       window.history.back();
     }
@@ -337,8 +332,8 @@ export default function LocationSummary() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => handleTableKeyDown(e);
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
   }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows, summaryData]);
 
   useEffect(() => {

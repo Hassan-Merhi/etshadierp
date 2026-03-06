@@ -1,20 +1,27 @@
 import { useEffect, useCallback } from "react";
 
+function hasAnyOpenDialog(): boolean {
+  return !!(
+    document.querySelector('[data-state="open"][role="dialog"]') ||
+    document.querySelector('[data-state="open"][role="alertdialog"]') ||
+    document.querySelector('[data-radix-popper-content-wrapper]') ||
+    document.querySelector('[role="listbox"]') ||
+    document.querySelector('[data-state="open"].fixed') ||
+    document.querySelector('[data-state="open"][role="menu"]') ||
+    document.querySelector('[data-state="open"][role="combobox"]') ||
+    document.querySelector('[data-radix-select-viewport]') ||
+    document.querySelector('[cmdk-dialog]')
+  );
+}
+
 export function useEscapeBack(onBack: (() => void) | null) {
   const handler = useCallback(
     (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (!onBack) return;
 
-      const hasOpenDialog =
-        document.querySelector('[data-state="open"][role="dialog"]') ||
-        document.querySelector('[data-state="open"][role="alertdialog"]') ||
-        document.querySelector(".radix-dialog-overlay[data-state='open']") ||
-        document.querySelector('[data-radix-popper-content-wrapper]') ||
-        document.querySelector('[role="listbox"]') ||
-        document.querySelector('[data-state="open"].fixed');
-
-      if (hasOpenDialog) return;
+      // Run in capture phase so we check dialog state BEFORE Radix closes it.
+      if (hasAnyOpenDialog()) return;
 
       const activeEl = document.activeElement;
       if (
@@ -37,7 +44,11 @@ export function useEscapeBack(onBack: (() => void) | null) {
 
   useEffect(() => {
     if (!onBack) return;
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    // Capture phase: fires before Radix dialog Escape handling,
+    // so data-state is still "open" when we check.
+    document.addEventListener("keydown", handler, { capture: true });
+    return () => document.removeEventListener("keydown", handler, { capture: true });
   }, [handler, onBack]);
 }
+
+export { hasAnyOpenDialog };

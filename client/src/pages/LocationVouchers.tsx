@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,13 +195,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
-      const hasOpenDialog =
-        document.querySelector('[data-state="open"][role="dialog"]') ||
-        document.querySelector('[data-state="open"][role="alertdialog"]') ||
-        document.querySelector('[data-radix-popper-content-wrapper]') ||
-        document.querySelector('[role="listbox"]') ||
-        document.querySelector('[data-state="open"].fixed');
-      if (hasOpenDialog) return;
+      if (hasAnyOpenDialog()) return;
       e.preventDefault();
       window.history.back();
       return;
@@ -232,8 +227,8 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   };
 
   useEffect(() => {
-    window.addEventListener("keydown", handleTableKeyDown);
-    return () => window.removeEventListener("keydown", handleTableKeyDown);
+    window.addEventListener("keydown", handleTableKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleTableKeyDown, { capture: true });
   }, [selectedRowIndex, data]);
 
   useEffect(() => {

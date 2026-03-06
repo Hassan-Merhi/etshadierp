@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { ArrowLeft, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,13 +109,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
-      const hasOpenDialog =
-        document.querySelector('[data-state="open"][role="dialog"]') ||
-        document.querySelector('[data-state="open"][role="alertdialog"]') ||
-        document.querySelector('[data-radix-popper-content-wrapper]') ||
-        document.querySelector('[role="listbox"]') ||
-        document.querySelector('[data-state="open"].fixed');
-      if (hasOpenDialog) return;
+      if (hasAnyOpenDialog()) return;
       e.preventDefault();
       window.history.back();
       return;
@@ -147,13 +142,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        const hasOpenDialog =
-          document.querySelector('[data-state="open"][role="dialog"]') ||
-          document.querySelector('[data-state="open"][role="alertdialog"]') ||
-          document.querySelector('[data-radix-popper-content-wrapper]') ||
-          document.querySelector('[role="listbox"]') ||
-          document.querySelector('[data-state="open"].fixed');
-        if (hasOpenDialog) return;
+        if (hasAnyOpenDialog()) return;
         e.preventDefault();
         window.history.back();
         return;
@@ -183,8 +172,8 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
       }
     };
     
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [selectedRowIndex, data, isAllLocationsMode]);
 
   useEffect(() => {
