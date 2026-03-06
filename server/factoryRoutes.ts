@@ -6432,14 +6432,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Check if this scan code matches a bale already reserved (status = RESERVED_FOR_ORDER).
       // This prevents scanning the same physical bale/ref code a second time from silently
       // jumping to the next available bale instead of blocking with a clear error.
+      const scanLower = scanCode.toLowerCase();
       const [reservedBale] = await db.select().from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
           eq(factoryBales.status, "RESERVED_FOR_ORDER"),
           or(
-            eq(factoryBales.referenceNumber, scanCode),
-            eq(factoryBales.baleCode, scanCode),
-            eq(factoryBales.articleCode, scanCode)
+            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.productName}) = ${scanLower}`
           )
         ));
 
@@ -6458,11 +6460,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
           eq(factoryBales.erpLocationId, parseInt(locationId)),
           or(
-            eq(factoryBales.referenceNumber, scanCode),
-            eq(factoryBales.baleCode, scanCode),
-            eq(factoryBales.articleCode, scanCode)
+            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.productName}) = ${scanLower}`
           )
-        ));
+        ))
+        .orderBy(factoryBales.id)
+        .limit(1);
 
       if (!bale) return res.status(404).json({ message: "Bale not found, not at this location, or not available for sale" });
 

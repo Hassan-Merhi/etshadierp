@@ -307,7 +307,7 @@ export default function FactoryContainerLoadingScan() {
         return;
       e.preventDefault();
       addBaleMutation.mutate({
-        scanCode: scanCode.trim().toUpperCase(),
+        scanCode: scanCode.trim(),
         locationId: parseInt(selectedLocationId),
       });
     },
