@@ -72,7 +72,6 @@ import StockItemHistory from "@/pages/StockItemHistory";
 import StockItemVouchers from "@/pages/StockItemVouchers";
 import LocationMonthlySummary from "@/pages/LocationMonthlySummary";
 import LocationVouchers from "@/pages/LocationVouchers";
-import LocationSummary from "@/pages/LocationSummary";
 import OpeningStockSummary from "@/pages/OpeningStockSummary";
 import OpeningStockDetail from "@/pages/OpeningStockDetail";
 import ClosingStockSummary from "@/pages/ClosingStockSummary";
@@ -101,7 +100,6 @@ import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
 import OptionalVouchers from "@/pages/OptionalVouchers";
-import CombinedInventory from "@/pages/CombinedInventory";
 import SalesReportDetail from "@/pages/SalesReportDetail";
 import FactoryImport from "@/pages/FactoryImport";
 import FactoryUsers from "@/pages/FactoryUsers";
@@ -207,7 +205,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/import-stock-items" component={ImportStockItems} />
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
-      <Route path="/location-summary" component={LocationSummary} />
+      <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
       <Route path="/optional-vouchers" component={OptionalVouchers} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
@@ -217,7 +215,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/sales-report/detail" component={SalesReportDetail} />
-      <Route path="/combined-inventory" component={CombinedInventory} />
+      <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
       <Route path="/containers/:containerId/verification" component={ContainerVerification} />

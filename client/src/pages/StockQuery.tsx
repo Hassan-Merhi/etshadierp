@@ -4,10 +4,12 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Search, Grid3X3 } from "lucide-react";
+import LocationSummary from "@/pages/LocationSummary";
 
 interface StockItem {
   id: number;
@@ -26,7 +28,7 @@ interface FactoryBaleProduct {
   active: boolean;
 }
 
-export default function StockQuery() {
+function StockQueryContent() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const isFactory = appMode === "factory";
@@ -167,6 +169,47 @@ export default function StockQuery() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+export default function StockQuery() {
+  const [location, navigate] = useLocation();
+  const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+  const activeTab = params.get("tab") || "query";
+
+  const switchTab = (tab: string) => {
+    const base = location.split("?")[0];
+    navigate(tab === "query" ? base : `${base}?tab=${tab}`);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1 px-3 sm:px-6 pt-3 sm:pt-6 pb-0">
+        <div className="flex items-center gap-1 rounded-md border p-1">
+          <Button
+            size="sm"
+            variant={activeTab === "query" ? "secondary" : "ghost"}
+            onClick={() => switchTab("query")}
+            data-testid="tab-stock-query"
+          >
+            <Search className="h-3.5 w-3.5 mr-1.5" />
+            Stock Query
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "summary" ? "secondary" : "ghost"}
+            onClick={() => switchTab("summary")}
+            data-testid="tab-location-summary"
+          >
+            <Grid3X3 className="h-3.5 w-3.5 mr-1.5" />
+            Location Summary
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {activeTab === "summary" ? <LocationSummary /> : <StockQueryContent />}
+      </div>
     </div>
   );
 }

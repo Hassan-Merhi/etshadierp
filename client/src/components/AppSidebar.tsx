@@ -19,7 +19,6 @@ import {
   ArrowLeftRight,
   Factory,
   Barcode,
-  Grid3X3,
   ChevronRight,
   Eye,
   Boxes,
@@ -28,7 +27,6 @@ import {
   TrendingUp,
   Upload,
   MessageCircle,
-  Layers,
 } from "lucide-react";
 import {
   Sidebar,
@@ -83,9 +81,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Stock OTW", url: "/stock-otw", icon: Ship },
       { title: "Containers", url: "/containers", icon: Container },
       { title: "Stock Items", url: "/stock-items", icon: Package },
-      { title: "Stock Query", url: "/stock-query", icon: Search },
-      { title: "Location Summary", url: "/location-summary", icon: Grid3X3 },
-      { title: "Combined Inventory", url: "/combined-inventory", icon: Layers },
+      { title: "Inventory View", url: "/stock-query", icon: Search },
       { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
     ],
   },

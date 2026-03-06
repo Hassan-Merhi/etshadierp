@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown } from "lucide-react";
+import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useLocation } from "wouter";
+import CombinedInventory from "@/pages/CombinedInventory";
 import type { Container, Supplier } from "@shared/schema";
 
 interface ContainerDetailData {
@@ -44,7 +46,7 @@ interface GroupedStockItem {
   }[];
 }
 
-export default function StockOTW() {
+function StockOTWContent() {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -464,6 +466,47 @@ export default function StockOTW() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+export default function StockOTW() {
+  const [location, navigate] = useLocation();
+  const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+  const activeTab = params.get("tab") || "otw";
+
+  const switchTab = (tab: string) => {
+    const base = location.split("?")[0];
+    navigate(tab === "otw" ? base : `${base}?tab=${tab}`);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1 px-3 sm:px-6 pt-3 sm:pt-6 pb-0">
+        <div className="flex items-center gap-1 rounded-md border p-1">
+          <Button
+            size="sm"
+            variant={activeTab === "otw" ? "secondary" : "ghost"}
+            onClick={() => switchTab("otw")}
+            data-testid="tab-stock-otw"
+          >
+            <Ship className="h-3.5 w-3.5 mr-1.5" />
+            Stock OTW
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "combined" ? "secondary" : "ghost"}
+            onClick={() => switchTab("combined")}
+            data-testid="tab-combined-inventory"
+          >
+            <Layers className="h-3.5 w-3.5 mr-1.5" />
+            Combined
+          </Button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {activeTab === "combined" ? <CombinedInventory /> : <StockOTWContent />}
+      </div>
     </div>
   );
 }
