@@ -2,7 +2,6 @@ import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useCompany } from "@/contexts/CompanyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { queryClient } from "@/lib/queryClient";
@@ -115,7 +114,6 @@ export default function FactoryLocationInventory() {
   const printRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -161,8 +159,8 @@ export default function FactoryLocationInventory() {
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id && finalizeOpen,
+    queryKey: ["/api/factory/customers"],
+    enabled: finalizeOpen,
   });
 
   const createCustomerMutation = useMutation({
@@ -171,7 +169,8 @@ export default function FactoryLocationInventory() {
     },
     onSuccess: (newCustomer: any) => {
       toast({ title: "Customer created" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setSelectedCustomerId(String(newCustomer.id));
       setShowCreateCustomer(false);
       setNewCustomerName("");

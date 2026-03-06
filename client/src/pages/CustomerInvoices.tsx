@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -50,7 +49,6 @@ interface CustomerOrder {
 
 export default function CustomerInvoices() {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
@@ -59,8 +57,7 @@ export default function CustomerInvoices() {
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
   const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customers"],
   });
 
   const queryParams = new URLSearchParams();
@@ -70,7 +67,6 @@ export default function CustomerInvoices() {
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<CustomerOrder[]>({
     queryKey: [`/api/factory/customer-orders?${queryString}`, statusFilter, customerFilter],
-    enabled: !!selectedCompany?.id,
   });
 
   const deleteMutation = useMutation({

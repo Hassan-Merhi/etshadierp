@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -67,7 +66,6 @@ interface OrderDetail {
 
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -99,13 +97,11 @@ export default function FactoryContainerLoadingScan() {
   }, []);
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customers"],
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    enabled: !!selectedCompany?.id,
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({

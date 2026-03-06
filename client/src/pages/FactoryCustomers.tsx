@@ -52,6 +52,7 @@ export default function FactoryCustomers() {
     onSuccess: () => {
       toast({ title: "Success", description: "Customer created" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setIsCreateOpen(false);
       resetForm();
     },
@@ -82,6 +83,7 @@ export default function FactoryCustomers() {
     onSuccess: () => {
       toast({ title: "Success", description: "Customer deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setDeletingCustomer(null);
     },
     onError: (error: Error) => {

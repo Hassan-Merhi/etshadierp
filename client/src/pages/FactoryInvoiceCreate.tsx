@@ -99,13 +99,11 @@ export default function FactoryInvoiceCreate() {
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/factory/customers", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customers"],
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    enabled: !!selectedCompany?.id,
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
