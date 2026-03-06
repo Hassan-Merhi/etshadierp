@@ -3421,6 +3421,113 @@ function LoginHistoryTab() {
           {activeSection === "files" && (
             <FileStorageTab />
           )}
+
+          {activeSection === "fiscal" && (
+            <FiscalPeriodTab />
+          )}
+
+          {activeSection === "preferences" && (
+            <div className="space-y-6 max-w-lg">
+              <div>
+                <h2 className="text-2xl font-semibold flex items-center gap-2"><Settings2 className="h-5 w-5" />Preferences</h2>
+                <p className="text-muted-foreground text-sm mt-1">Customize your display and regional settings.</p>
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Date Format</CardTitle>
+                  <CardDescription>Choose how dates are displayed across the application.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(["MM/DD/YYYY", "DD/MM/YYYY"] as const).map((fmt) => (
+                    <label
+                      key={fmt}
+                      className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${dateFormat === fmt ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="dateFormat"
+                        value={fmt}
+                        checked={dateFormat === fmt}
+                        onChange={() => setDateFormat(fmt)}
+                        disabled={isDateFormatPending}
+                        className="accent-primary"
+                        data-testid={`radio-date-format-${fmt}`}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">{fmt}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {fmt === "MM/DD/YYYY" ? "e.g. 12/31/2025 (US style)" : "e.g. 31/12/2025 (International style)"}
+                        </div>
+                      </div>
+                      {dateFormat === fmt && <Check className="h-4 w-4 text-primary ml-auto" />}
+                    </label>
+                  ))}
+                  {isDateFormatPending && <p className="text-xs text-muted-foreground">Saving…</p>}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeSection === "system" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold flex items-center gap-2"><Wrench className="h-5 w-5" />System Tools</h2>
+                <p className="text-muted-foreground text-sm mt-1">Administrative tools for data maintenance and company configuration.</p>
+              </div>
+
+              {/* Parent Company */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Parent Company</CardTitle>
+                  <CardDescription>Set which company is the parent/holding entity. Used for inter-company accounting.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap items-center gap-3">
+                  <Select
+                    value={parentCompanyData?.parentCompanyId?.toString() ?? "none"}
+                    onValueChange={(val) => setParentCompanyMutation.mutate(val === "none" ? null : parseInt(val))}
+                    data-testid="select-parent-company"
+                  >
+                    <SelectTrigger className="w-64" data-testid="trigger-parent-company">
+                      <SelectValue placeholder="No parent company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No parent company</SelectItem>
+                      {(companies || []).map((c: any) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {setParentCompanyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                </CardContent>
+              </Card>
+
+              {/* Data maintenance actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Data Maintenance</CardTitle>
+                  <CardDescription>Advanced tools for fixing or resetting accounting data. Use with caution.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                  <Button variant="outline" onClick={() => setIsInitBalancesDialogOpen(true)} data-testid="button-init-balances">
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Initialize Accounting Balances
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsZeroBalanceDialogOpen(true)} data-testid="button-zero-balances">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Zero Account Balances
+                  </Button>
+                  <Button variant="outline" onClick={() => { setFixPOCreditsResult(null); setReversePOCreditsResult(null); setIsFixPOCreditsDialogOpen(true); }} data-testid="button-fix-po-credits">
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Fix PO Credits
+                  </Button>
+                  <Button variant="destructive" onClick={() => { setResetDataResult(null); setIsResetDataDialogOpen(true); }} data-testid="button-reset-data">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Reset Company Data
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         {/* Initialize Accounting Balances Dialog */}
