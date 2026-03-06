@@ -178,15 +178,6 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Barcode Lookup", url: "/factory/barcode-lookup", icon: Search },
     ],
   },
-  {
-    title: "Data",
-    icon: Upload,
-    items: [
-      { title: "Import Data", url: "/factory/import", icon: Upload },
-      { title: "Chat", url: "/factory/chat", icon: MessageCircle },
-      { title: "Settings", url: "/factory/settings", icon: Settings, adminOnly: true },
-    ],
-  },
 ];
 
 export function FactorySidebar({ user }: { user?: any }) {
@@ -328,18 +319,12 @@ export function FactorySidebar({ user }: { user?: any }) {
                         <SidebarMenuSub>
                           {group.items.map((item) => {
                             const isActive = location === item.url;
-                            const unreadCount = item.title === "Chat" ? (chatUnread?.count || 0) : 0;
                             return (
                               <SidebarMenuSubItem key={item.title}>
                                 <SidebarMenuSubButton asChild isActive={isActive}>
                                   <a href={item.url} data-testid={`link-factory-${item.url.split('/').pop()}`}>
                                     <item.icon className="h-4 w-4" />
                                     <span className="flex-1">{item.title}</span>
-                                    {unreadCount > 0 && (
-                                      <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-factory-chat-unread">
-                                        {unreadCount}
-                                      </Badge>
-                                    )}
                                   </a>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
@@ -351,6 +336,33 @@ export function FactorySidebar({ user }: { user?: any }) {
                   </Collapsible>
                 );
               })}
+
+              {/* Chat — flat top-level button with unread badge */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/factory/chat"}>
+                  <a href="/factory/chat" data-testid="link-factory-chat" className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    <span className="flex-1">Chat</span>
+                    {(chatUnread?.count || 0) > 0 && (
+                      <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-factory-chat-unread">
+                        {chatUnread?.count}
+                      </Badge>
+                    )}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Settings — flat top-level button (admin only) */}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/factory/settings"}>
+                    <a href="/factory/settings" data-testid="link-factory-settings" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

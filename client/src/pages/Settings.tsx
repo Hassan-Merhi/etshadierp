@@ -709,6 +709,31 @@ function DataToolsTab() {
         Administrative utilities for bulk data operations and maintenance tasks.
       </p>
 
+      {appMode === "factory" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Import Data
+            </CardTitle>
+            <CardDescription>
+              Import factory data including bales, raw stock, opening balances, and production records
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/factory/import">
+              <button
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                data-testid="button-go-to-import"
+              >
+                <Upload className="h-4 w-4" />
+                Open Import Tool
+              </button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Import Cost Prices Card */}
         <Card>
