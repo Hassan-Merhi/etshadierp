@@ -686,111 +686,116 @@ export default function Suppliers() {
                     ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
                     : ""}.
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {purchaseOrders.length} purchase order{purchaseOrders.length !== 1 ? "s" : ""}
-                    {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                      ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                      : " from all companies"}
-                  </div>
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Container</TableHead>
-                          <TableHead>Import Date</TableHead>
-                          <TableHead>Company</TableHead>
-                          <TableHead className="text-right">Total Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {[...purchaseOrders]
-                          .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
-                          .map((po: any, idx: number) => {
-                            const itemsTotal = parseFloat(po.itemsTotal || "0");
-                            const freight = parseFloat(po.freight || "0");
-                            const surcharge = parseFloat(po.surcharge || "0");
-                            const fumigation = parseFloat(po.fumigation || "0");
-                            const documentCharges = parseFloat(po.documentCharges || "0");
-                            const discount = parseFloat(po.discount || "0");
-                            const otherCharges = parseFloat(po.otherCharges || "0");
-                            const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-                            
-                            return (
-                              <TableRow key={po.id}>
+              ) : (() => {
+                  const sortedPOs = [...purchaseOrders]
+                    .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
+                    .map((po: any) => {
+                      const itemsTotal = parseFloat(po.itemsTotal || "0");
+                      const freight = parseFloat(po.freight || "0");
+                      const surcharge = parseFloat(po.surcharge || "0");
+                      const fumigation = parseFloat(po.fumigation || "0");
+                      const documentCharges = parseFloat(po.documentCharges || "0");
+                      const discount = parseFloat(po.discount || "0");
+                      const otherCharges = parseFloat(po.otherCharges || "0");
+                      const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+                      return { ...po, totalAmount };
+                    });
+                  const grandTotal = sortedPOs.reduce((sum: number, po: any) => sum + po.totalAmount, 0);
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {sortedPOs.length} purchase order{sortedPOs.length !== 1 ? "s" : ""}
+                        {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter))
+                          ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                          : " from all companies"}
+                      </div>
+
+                      <div className="hidden md:block">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-base">Container</TableHead>
+                              <TableHead className="text-base">Import Date</TableHead>
+                              <TableHead className="text-base">Company</TableHead>
+                              <TableHead className="text-right text-base">Total Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sortedPOs.map((po: any, idx: number) => (
+                              <TableRow key={po.id} className="h-14">
                                 <TableCell>
                                   {po.containerId ? (
                                     <button
                                       onClick={() => handleContainerClick(po)}
-                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-mono font-semibold"
-                                      data-testid={`link-container-${idx}`}
+                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-mono font-bold text-base"
+                                      data-testid={`link-po-container-${idx}`}
                                     >
                                       {po.containerNumber || "-"}
-                                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
                                     </button>
                                   ) : (
-                                    <span className="font-mono font-semibold">{po.containerNumber || "-"}</span>
+                                    <span className="font-mono font-bold text-base">{po.containerNumber || "-"}</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                  {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
+                                <TableCell className="font-mono text-base">
+                                  {po.importDate ? format(new Date(po.importDate), "dd MMM yyyy") : "-"}
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell>
                                   <Badge variant="secondary">{po.companyName}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right font-mono font-semibold">
-                                  {formatAmount(totalAmount)}
+                                <TableCell className="text-right font-mono font-bold text-base">
+                                  {formatAmount(po.totalAmount)}
                                 </TableCell>
                               </TableRow>
-                            );
-                          })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="md:hidden space-y-3">
-                    {[...purchaseOrders]
-                      .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
-                      .map((po: any, idx: number) => {
-                        const itemsTotal = parseFloat(po.itemsTotal || "0");
-                        const freight = parseFloat(po.freight || "0");
-                        const surcharge = parseFloat(po.surcharge || "0");
-                        const fumigation = parseFloat(po.fumigation || "0");
-                        const documentCharges = parseFloat(po.documentCharges || "0");
-                        const discount = parseFloat(po.discount || "0");
-                        const otherCharges = parseFloat(po.otherCharges || "0");
-                        const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-                        return (
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      <div className="md:hidden space-y-2">
+                        {sortedPOs.map((po: any, idx: number) => (
                           <Card key={po.id}>
-                            <CardContent className="p-3 space-y-2">
+                            <CardContent className="p-3 space-y-1">
                               <div className="flex items-center justify-between gap-2">
                                 {po.containerId ? (
                                   <button
                                     onClick={() => handleContainerClick(po)}
-                                    className="flex items-center gap-1 text-primary hover:underline cursor-pointer font-mono font-semibold text-sm"
-                                    data-testid={`link-container-mobile-${idx}`}
+                                    className="flex items-center gap-1 text-primary hover:underline cursor-pointer font-mono font-bold"
+                                    data-testid={`link-po-container-mobile-${idx}`}
                                   >
                                     {po.containerNumber || "-"}
                                     <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                   </button>
                                 ) : (
-                                  <span className="font-mono font-semibold text-sm">{po.containerNumber || "-"}</span>
+                                  <span className="font-mono font-bold">{po.containerNumber || "-"}</span>
                                 )}
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
+                                <span className="font-mono text-sm text-muted-foreground">
+                                  {po.importDate ? format(new Date(po.importDate), "dd MMM yyyy") : "-"}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between gap-2">
                                 <Badge variant="secondary" className="text-xs">{po.companyName}</Badge>
-                                <span className="font-mono font-semibold">{formatAmount(totalAmount)}</span>
+                                <span className="font-mono font-bold">{formatAmount(po.totalAmount)}</span>
                               </div>
                             </CardContent>
                           </Card>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
+                        ))}
+                      </div>
+
+                      <div className="border-t pt-3 flex items-center justify-between bg-muted/50 rounded-md px-4 py-3">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          {sortedPOs.length} container{sortedPOs.length !== 1 ? "s" : ""}
+                        </span>
+                        <div className="text-right">
+                          <span className="text-xs text-muted-foreground block">Total</span>
+                          <span className="font-mono font-bold text-lg">{formatAmount(grandTotal)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              }
             </TabsContent>
           </Tabs>
         </DialogContent>
