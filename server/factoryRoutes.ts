@@ -60,6 +60,7 @@ import {
   insertUserSchema,
   directMessages,
   insertDirectMessageSchema,
+  userPresence,
   factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
   companySettings,
@@ -7956,6 +7957,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
       const filtered = allUsers.filter((u: any) => u.id !== currentUserId);
 
+      // Fetch all presence records in one query
+      const presenceRecords = await db.select().from(userPresence);
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
       const usersWithUnread = await Promise.all(filtered.map(async (u: any) => {
         const [unreadResult] = await db.select({ count: sql<number>`count(*)::int` })
           .from(directMessages)
@@ -7970,7 +7975,22 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             and(eq(directMessages.senderId, u.id), eq(directMessages.receiverId, currentUserId)),
             and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, u.id))
           ));
-        return { ...u, unreadCount: unreadResult?.count || 0, hasMessages: (msgResult?.count || 0) > 0 };
+
+        // Find most recent presence record for this user
+        const userPresenceRecords = presenceRecords.filter((p: any) => p.userId === u.id);
+        const latestPresence = userPresenceRecords.sort((a: any, b: any) =>
+          new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+        )[0];
+        const isOnline = latestPresence ? new Date(latestPresence.lastSeen) > twoMinutesAgo : false;
+        const lastSeen = latestPresence ? latestPresence.lastSeen : null;
+
+        return {
+          ...u,
+          unreadCount: unreadResult?.count || 0,
+          hasMessages: (msgResult?.count || 0) > 0,
+          isOnline,
+          lastSeen,
+        };
       }));
 
       res.json(usersWithUnread);

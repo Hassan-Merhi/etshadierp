@@ -20,6 +20,8 @@ interface ChatUser {
   active: boolean;
   unreadCount: number;
   hasMessages: boolean;
+  isOnline: boolean;
+  lastSeen: string | null;
 }
 
 export default function Chat() {
@@ -137,6 +139,22 @@ export default function Chat() {
     return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const formatLastSeen = (user: ChatUser): string => {
+    if (user.isOnline) return "Online";
+    if (!user.lastSeen) return "Offline";
+    const d = new Date(user.lastSeen);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Last seen just now";
+    if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24 && d.toDateString() === now.toDateString())
+      return `Last seen today at ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffHours < 48) return `Last seen yesterday at ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return `Last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+  };
+
   const selectedUser = chatUsers.find((u) => u.id === selectedUserId);
   const conversationUsers = chatUsers.filter((u) => u.hasMessages || u.unreadCount > 0 || u.id === selectedUserId);
   const filteredAllUsers = chatUsers.filter((u) =>
@@ -177,9 +195,14 @@ export default function Chat() {
                 onClick={() => setSelectedUserId(user.id)}
                 data-testid={`button-chat-user-${user.id}`}
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">{getInitials(user.username)}</AvatarFallback>
-                </Avatar>
+                <div className="relative shrink-0">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs">{getInitials(user.username)}</AvatarFallback>
+                  </Avatar>
+                  {user.isOnline && (
+                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-sm font-medium truncate">{user.username}</span>
@@ -187,6 +210,9 @@ export default function Chat() {
                       <Badge variant="default" className="text-xs min-w-5 justify-center">{user.unreadCount}</Badge>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.isOnline ? "Online" : user.lastSeen ? formatLastSeen(user) : "Offline"}
+                  </p>
                 </div>
               </button>
             ))
@@ -207,10 +233,22 @@ export default function Chat() {
         ) : (
           <>
             <div className="p-3 border-b flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs">{selectedUser ? getInitials(selectedUser.username) : "?"}</AvatarFallback>
-              </Avatar>
-              <span className="font-semibold text-sm flex-1">{selectedUser?.username}</span>
+              <div className="relative shrink-0">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">{selectedUser ? getInitials(selectedUser.username) : "?"}</AvatarFallback>
+                </Avatar>
+                {selectedUser?.isOnline && (
+                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm leading-tight">{selectedUser?.username}</p>
+                {selectedUser && (
+                  <p className={`text-xs leading-tight ${selectedUser.isOnline ? "text-green-500" : "text-muted-foreground"}`}>
+                    {formatLastSeen(selectedUser)}
+                  </p>
+                )}
+              </div>
               <Button
                 size="icon"
                 variant="ghost"
@@ -253,8 +291,8 @@ export default function Chat() {
                           </span>
                           {isMine && (
                             msg.readAt
-                              ? <CheckCheck className={`h-3 w-3 ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
-                              : <Check className={`h-3 w-3 ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
+                              ? <CheckCheck className="h-3 w-3 text-sky-300" title="Read" />
+                              : <CheckCheck className="h-3 w-3 text-primary-foreground/50" title="Delivered" />
                           )}
                         </div>
                       </div>
