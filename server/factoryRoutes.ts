@@ -469,8 +469,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           let product = productByName.get(itemName.toLowerCase());
           if (!product) {
-            const autoCode = itemName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 20);
-            const articleCode = "IMP-" + autoCode + "-" + Date.now().toString(36).slice(-4).toUpperCase();
+            const autoPrefix = "HMD00";
+            const autoPrefixLen = autoPrefix.length;
+            const [autoMaxResult] = await tx
+              .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${autoPrefixLen + 1}) AS INTEGER)), 0)` })
+              .from(factoryBaleProducts)
+              .where(and(
+                eq(factoryBaleProducts.companyId, companyId),
+                sql`${factoryBaleProducts.articleCode} LIKE ${autoPrefix + '%'}`,
+                sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${autoPrefixLen + 1}) ~ '^[0-9]+$'`
+              ));
+            let autoNextNum = (autoMaxResult?.maxNum || 0) + 1;
+            let articleCode = `${autoPrefix}${String(autoNextNum).padStart(3, "0")}`;
+            let autoAttempts = 0;
+            while (autoAttempts < 100) {
+              const [dupCheck] = await tx.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
+              if (!dupCheck) break;
+              autoNextNum++;
+              articleCode = `${autoPrefix}${String(autoNextNum).padStart(3, "0")}`;
+              autoAttempts++;
+            }
             const code = articleCode;
 
             const [newProduct] = await tx.insert(factoryBaleProducts).values({
@@ -1416,10 +1435,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
         articleCode = candidateCode;
       } else if (!articleCode) {
-        const name = req.body.name || "";
-        const baseArticle = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 40);
-        const timestamp = Date.now().toString(36).toUpperCase();
-        articleCode = baseArticle ? `${baseArticle}-${timestamp}` : `PROD-${timestamp}`;
+        const noGradePrefix = "HMD00";
+        const noGradePrefixLen = noGradePrefix.length;
+        const [noGradeMax] = await db
+          .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) AS INTEGER)), 0)` })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            sql`${factoryBaleProducts.articleCode} LIKE ${noGradePrefix + '%'}`,
+            sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) ~ '^[0-9]+$'`
+          ));
+        let noGradeNext = (noGradeMax?.maxNum || 0) + 1;
+        articleCode = `${noGradePrefix}${String(noGradeNext).padStart(3, "0")}`;
+        let noGradeAttempts = 0;
+        while (noGradeAttempts < 100) {
+          const [dupCheck] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
+          if (!dupCheck) break;
+          noGradeNext++;
+          articleCode = `${noGradePrefix}${String(noGradeNext).padStart(3, "0")}`;
+          noGradeAttempts++;
+        }
       }
 
       if (!code) {
