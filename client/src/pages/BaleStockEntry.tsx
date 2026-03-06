@@ -1772,30 +1772,26 @@
               <span className="text-sm font-semibold" data-testid="text-entry-today-qty">{regularQty} qty</span>
               <span className="text-sm font-semibold" data-testid="text-entry-today-kg">{formatDailyNum(regularKg)} kg</span>
             </div>
-            {garbageQty > 0 && (
-              <>
-                <div className="w-px h-4 bg-border" />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Garbage</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold" data-testid="text-entry-garbage-qty">{garbageQty} qty</span>
-                  <span className="text-sm font-semibold" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)} kg</span>
-                </div>
-              </>
-            )}
-            {wipersQty > 0 && (
-              <>
-                <div className="w-px h-4 bg-border" />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-medium">Wipers</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold" data-testid="text-entry-wipers-qty">{wipersQty} qty</span>
-                  <span className="text-sm font-semibold" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)} kg</span>
-                </div>
-              </>
-            )}
+            <>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-medium">Garbage</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold" data-testid="text-entry-garbage-qty">{garbageQty} qty</span>
+                <span className="text-sm font-semibold" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)} kg</span>
+              </div>
+            </>
+            <>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-medium">Wipers</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold" data-testid="text-entry-wipers-qty">{wipersQty} qty</span>
+                <span className="text-sm font-semibold" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)} kg</span>
+              </div>
+            </>
           </div>
         </CardContent>
       </Card>

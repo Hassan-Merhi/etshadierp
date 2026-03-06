@@ -5378,6 +5378,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.delete("/api/factory/customers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (!existing) return res.status(404).json({ message: "Customer not found" });
+      if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+
+      const [deleted] = await db.update(customers)
+        .set({ deletedAt: new Date() })
+        .where(eq(customers.id, customerId))
+        .returning();
+
+      res.json(deleted);
+    } catch (error: any) {
+      console.error("Error deleting factory customer:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // CUSTOMER PROFORMAS CRUD
   // ───────────────────────────────────────────────
 

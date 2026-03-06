@@ -12,7 +12,8 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Phone, User } from "lucide-react";
+import { Plus, Pencil, Search, Phone, User, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Customer {
   id: number;
@@ -32,6 +33,7 @@ export default function FactoryCustomers() {
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     legalName: "",
     phone: "",
@@ -68,6 +70,20 @@ export default function FactoryCustomers() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
       setEditingCustomer(null);
       resetForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await factoryApiRequest("DELETE", `/api/factory/customers/${id}`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Customer deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", selectedCompany?.id] });
+      setDeletingCustomer(null);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -160,27 +176,23 @@ export default function FactoryCustomers() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="w-[90px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       {search ? "No customers match your search" : "No customers yet"}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((customer) => (
                     <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                      <TableCell className="font-mono text-sm" data-testid={`text-customer-code-${customer.id}`}>
-                        {customer.code}
-                      </TableCell>
                       <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
                         {customer.legalName}
                       </TableCell>
@@ -203,14 +215,24 @@ export default function FactoryCustomers() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(customer)}
-                          data-testid={`button-edit-customer-${customer.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(customer)}
+                            data-testid={`button-edit-customer-${customer.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingCustomer(customer)}
+                            data-testid={`button-delete-customer-${customer.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -340,6 +362,27 @@ export default function FactoryCustomers() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingCustomer} onOpenChange={(open) => { if (!open) setDeletingCustomer(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-customer">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingCustomer && deleteMutation.mutate(deletingCustomer.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-customer"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
