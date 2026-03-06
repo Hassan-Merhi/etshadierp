@@ -194,6 +194,13 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
+      const hasOpenDialog =
+        document.querySelector('[data-state="open"][role="dialog"]') ||
+        document.querySelector('[data-state="open"][role="alertdialog"]') ||
+        document.querySelector('[data-radix-popper-content-wrapper]') ||
+        document.querySelector('[role="listbox"]') ||
+        document.querySelector('[data-state="open"].fixed');
+      if (hasOpenDialog) return;
       e.preventDefault();
       window.history.back();
       return;
