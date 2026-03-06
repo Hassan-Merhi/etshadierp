@@ -1859,9 +1859,12 @@ export class DbStorage implements IStorage {
         lineTotal: schema.poLineItems.lineTotal,
         createdAt: schema.poLineItems.createdAt,
         totalCost: schema.poLineItems.lineTotal,
+        stockGroupId: schema.stockItems.stockGroupId,
+        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
       })
       .from(schema.poLineItems)
       .leftJoin(schema.stockItems, eq(schema.poLineItems.stockItemId, schema.stockItems.id))
+      .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .where(eq(schema.poLineItems.poId, poId));
     
     return items as any;
