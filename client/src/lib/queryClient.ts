@@ -21,34 +21,37 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function isNetworkError(error: any): boolean {
+  if (error instanceof TypeError) return true;
+  if (error instanceof DOMException && error.name === "NetworkError") return true;
+  const msg: string = error?.message ?? "";
+  return (
+    msg.includes("Load failed") ||
+    msg.includes("Failed to fetch") ||
+    msg.includes("Network request failed") ||
+    msg.includes("NetworkError") ||
+    msg.includes("network error")
+  );
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  console.log(`[apiRequest] Starting ${method} ${url}`);
-  
-  // Add timeout to prevent infinite hanging
   const controller = new AbortController();
+  let intentionalAbort = false;
   const timeoutId = setTimeout(() => {
-    console.error(`[apiRequest] TIMEOUT after 30s for ${method} ${url}`);
+    intentionalAbort = true;
     controller.abort();
   }, 30000);
   
   try {
-    console.log(`[apiRequest] Preparing fetch for ${method} ${url}`);
     let body: string | undefined;
     if (data) {
-      try {
-        body = JSON.stringify(data);
-        console.log(`[apiRequest] Body stringified successfully, length: ${body.length}`);
-      } catch (jsonError) {
-        console.error(`[apiRequest] JSON.stringify failed:`, jsonError);
-        throw jsonError;
-      }
+      body = JSON.stringify(data);
     }
     
-    console.log(`[apiRequest] Calling fetch...`);
     const res = await fetch(url, {
       method,
       headers: data ? { "Content-Type": "application/json" } : {},
@@ -56,19 +59,19 @@ export async function apiRequest(
       credentials: "include",
       signal: controller.signal,
     });
-    console.log(`[apiRequest] Fetch completed, status: ${res.status}`);
 
     clearTimeout(timeoutId);
     await throwIfResNotOk(res);
-    console.log(`[apiRequest] Response OK, returning`);
     return res;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      console.error(`[apiRequest] Request aborted (timeout) for ${method} ${url}`);
+    if (error.name === "AbortError" && intentionalAbort) {
       throw new Error(`Request timeout after 30 seconds for ${method} ${url}`);
     }
-    if (error instanceof TypeError && isSafeToQueue(method, url)) {
+    const networkFail = error.name === "AbortError"
+      ? true
+      : isNetworkError(error);
+    if (networkFail && isSafeToQueue(method, url)) {
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
       enqueueRequest(url, method, body, description);
@@ -77,7 +80,6 @@ export async function apiRequest(
       offlineError.description = description;
       throw offlineError;
     }
-    console.error(`[apiRequest] Error in ${method} ${url}:`, error);
     throw error;
   }
 }

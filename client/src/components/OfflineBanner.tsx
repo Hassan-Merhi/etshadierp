@@ -50,7 +50,7 @@ function formatRelativeTime(ts: number): string {
 }
 
 export function OfflineBanner() {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>(() => getQueue());
   const [lastSynced, setLastSyncedState] = useState<number | null>(getLastSynced);
@@ -146,24 +146,45 @@ export function OfflineBanner() {
   };
 
   useEffect(() => {
-    const handleOffline = () => {
-      setIsOffline(true);
-      refreshQueue();
-    };
+    let lastKnownOffline = false;
 
-    const handleOnline = async () => {
+    const checkConnectivity = async (triggerSync = false) => {
       const reachable = await pingServer();
-      if (reachable) {
+      if (!reachable && !lastKnownOffline) {
+        lastKnownOffline = true;
+        setIsOffline(true);
+        refreshQueue();
+      } else if (reachable && lastKnownOffline) {
+        lastKnownOffline = false;
+        setIsOffline(false);
+        refreshQueue();
+        if (triggerSync) await replayQueue();
+      } else if (reachable && triggerSync) {
         setIsOffline(false);
         refreshQueue();
         await replayQueue();
       }
     };
 
+    checkConnectivity();
+
+    const pollInterval = setInterval(() => checkConnectivity(false), 30000);
+
+    const handleOffline = () => {
+      lastKnownOffline = true;
+      setIsOffline(true);
+      refreshQueue();
+    };
+
+    const handleOnline = () => {
+      checkConnectivity(true);
+    };
+
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };

@@ -1,9 +1,11 @@
-const CACHE_NAME = "erp-v1";
+const CACHE_VERSION = "erp-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add("/"))
+    caches.open(CACHE_VERSION).then((cache) =>
+      cache.addAll(["/", "/manifest.json"])
+    )
   );
 });
 
@@ -12,7 +14,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
   );
@@ -37,7 +39,7 @@ async function networkFirstApi(request) {
   try {
     const response = await fetch(request.clone());
     if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
+      const cache = await caches.open(CACHE_VERSION);
       cache.put(request, response.clone());
     }
     return response;
@@ -52,7 +54,7 @@ async function networkFirstApi(request) {
 }
 
 async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(CACHE_VERSION);
   const cached = await cache.match(request);
 
   const fetchPromise = fetch(request.clone())
