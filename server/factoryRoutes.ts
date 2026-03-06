@@ -79,6 +79,7 @@ import {
   exchangeRates,
   vouchers,
   suppliers,
+  containerSales,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -8453,6 +8454,133 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       });
     } catch (error: any) {
       console.error("Import company data error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Factory Analytics: Sales by Customer ─────────────────────────────────
+  app.get("/api/factory/analytics/sales-by-customer", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select({
+          customerId: containerSales.customerId,
+          customerName: customers.legalName,
+          containers: sql<number>`COUNT(${containerSales.id})`,
+          totalAmount: sql<string>`COALESCE(SUM(${containerSales.totalAmount}), '0')`,
+          paidAmount: sql<string>`COALESCE(SUM(${containerSales.paidAmount}), '0')`,
+        })
+        .from(containerSales)
+        .leftJoin(customers, eq(containerSales.customerId, customers.id))
+        .where(eq(containerSales.companyId, companyId))
+        .groupBy(containerSales.customerId, customers.legalName)
+        .orderBy(sql`SUM(${containerSales.totalAmount}) DESC`);
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Factory Analytics: Container Sales Report (loaded containers by customer) ──
+  app.get("/api/factory/analytics/container-sales-report", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { startDate, endDate, customerId, paymentStatus } = req.query as Record<string, string>;
+
+      const conditions: any[] = [eq(containerSales.companyId, companyId)];
+      if (startDate) conditions.push(sql`${containerSales.saleDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${containerSales.saleDate} <= ${endDate}`);
+      if (customerId && customerId !== "all") conditions.push(eq(containerSales.customerId, parseInt(customerId)));
+      if (paymentStatus && paymentStatus !== "all") conditions.push(eq(containerSales.paymentStatus, paymentStatus));
+
+      const rows = await db
+        .select({
+          id: containerSales.id,
+          saleDate: containerSales.saleDate,
+          invoiceNumber: containerSales.invoiceNumber,
+          paymentStatus: containerSales.paymentStatus,
+          totalAmount: containerSales.totalAmount,
+          paidAmount: containerSales.paidAmount,
+          containerNumber: factoryContainers.containerNumber,
+          containerStatus: factoryContainers.status,
+          customerId: containerSales.customerId,
+          customerName: customers.legalName,
+        })
+        .from(containerSales)
+        .leftJoin(factoryContainers, eq(containerSales.containerId, factoryContainers.id))
+        .leftJoin(customers, eq(containerSales.customerId, customers.id))
+        .where(and(...conditions))
+        .orderBy(desc(containerSales.saleDate));
+
+      const total = rows.reduce((sum, r) => sum + parseFloat(r.totalAmount || "0"), 0);
+      const paid = rows.reduce((sum, r) => sum + parseFloat(r.paidAmount || "0"), 0);
+
+      res.json({ rows, summary: { total, paid, outstanding: total - paid, count: rows.length } });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Factory Analytics: Stock Summary (opening + closing stock) ───────────
+  app.get("/api/factory/analytics/stock-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Opening stock = total raw material received (cost basis)
+      const [rawReceived] = await db
+        .select({
+          totalCost: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg} * ${factoryRawStock.costPerKgUsd}), '0')`,
+          totalKg: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg}), '0')`,
+        })
+        .from(factoryRawStock)
+        .where(eq(factoryRawStock.companyId, companyId));
+
+      // Closing stock = remaining raw material (not yet used) + bale stock in stock
+      const [rawRemaining] = await db
+        .select({
+          remainingCost: sql<string>`COALESCE(SUM((${factoryRawStock.receivedKg} - ${factoryRawStock.usedKg}) * ${factoryRawStock.costPerKgUsd}), '0')`,
+          remainingKg: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg} - ${factoryRawStock.usedKg}), '0')`,
+        })
+        .from(factoryRawStock)
+        .where(eq(factoryRawStock.companyId, companyId));
+
+      const [baleStock] = await db
+        .select({
+          totalCost: sql<string>`COALESCE(SUM(${factoryBales.totalCost}), '0')`,
+          totalWeightKg: sql<string>`COALESCE(SUM(${factoryBales.weightKg}), '0')`,
+          count: sql<number>`COUNT(${factoryBales.id})`,
+        })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+        ));
+
+      const openingStock = parseFloat(rawReceived?.totalCost || "0");
+      const closingRaw = parseFloat(rawRemaining?.remainingCost || "0");
+      const closingBales = parseFloat(baleStock?.totalCost || "0");
+      const closingStock = closingRaw + closingBales;
+
+      res.json({
+        openingStock,
+        closingStock,
+        detail: {
+          rawReceived: { cost: openingStock, kg: parseFloat(rawReceived?.totalKg || "0") },
+          rawRemaining: { cost: closingRaw, kg: parseFloat(rawRemaining?.remainingKg || "0") },
+          balesInStock: {
+            cost: closingBales,
+            kg: parseFloat(baleStock?.totalWeightKg || "0"),
+            count: baleStock?.count ?? 0,
+          },
+        },
+      });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

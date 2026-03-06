@@ -335,6 +335,13 @@ export default function Analytics() {
   const [expandedNetProfitSections, setExpandedNetProfitSections] = useState<Set<string>>(new Set());
   const [plStartDate, setPlStartDate] = useState("");
   const [plEndDate, setPlEndDate] = useState("");
+
+  // Factory-specific filters
+  const [factoryContainerCustomerId, setFactoryContainerCustomerId] = useState("all");
+  const [factoryContainerStartDate, setFactoryContainerStartDate] = useState("");
+  const [factoryContainerEndDate, setFactoryContainerEndDate] = useState("");
+  const [factoryContainerPaymentStatus, setFactoryContainerPaymentStatus] = useState("all");
+  const [expandedCustomerRows, setExpandedCustomerRows] = useState<Set<number>>(new Set());
   
   const [activeSection, setActiveSection] = useState("overview");
 
@@ -544,6 +551,46 @@ export default function Analytics() {
       return response.json();
     },
     enabled: false, // Manual trigger via Generate button
+  });
+
+  // ── Factory Analytics Queries ───────────────────────────────────────────
+  const { data: factorySalesByCustomer = [], isLoading: loadingFactorySales } = useQuery<any[]>({
+    queryKey: ["/api/factory/analytics/sales-by-customer", selectedCompany?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/analytics/sales-by-customer", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory sales");
+      return res.json();
+    },
+    enabled: !!selectedCompany && appMode === "factory",
+  });
+
+  const buildFactoryContainerSalesUrl = () => {
+    const params = new URLSearchParams();
+    if (factoryContainerStartDate) params.append("startDate", factoryContainerStartDate);
+    if (factoryContainerEndDate) params.append("endDate", factoryContainerEndDate);
+    if (factoryContainerCustomerId && factoryContainerCustomerId !== "all") params.append("customerId", factoryContainerCustomerId);
+    if (factoryContainerPaymentStatus && factoryContainerPaymentStatus !== "all") params.append("paymentStatus", factoryContainerPaymentStatus);
+    return `/api/factory/analytics/container-sales-report?${params}`;
+  };
+
+  const { data: factoryContainerSales, refetch: refetchFactoryContainerSales, isLoading: loadingFactoryContainerSales } = useQuery<any>({
+    queryKey: [buildFactoryContainerSalesUrl(), selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const res = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory container sales");
+      return res.json();
+    },
+    enabled: appMode === "factory" && false, // Manual trigger
+  });
+
+  const { data: factoryStockSummary } = useQuery<any>({
+    queryKey: ["/api/factory/analytics/stock-summary", selectedCompany?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/analytics/stock-summary", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory stock summary");
+      return res.json();
+    },
+    enabled: !!selectedCompany && appMode === "factory",
   });
 
   // Fetch Opening Stock Summary
@@ -1353,6 +1400,72 @@ export default function Analytics() {
         )}
 
         {activeSection === "sales" && (<>
+          {appMode === "factory" ? (
+            <Card className="p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium">Sales by Customer</h3>
+                <p className="text-sm text-muted-foreground mt-1">Container sales grouped by customer</p>
+              </div>
+              {loadingFactorySales ? (
+                <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+              ) : factorySalesByCustomer.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No factory sales data available</p>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Customer</TableHead>
+                          <TableHead className="text-right">Containers</TableHead>
+                          <TableHead className="text-right">Total Value</TableHead>
+                          <TableHead className="text-right">Paid</TableHead>
+                          <TableHead className="text-right">Outstanding</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {factorySalesByCustomer.map((row: any) => (
+                          <TableRow key={row.customerId}>
+                            <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
+                            <TableCell className="text-right">{row.containers}</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                            <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                            <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
+                              {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableBody className="font-semibold border-t-2">
+                        <TableRow>
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-right">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-3">
+                    {factorySalesByCustomer.map((row: any) => (
+                      <Card key={row.customerId}>
+                        <CardContent className="p-4 space-y-2">
+                          <div className="font-medium">{row.customerName || `Customer #${row.customerId}`}</div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div><span className="text-muted-foreground">Containers: </span>{row.containers}</div>
+                            <div className="text-right"><span className="text-muted-foreground">Total: </span><span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span></div>
+                            <div><span className="text-muted-foreground">Paid: </span><span className="font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</span></div>
+                            <div className="text-right"><span className="text-muted-foreground">Outstanding: </span><span className="font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</span></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
+          ) : (
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h3 className="text-lg font-medium">Sales by Location</h3>
@@ -1434,8 +1547,10 @@ export default function Analytics() {
               </>
             )}
           </Card>
+          )}
 
-          {/* Sales Details Dialog */}
+          {/* Sales Details Dialog (ERP only) */}
+          {appMode !== "factory" && (
           <Dialog 
             open={selectedLocationForDetails !== null} 
             onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
@@ -1546,9 +1661,148 @@ export default function Analytics() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </>)}
 
-        {activeSection === "containers" && (
+        {activeSection === "containers" && appMode === "factory" && (
+          <Card className="p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <ContainerIcon className="h-5 w-5" />
+                Container Report
+              </h3>
+              <Button size="sm" onClick={() => refetchFactoryContainerSales()} disabled={loadingFactoryContainerSales}>
+                {loadingFactoryContainerSales ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <Label>Start Date</Label>
+                <DatePickerInput value={factoryContainerStartDate} onChange={setFactoryContainerStartDate} placeholder="Start date" />
+              </div>
+              <div>
+                <Label>End Date</Label>
+                <DatePickerInput value={factoryContainerEndDate} onChange={setFactoryContainerEndDate} placeholder="End date" />
+              </div>
+              <div>
+                <Label>Customer</Label>
+                <Select value={factoryContainerCustomerId} onValueChange={setFactoryContainerCustomerId}>
+                  <SelectTrigger><SelectValue placeholder="All Customers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Customers</SelectItem>
+                    {factorySalesByCustomer.map((r: any) => (
+                      <SelectItem key={r.customerId} value={r.customerId.toString()}>
+                        {r.customerName || `Customer #${r.customerId}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Payment Status</Label>
+                <Select value={factoryContainerPaymentStatus} onValueChange={setFactoryContainerPaymentStatus}>
+                  <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="PARTIAL">Partial</SelectItem>
+                    <SelectItem value="PAID">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingFactoryContainerSales ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : factoryContainerSales ? (
+              <div className="space-y-4">
+                {/* Summary cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Containers</div>
+                    <div className="text-xl font-bold">{factoryContainerSales.summary.count}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Total Value</div>
+                    <div className="text-xl font-bold font-mono">{formatAmount(factoryContainerSales.summary.total)}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Paid</div>
+                    <div className="text-xl font-bold font-mono text-green-600 dark:text-green-400">{formatAmount(factoryContainerSales.summary.paid)}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Outstanding</div>
+                    <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">{formatAmount(factoryContainerSales.summary.outstanding)}</div>
+                  </div>
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>Sale Date</TableHead>
+                        <TableHead>Container Status</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {factoryContainerSales.rows.map((row: any) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-mono">{row.containerNumber || "-"}</TableCell>
+                          <TableCell className="font-medium">{row.customerName || `#${row.customerId}`}</TableCell>
+                          <TableCell className="font-mono text-sm">{row.invoiceNumber || "-"}</TableCell>
+                          <TableCell>{row.saleDate}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.containerStatus === "OFFLOADED" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>
+                              {row.containerStatus || "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.paymentStatus === "PAID" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : row.paymentStatus === "PARTIAL" ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>
+                              {row.paymentStatus}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {factoryContainerSales.rows.map((row: any) => (
+                    <Card key={row.id}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-medium">{row.containerNumber || "-"}</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.paymentStatus === "PAID" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : row.paymentStatus === "PARTIAL" ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>{row.paymentStatus}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{row.customerName} · {row.saleDate}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                          <div><span className="text-muted-foreground block">Total</span><span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span></div>
+                          <div><span className="text-muted-foreground block">Paid</span><span className="font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</span></div>
+                          <div className="text-right"><span className="text-muted-foreground block">Outstanding</span><span className="font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</span></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">Click Generate to load the container report.</div>
+            )}
+          </Card>
+        )}
+
+        {activeSection === "containers" && appMode !== "factory" && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
@@ -1814,15 +2068,19 @@ export default function Analytics() {
                   <div className="divide-y">
                     {/* Opening Stock */}
                     <div 
-                      className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                      onClick={() => navigate("/opening-stock")}
+                      className={`flex justify-between items-center p-3 ${appMode !== "factory" ? "cursor-pointer hover-elevate" : ""}`}
+                      onClick={() => appMode !== "factory" && navigate("/opening-stock")}
                       data-testid="row-opening-stock"
                     >
                       <span className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4" />
                         Opening Stock
                       </span>
-                      <span className="font-mono">{formatAmount(netProfitData.leftPane.openingStock.value)}</span>
+                      <span className="font-mono">
+                        {appMode === "factory"
+                          ? formatAmount(factoryStockSummary?.openingStock ?? 0)
+                          : formatAmount(netProfitData.leftPane.openingStock.value)}
+                      </span>
                     </div>
 
                     {/* Purchase Accounts */}
@@ -2025,15 +2283,19 @@ export default function Analytics() {
 
                     {/* Closing Stock */}
                     <div 
-                      className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                      onClick={() => navigate("/closing-stock-summary")}
+                      className={`flex justify-between items-center p-3 ${appMode !== "factory" ? "cursor-pointer hover-elevate" : ""}`}
+                      onClick={() => appMode !== "factory" && navigate("/closing-stock-summary")}
                       data-testid="row-closing-stock"
                     >
                       <span className="flex items-center gap-2">
                         <ChevronRight className="h-4 w-4" />
                         Closing Stock
                       </span>
-                      <span className="font-mono">{formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}</span>
+                      <span className="font-mono">
+                        {appMode === "factory"
+                          ? formatAmount(factoryStockSummary?.closingStock ?? 0)
+                          : formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}
+                      </span>
                     </div>
 
                     {/* Empty spacer rows to match left pane */}

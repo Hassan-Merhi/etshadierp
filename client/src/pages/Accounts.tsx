@@ -310,12 +310,12 @@ export default function Accounts() {
     enabled: !!selectedAccount,
   });
 
-  // Fetch pre-period balance when a period start date is set
+  // Fetch pre-period balance when a period start date is set (factory mode only)
   const prePeriodAccountType = selectedAccount
     ? (selectedAccount.type || "").toLowerCase().replace(" ", "-")
     : null;
   const { data: prePeriodData } = useQuery<{ balance: number }>({
-    queryKey: selectedAccount && periodFilter.fromDate
+    queryKey: selectedAccount && periodFilter.fromDate && appMode === "factory"
       ? [`/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/pre-period-balance`, { endDate: periodFilter.fromDate }]
       : [],
     queryFn: async () => {
@@ -327,7 +327,7 @@ export default function Accounts() {
       if (!res.ok) return { balance: 0 };
       return res.json();
     },
-    enabled: !!selectedAccount && !!periodFilter.fromDate,
+    enabled: !!selectedAccount && !!periodFilter.fromDate && appMode === "factory",
   });
 
   // Restore account from URL params when accounts load
@@ -511,9 +511,9 @@ export default function Accounts() {
   const groupedVouchers = groupTransactionsByVoucher();
 
   // Calculate opening balance
-  // When a period start date is active, use the pre-period balance (closing of last period)
+  // In factory mode, when a period start date is active, use the pre-period balance
   const getOpeningBalance = (): number => {
-    if (periodFilter.fromDate && prePeriodData !== undefined) {
+    if (appMode === "factory" && periodFilter.fromDate && prePeriodData !== undefined) {
       return prePeriodData.balance;
     }
     const rawOpeningBalance = parseBalance(
