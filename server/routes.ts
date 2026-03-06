@@ -13665,12 +13665,12 @@ if (asOfDate) {
           );
         }
 
-        // Write to factory daybook if this is a factory company
+        // Write to factory daybook if this company has factory settings
         try {
           const cid = req.session.currentCompanyId!;
-          const co = await storage.getCompanyById(cid);
-          if (co?.companyType === "factory") {
-            const { factoryDaybookEntries: fde } = await import("@shared/schema");
+          const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
+          const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, cid));
+          if (fSetting) {
             const vType = result.voucher.voucherType;
             const txType = vType === "Payment" ? "PAYMENT" : vType === "Receipt" ? "RECEIPT" : "JOURNAL";
             const currency = result.voucher.currency || "USD";
@@ -14053,12 +14053,12 @@ if (asOfDate) {
           );
         }
 
-        // Write to factory daybook if this is a factory company
+        // Write to factory daybook if this company has factory settings
         try {
           const cid = req.session.currentCompanyId!;
-          const co = await storage.getCompanyById(cid);
-          if (co?.companyType === "factory") {
-            const { factoryDaybookEntries: fde } = await import("@shared/schema");
+          const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
+          const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, cid));
+          if (fSetting) {
             const currency = result.voucher.currency || "USD";
             const fxRate = parseFloat(result.voucher.exchangeRate || "1") || 1;
             const amtCurrency = parseFloat(result.voucher.totalAmount || "0");
@@ -28815,11 +28815,11 @@ if (asOfDate) {
         return transfer;
       });
 
-      // Write to factory daybook if this is a factory company
+      // Write to factory daybook if this company has factory settings
       try {
-        const co = await storage.getCompanyById(companyId);
-        if (co?.companyType === "factory") {
-          const { factoryDaybookEntries: fde } = await import("@shared/schema");
+        const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
+        const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, companyId));
+        if (fSetting) {
           const totalCost = items.reduce((s: number, it: any) => s + parseFloat(it.totalCost || "0"), 0);
           await db.insert(fde).values({
             companyId,
