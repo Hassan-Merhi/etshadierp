@@ -5057,6 +5057,30 @@ if (asOfDate) {
       const companyId = (req.session as any).currentCompanyId;
       const suppliers = await storage.getAllSuppliers();
 
+      // Build a set of supplier IDs that have activity (voucher entries or containers)
+      // in the current company — opening balance is only included for those suppliers.
+      // This prevents the global opening balance from leaking into sub-companies that
+      // have never transacted with a supplier.
+      let supplierIdsWithActivity = new Set<number>();
+      if (companyId) {
+        const [voucherRows, containerRows] = await Promise.all([
+          db.select({ supplierId: voucherEntries.supplierId })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              isNotNull(voucherEntries.supplierId),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )),
+          db.select({ supplierId: containers.supplierId })
+            .from(containers)
+            .where(eq(containers.companyId, companyId)),
+        ]);
+        for (const r of voucherRows) if (r.supplierId) supplierIdsWithActivity.add(r.supplierId);
+        for (const r of containerRows) if (r.supplierId) supplierIdsWithActivity.add(r.supplierId);
+      }
+
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
           const containerCount = await storage.getContainerCountBySupplier(
@@ -5075,7 +5099,11 @@ if (asOfDate) {
             poCount = pos.length;
           }
 
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          // Only include the global opening balance if this company has actual activity
+          // with the supplier (voucher entries or containers). Otherwise sub-companies
+          // would inherit the parent company's opening balance.
+          const hasActivityInCompany = !companyId || supplierIdsWithActivity.has(supplier.id);
+          const openingBalance = hasActivityInCompany ? parseFloat(supplier.openingBalance || "0") : 0;
 
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
@@ -5093,7 +5121,7 @@ if (asOfDate) {
             ...supplier,
             containerCount,
             balance,
-            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0 || openingBalance !== 0,
+            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0,
           };
         }),
       );
@@ -5132,12 +5160,15 @@ if (asOfDate) {
       if (isNaN(supplierId)) {
         return res.status(400).json({ message: "Invalid supplier ID" });
       }
+      const companyId = (req.session as any).currentCompanyId;
       const supplier = await storage.getSupplierById(supplierId);
       if (!supplier) {
         return res.status(404).json({ message: "Supplier not found" });
       }
-      const entries = await storage.getVoucherEntriesBySupplier(supplierId);
-      const openingBalance = parseFloat(supplier.openingBalance || "0");
+      // Filter entries by current company so sub-companies only see their own transactions
+      const entries = await storage.getVoucherEntriesBySupplier(supplierId, companyId || undefined);
+      // Only include global opening balance if this company has actual activity with the supplier
+      const openingBalance = entries.length > 0 ? parseFloat(supplier.openingBalance || "0") : 0;
       const balance = entries.reduce((sum, entry) => {
         const credit = parseFloat(entry.creditAmount || "0");
         const debit = parseFloat(entry.debitAmount || "0");
@@ -13261,7 +13292,15 @@ if (asOfDate) {
 
         // Get supplier opening balance
         const supplier = await storage.getSupplierById(supplierId);
-        const openingBalance = parseFloat(supplier?.openingBalance || "0");
+        const globalOpeningBalance = parseFloat(supplier?.openingBalance || "0");
+
+        // When filtering by a specific company, only include the global opening balance
+        // if that company has actually transacted with this supplier. Otherwise sub-companies
+        // would show a balance they don't own.
+        const openingBalance =
+          !filterCompanyId || voucherEntries.length > 0
+            ? globalOpeningBalance
+            : 0;
 
         // Add opening balance as first row if it exists
         const result: any[] = [];
