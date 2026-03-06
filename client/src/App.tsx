@@ -128,6 +128,7 @@ import FactoryCashflow from "@/pages/FactoryCashflow";
 import FactoryWaste from "@/pages/FactoryWaste";
 import FactoryIntelSettings from "@/pages/FactorySettings";
 import Chat from "@/pages/Chat";
+import SpreadsheetEditor from "@/pages/SpreadsheetEditor";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useEffect, useCallback, useState, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -233,6 +234,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
       <Route path="/factory-production"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/barcode-manager" component={BarcodeManager} />
+      <Route path="/spreadsheet" component={SpreadsheetEditor} />
       <Route path="/chat" component={Chat} />
       <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
       <Route path="/mix-batches"><Redirect to="/factory/mix-batches" /></Route>

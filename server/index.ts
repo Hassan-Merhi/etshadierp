@@ -229,6 +229,14 @@ app.use((req, res, next) => {
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_name text`,
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_type text`,
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_size integer`,
+    `CREATE TABLE IF NOT EXISTS spreadsheets (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL REFERENCES companies(id),
+      name text NOT NULL DEFAULT 'Untitled Spreadsheet',
+      data jsonb NOT NULL DEFAULT '[]',
+      created_by text,
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   for (const migration of migrations) {
     try {

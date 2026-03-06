@@ -399,6 +399,13 @@ export interface IStorage {
   openShift(shift: schema.InsertPosShift): Promise<schema.PosShift>;
   closeShift(id: number, closingCash: string, notes?: string): Promise<schema.PosShift>;
   updateShiftStats(id: number, salesCount: number, salesTotal: string): Promise<void>;
+
+  // Spreadsheets
+  listSpreadsheets(companyId: number): Promise<Pick<schema.Spreadsheet, "id" | "name" | "createdBy" | "updatedAt">[]>;
+  getSpreadsheet(id: number, companyId: number): Promise<schema.Spreadsheet | undefined>;
+  createSpreadsheet(companyId: number, name: string, data: any, createdBy?: string): Promise<schema.Spreadsheet>;
+  updateSpreadsheet(id: number, companyId: number, fields: { name?: string; data?: any }): Promise<schema.Spreadsheet | undefined>;
+  deleteSpreadsheet(id: number, companyId: number): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -6673,6 +6680,46 @@ export class DbStorage implements IStorage {
         salesTotal: salesTotal,
       })
       .where(eq(schema.posShifts.id, id));
+  }
+
+  // Spreadsheets
+  async listSpreadsheets(companyId: number): Promise<Pick<schema.Spreadsheet, "id" | "name" | "createdBy" | "updatedAt">[]> {
+    return db
+      .select({ id: schema.spreadsheets.id, name: schema.spreadsheets.name, createdBy: schema.spreadsheets.createdBy, updatedAt: schema.spreadsheets.updatedAt })
+      .from(schema.spreadsheets)
+      .where(eq(schema.spreadsheets.companyId, companyId))
+      .orderBy(desc(schema.spreadsheets.updatedAt));
+  }
+
+  async getSpreadsheet(id: number, companyId: number): Promise<schema.Spreadsheet | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.spreadsheets)
+      .where(and(eq(schema.spreadsheets.id, id), eq(schema.spreadsheets.companyId, companyId)));
+    return row;
+  }
+
+  async createSpreadsheet(companyId: number, name: string, data: any, createdBy?: string): Promise<schema.Spreadsheet> {
+    const [row] = await db
+      .insert(schema.spreadsheets)
+      .values({ companyId, name, data, createdBy: createdBy ?? null })
+      .returning();
+    return row;
+  }
+
+  async updateSpreadsheet(id: number, companyId: number, fields: { name?: string; data?: any }): Promise<schema.Spreadsheet | undefined> {
+    const [row] = await db
+      .update(schema.spreadsheets)
+      .set({ ...fields, updatedAt: sql`now()` })
+      .where(and(eq(schema.spreadsheets.id, id), eq(schema.spreadsheets.companyId, companyId)))
+      .returning();
+    return row;
+  }
+
+  async deleteSpreadsheet(id: number, companyId: number): Promise<void> {
+    await db
+      .delete(schema.spreadsheets)
+      .where(and(eq(schema.spreadsheets.id, id), eq(schema.spreadsheets.companyId, companyId)));
   }
 }
 

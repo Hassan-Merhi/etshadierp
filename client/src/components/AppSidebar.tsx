@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Upload,
   MessageCircle,
+  TableProperties,
 } from "lucide-react";
 import {
   Sidebar,
@@ -123,6 +124,7 @@ const navEntries: NavEntry[] = [
     ],
   },
   { kind: "item", title: "Create", url: "/create", icon: FolderPlus },
+  { kind: "item", title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
   { kind: "item", title: "Chat", url: "/chat", icon: MessageCircle },
   { kind: "item", title: "Settings", url: "/settings", icon: Settings },
 ];

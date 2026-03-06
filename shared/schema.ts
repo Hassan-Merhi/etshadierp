@@ -3467,3 +3467,26 @@ export const insertStoredFileSchema = createInsertSchema(storedFiles).omit({
 
 export type InsertStoredFile = z.infer<typeof insertStoredFileSchema>;
 export type StoredFile = typeof storedFiles.$inferSelect;
+
+// Spreadsheets table - shared Excel-like workbooks accessible by all ERP users
+export const spreadsheets = pgTable("spreadsheets", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull().default("Untitled Spreadsheet"),
+  data: jsonb("data").notNull().default([]),
+  createdBy: text("created_by"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSpreadsheetSchema = createInsertSchema(spreadsheets).omit({
+  id: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  name: z.string().min(1).default("Untitled Spreadsheet"),
+  data: z.any().default([]),
+  createdBy: z.string().optional(),
+});
+
+export type InsertSpreadsheet = z.infer<typeof insertSpreadsheetSchema>;
+export type Spreadsheet = typeof spreadsheets.$inferSelect;

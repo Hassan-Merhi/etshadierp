@@ -34866,6 +34866,68 @@ if (asOfDate) {
     }
   });
 
+  // ── Spreadsheets ───────────────────────────────────────────────────────────
+  app.get("/api/spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const list = await storage.listSpreadsheets(companyId);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const id = parseInt(req.params.id);
+      const sheet = await storage.getSpreadsheet(id, companyId);
+      if (!sheet) return res.status(404).json({ message: "Spreadsheet not found" });
+      res.json(sheet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const username = req.session?.username ?? req.session?.userId ?? "Unknown";
+      const { name, data } = req.body;
+      const sheet = await storage.createSpreadsheet(companyId, name || "Untitled Spreadsheet", data ?? [], username);
+      res.status(201).json(sheet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const id = parseInt(req.params.id);
+      const { name, data } = req.body;
+      const fields: { name?: string; data?: any } = {};
+      if (name !== undefined) fields.name = name;
+      if (data !== undefined) fields.data = data;
+      const sheet = await storage.updateSpreadsheet(id, companyId, fields);
+      if (!sheet) return res.status(404).json({ message: "Spreadsheet not found" });
+      res.json(sheet);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const id = parseInt(req.params.id);
+      await storage.deleteSpreadsheet(id, companyId);
+      res.json({ message: "Spreadsheet deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
