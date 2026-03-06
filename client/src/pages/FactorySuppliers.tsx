@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
-  FileText, Package, Weight, DollarSign, Calendar, ArrowLeft,
+  FileText, Package, Weight, Calendar, ArrowLeft,
   ChevronRight, Clock, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -34,11 +33,6 @@ interface SupplierWithBalance extends FactorySupplier {
   linkedErpSupplierName: string | null;
 }
 
-interface ErpSupplier {
-  id: number;
-  legalName: string;
-  name?: string;
-}
 
 interface StatementEntry {
   id: number;
@@ -82,16 +76,11 @@ export default function FactorySuppliers() {
     email: "",
     address: "",
     notes: "",
-    linkedSupplierId: null as number | null,
   });
   const { toast } = useToast();
 
   const { data: suppliers, isLoading } = useQuery<SupplierWithBalance[]>({
     queryKey: ["/api/factory/suppliers/with-balances"],
-  });
-
-  const { data: erpSuppliers = [] } = useQuery<ErpSupplier[]>({
-    queryKey: ["/api/suppliers"],
   });
 
   const { data: statementData, isLoading: statementLoading } = useQuery<StatementResponse>({
@@ -162,7 +151,7 @@ export default function FactorySuppliers() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", linkedSupplierId: null });
+    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "" });
   };
 
   const openEdit = (s: FactorySupplier) => {
@@ -174,7 +163,6 @@ export default function FactorySuppliers() {
       email: s.email || "",
       address: s.address || "",
       notes: s.notes || "",
-      linkedSupplierId: s.linkedSupplierId || null,
     });
   };
 
@@ -587,12 +575,6 @@ export default function FactorySuppliers() {
                           <Weight className="h-3.5 w-3.5 text-muted-foreground" />
                           {formatKg(s.totalKg)}
                         </span>
-                        {s.linkedErpSupplierName && (
-                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                            <DollarSign className="h-3 w-3" />
-                            {s.linkedErpSupplierName}
-                          </span>
-                        )}
                         {s.lastContainerDate && (
                           <span className="flex items-center gap-1 text-muted-foreground">
                             <Calendar className="h-3.5 w-3.5" />
@@ -722,25 +704,6 @@ export default function FactorySuppliers() {
                 placeholder="Notes"
                 data-testid="input-supplier-notes"
               />
-            </div>
-            <div>
-              <Label>Link to Accounting Supplier (for voucher balance)</Label>
-              <Select
-                value={formData.linkedSupplierId ? String(formData.linkedSupplierId) : "none"}
-                onValueChange={(val) => setFormData({ ...formData, linkedSupplierId: val === "none" ? null : parseInt(val) })}
-              >
-                <SelectTrigger data-testid="select-linked-erp-supplier">
-                  <SelectValue placeholder="None (no link)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {erpSuppliers.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.legalName || s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
