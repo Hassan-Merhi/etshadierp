@@ -103,7 +103,6 @@ export default function FactoryDaybook() {
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const [isDetailed, setIsDetailed] = useState(false);
-  const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
@@ -127,16 +126,39 @@ export default function FactoryDaybook() {
   });
 
   const condensedRows = useMemo(() => {
-    const byDate: Record<string, { date: string; count: number; totalUsd: number; types: Set<string> }> = {};
+    const grouped: Record<string, {
+      date: string;
+      txType: string;
+      currencyCode: string;
+      count: number;
+      totalAmountCurrency: number;
+      fxRateToUsd: string | null;
+      totalAmountUsd: number;
+    }> = {};
     entries.forEach((e) => {
-      if (!byDate[e.txDate]) {
-        byDate[e.txDate] = { date: e.txDate, count: 0, totalUsd: 0, types: new Set() };
+      const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          date: e.txDate,
+          txType: e.txType,
+          currencyCode: e.currencyCode,
+          count: 0,
+          totalAmountCurrency: 0,
+          fxRateToUsd: e.fxRateToUsd,
+          totalAmountUsd: 0,
+        };
       }
-      byDate[e.txDate].count += 1;
-      byDate[e.txDate].totalUsd += parseFloat(e.amountUsd || "0");
-      byDate[e.txDate].types.add(e.txType);
+      grouped[key].count += 1;
+      grouped[key].totalAmountCurrency += parseFloat(e.amountCurrency || "0");
+      grouped[key].totalAmountUsd += parseFloat(e.amountUsd || "0");
+      if (grouped[key].fxRateToUsd !== e.fxRateToUsd) {
+        grouped[key].fxRateToUsd = null;
+      }
     });
-    return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
+    return Object.values(grouped).sort((a, b) => {
+      if (b.date !== a.date) return b.date.localeCompare(a.date);
+      return a.txType.localeCompare(b.txType);
+    });
   }, [entries]);
 
   const editMutation = useMutation({
@@ -306,78 +328,48 @@ export default function FactoryDaybook() {
           ) : !isDetailed ? (
             condensedRows.length > 0 ? (
               <div className="overflow-x-auto">
-                <Table className="w-full table-fixed">
-                  <colgroup>
-                    <col className="w-[15%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[60%]" />
-                  </colgroup>
+                <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Entries</TableHead>
-                      <TableHead className="text-right">Total (USD)</TableHead>
-                      <TableHead>Types</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Currency</TableHead>
+                      <TableHead className="text-right">Amount (Currency)</TableHead>
+                      <TableHead className="text-right">FX Rate</TableHead>
+                      <TableHead className="text-right">Amount (USD)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {condensedRows.map((row) => {
-                      const isExpanded = expandedDate === row.date;
-                      const dayEntries = entries.filter((e) => e.txDate === row.date);
-                      return (
-                        <tbody key={row.date}>
-                          <TableRow
-                            data-testid={`row-condensed-${row.date}`}
-                            className="cursor-pointer hover-elevate"
-                            onClick={() => setExpandedDate(isExpanded ? null : row.date)}
-                          >
-                            <TableCell className="font-mono text-sm whitespace-nowrap">
-                              {new Date(row.date + "T00:00:00").toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">{row.count}</TableCell>
-                            <TableCell className="text-right font-mono font-medium">
-                              ${formatNumber(row.totalUsd)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-1 flex-wrap">
-                                {Array.from(row.types).map((t) => (
-                                  <Badge key={t} variant="default" className="text-xs">
-                                    {formatTxType(t)}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {isExpanded && dayEntries.map((entry) => {
-                            const isClickable = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId;
-                            return (
-                            <TableRow
-                              key={`expanded-${entry.id}`}
-                              className={`bg-muted/40${isClickable ? " cursor-pointer hover-elevate" : ""}`}
-                              data-testid={`row-expanded-${entry.id}`}
-                              onClick={isClickable ? (e) => handleEntryClick(entry, e) : undefined}
-                            >
-                              <TableCell className="pl-6 text-xs text-muted-foreground font-mono whitespace-nowrap" colSpan={1}>
-                                {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
-                              </TableCell>
-                              <TableCell colSpan={1}>
-                                <Badge variant="default" className="text-xs">
-                                  {formatTxType(entry.txType)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs" colSpan={1}>
-                                ${formatNumber(parseFloat(entry.amountUsd || "0"))}
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={entry.description}>
-                                {entry.description}
-                              </TableCell>
-                            </TableRow>
-                          );
-                          })}
-                        </tbody>
-                      );
-                    })}
+                    {condensedRows.map((row, idx) => (
+                      <TableRow key={idx} data-testid={`row-condensed-${row.date}-${row.txType}`}>
+                        <TableCell className="font-mono text-sm whitespace-nowrap">
+                          {new Date(row.date + "T00:00:00").toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="default">{formatTxType(row.txType)}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {row.count === 1 ? "1 entry" : `${row.count} entries`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{row.currencyCode}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(row.totalAmountCurrency)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {row.currencyCode === "USD"
+                            ? "-"
+                            : row.fxRateToUsd
+                            ? parseFloat(row.fxRateToUsd).toFixed(4)
+                            : "mixed"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          ${formatNumber(row.totalAmountUsd)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
