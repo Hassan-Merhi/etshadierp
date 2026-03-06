@@ -9,7 +9,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -50,7 +50,10 @@ export default function FactoryProformas() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("customerId") || "";
+  });
   const [expandedProformaId, setExpandedProformaId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProformaName, setNewProformaName] = useState("");

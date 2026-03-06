@@ -98,6 +98,7 @@ const allMenuGroups: MenuGroup[] = [
     title: "Sales",
     icon: ShoppingCart,
     items: [
+      { title: "Customers", url: "/factory/customers", icon: Users },
       { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
       { title: "Proformas", url: "/factory/sales/proformas", icon: FileText },
       { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
