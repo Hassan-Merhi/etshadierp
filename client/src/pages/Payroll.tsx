@@ -4232,7 +4232,8 @@ export default function Payroll() {
               const sorted = [...employeeTransactions].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
               const totalDebit = sorted.reduce((s: number, t: any) => s + (t.isDebit ? parseFloat(t.amount || "0") : 0), 0);
               const totalCredit = sorted.reduce((s: number, t: any) => s + (!t.isDebit ? parseFloat(t.amount || "0") : 0), 0);
-              const balance = totalCredit - totalDebit;
+              const currentBalance = parseFloat(statementEmployee?.calculatedBalance || "0");
+              const openingBalance = currentBalance - totalCredit + totalDebit;
               return (
                 <div className="space-y-3">
                   <div className="hidden md:block border rounded-md overflow-hidden">
@@ -4246,6 +4247,15 @@ export default function Payroll() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        <TableRow className="bg-muted/20 font-medium">
+                          <TableCell className="text-sm text-muted-foreground" colSpan={2}>Opening Balance</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {openingBalance >= 0 ? formatAmount(openingBalance) : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                        </TableRow>
                         {sorted.map((txn: any) => (
                           <TableRow key={txn.id || `${txn.voucherId}-${txn.date}`}>
                             <TableCell className="font-mono text-sm whitespace-nowrap">
@@ -4270,9 +4280,9 @@ export default function Payroll() {
                           <TableCell className="text-right font-mono text-sm">{formatAmount(totalCredit)}</TableCell>
                         </TableRow>
                         <TableRow className="font-semibold bg-muted/20">
-                          <TableCell colSpan={3} className="text-sm text-muted-foreground">Remaining Balance</TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${balance >= 0 ? "" : "text-destructive"}`}>
-                            {formatAmount(Math.abs(balance))}{balance < 0 ? " (Dr)" : ""}
+                          <TableCell colSpan={3} className="text-sm text-muted-foreground">Current Balance</TableCell>
+                          <TableCell className={`text-right font-mono text-sm ${currentBalance >= 0 ? "" : "text-destructive"}`}>
+                            {formatAmount(Math.abs(currentBalance))}{currentBalance < 0 ? " (Dr)" : ""}
                           </TableCell>
                         </TableRow>
                       </tfoot>
@@ -4297,6 +4307,10 @@ export default function Payroll() {
                     ))}
                     <div className="pt-2 space-y-1 border-t-2">
                       <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Opening Balance</span>
+                        <span className="font-mono font-semibold">{formatAmount(Math.abs(openingBalance))}{openingBalance < 0 ? " (Dr)" : ""}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total Debit</span>
                         <span className="font-mono font-semibold">{formatAmount(totalDebit)}</span>
                       </div>
@@ -4305,8 +4319,8 @@ export default function Payroll() {
                         <span className="font-mono font-semibold">{formatAmount(totalCredit)}</span>
                       </div>
                       <div className="flex justify-between text-sm font-semibold">
-                        <span>Balance</span>
-                        <span className={`font-mono ${balance >= 0 ? "" : "text-destructive"}`}>{formatAmount(Math.abs(balance))}{balance < 0 ? " (Dr)" : ""}</span>
+                        <span>Current Balance</span>
+                        <span className={`font-mono ${currentBalance >= 0 ? "" : "text-destructive"}`}>{formatAmount(Math.abs(currentBalance))}{currentBalance < 0 ? " (Dr)" : ""}</span>
                       </div>
                     </div>
                   </div>
