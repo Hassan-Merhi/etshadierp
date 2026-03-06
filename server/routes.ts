@@ -31576,7 +31576,7 @@ if (asOfDate) {
       }
 
       res.json({
-        enabled: user?.chatbotEnabled || false,
+        enabled: true,
         providerName,
         selectedProvider,
         hasApiKey,
@@ -31635,16 +31635,6 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Check if user has chatbot enabled
-      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user?.chatbotEnabled) {
-        console.log("[Chatbot] Error: Chatbot not enabled for user");
-        return res.status(403).json({ message: "Chatbot is not enabled for your account" });
-      }
-
       const { message, sessionId } = req.body;
       if (!message || !sessionId) {
         console.log("[Chatbot] Error: Missing message or sessionId");
@@ -31687,16 +31677,6 @@ if (asOfDate) {
       if (!userId) {
         console.log("[Chatbot] History error: Not authenticated");
         return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      // Check if user has chatbot enabled
-      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user?.chatbotEnabled) {
-        console.log("[Chatbot] History error: Chatbot not enabled");
-        return res.status(403).json({ message: "Chatbot is not enabled for your account" });
       }
 
       const { sessionId } = req.params;
