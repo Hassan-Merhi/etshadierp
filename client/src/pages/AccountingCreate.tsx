@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -139,9 +140,11 @@ const getDefaultValues = (entityType: EntityType) => {
 function EntityFormWrapper({
   entityType,
   config,
+  onCreated,
 }: {
   entityType: EntityType;
   config: (typeof entityConfig)[EntityType];
+  onCreated?: () => void;
 }) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -190,6 +193,7 @@ function EntityFormWrapper({
       }
 
       form.reset(getDefaultValues(entityType) as any);
+      onCreated?.();
     },
     onError: (error: any) => {
       toast({
@@ -281,7 +285,10 @@ interface SidebarGroup {
 export default function AccountingCreate() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const [, navigate] = useLocation();
   const [selectedEntity, setSelectedEntity] = useState<EntityType>("location");
+  const isFactory = appMode === "factory";
+  const handleCreated = () => navigate(isFactory ? "/factory/accounts" : "/accounting");
   const config = entityConfig[selectedEntity];
 
   const sidebarGroups: SidebarGroup[] = [
@@ -344,6 +351,7 @@ export default function AccountingCreate() {
             key={selectedEntity}
             entityType={selectedEntity}
             config={config}
+            onCreated={handleCreated}
           />
         </div>
       </div>
