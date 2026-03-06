@@ -61,7 +61,6 @@ import Bales from "@/pages/Bales";
 import MixBatches from "@/pages/MixBatches";
 import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
-import BaleTransfer from "@/pages/bale-transfer";
 import OrphanedRecords from "@/pages/OrphanedRecords";
 import DeletedItems from "@/pages/DeletedItems";
 import ChatbotSettings from "@/pages/ChatbotSettings";
@@ -87,7 +86,6 @@ import BalesHistory from "@/pages/BalesHistory";
 import FactoryBaleProductHistory, { FactoryBaleProductMonthDetail } from "@/pages/FactoryBaleProductHistory";
 import BarcodeLookup from "@/pages/BarcodeLookup";
 import ProductionSummary from "@/pages/ProductionSummary";
-import BaleTransfers from "@/pages/BaleTransfers";
 import FactorySuppliers from "@/pages/FactorySuppliers";
 import FactoryContainers from "@/pages/FactoryContainers";
 import BarcodeManager from "@/pages/BarcodeManager";
@@ -538,7 +536,6 @@ function AuthenticatedApp() {
                     <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>
                     <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
-                    <Route path="/factory/bale-transfers" component={BaleTransfers} />
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />

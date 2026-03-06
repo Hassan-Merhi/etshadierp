@@ -6,7 +6,6 @@ import {
   Container,
   History,
   BarChart3,
-  ArrowRightLeft,
   ScanLine,
   CheckCircle,
   Users,
@@ -122,13 +121,6 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Pending Invoices", url: "/factory/sales/pending-invoices", icon: ClipboardCheck },
       { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
       { title: "Proformas", url: "/factory/sales/proformas", icon: FileText },
-    ],
-  },
-  {
-    title: "Logistics",
-    icon: ArrowRightLeft,
-    items: [
-      { title: "Bale Transfers", url: "/factory/bale-transfers", icon: ArrowRightLeft },
     ],
   },
   {
