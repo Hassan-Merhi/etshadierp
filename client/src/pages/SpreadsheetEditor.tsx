@@ -159,17 +159,9 @@ export default function SpreadsheetEditor() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDataRef = useRef<FortuneSheet[]>([]);
-  const openSheetIdTrackRef = useRef<number | null>(null);
-  const openTimeRef = useRef<number>(0);
+  const hasInteractedRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-
-  // Set synchronously during render (before any effects) so the 200ms guard
-  // is already in place when Fortune Sheet fires its init onChange in its child useEffect.
-  if (openSheetIdTrackRef.current !== openSheetId) {
-    openSheetIdTrackRef.current = openSheetId;
-    openTimeRef.current = Date.now();
-  }
 
   const { data: library = [], isLoading: libraryLoading } = useQuery<any[]>({
     queryKey: ["/api/spreadsheets"],
@@ -245,10 +237,12 @@ export default function SpreadsheetEditor() {
 
   const handleChange = useCallback(
     (data: FortuneSheet[]) => {
-      // Ignore any onChange fired within 200ms of the sheet opening.
-      // Fortune Sheet always fires its initialization onChange within ~50ms of mount.
-      // A real user action (click a cell then type) always takes > 200ms.
-      if (Date.now() - openTimeRef.current < 200) return;
+      // Only save data that results from a real user interaction.
+      // Fortune Sheet fires onChange multiple times during initialization
+      // (at ~50ms AND again at ~200-500ms for formula/dependency computation).
+      // Blocking all saves until the user physically clicks or types ensures
+      // we never overwrite correct uploaded data with Fortune Sheet's init state.
+      if (!hasInteractedRef.current) return;
       currentDataRef.current = data;
       setSaveStatus("unsaved");
       scheduleSave(data);
@@ -256,8 +250,13 @@ export default function SpreadsheetEditor() {
     [scheduleSave]
   );
 
+  const markInteracted = useCallback(() => {
+    hasInteractedRef.current = true;
+  }, []);
+
   useEffect(() => {
     currentDataRef.current = [];
+    hasInteractedRef.current = false;
     setSaveStatus("saved");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, [openSheetId]);
@@ -396,7 +395,13 @@ export default function SpreadsheetEditor() {
             </Button>
           </div>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div
+          style={{ height: "calc(100vh - 104px)" }}
+          className="overflow-hidden"
+          onMouseDown={markInteracted}
+          onKeyDown={markInteracted}
+          onTouchStart={markInteracted}
+        >
           {(sheetLoading || !openedSheet) ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
