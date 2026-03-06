@@ -8037,6 +8037,31 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     }
   });
 
+  app.delete("/api/chat/messages/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const otherUserId = req.params.userId;
+
+      await db.delete(directMessages)
+        .where(
+          or(
+            and(
+              eq(directMessages.senderId, currentUserId),
+              eq(directMessages.receiverId, otherUserId)
+            ),
+            and(
+              eq(directMessages.senderId, otherUserId),
+              eq(directMessages.receiverId, currentUserId)
+            )
+          )
+        );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/chat/unread-count", requireAuth, async (req: any, res: any) => {
     try {
       const currentUserId = (req.session as any).userId;

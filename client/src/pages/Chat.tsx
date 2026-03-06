@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, MessageCircle, Check, CheckCheck, Plus, Search } from "lucide-react";
+import { Send, MessageCircle, Check, CheckCheck, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -27,6 +27,7 @@ export default function Chat() {
   const [messageText, setMessageText] = useState("");
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const appMode = useAppMode();
@@ -75,6 +76,26 @@ export default function Chat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/users"] });
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/chat/messages/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear messages");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedUserId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/users"] });
+      setClearConfirmOpen(false);
+      toast({ title: "Conversation cleared" });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear messages", variant: "destructive" });
     },
   });
 
@@ -189,7 +210,17 @@ export default function Chat() {
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="text-xs">{selectedUser ? getInitials(selectedUser.username) : "?"}</AvatarFallback>
               </Avatar>
-              <span className="font-semibold text-sm">{selectedUser?.username}</span>
+              <span className="font-semibold text-sm flex-1">{selectedUser?.username}</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setClearConfirmOpen(true)}
+                disabled={messages.length === 0}
+                data-testid="button-clear-messages"
+                title="Clear conversation"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -258,6 +289,35 @@ export default function Chat() {
           </>
         )}
       </Card>
+
+      {/* Clear messages confirmation dialog */}
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear Conversation</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all messages with <strong>{selectedUser?.username}</strong>. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setClearConfirmOpen(false)}
+              data-testid="button-cancel-clear"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => selectedUserId && clearMutation.mutate(selectedUserId)}
+              disabled={clearMutation.isPending}
+              data-testid="button-confirm-clear"
+            >
+              {clearMutation.isPending ? "Clearing..." : "Clear Messages"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New chat dialog */}
       <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
