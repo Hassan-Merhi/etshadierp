@@ -310,6 +310,26 @@ export default function Accounts() {
     enabled: !!selectedAccount,
   });
 
+  // Fetch pre-period balance when a period start date is set
+  const prePeriodAccountType = selectedAccount
+    ? (selectedAccount.type || "").toLowerCase().replace(" ", "-")
+    : null;
+  const { data: prePeriodData } = useQuery<{ balance: number }>({
+    queryKey: selectedAccount && periodFilter.fromDate
+      ? [`/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/pre-period-balance`, { endDate: periodFilter.fromDate }]
+      : [],
+    queryFn: async () => {
+      if (!selectedAccount || !periodFilter.fromDate || !prePeriodAccountType) return { balance: 0 };
+      const res = await fetch(
+        `/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/pre-period-balance?endDate=${encodeURIComponent(periodFilter.fromDate)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return { balance: 0 };
+      return res.json();
+    },
+    enabled: !!selectedAccount && !!periodFilter.fromDate,
+  });
+
   // Restore account from URL params when accounts load
   useEffect(() => {
     if (
@@ -491,7 +511,11 @@ export default function Accounts() {
   const groupedVouchers = groupTransactionsByVoucher();
 
   // Calculate opening balance
+  // When a period start date is active, use the pre-period balance (closing of last period)
   const getOpeningBalance = (): number => {
+    if (periodFilter.fromDate && prePeriodData !== undefined) {
+      return prePeriodData.balance;
+    }
     const rawOpeningBalance = parseBalance(
       selectedAccount?.openingBalance ?? 0,
     );
@@ -1852,7 +1876,7 @@ export default function Accounts() {
                                 colSpan={3}
                                 className="text-right font-bold py-2"
                               >
-                                Period Closing Balance:
+                                Current Balance:
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
@@ -1907,7 +1931,7 @@ export default function Accounts() {
                             <span className="font-mono font-semibold">{formatAmount(transactionTotals.totalCredit)}</span>
                           </div>
                           <div className="flex justify-between bg-accent/50 p-2 rounded border-t-2">
-                            <span className="font-bold">Period Closing Balance:</span>
+                            <span className="font-bold">Current Balance:</span>
                             <span className="font-mono font-bold">
                               {formatAmount(Math.abs(closingBalance))}{" "}
                               {selectedAccount?.type === "supplier"

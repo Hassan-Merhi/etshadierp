@@ -13032,6 +13032,100 @@ if (asOfDate) {
     },
   );
 
+  // Compute the pre-period (opening) balance for any account type
+  // endDate = last day BEFORE the current period start
+  app.get("/api/accounts/:type/:id/pre-period-balance", requireAuth, async (req, res) => {
+    try {
+      const accountType = req.params.type;
+      const accountId = parseInt(req.params.id);
+      const { endDate } = req.query as { endDate?: string };
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+
+      // Map type to the FK column name in voucher_entries
+      const typeToColumn: Record<string, any> = {
+        ledger: voucherEntries.ledgerAccountId,
+        bank: voucherEntries.bankAccountId,
+        "fixed-asset": voucherEntries.fixedAssetId,
+        supplier: voucherEntries.supplierId,
+        employee: voucherEntries.employeeId,
+        customer: voucherEntries.customerId,
+      };
+      const entryColumn = typeToColumn[accountType];
+      if (!entryColumn) return res.status(400).json({ message: "Unknown account type" });
+
+      // Get initial opening balance from the account table
+      let rawOB = 0;
+      let obSide = "Dr";
+      if (accountType === "ledger") {
+        const [acct] = await db.select({ ob: ledgerAccounts.openingBalance, side: ledgerAccounts.openingBalanceSide })
+          .from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = acct?.side ?? "Dr";
+      } else if (accountType === "bank") {
+        const [acct] = await db.select({ ob: bankAccounts.openingBalance, side: bankAccounts.openingBalanceSide })
+          .from(bankAccounts).where(eq(bankAccounts.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = acct?.side ?? "Dr";
+      } else if (accountType === "supplier") {
+        const [acct] = await db.select({ ob: suppliers.openingBalance })
+          .from(suppliers).where(eq(suppliers.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = "Cr";
+      } else if (accountType === "employee") {
+        const [acct] = await db.select({ ob: employees.openingBalance })
+          .from(employees).where(eq(employees.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = "Dr";
+      } else if (accountType === "customer") {
+        const [acct] = await db.select({ ob: customers.openingBalance })
+          .from(customers).where(eq(customers.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = "Dr";
+      } else if (accountType === "fixed-asset") {
+        const [acct] = await db.select({ ob: fixedAssets.openingBalance })
+          .from(fixedAssets).where(eq(fixedAssets.id, accountId));
+        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        obSide = "Dr";
+      }
+
+      // Signed initial opening balance
+      // Supplier: positive rawOB is treated as Cr (they're owed money)
+      // Others: Cr side means negative in Dr-positive convention
+      const isSupplier = accountType === "supplier";
+      let balance = isSupplier ? rawOB : (obSide === "Cr" ? -rawOB : rawOB);
+
+      // Sum all voucher entries before endDate (exclusive of period start)
+      if (endDate) {
+        const conditions: any[] = [
+          eq(entryColumn, accountId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+          sql`${vouchers.voucherDate} < ${endDate}`,
+        ];
+        const [totals] = await db.select({
+          totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}), 0)`,
+          totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}), 0)`,
+        }).from(voucherEntries)
+          .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(...conditions));
+
+        const sumDebit = parseFloat(totals?.totalDebit ?? "0") || 0;
+        const sumCredit = parseFloat(totals?.totalCredit ?? "0") || 0;
+        if (isSupplier) {
+          balance += sumCredit - sumDebit;
+        } else {
+          balance += sumDebit - sumCredit;
+        }
+      }
+
+      res.json({ balance });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all vouchers with date filtering
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
