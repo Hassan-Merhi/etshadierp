@@ -18,7 +18,7 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
@@ -125,6 +125,7 @@ import FactoryCashflow from "@/pages/FactoryCashflow";
 import FactoryWaste from "@/pages/FactoryWaste";
 import FactoryIntelSettings from "@/pages/FactorySettings";
 import Chat from "@/pages/Chat";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useEffect, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -255,6 +256,7 @@ function AuthenticatedApp() {
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   
   const { data: user, isLoading, error } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -461,8 +463,20 @@ function AuthenticatedApp() {
               </SidebarFooter>
             </Sidebar>
             <div className="flex flex-col flex-1 min-w-0">
-              <header className="flex items-center gap-2 p-2 border-b h-12">
+              <header className="flex items-center justify-between gap-2 p-2 border-b h-12">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-1.5 text-muted-foreground"
+                  onClick={() => setPaletteOpen(true)}
+                  data-testid="button-open-palette"
+                >
+                  <Search className="h-4 w-4" />
+                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                    Ctrl K
+                  </kbd>
+                </Button>
               </header>
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
@@ -472,6 +486,11 @@ function AuthenticatedApp() {
             </div>
           </div>
         </SidebarProvider>
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          isPOS={true}
+        />
         {leaveConfirmDialog}
       </>
     );
@@ -522,6 +541,18 @@ function AuthenticatedApp() {
                       Switch to ERP
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                    onClick={() => setPaletteOpen(true)}
+                    data-testid="button-open-palette"
+                  >
+                    <Search className="h-4 w-4" />
+                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                      Ctrl K
+                    </kbd>
+                  </Button>
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                     <LogOut className="h-4 w-4" />
@@ -605,6 +636,14 @@ function AuthenticatedApp() {
             </div>
           </div>
         </SidebarProvider>
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          hasErpAccess={hasErpAccess}
+          hasFactoryAccess={hasFactoryAccess}
+          isAdminOwner={isAdminOwner}
+          hasDashboardAccess={hasDashboardAccess}
+        />
         {leaveConfirmDialog}
       </AppModeProvider>
     );
@@ -621,6 +660,18 @@ function AuthenticatedApp() {
             <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-1.5 text-muted-foreground"
+                  onClick={() => setPaletteOpen(true)}
+                  data-testid="button-open-palette"
+                >
+                  <Search className="h-4 w-4" />
+                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                    Ctrl K
+                  </kbd>
+                </Button>
                 <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                 <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="h-4 w-4" />
@@ -638,6 +689,14 @@ function AuthenticatedApp() {
           </div>
         </div>
       </SidebarProvider>
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        hasErpAccess={hasErpAccess}
+        hasFactoryAccess={hasFactoryAccess}
+        isAdminOwner={isAdminOwner}
+        hasDashboardAccess={hasDashboardAccess}
+      />
       {leaveConfirmDialog}
     </AppModeProvider>
   );
