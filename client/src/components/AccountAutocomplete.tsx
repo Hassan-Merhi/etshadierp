@@ -75,6 +75,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     }));
 
     // Filter accounts based on search term (search both name and code/barcode)
+    const filteredAccounts = useMemo(() => {
       const term = (searchTerm ?? "").toLowerCase();
 
       return allAccounts.filter((acc) =>
