@@ -159,14 +159,14 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => setScanFlash(null), 500);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setScanCode("");
-      scannerRef.current?.focus();
+      setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
       setScanFlash("error");
       setTimeout(() => setScanFlash(null), 500);
       toast({ title: "Scan Error", description: error.message, variant: "destructive" });
       setScanCode("");
-      scannerRef.current?.focus();
+      setTimeout(() => scannerRef.current?.focus(), 100);
     },
   });
 

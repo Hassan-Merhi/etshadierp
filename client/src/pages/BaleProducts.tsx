@@ -775,28 +775,11 @@ export default function BaleProducts() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Grade (generates new article code)</Label>
-              <Select value={editForm.grade} onValueChange={handleGradeChange}>
-                <SelectTrigger data-testid="select-edit-product-grade" disabled={isGeneratingCode}>
-                  <SelectValue placeholder="Select grade to regenerate code..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CREAM">CREAM</SelectItem>
-                  <SelectItem value="#1">#1</SelectItem>
-                  <SelectItem value="#2">#2</SelectItem>
-                  <SelectItem value="#3">#3</SelectItem>
-                  <SelectItem value="#4">#4</SelectItem>
-                  <SelectItem value="Garbage">Garbage</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="edit-articleCode">Article Code</Label>
               <Input
                 id="edit-articleCode"
-                value={isGeneratingCode ? "Generating..." : editForm.articleCode}
+                value={editForm.articleCode}
                 onChange={(e) => setEditForm({ ...editForm, articleCode: e.target.value })}
-                disabled={isGeneratingCode}
                 className="font-mono"
                 data-testid="input-edit-product-articleCode"
               />

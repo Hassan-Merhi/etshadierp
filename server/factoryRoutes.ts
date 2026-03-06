@@ -6429,6 +6429,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
 
+      // Check if this scan code matches a bale already reserved (status = RESERVED_FOR_ORDER).
+      // This prevents scanning the same physical bale/ref code a second time from silently
+      // jumping to the next available bale instead of blocking with a clear error.
+      const [reservedBale] = await db.select().from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.status, "RESERVED_FOR_ORDER"),
+          or(
+            eq(factoryBales.referenceNumber, scanCode),
+            eq(factoryBales.baleCode, scanCode),
+            eq(factoryBales.articleCode, scanCode)
+          )
+        ));
+
+      if (reservedBale) {
+        const [inThisOrder] = await db.select().from(customerOrderBales)
+          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.baleId, reservedBale.id)));
+        if (inThisOrder) {
+          return res.status(400).json({ message: `${reservedBale.referenceNumber || scanCode} is already loaded in this order` });
+        }
+        return res.status(400).json({ message: `Bale ${reservedBale.referenceNumber || scanCode} is reserved for another loading order` });
+      }
+
       const [bale] = await db.select().from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
