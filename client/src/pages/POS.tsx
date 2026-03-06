@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown, Plus, Pencil, X } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -39,6 +39,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface SaleRow {
   id: string;
@@ -235,6 +241,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const itemListRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Mobile-specific state
+  const [mobileItemSearchOpen, setMobileItemSearchOpen] = useState(false);
+  const [mobileItemSearchTerm, setMobileItemSearchTerm] = useState("");
+  const [mobileItemSearchTarget, setMobileItemSearchTarget] = useState<number | null>(null);
+  const [mobileRowEditOpen, setMobileRowEditOpen] = useState(false);
+  const [mobileRowEditIndex, setMobileRowEditIndex] = useState<number | null>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Reset sale state when POS user switches location
   const prevLocationRef = useRef<number | null>(null);
@@ -1151,6 +1165,68 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }, 0);
   };
 
+  // Mobile helpers
+  const openMobileItemSearch = (rowIndex: number) => {
+    setMobileItemSearchTarget(rowIndex);
+    setMobileItemSearchTerm("");
+    setMobileItemSearchOpen(true);
+    setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
+  };
+
+  const selectMobileItem = (item: InventoryItem & { stockItemId: number }) => {
+    if (item.stock === 0) {
+      setZeroStockItem(item.name);
+      setZeroStockAlert(true);
+      return;
+    }
+    const targetRow = mobileItemSearchTarget ?? rows.length - 1;
+    const lastSoldPrice = lastSoldPrices[item.stockItemId];
+    const rateUSD = lastSoldPrice ? parseFloat(lastSoldPrice) : item.price;
+    const displayRate = activeCurrency === "CFA" && exchangeRate ? Math.round(rateUSD * exchangeRate) : rateUSD;
+    const newRows = [...rows];
+    const qty = newRows[targetRow].quantity || 1;
+    newRows[targetRow] = {
+      ...newRows[targetRow],
+      itemName: item.name,
+      stockItemCode: item.code,
+      rate: displayRate,
+      rateUSD,
+      quantity: qty,
+      stockItemId: item.stockItemId,
+      amount: qty * displayRate,
+    };
+    if (targetRow === rows.length - 1) {
+      newRows.push({ id: String(rows.length + 1), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
+    }
+    setRows(newRows);
+    setMobileItemSearchOpen(false);
+    setMobileItemSearchTerm("");
+    // Open row editor so user can adjust qty/rate
+    setMobileRowEditIndex(targetRow);
+    setMobileRowEditOpen(true);
+  };
+
+  const getMobileFilteredInventory = () => {
+    if (!mobileItemSearchTerm) return inventory;
+    const searchNorm = (mobileItemSearchTerm || "").toLowerCase().replace(/[.\-\s]/g, "");
+    return inventory.filter((item) =>
+      (item.name || "").toLowerCase().replace(/[.\-\s]/g, "").includes(searchNorm) ||
+      (item.code || "").toLowerCase().replace(/[.\-\s]/g, "").includes(searchNorm)
+    );
+  };
+
+  const addMobileRow = () => {
+    const newRowIndex = rows.length - 1;
+    // If the last row already has an item, push a fresh empty row first
+    if (rows[newRowIndex].stockItemId) {
+      const newRow = { id: String(rows.length + 1), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 };
+      setRows(prev => [...prev, newRow]);
+      openMobileItemSearch(rows.length);
+    } else {
+      openMobileItemSearch(newRowIndex);
+    }
+  };
+
   // Export current Sale to Excel
   const handleExportSale = (detailed: boolean) => {
     const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
@@ -1541,7 +1617,64 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4">
+      {/* ── MOBILE card list (hidden on md+) ── */}
+      <div className="md:hidden space-y-1 pb-36">
+        {rows.map((row, realIndex) => {
+          if (!row.stockItemId) return null;
+          return (
+            <div
+              key={row.id}
+              className="rounded-md border bg-card px-3 py-2.5 flex items-center gap-2 hover-elevate active-elevate-2 cursor-pointer"
+              onClick={() => { setMobileRowEditIndex(realIndex); setMobileRowEditOpen(true); }}
+              data-testid={`mobile-row-card-${realIndex}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground shrink-0">{realIndex + 1}.</span>
+                  <span className="text-sm font-medium truncate">{row.itemName}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  Qty: {row.quantity} · Rate: {formatDisplayAmount(row.rate)}
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center gap-1.5">
+                <span className="text-sm font-semibold font-mono">{formatDisplayAmount(row.amount)}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteRow(realIndex); }}
+                  data-testid={`mobile-delete-row-${realIndex}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+        {/* "Add item" card */}
+        <div
+          className="rounded-md border border-dashed border-muted-foreground/30 px-3 py-3 flex items-center gap-2 text-muted-foreground cursor-pointer hover-elevate active-elevate-2"
+          onClick={addMobileRow}
+          data-testid="mobile-add-item-card"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="text-sm">Tap to add item</span>
+        </div>
+
+        {/* Mobile summary */}
+        <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">
+            {rows.filter(r => r.amount > 0).length} items · Qty {totalQty > 0 ? totalQty.toFixed(2) : "0"}
+          </span>
+          <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">
+            {formatDisplayAmount(total)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── DESKTOP table + right search panel (hidden on mobile) ── */}
+      <div className="hidden md:flex flex-col lg:flex-row gap-4">
         {/* Main Spreadsheet Area */}
         <Card className="flex-1 overflow-hidden min-w-0">
           <div className="overflow-x-auto">
@@ -1659,35 +1792,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         </div>
                       ))}
                     </div>
-                    {/* Mobile inline autocomplete dropdown */}
-                    {activeRow === rowIndex && filteredItems.length > 0 && (
-                      <div className="lg:hidden border-b border-muted bg-background shadow-md max-h-48 overflow-y-auto z-20 relative">
-                        {filteredItems.slice(0, 8).map((item, idx) => (
-                          <button
-                            key={item.code}
-                            onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
-                            className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-2 border-b border-muted/30 active-elevate-2 ${
-                              item.stock === 0 ? "opacity-60" : ""
-                            } ${idx === highlightedIndex ? "bg-accent" : ""}`}
-                            data-testid={`mobile-item-${idx}`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm">{item.name}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{item.code}</div>
-                            </div>
-                            <div className={`text-xs font-medium px-2 py-0.5 rounded shrink-0 ${
-                              item.stock === 0 
-                                ? "bg-destructive/10 text-destructive" 
-                                : item.stock < 10
-                                ? "bg-chart-3/10 text-chart-3"
-                                : "bg-chart-2/10 text-chart-2"
-                            }`}>
-                              {item.stock === 0 ? "Out" : `${item.stock}`}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1792,6 +1896,197 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* ── MOBILE: Full-screen item search Sheet ── */}
+      <Sheet open={mobileItemSearchOpen} onOpenChange={(open) => { setMobileItemSearchOpen(open); if (!open) setMobileItemSearchTerm(""); }}>
+        <SheetContent side="bottom" className="h-[90vh] flex flex-col p-0">
+          <SheetHeader className="px-4 pt-4 pb-2 border-b shrink-0">
+            <SheetTitle className="text-base">Select Item</SheetTitle>
+            <div className="relative mt-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={mobileSearchInputRef}
+                placeholder="Search by name or code..."
+                value={mobileItemSearchTerm}
+                onChange={(e) => setMobileItemSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-mobile-item-search"
+              />
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto">
+            {(() => {
+              const mobileFiltered = getMobileFilteredInventory();
+              const inStock = mobileFiltered.filter(i => i.stock > 0);
+              const outOfStock = mobileFiltered.filter(i => i.stock === 0);
+              const sorted = [...inStock, ...outOfStock];
+              return sorted.map((item) => (
+                <button
+                  key={item.code}
+                  className={`w-full text-left px-4 py-3 border-b border-muted/40 flex items-center justify-between gap-3 active-elevate-2 ${item.stock === 0 ? "opacity-50" : ""}`}
+                  onClick={() => selectMobileItem(item)}
+                  data-testid={`mobile-search-item-${item.code}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{item.name}</div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.code}</div>
+                  </div>
+                  <div className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${
+                    item.stock === 0 ? "bg-destructive/10 text-destructive"
+                    : item.stock < 10 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    : "bg-green-500/10 text-green-700 dark:text-green-400"
+                  }`}>
+                    {item.stock === 0 ? "Out" : `${item.stock}`}
+                  </div>
+                </button>
+              ));
+            })()}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── MOBILE: Row editor Sheet ── */}
+      <Sheet open={mobileRowEditOpen} onOpenChange={setMobileRowEditOpen}>
+        <SheetContent side="bottom" className="flex flex-col p-0" style={{ height: "auto", maxHeight: "85vh" }}>
+          {mobileRowEditIndex !== null && rows[mobileRowEditIndex] && (() => {
+            const row = rows[mobileRowEditIndex];
+            return (
+              <>
+                <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <SheetTitle className="text-base truncate">{row.itemName || "New Item"}</SheetTitle>
+                      {row.stockItemCode && <p className="text-xs text-muted-foreground font-mono mt-0.5">{row.stockItemCode}</p>}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-xs"
+                      onClick={() => { setMobileRowEditOpen(false); openMobileItemSearch(mobileRowEditIndex); }}
+                      data-testid="button-mobile-change-item"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Change
+                    </Button>
+                  </div>
+                </SheetHeader>
+                <div className="px-4 py-4 space-y-5 overflow-y-auto">
+                  {/* Quantity */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Quantity</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 h-12 w-12"
+                        onClick={() => {
+                          const newQty = Math.max(0, (row.quantity || 0) - 1);
+                          updateRow(mobileRowEditIndex, "quantity", newQty);
+                        }}
+                        data-testid="button-mobile-qty-minus"
+                      >
+                        <span className="text-xl font-bold">−</span>
+                      </Button>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        value={row.quantity === 0 ? "" : row.quantity}
+                        onChange={(e) => updateRow(mobileRowEditIndex, "quantity", e.target.value)}
+                        className="flex-1 text-center text-lg font-mono h-12"
+                        placeholder="0"
+                        style={{ fontSize: "18px" }}
+                        data-testid="input-mobile-qty"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 h-12 w-12"
+                        onClick={() => {
+                          updateRow(mobileRowEditIndex, "quantity", (row.quantity || 0) + 1);
+                        }}
+                        data-testid="button-mobile-qty-plus"
+                      >
+                        <span className="text-xl font-bold">+</span>
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Rate */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Rate ({activeCurrency})</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      value={row.rate === 0 ? "" : row.rate}
+                      onChange={(e) => updateRow(mobileRowEditIndex, "rate", e.target.value)}
+                      className="text-right font-mono h-12 text-lg"
+                      placeholder="0"
+                      style={{ fontSize: "18px" }}
+                      data-testid="input-mobile-rate"
+                    />
+                  </div>
+                  {/* Amount */}
+                  <div className="rounded-md bg-muted/30 border px-3 py-2.5 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Amount</span>
+                    <span className="text-lg font-semibold font-mono">{formatDisplayAmount(row.amount)}</span>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1 pb-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => { handleDeleteRow(mobileRowEditIndex); setMobileRowEditOpen(false); }}
+                      data-testid="button-mobile-remove-row"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1.5" />
+                      Remove
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setMobileRowEditOpen(false)}
+                      data-testid="button-mobile-row-done"
+                    >
+                      <Check className="h-4 w-4 mr-1.5" />
+                      Done
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── MOBILE: FAB (floating add button) ── */}
+      <button
+        className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        onClick={addMobileRow}
+        data-testid="button-mobile-fab-add"
+        aria-label="Add item"
+      >
+        <Plus className="h-7 w-7" />
+      </button>
+
+      {/* ── MOBILE: Sticky save bar ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-3 py-2 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-muted-foreground truncate">
+            {rows.filter(r => r.amount > 0).length} items · Qty {totalQty > 0 ? totalQty.toFixed(2) : "0"}
+          </div>
+          <div className="text-base font-semibold font-mono leading-tight" data-testid="text-sticky-total">
+            {formatDisplayAmount(total)}
+          </div>
+        </div>
+        <Button
+          onClick={handleSaveSale}
+          disabled={saveMutation.isPending}
+          className="shrink-0 h-10 px-5"
+          data-testid="button-mobile-sticky-save"
+        >
+          {saveMutation.isPending ? "..." : <><Check className="h-4 w-4 mr-1.5" />{editVoucherId ? "Update" : "Save"}</>}
+        </Button>
       </div>
 
       {/* Zero Stock Alert Dialog */}
