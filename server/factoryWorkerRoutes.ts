@@ -353,9 +353,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
+      const updateData = { ...req.body };
+      for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
+        if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = null;
+      }
       const [updated] = await db
         .update(factoryWorkers)
-        .set({ ...req.body, updatedAt: new Date() })
+        .set({ ...updateData, updatedAt: new Date() })
         .where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)))
         .returning();
 
