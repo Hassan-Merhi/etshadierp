@@ -168,6 +168,11 @@ export default function SpreadsheetEditor() {
 
   const { data: openedSheet, isLoading: sheetLoading } = useQuery<any>({
     queryKey: ["/api/spreadsheets", openSheetId],
+    queryFn: async () => {
+      const res = await fetch(`/api/spreadsheets/${openSheetId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load spreadsheet");
+      return res.json();
+    },
     enabled: openSheetId !== null,
   });
 
