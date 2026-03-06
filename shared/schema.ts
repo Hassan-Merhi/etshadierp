@@ -2155,6 +2155,7 @@ export const factorySuppliers = pgTable("factory_suppliers", {
   address: text("address"),
   notes: text("notes"),
   openingBalance: decimal("opening_balance", { precision: 20, scale: 4 }).notNull().default("0"),
+  linkedSupplierId: integer("linked_supplier_id"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2175,6 +2176,7 @@ export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers).
   address: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   openingBalance: z.string().optional(),
+  linkedSupplierId: z.number().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 

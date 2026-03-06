@@ -78,6 +78,7 @@ import {
   inventory,
   exchangeRates,
   vouchers,
+  suppliers,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -1019,7 +1020,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const suppliers = await db
+      const suppliersList = await db
         .select()
         .from(factorySuppliers)
         .where(eq(factorySuppliers.companyId, companyId))
@@ -1030,13 +1031,49 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factoryContainers)
         .where(eq(factoryContainers.companyId, companyId));
 
-      const suppliersWithBalances = suppliers.map((s: any) => {
+      // Fetch ERP supplier voucher entries for balance computation
+      const linkedSupplierIds = suppliersList
+        .map((s: any) => s.linkedSupplierId)
+        .filter(Boolean);
+
+      let voucherEntryMap: Record<number, { credits: number; debits: number }> = {};
+      if (linkedSupplierIds.length > 0) {
+        const entries = await db
+          .select({
+            supplierId: voucherEntries.supplierId,
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              inArray(voucherEntries.supplierId, linkedSupplierIds),
+              sql`${vouchers.deleted_at} IS NULL`
+            )
+          );
+        for (const e of entries) {
+          if (!e.supplierId) continue;
+          if (!voucherEntryMap[e.supplierId]) voucherEntryMap[e.supplierId] = { credits: 0, debits: 0 };
+          voucherEntryMap[e.supplierId].credits += parseFloat(e.creditAmount || "0");
+          voucherEntryMap[e.supplierId].debits += parseFloat(e.debitAmount || "0");
+        }
+      }
+
+      // Fetch ERP suppliers for name+id display
+      const erpSuppliers = await db
+        .select({ id: suppliers.id, name: suppliers.legalName })
+        .from(suppliers)
+        .where(eq(suppliers.companyId, companyId));
+
+      const suppliersWithBalances = suppliersList.map((s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
         const totalContainers = supplierContainers.length;
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
-        const totalValue = supplierContainers.reduce((sum: number, c: any) => {
+        const containerValue = supplierContainers.reduce((sum: number, c: any) => {
           if (c.finalPayableAmount) return sum + parseFloat(c.finalPayableAmount);
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
@@ -1052,14 +1089,26 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             }, null)
           : null;
 
+        // Compute actual balance: openingBalance + containerValue + voucherCredits - voucherDebits
+        let balance = parseFloat(s.openingBalance || "0") + containerValue;
+        if (s.linkedSupplierId && voucherEntryMap[s.linkedSupplierId]) {
+          const { credits, debits } = voucherEntryMap[s.linkedSupplierId];
+          balance = balance + credits - debits;
+        }
+
+        const linkedErpSupplierName = s.linkedSupplierId
+          ? (erpSuppliers.find((e: any) => e.id === s.linkedSupplierId)?.name || null)
+          : null;
+
         return {
           ...s,
           totalContainers,
           totalKg: totalKg.toFixed(3),
-          totalValue: totalValue.toFixed(2),
+          totalValue: balance.toFixed(2),
           pendingContainers,
           receivedContainers,
           lastContainerDate,
+          linkedErpSupplierName,
         };
       });
 

@@ -16,6 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,13 @@ interface SupplierWithBalance extends FactorySupplier {
   pendingContainers: number;
   receivedContainers: number;
   lastContainerDate: string | null;
+  linkedErpSupplierName: string | null;
+}
+
+interface ErpSupplier {
+  id: number;
+  legalName: string;
+  name?: string;
 }
 
 interface StatementEntry {
@@ -74,11 +82,16 @@ export default function FactorySuppliers() {
     email: "",
     address: "",
     notes: "",
+    linkedSupplierId: null as number | null,
   });
   const { toast } = useToast();
 
   const { data: suppliers, isLoading } = useQuery<SupplierWithBalance[]>({
     queryKey: ["/api/factory/suppliers/with-balances"],
+  });
+
+  const { data: erpSuppliers = [] } = useQuery<ErpSupplier[]>({
+    queryKey: ["/api/suppliers"],
   });
 
   const { data: statementData, isLoading: statementLoading } = useQuery<StatementResponse>({
@@ -149,7 +162,7 @@ export default function FactorySuppliers() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "" });
+    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", linkedSupplierId: null });
   };
 
   const openEdit = (s: FactorySupplier) => {
@@ -161,6 +174,7 @@ export default function FactorySuppliers() {
       email: s.email || "",
       address: s.address || "",
       notes: s.notes || "",
+      linkedSupplierId: s.linkedSupplierId || null,
     });
   };
 
@@ -562,13 +576,25 @@ export default function FactorySuppliers() {
                           <Package className="h-3.5 w-3.5 text-muted-foreground" />
                           {s.totalContainers} container{s.totalContainers !== 1 ? "s" : ""}
                         </span>
+                        {s.pendingContainers > 0 && (
+                          <span className="flex items-center gap-1 text-amber-500" data-testid={`text-supplier-otw-${s.id}`}>
+                            <Clock className="h-3.5 w-3.5" />
+                            {s.pendingContainers} OTW
+                          </span>
+                        )}
                         <span className="flex items-center gap-1" data-testid={`text-supplier-kg-${s.id}`}>
                           <Weight className="h-3.5 w-3.5 text-muted-foreground" />
                           {formatKg(s.totalKg)}
                         </span>
+                        {s.linkedErpSupplierName && (
+                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                            <DollarSign className="h-3 w-3" />
+                            {s.linkedErpSupplierName}
+                          </span>
+                        )}
                         {s.lastContainerDate && (
                           <span className="flex items-center gap-1 text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
+                            <Calendar className="h-3.5 w-3.5" />
                             Last: {formatDate(s.lastContainerDate)}
                           </span>
                         )}
@@ -691,6 +717,25 @@ export default function FactorySuppliers() {
                 placeholder="Notes"
                 data-testid="input-supplier-notes"
               />
+            </div>
+            <div>
+              <Label>Link to Accounting Supplier (for voucher balance)</Label>
+              <Select
+                value={formData.linkedSupplierId ? String(formData.linkedSupplierId) : "none"}
+                onValueChange={(val) => setFormData({ ...formData, linkedSupplierId: val === "none" ? null : parseInt(val) })}
+              >
+                <SelectTrigger data-testid="select-linked-erp-supplier">
+                  <SelectValue placeholder="None (no link)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {erpSuppliers.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.legalName || s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
