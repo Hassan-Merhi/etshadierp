@@ -639,7 +639,7 @@ function AuthenticatedApp() {
         <CommandPalette
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
-          hasErpAccess={hasErpAccess}
+          hasErpAccess={false}
           hasFactoryAccess={hasFactoryAccess}
           isAdminOwner={isAdminOwner}
           hasDashboardAccess={hasDashboardAccess}
@@ -693,7 +693,7 @@ function AuthenticatedApp() {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         hasErpAccess={hasErpAccess}
-        hasFactoryAccess={hasFactoryAccess}
+        hasFactoryAccess={false}
         isAdminOwner={isAdminOwner}
         hasDashboardAccess={hasDashboardAccess}
       />
