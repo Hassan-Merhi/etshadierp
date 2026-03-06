@@ -64,8 +64,13 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-const menuGroups: MenuGroup[] = [
+type NavEntry =
+  | ({ kind: "group" } & MenuGroup)
+  | ({ kind: "item" } & MenuItem);
+
+const navEntries: NavEntry[] = [
   {
+    kind: "group",
     title: "Overview",
     icon: Eye,
     items: [
@@ -74,6 +79,7 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    kind: "group",
     title: "Inventory",
     icon: Boxes,
     items: [
@@ -86,6 +92,7 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    kind: "group",
     title: "Accounting",
     icon: Calculator,
     items: [
@@ -95,7 +102,10 @@ const menuGroups: MenuGroup[] = [
       { title: "Payroll", url: "/payroll", icon: UserCheck },
     ],
   },
+  { kind: "item", title: "Daybook", url: "/daybook", icon: Book },
+  { kind: "item", title: "Vouchers", url: "/vouchers", icon: Receipt },
   {
+    kind: "group",
     title: "Sales & POS",
     icon: Store,
     items: [
@@ -104,6 +114,7 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    kind: "group",
     title: "Analytics",
     icon: TrendingUp,
     items: [
@@ -111,14 +122,9 @@ const menuGroups: MenuGroup[] = [
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
     ],
   },
-];
-
-const standaloneItems: MenuItem[] = [
-  { title: "Create", url: "/create", icon: FolderPlus },
-  { title: "Chat", url: "/chat", icon: MessageCircle },
-  { title: "Vouchers", url: "/vouchers", icon: Receipt },
-  { title: "Daybook", url: "/daybook", icon: Book },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { kind: "item", title: "Create", url: "/create", icon: FolderPlus },
+  { kind: "item", title: "Chat", url: "/chat", icon: MessageCircle },
+  { kind: "item", title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
@@ -148,8 +154,9 @@ export function AppSidebar({ user }: { user?: any }) {
 
   // Auto-collapse: only keep the group containing current route open
   useEffect(() => {
-    const activeGroup = menuGroups.find(group => 
-      group.items.some(item => location === item.url)
+    const activeGroup = navEntries.find(
+      (entry): entry is ({ kind: "group" } & MenuGroup) =>
+        entry.kind === "group" && entry.items.some(item => location === item.url)
     );
     if (activeGroup) {
       setOpenGroups([activeGroup.title]);
@@ -247,69 +254,69 @@ export function AppSidebar({ user }: { user?: any }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuGroups.map((group) => {
-                const visibleItems = group.items.filter(isItemVisible);
-                if (visibleItems.length === 0) return null;
+              {navEntries.map((entry) => {
+                if (entry.kind === "group") {
+                  const visibleItems = entry.items.filter(isItemVisible);
+                  if (visibleItems.length === 0) return null;
 
-                const isOpen = openGroups.includes(group.title);
-                const hasActiveItem = isGroupActive(group);
+                  const isOpen = openGroups.includes(entry.title);
+                  const hasActiveItem = isGroupActive(entry);
 
+                  return (
+                    <Collapsible
+                      key={entry.title}
+                      open={isOpen || hasActiveItem}
+                      onOpenChange={() => toggleGroup(entry.title)}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton
+                            className="w-full justify-between"
+                            isActive={hasActiveItem && !isOpen}
+                          >
+                            <div className="flex items-center gap-2">
+                              <entry.icon className="h-4 w-4" />
+                              <span>{entry.title}</span>
+                            </div>
+                            <ChevronRight
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                isOpen || hasActiveItem ? "rotate-90" : ""
+                              }`}
+                            />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {visibleItems.map((item) => {
+                              const isActive = location === item.url;
+                              return (
+                                <SidebarMenuSubItem key={item.title}>
+                                  <SidebarMenuSubButton asChild isActive={isActive}>
+                                    <a href={item.url} data-testid={`link-${item.url}`}>
+                                      <item.icon className="h-4 w-4" />
+                                      <span>{item.title}</span>
+                                    </a>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                }
+
+                if (!isItemVisible(entry)) return null;
+                const isActive = location === entry.url;
+                const unreadCount = entry.title === "Chat" ? (chatUnread?.count || 0) : 0;
                 return (
-                  <Collapsible
-                    key={group.title}
-                    open={isOpen || hasActiveItem}
-                    onOpenChange={() => toggleGroup(group.title)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          className="w-full justify-between"
-                          isActive={hasActiveItem && !isOpen}
-                        >
-                          <div className="flex items-center gap-2">
-                            <group.icon className="h-4 w-4" />
-                            <span>{group.title}</span>
-                          </div>
-                          <ChevronRight
-                            className={`h-4 w-4 transition-transform duration-200 ${
-                              isOpen || hasActiveItem ? "rotate-90" : ""
-                            }`}
-                          />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {visibleItems.map((item) => {
-                            const isActive = location === item.url;
-                            return (
-                              <SidebarMenuSubItem key={item.title}>
-                                <SidebarMenuSubButton asChild isActive={isActive}>
-                                  <a href={item.url} data-testid={`link-${item.url}`}>
-                                    <item.icon className="h-4 w-4" />
-                                    <span>{item.title}</span>
-                                  </a>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })}
-
-              {standaloneItems.map((item) => {
-                if (!isItemVisible(item)) return null;
-                const isActive = location === item.url;
-                const unreadCount = item.title === "Chat" ? (chatUnread?.count || 0) : 0;
-                return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={entry.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <a href={item.url} data-testid={`link-${item.url}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span className="flex-1">{item.title}</span>
+                      <a href={entry.url} data-testid={`link-${entry.url}`}>
+                        <entry.icon className="h-4 w-4" />
+                        <span className="flex-1">{entry.title}</span>
                         {unreadCount > 0 && (
                           <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
                             {unreadCount}
