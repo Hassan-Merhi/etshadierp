@@ -4228,78 +4228,91 @@ export default function Payroll() {
               <div className="text-center py-8 text-muted-foreground">
                 No transactions found for this employee
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="hidden md:block border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Voucher #</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Dr/Cr</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...employeeTransactions]
-                        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map((txn: any) => (
+            ) : (() => {
+              const sorted = [...employeeTransactions].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              const totalDebit = sorted.reduce((s: number, t: any) => s + (t.isDebit ? parseFloat(t.amount || "0") : 0), 0);
+              const totalCredit = sorted.reduce((s: number, t: any) => s + (!t.isDebit ? parseFloat(t.amount || "0") : 0), 0);
+              const balance = totalCredit - totalDebit;
+              return (
+                <div className="space-y-3">
+                  <div className="hidden md:block border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sorted.map((txn: any) => (
                           <TableRow key={txn.id || `${txn.voucherId}-${txn.date}`}>
-                            <TableCell className="font-mono text-sm">
+                            <TableCell className="font-mono text-sm whitespace-nowrap">
                               {txn.date ? formatDisplayDate(txn.date) : "-"}
                             </TableCell>
-                            <TableCell className="font-mono font-medium">
-                              {txn.voucherNumber || "-"}
+                            <TableCell className="text-sm text-muted-foreground">
+                              {txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-"}
                             </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge variant="outline">{txn.voucherType || "-"}</Badge>
+                            <TableCell className="text-right font-mono text-sm">
+                              {txn.isDebit ? formatAmount(parseFloat(txn.amount || "0")) : <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell className="text-sm max-w-[200px] truncate">
-                              {txn.narration || txn.description || "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(parseFloat(txn.amount || "0"))}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={txn.isDebit ? "secondary" : "default"}>
-                                {txn.isDebit ? "Dr" : "Cr"}
-                              </Badge>
+                            <TableCell className="text-right font-mono text-sm">
+                              {!txn.isDebit ? formatAmount(parseFloat(txn.amount || "0")) : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                           </TableRow>
                         ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="md:hidden space-y-3">
-                  {[...employeeTransactions]
-                    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .map((txn: any) => (
-                      <Card key={txn.id || `${txn.voucherId}-${txn.date}`}>
-                        <CardContent className="p-3 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-sm">{txn.date ? formatDisplayDate(txn.date) : "-"}</span>
-                            <Badge variant={txn.isDebit ? "secondary" : "default"}>
-                              {txn.isDebit ? "Dr" : "Cr"}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">{txn.voucherType || "-"}</Badge>
-                              <span className="font-mono">{txn.voucherNumber || "-"}</span>
-                            </div>
-                            <span className="font-mono font-medium">{formatAmount(parseFloat(txn.amount || "0"))}</span>
-                          </div>
-                          {(txn.narration || txn.description) && (
-                            <div className="text-sm text-muted-foreground truncate">{txn.narration || txn.description}</div>
+                      </TableBody>
+                      <tfoot>
+                        <TableRow className="border-t-2 font-semibold bg-muted/40">
+                          <TableCell colSpan={2} className="text-sm">Total</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatAmount(totalDebit)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatAmount(totalCredit)}</TableCell>
+                        </TableRow>
+                        <TableRow className="font-semibold bg-muted/20">
+                          <TableCell colSpan={3} className="text-sm text-muted-foreground">Remaining Balance</TableCell>
+                          <TableCell className={`text-right font-mono text-sm ${balance >= 0 ? "" : "text-destructive"}`}>
+                            {formatAmount(Math.abs(balance))}{balance < 0 ? " (Dr)" : ""}
+                          </TableCell>
+                        </TableRow>
+                      </tfoot>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-2">
+                    {sorted.map((txn: any) => (
+                      <div key={txn.id || `${txn.voucherId}-${txn.date}`} className="flex items-start justify-between gap-3 py-2 border-b last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground font-mono">{txn.date ? formatDisplayDate(txn.date) : "-"}</p>
+                          <p className="text-sm truncate">{txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-"}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {txn.isDebit ? (
+                            <p className="font-mono text-sm font-medium">{formatAmount(parseFloat(txn.amount || "0"))}</p>
+                          ) : (
+                            <p className="font-mono text-sm font-medium text-green-600 dark:text-green-400">{formatAmount(parseFloat(txn.amount || "0"))}</p>
                           )}
-                        </CardContent>
-                      </Card>
+                          <p className="text-xs text-muted-foreground">{txn.isDebit ? "Dr" : "Cr"}</p>
+                        </div>
+                      </div>
                     ))}
+                    <div className="pt-2 space-y-1 border-t-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Debit</span>
+                        <span className="font-mono font-semibold">{formatAmount(totalDebit)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Credit</span>
+                        <span className="font-mono font-semibold">{formatAmount(totalCredit)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold">
+                        <span>Balance</span>
+                        <span className={`font-mono ${balance >= 0 ? "" : "text-destructive"}`}>{formatAmount(Math.abs(balance))}{balance < 0 ? " (Dr)" : ""}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
