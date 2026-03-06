@@ -131,7 +131,7 @@ function defaultBlankSheets(): FortuneSheet[] {
       name: "Sheet1",
       status: 1,
       order: 0,
-      celldata: [],
+      data: Array.from({ length: 50 }, () => Array(26).fill(null)),
       row: 50,
       column: 26,
     } as FortuneSheet,
@@ -159,6 +159,7 @@ export default function SpreadsheetEditor() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentDataRef = useRef<FortuneSheet[]>([]);
+  const isFirstChangeRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +183,7 @@ export default function SpreadsheetEditor() {
       return res.json();
     },
     onSuccess: (sheet) => {
+      queryClient.setQueryData(["/api/spreadsheets", sheet.id], sheet);
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"] });
       setOpenSheetId(sheet.id);
       setSheetName(sheet.name);
@@ -235,6 +237,10 @@ export default function SpreadsheetEditor() {
 
   const handleChange = useCallback(
     (data: FortuneSheet[]) => {
+      if (isFirstChangeRef.current) {
+        isFirstChangeRef.current = false;
+        return;
+      }
       currentDataRef.current = data;
       setSaveStatus("unsaved");
       scheduleSave(data);
@@ -244,6 +250,7 @@ export default function SpreadsheetEditor() {
 
   useEffect(() => {
     currentDataRef.current = [];
+    isFirstChangeRef.current = true;
     setSaveStatus("saved");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, [openSheetId]);
@@ -383,7 +390,7 @@ export default function SpreadsheetEditor() {
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          {sheetLoading ? (
+          {(sheetLoading || !openedSheet) ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               Loading spreadsheet…
