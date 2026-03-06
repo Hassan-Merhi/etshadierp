@@ -91,6 +91,7 @@ export interface IStorage {
   getEmployeeByCode(code: string): Promise<Employee | undefined>;
   getEmployeeById(id: number): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: number, companyId: number, updates: Partial<InsertEmployee>): Promise<Employee | undefined>;
   deleteEmployee(id: number, forceDelete?: boolean): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}>;
 
   // Employee Groups
@@ -797,6 +798,15 @@ export class DbStorage implements IStorage {
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
     const [created] = await db.insert(schema.employees).values([employee as any]).returning();
     return created;
+  }
+
+  async updateEmployee(id: number, companyId: number, updates: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    const [updated] = await db
+      .update(schema.employees)
+      .set(updates as any)
+      .where(and(eq(schema.employees.id, id), eq(schema.employees.companyId, companyId)))
+      .returning();
+    return updated;
   }
 
   async deleteEmployee(id: number, forceDelete: boolean = false): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}> {

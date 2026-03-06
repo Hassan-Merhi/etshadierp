@@ -3507,6 +3507,39 @@ if (asOfDate) {
     }
   });
 
+  app.patch("/api/employees/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId } = req.body;
+
+      const updates: Record<string, any> = {};
+      if (firstName !== undefined) updates.firstName = firstName;
+      if (lastName !== undefined) updates.lastName = lastName;
+      if (code !== undefined) updates.code = code;
+      if (monthlySalary !== undefined) updates.monthlySalary = monthlySalary;
+      if (department !== undefined) updates.department = department;
+      if (active !== undefined) updates.active = active;
+      if (joinDate !== undefined) updates.joinDate = joinDate;
+      if (employeeGroupId !== undefined) updates.employeeGroupId = employeeGroupId === null || employeeGroupId === "" || employeeGroupId === "none" ? null : parseInt(employeeGroupId);
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      const updated = await storage.updateEmployee(id, companyId, updates as any);
+      if (!updated) return res.status(404).json({ message: "Employee not found" });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/employees/:id", requireAuth, async (req, res) => {
     try {
       // Only Admin can delete employees
