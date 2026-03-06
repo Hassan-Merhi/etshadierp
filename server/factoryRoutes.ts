@@ -1751,6 +1751,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       if (!existing) return res.status(404).json({ message: "Product not found" });
 
+      // If article code is being changed, verify it isn't already taken by another product
+      if (articleCode !== undefined && articleCode !== existing.articleCode) {
+        const [conflict] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            eq(factoryBaleProducts.articleCode, articleCode),
+            sql`${factoryBaleProducts.id} != ${id}`
+          ));
+        if (conflict) {
+          return res.status(400).json({ message: `Article code "${articleCode}" is already used by another product` });
+        }
+      }
+
       const productUpdate: any = { updatedAt: new Date() };
       if (name !== undefined) productUpdate.name = name;
       if (weightPerBaleKg !== undefined) productUpdate.weightPerBaleKg = weightPerBaleKg;
