@@ -217,7 +217,6 @@ export default function FactoryContainerLoadingScan() {
         queryKey: ["/api/factory/customer-orders", orderId],
       });
       setScanCode("");
-      setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
       setScanFlash("error");
@@ -228,9 +227,21 @@ export default function FactoryContainerLoadingScan() {
         variant: "destructive",
       });
       setScanCode("");
-      setTimeout(() => scannerRef.current?.focus(), 100);
     },
   });
+
+  // Restore focus to the scan input whenever the mutation finishes (success or error).
+  // Using a useEffect keyed on isPending is more reliable than setTimeout because
+  // it fires after React re-enables the input (disabled={isPending}), so focus
+  // is never called on a disabled element.
+  const wasPending = useRef(false);
+  useEffect(() => {
+    const justFinished = wasPending.current && !addBaleMutation.isPending;
+    wasPending.current = addBaleMutation.isPending;
+    if (justFinished && scannerRef.current) {
+      scannerRef.current.focus();
+    }
+  }, [addBaleMutation.isPending]);
 
   const removeBaleMutation = useMutation({
     mutationFn: async (baleId: number) => {
