@@ -86,6 +86,9 @@ import BaleStockEntry from "@/pages/BaleStockEntry";
 import BalesHistory from "@/pages/BalesHistory";
 import FactoryBaleProductHistory, { FactoryBaleProductMonthDetail } from "@/pages/FactoryBaleProductHistory";
 import BarcodeLookup from "@/pages/BarcodeLookup";
+import FactoryBalesHub from "@/pages/FactoryBalesHub";
+import FactoryRawMaterialsHub from "@/pages/FactoryRawMaterialsHub";
+import FactoryLoadingsHub from "@/pages/FactoryLoadingsHub";
 import ProductionSummary from "@/pages/ProductionSummary";
 import FactorySuppliers from "@/pages/FactorySuppliers";
 import FactoryContainers from "@/pages/FactoryContainers";
@@ -533,10 +536,12 @@ function AuthenticatedApp() {
                     <Route path="/factory/bale-products" component={BaleProducts} />
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />
                     <Route path="/factory/mix-batches" component={MixBatches} />
+                    <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
                     <Route path="/factory/pressing"><Redirect to="/factory/stock-entry" /></Route>
                     <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>
                     <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
+                    <Route path="/factory/bales-hub" component={FactoryBalesHub} />
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
@@ -554,6 +559,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
                     <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
                     <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
+                    <Route path="/factory/sales/loadings" component={FactoryLoadingsHub} />
                     <Route path="/factory/sales/pending-invoices/:id/verify" component={FactoryPendingInvoiceVerify} />
                     <Route path="/factory/sales/pending-invoices" component={FactoryPendingInvoices} />
                     <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />

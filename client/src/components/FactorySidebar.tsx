@@ -85,42 +85,22 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "Master Data",
-    icon: Tags,
-    items: [
-      { title: "Suppliers", url: "/factory/suppliers", icon: Users },
-      { title: "Customers", url: "/factory/customers", icon: ShoppingCart },
-      { title: "Containers", url: "/factory/containers", icon: Container },
-      { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
-      { title: "Workers", url: "/factory/workers", icon: HardHat },
-    ],
-  },
-  {
-    title: "Raw Materials",
-    icon: Package,
-    items: [
-      { title: "Raw Stock", url: "/factory/raw-stock", icon: Package },
-      { title: "Mix Batches", url: "/factory/mix-batches", icon: Boxes },
-    ],
-  },
-  {
-    title: "Production",
-    icon: ScanLine,
+    title: "Operations",
+    icon: Factory,
     items: [
       { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
-      { title: "Bales History", url: "/factory/bales-history", icon: History },
-      { title: "Barcode Lookup", url: "/factory/barcode-lookup", icon: Search },
+      { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
+      { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
+      { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
     ],
   },
   {
     title: "Sales",
     icon: ShoppingCart,
     items: [
-      { title: "Container Loading", url: "/factory/sales/loading/new", icon: Container },
-      { title: "Pending Loadings", url: "/factory/sales/loading/pending", icon: Clock },
-      { title: "Pending Invoices", url: "/factory/sales/pending-invoices", icon: ClipboardCheck },
-      { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
+      { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
       { title: "Proformas", url: "/factory/sales/proformas", icon: FileText },
+      { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
     ],
   },
   {
@@ -136,24 +116,17 @@ const allMenuGroups: MenuGroup[] = [
     title: "Accounting",
     icon: Landmark,
     items: [
-      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
-      { title: "Create", url: "/factory/create", icon: PlusCircle },
+      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
     ],
   },
   {
     title: "Finance",
     icon: Wallet,
     items: [
-      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
-      { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Reports",
-    icon: ClipboardCheck,
-    items: [
-      { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
+      { title: "Workers", url: "/factory/workers", icon: HardHat },
+      { title: "Suppliers", url: "/factory/suppliers", icon: Users },
+      { title: "Containers", url: "/factory/containers", icon: Container },
     ],
   },
   {
@@ -169,6 +142,15 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Mix Optimizer", url: "/factory/intelligence/mix-optimizer", icon: Beaker, featureFlag: "mixOptimizerEnabled" },
       { title: "Cash Flow", url: "/factory/intelligence/cashflow", icon: DollarSign, featureFlag: "cashflowEnabled" },
       { title: "Intelligence Settings", url: "/factory/intelligence/settings", icon: Settings, adminOnly: true },
+    ],
+  },
+  {
+    title: "Reports",
+    icon: ClipboardCheck,
+    items: [
+      { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
+      { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
     ],
   },
 ];
