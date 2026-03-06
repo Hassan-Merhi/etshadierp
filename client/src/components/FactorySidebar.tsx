@@ -59,7 +59,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 
 interface MenuItem {
   title: string;
@@ -82,7 +82,6 @@ const allMenuGroups: MenuGroup[] = [
     icon: LayoutDashboard,
     items: [
       { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard, requiresExplicitAccess: true },
-      { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
     ],
   },
   {
@@ -292,8 +291,8 @@ export function FactorySidebar({ user }: { user?: any }) {
                 const hasActiveItem = isGroupActive(group);
 
                 return (
+                  <Fragment key={group.title}>
                   <Collapsible
-                    key={group.title}
                     open={isOpen || hasActiveItem}
                     onOpenChange={() => toggleGroup(group.title)}
                     className="group/collapsible"
@@ -334,6 +333,17 @@ export function FactorySidebar({ user }: { user?: any }) {
                       </CollapsibleContent>
                     </SidebarMenuItem>
                   </Collapsible>
+                  {group.title === "Overview" && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={location === "/factory/daybook"}>
+                        <a href="/factory/daybook" data-testid="link-factory-daybook" className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4" />
+                          <span>Daybook</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                  </Fragment>
                 );
               })}
 
