@@ -194,121 +194,108 @@ export default function LedgerVouchers() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="border rounded-lg overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-24">Date</TableHead>
-                        <TableHead>Particulars</TableHead>
-                        <TableHead className="w-32 hidden sm:table-cell">Vch Type</TableHead>
-                        <TableHead className="text-right w-32">Debit</TableHead>
-                        <TableHead className="text-right w-32">Credit</TableHead>
-                        <TableHead className="w-8 hidden sm:table-cell"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.vouchers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
-                            <p className="text-muted-foreground">
-                              No vouchers found for this period
-                            </p>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {data.vouchers.map((voucher) => (
-                            <TableRow
-                              key={voucher.id}
-                              className="cursor-pointer hover-elevate"
-                              onClick={() => handleVoucherClick(voucher.voucherId)}
-                              data-testid={`row-voucher-${voucher.voucherId}`}
-                            >
-                              <TableCell className="font-mono text-sm">
-                                {formatShortDate(voucher.date)}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {voucher.particulars}
-                              </TableCell>
-                              <TableCell className="hidden sm:table-cell">
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-xs ${
-                                    voucherTypeColors[voucher.voucherType] || ""
-                                  }`}
-                                >
-                                  {voucher.voucherType}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {voucher.debit > 0
-                                  ? formatAmount(voucher.debit)
-                                  : ""}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {voucher.credit > 0
-                                  ? formatAmount(voucher.credit)
-                                  : ""}
-                              </TableCell>
-                              <TableCell className="hidden sm:table-cell">
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                {(() => {
+                  let runningBal = data.openingBalance;
+                  const vouchersWithBal = data.vouchers.map((v) => {
+                    runningBal = runningBal + v.credit - v.debit;
+                    return { ...v, runningBalance: runningBal };
+                  });
+                  const formatBal = (bal: number) =>
+                    bal === 0
+                      ? "—"
+                      : `${formatAmount(Math.abs(bal))} ${bal >= 0 ? "Cr" : "Dr"}`;
+                  return (
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-28">Date</TableHead>
+                            <TableHead className="w-28 hidden sm:table-cell">Type</TableHead>
+                            <TableHead>Particulars</TableHead>
+                            <TableHead className="text-right w-32">Debit</TableHead>
+                            <TableHead className="text-right w-32">Credit</TableHead>
+                            <TableHead className="text-right w-36">Balance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {/* Opening Balance Row */}
+                          <TableRow className="bg-muted/20 font-semibold">
+                            <TableCell className="text-sm text-muted-foreground" colSpan={3}>Opening Balance</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatBal(data.openingBalance)}
+                            </TableCell>
+                          </TableRow>
+                          {data.vouchers.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8">
+                                <p className="text-muted-foreground">No vouchers found for this period</p>
                               </TableCell>
                             </TableRow>
-                          ))}
-
-                          {/* Totals Row */}
-                          <TableRow className="bg-primary/10 font-bold border-t-2">
-                            <TableCell colSpan={2}></TableCell>
-                            <TableCell className="hidden sm:table-cell"></TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(data.totals.debit)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(data.totals.credit)}
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell"></TableCell>
+                          ) : (
+                            vouchersWithBal.map((voucher) => (
+                              <TableRow
+                                key={voucher.id}
+                                className="cursor-pointer hover-elevate"
+                                onClick={() => handleVoucherClick(voucher.voucherId)}
+                                data-testid={`row-voucher-${voucher.voucherId}`}
+                              >
+                                <TableCell className="font-mono text-sm whitespace-nowrap">
+                                  {formatShortDate(voucher.date)}
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs ${voucherTypeColors[voucher.voucherType] || ""}`}
+                                  >
+                                    {voucher.voucherType}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {voucher.particulars}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {voucher.debit > 0 ? formatAmount(voucher.debit) : <span className="text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {voucher.credit > 0 ? formatAmount(voucher.credit) : <span className="text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {formatBal(voucher.runningBalance)}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                        <tfoot>
+                          <TableRow className="border-t bg-muted/20 text-sm">
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">Opening Balance:</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                            <TableCell className="text-right font-mono">{formatBal(data.openingBalance)}</TableCell>
                           </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                          <TableRow className="bg-muted/10 text-sm">
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">Current Total:</TableCell>
+                            <TableCell className="text-right font-mono font-semibold">{data.totals.debit > 0 ? formatAmount(data.totals.debit) : "—"}</TableCell>
+                            <TableCell className="text-right font-mono font-semibold">{data.totals.credit > 0 ? formatAmount(data.totals.credit) : "—"}</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/30 font-bold text-sm">
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-semibold">Current Balance:</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                            <TableCell className={`text-right font-mono ${data.closingBalance >= 0 ? "" : "text-destructive"}`}>
+                              {formatBal(data.closingBalance)}
+                            </TableCell>
+                          </TableRow>
+                        </tfoot>
+                      </Table>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Opening Balance</p>
-                  <p className="text-lg font-bold font-mono">
-                    {formatAmount(Math.abs(data.openingBalance))}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Current Total</p>
-                  <p className="text-lg font-bold font-mono">
-                    {formatAmount(data.totals.debit - data.totals.credit)}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Closing Balance</p>
-                  <p
-                    className={`text-lg font-bold font-mono ${
-                      data.closingBalance >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatAmount(Math.abs(data.closingBalance))}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
           </>
         ) : (
           <Card>
