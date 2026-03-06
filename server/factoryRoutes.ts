@@ -5420,13 +5420,91 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { startDate, endDate, txType, currencyCode } = req.query;
+
+      // ── 1. Query existing factory_daybook_entries ──────────────────────────
       const conditions: any[] = [eq(factoryDaybookEntries.companyId, companyId)];
       if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
       if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
       if (currencyCode) conditions.push(eq(factoryDaybookEntries.currencyCode, currencyCode as string));
-      const results = await db.select().from(factoryDaybookEntries).where(and(...conditions)).orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
-      res.json(results);
+      const daybookRows = await db.select().from(factoryDaybookEntries)
+        .where(and(...conditions))
+        .orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
+
+      // ── 2. Query vouchers directly (to catch pre-fix historical entries) ───
+      // Only include Payment / Receipt / Journal vouchers in the daybook view
+      const voucherTxTypeMap: Record<string, string> = {
+        Payment: "PAYMENT",
+        Receipt: "RECEIPT",
+        Journal: "JOURNAL",
+      };
+      // If a txType filter is applied, skip voucher pull for non-voucher types
+      const voucherTypesReversed: Record<string, string> = {
+        PAYMENT: "Payment",
+        RECEIPT: "Receipt",
+        JOURNAL: "Journal",
+      };
+      const shouldFetchVouchers = !txType || txType in voucherTypesReversed;
+
+      let syntheticRows: any[] = [];
+      if (shouldFetchVouchers) {
+        // Build the set of voucher IDs already captured in factory_daybook_entries
+        const capturedVoucherIds = new Set<number>(
+          daybookRows
+            .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
+            .map((r: any) => r.referenceId as number)
+        );
+
+        const voucherConds: any[] = [
+          eq(vouchers.companyId, companyId),
+          sql`${vouchers.deletedAt} IS NULL`,
+          inArray(vouchers.voucherType, ["Payment", "Receipt", "Journal"]),
+        ];
+        if (startDate) voucherConds.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        if (endDate) voucherConds.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        if (txType && txType in voucherTypesReversed) {
+          voucherConds.push(eq(vouchers.voucherType, voucherTypesReversed[txType as string]));
+        }
+        if (currencyCode && currencyCode !== "ALL") {
+          voucherConds.push(eq(vouchers.currency, currencyCode as string));
+        }
+
+        const rawVouchers = await db.select().from(vouchers).where(and(...voucherConds));
+
+        syntheticRows = rawVouchers
+          .filter((v: any) => !capturedVoucherIds.has(v.id))
+          .map((v: any) => {
+            const txTypeVal = voucherTxTypeMap[v.voucherType] || "JOURNAL";
+            const currency = v.currency || "USD";
+            const fxRate = parseFloat(v.exchangeRate || "1") || 1;
+            const amtCurrency = parseFloat(v.totalAmount || "0");
+            const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+            return {
+              id: -(v.id),          // negative id so FE can distinguish; won't clash with real ids
+              companyId: v.companyId,
+              txDate: v.voucherDate,
+              txType: txTypeVal,
+              referenceId: v.id,
+              referenceTable: "vouchers",
+              description: v.description || `${v.voucherType} voucher #${v.voucherNumber}`,
+              currencyCode: currency,
+              amountCurrency: String(amtCurrency),
+              fxRateToUsd: String(fxRate),
+              amountUsd: String(amtUsd),
+              createdAt: v.createdAt,
+              createdBy: null,
+            };
+          });
+      }
+
+      // ── 3. Merge + sort ────────────────────────────────────────────────────
+      const merged = [...daybookRows, ...syntheticRows].sort((a: any, b: any) => {
+        if (b.txDate > a.txDate) return 1;
+        if (b.txDate < a.txDate) return -1;
+        return Math.abs(b.id) - Math.abs(a.id);
+      });
+
+      res.json(merged);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
