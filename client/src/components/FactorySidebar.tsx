@@ -25,7 +25,6 @@ import {
   Settings,
   Upload,
   ShoppingCart,
-  Receipt,
   ClipboardList,
   HardHat,
   ClipboardCheck,
@@ -118,7 +117,6 @@ const allMenuGroups: MenuGroup[] = [
     title: "Sales",
     icon: ShoppingCart,
     items: [
-      { title: "New Invoice", url: "/factory/sales/new", icon: Receipt },
       { title: "Container Loading", url: "/factory/sales/loading/new", icon: Container },
       { title: "Pending Loadings", url: "/factory/sales/loading/pending", icon: Clock },
       { title: "Pending Invoices", url: "/factory/sales/pending-invoices", icon: ClipboardCheck },
