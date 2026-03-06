@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, MessageCircle, Check, CheckCheck, Plus, Search, Trash2 } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Plus, Search, Trash2, Paperclip, FileText, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,14 +24,23 @@ interface ChatUser {
   lastSeen: string | null;
 }
 
+interface PendingFile {
+  file: File;
+  previewUrl: string | null;
+}
+
 export default function Chat() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const { toast } = useToast();
@@ -53,14 +62,55 @@ export default function Chat() {
     refetchInterval: 3000,
   });
 
+  const { data: typingData } = useQuery<{ isTyping: boolean }>({
+    queryKey: ["/api/chat/typing", selectedUserId],
+    queryFn: async () => {
+      if (!selectedUserId) return { isTyping: false };
+      const res = await fetch(`/api/chat/typing/${selectedUserId}`, { credentials: "include" });
+      if (!res.ok) return { isTyping: false };
+      return res.json();
+    },
+    enabled: !!selectedUserId,
+    refetchInterval: 2000,
+  });
+
+  const isTyping = typingData?.isTyping ?? false;
+
+  const sendTypingSignal = useCallback((isTyping: boolean) => {
+    if (!selectedUserId) return;
+    fetch("/api/chat/typing", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ receiverId: selectedUserId, isTyping }),
+    }).catch(() => {});
+  }, [selectedUserId]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageText(e.target.value);
+    sendTypingSignal(true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => sendTypingSignal(false), 3000);
+  };
+
   const sendMutation = useMutation({
-    mutationFn: async (data: { receiverId: string; message: string }) => {
+    mutationFn: async (data: {
+      receiverId: string;
+      message?: string;
+      fileUrl?: string;
+      fileName?: string;
+      fileType?: string;
+      fileSize?: number;
+    }) => {
       return await modeApiRequest("POST", "/api/chat/messages", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedUserId] });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/users"] });
       setMessageText("");
+      setPendingFile(null);
+      sendTypingSignal(false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       inputRef.current?.focus();
     },
     onError: (error: any) => {
@@ -109,11 +159,59 @@ export default function Chat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isTyping]);
 
-  const handleSend = () => {
-    if (!messageText.trim() || !selectedUserId) return;
-    sendMutation.mutate({ receiverId: selectedUserId, message: messageText.trim() });
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    const previewUrl = isImage ? URL.createObjectURL(file) : null;
+    setPendingFile({ file, previewUrl });
+    e.target.value = "";
+  };
+
+  const removePendingFile = () => {
+    if (pendingFile?.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
+    setPendingFile(null);
+  };
+
+  const handleSend = async () => {
+    if ((!messageText.trim() && !pendingFile) || !selectedUserId) return;
+
+    if (pendingFile) {
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingFile.file);
+        const res = await fetch("/api/chat/upload", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const uploaded = await res.json();
+        sendMutation.mutate({
+          receiverId: selectedUserId,
+          message: messageText.trim() || undefined,
+          fileUrl: uploaded.fileUrl,
+          fileName: uploaded.fileName,
+          fileType: uploaded.fileType,
+          fileSize: uploaded.fileSize,
+        });
+      } catch {
+        toast({ title: "File upload failed", variant: "destructive" });
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      sendMutation.mutate({ receiverId: selectedUserId, message: messageText.trim() });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -155,11 +253,19 @@ export default function Chat() {
     return `Last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`;
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const selectedUser = chatUsers.find((u) => u.id === selectedUserId);
   const conversationUsers = chatUsers.filter((u) => u.hasMessages || u.unreadCount > 0 || u.id === selectedUserId);
   const filteredAllUsers = chatUsers.filter((u) =>
     u.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const isSending = sendMutation.isPending || isUploading;
 
   return (
     <div className="h-[calc(100vh-6rem)] flex gap-3" data-testid="chat-page">
@@ -232,6 +338,7 @@ export default function Chat() {
           </CardContent>
         ) : (
           <>
+            {/* Header */}
             <div className="p-3 border-b flex items-center gap-3">
               <div className="relative shrink-0">
                 <Avatar className="h-8 w-8">
@@ -244,8 +351,8 @@ export default function Chat() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm leading-tight">{selectedUser?.username}</p>
                 {selectedUser && (
-                  <p className={`text-xs leading-tight ${selectedUser.isOnline ? "text-green-500" : "text-muted-foreground"}`}>
-                    {formatLastSeen(selectedUser)}
+                  <p className={`text-xs leading-tight ${isTyping ? "text-muted-foreground italic" : selectedUser.isOnline ? "text-green-500" : "text-muted-foreground"}`}>
+                    {isTyping ? "typing..." : formatLastSeen(selectedUser)}
                   </p>
                 )}
               </div>
@@ -261,6 +368,7 @@ export default function Chat() {
               </Button>
             </div>
 
+            {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {messagesLoading ? (
                 <div className="space-y-3">
@@ -273,6 +381,7 @@ export default function Chat() {
               ) : (
                 messages.map((msg) => {
                   const isMine = msg.senderId !== selectedUserId;
+                  const isImage = msg.fileType?.startsWith("image/");
                   return (
                     <div
                       key={msg.id}
@@ -284,7 +393,39 @@ export default function Chat() {
                           isMine ? "bg-primary text-primary-foreground" : "bg-muted"
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                        {msg.fileUrl && (
+                          <div className="mb-1">
+                            {isImage ? (
+                              <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={msg.fileUrl}
+                                  alt={msg.fileName ?? "image"}
+                                  className="max-w-full rounded-md max-h-64 object-contain"
+                                  data-testid={`msg-image-${msg.id}`}
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={msg.fileUrl}
+                                download={msg.fileName ?? "file"}
+                                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${isMine ? "bg-primary-foreground/10 hover:bg-primary-foreground/20" : "bg-background/60 hover:bg-background/80"} transition-colors`}
+                                data-testid={`msg-file-${msg.id}`}
+                              >
+                                <FileText className="h-4 w-4 shrink-0" />
+                                <span className="truncate max-w-[180px]">{msg.fileName ?? "File"}</span>
+                                {msg.fileSize && (
+                                  <span className={`text-xs shrink-0 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                                    {formatFileSize(msg.fileSize)}
+                                  </span>
+                                )}
+                                <Download className="h-3 w-3 shrink-0" />
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        {msg.message && (
+                          <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                        )}
                         <div className={`flex items-center gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
                           <span className={`text-xs ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                             {formatTime(msg.createdAt as unknown as string)}
@@ -300,24 +441,71 @@ export default function Chat() {
                   );
                 })
               )}
+              {isTyping && (
+                <div className="flex justify-start" data-testid="typing-indicator">
+                  <div className="bg-muted rounded-lg px-3 py-2">
+                    <div className="flex gap-1 items-center h-4">
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 border-t">
+            {/* Input area */}
+            <div className="p-3 border-t space-y-2">
+              {pendingFile && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted" data-testid="pending-file-preview">
+                  {pendingFile.previewUrl ? (
+                    <img src={pendingFile.previewUrl} alt="preview" className="h-12 w-12 object-cover rounded-md shrink-0" />
+                  ) : (
+                    <div className="h-12 w-12 rounded-md bg-background flex items-center justify-center shrink-0">
+                      <FileText className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{pendingFile.file.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(pendingFile.file.size)}</p>
+                  </div>
+                  <Button size="icon" variant="ghost" onClick={removePendingFile} data-testid="button-remove-file">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
               <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  data-testid="input-file-upload"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSending}
+                  data-testid="button-attach-file"
+                  title="Attach file"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
                 <Input
                   ref={inputRef}
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={handleTextChange}
                   onKeyDown={handleKeyDown}
-                  placeholder="Type a message..."
-                  disabled={sendMutation.isPending}
+                  placeholder={pendingFile ? "Add a caption..." : "Type a message..."}
+                  disabled={isSending}
                   data-testid="input-chat-message"
                 />
                 <Button
                   size="icon"
                   onClick={handleSend}
-                  disabled={!messageText.trim() || sendMutation.isPending}
+                  disabled={(!messageText.trim() && !pendingFile) || isSending}
                   data-testid="button-send-message"
                 >
                   <Send className="h-4 w-4" />

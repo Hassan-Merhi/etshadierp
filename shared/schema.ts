@@ -1758,7 +1758,11 @@ export const directMessages = pgTable("direct_messages", {
   id: serial("id").primaryKey(),
   senderId: varchar("sender_id").notNull(),
   receiverId: varchar("receiver_id").notNull(),
-  message: text("message").notNull(),
+  message: text("message"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileType: text("file_type"),
+  fileSize: integer("file_size"),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -1772,8 +1776,12 @@ export const insertDirectMessageSchema = createInsertSchema(directMessages).omit
   readAt: true,
 }).extend({
   receiverId: z.string().min(1, "Receiver is required"),
-  message: z.string().min(1, "Message is required"),
-});
+  message: z.string().optional(),
+  fileUrl: z.string().optional(),
+  fileName: z.string().optional(),
+  fileType: z.string().optional(),
+  fileSize: z.number().optional(),
+}).refine((d) => d.message || d.fileUrl, { message: "Message or file is required" });
 
 export type InsertDirectMessage = z.infer<typeof insertDirectMessageSchema>;
 export type DirectMessage = typeof directMessages.$inferSelect;

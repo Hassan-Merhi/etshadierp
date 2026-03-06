@@ -3,6 +3,9 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import {
   factorySuppliers,
   factoryCategories,
@@ -7945,6 +7948,63 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   // ============ DIRECT MESSAGES / CHAT ============
 
+  const chatUploadsDir = path.resolve("uploads/chat");
+  if (!fs.existsSync(chatUploadsDir)) fs.mkdirSync(chatUploadsDir, { recursive: true });
+
+  const chatStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, chatUploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  });
+  const chatUpload = multer({ storage: chatStorage, limits: { fileSize: 25 * 1024 * 1024 } });
+
+  const typingStatus = new Map<string, { receiverId: string; until: number }>();
+
+  app.post("/api/chat/upload", requireAuth, chatUpload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const fileUrl = `/uploads/chat/${req.file.filename}`;
+      res.json({
+        fileUrl,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/chat/typing", requireAuth, async (req: any, res: any) => {
+    try {
+      const senderId = (req.session as any).userId;
+      const { receiverId, isTyping } = req.body;
+      if (!receiverId) return res.status(400).json({ message: "receiverId required" });
+      if (isTyping) {
+        typingStatus.set(senderId, { receiverId, until: Date.now() + 5000 });
+      } else {
+        typingStatus.delete(senderId);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/chat/typing/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentUserId = (req.session as any).userId;
+      const otherUserId = req.params.userId;
+      const record = typingStatus.get(otherUserId);
+      const isTyping = !!record && record.receiverId === currentUserId && record.until > Date.now();
+      res.json({ isTyping });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/chat/users", requireAuth, async (req: any, res: any) => {
     try {
       const currentUserId = (req.session as any).userId;
@@ -8028,8 +8088,14 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const [msg] = await db.insert(directMessages).values({
         senderId: currentUserId,
         receiverId: parsed.receiverId,
-        message: parsed.message,
+        message: parsed.message || null,
+        fileUrl: parsed.fileUrl || null,
+        fileName: parsed.fileName || null,
+        fileType: parsed.fileType || null,
+        fileSize: parsed.fileSize || null,
       }).returning();
+
+      typingStatus.delete(currentUserId);
 
       res.json(msg);
     } catch (error: any) {

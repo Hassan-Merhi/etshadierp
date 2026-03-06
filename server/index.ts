@@ -65,6 +65,7 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+app.use("/uploads", express.static("uploads"));
 
 // Trust proxy for HTTPS termination
 // This is required for both Replit (development) and Render (production)
@@ -223,6 +224,11 @@ app.use((req, res, next) => {
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS cash_account_id integer`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS pos_station integer`,
     `ALTER TABLE stock_transfer_vouchers ADD COLUMN IF NOT EXISTS inventory_applied boolean DEFAULT false`,
+    `ALTER TABLE direct_messages ALTER COLUMN message DROP NOT NULL`,
+    `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_url text`,
+    `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_name text`,
+    `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_type text`,
+    `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_size integer`,
   ];
   for (const migration of migrations) {
     try {
