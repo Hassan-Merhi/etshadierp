@@ -833,17 +833,25 @@ export default function VoucherEdit() {
     if (isPaymentOrReceipt && voucher.entries.length >= 1) {
       // For Payment: source account is CREDITED (money leaving), destinations are DEBITED
       // For Receipt: source account is DEBITED (money coming in), destinations are CREDITED
-      // Find the source account by looking for the entry with the correct direction
-      const paymentEntry = voucher.entries.find((e: any) => {
-        const cr = parseFloat(e.creditAmount || "0");
-        const dr = parseFloat(e.debitAmount || "0");
-        const isLiability = e.supplierId || e.employeeId;
-        if (voucherType === "Payment") {
-          return isLiability ? dr > 0 : cr > 0;
-        } else {
-          return isLiability ? cr > 0 : dr > 0;
-        }
-      });
+      // Find the source account: prefer non-liability (bank/ledger) as the pay-from/receive-into account
+      // For Payment: source (bank/ledger) is CREDITED (money leaves). For Receipt: DEBITED (money arrives).
+      // We search non-liability first so a standard bank→supplier payment always picks the bank, not the supplier.
+      const paymentEntry =
+        voucher.entries.find((e: any) => {
+          const cr = parseFloat(e.creditAmount || "0");
+          const dr = parseFloat(e.debitAmount || "0");
+          const isLiability = !!(e.supplierId || e.employeeId);
+          if (isLiability) return false;
+          return voucherType === "Payment" ? cr > 0 : dr > 0;
+        }) ||
+        voucher.entries.find((e: any) => {
+          // Fallback: liability account as the primary (e.g. advance payments)
+          const cr = parseFloat(e.creditAmount || "0");
+          const dr = parseFloat(e.debitAmount || "0");
+          const isLiability = !!(e.supplierId || e.employeeId);
+          if (!isLiability) return false;
+          return voucherType === "Payment" ? dr > 0 : cr > 0;
+        });
       
       // Fallback to first entry if not found (shouldn't happen for valid vouchers)
       const sourceEntry = paymentEntry || voucher.entries[0];
@@ -852,7 +860,7 @@ export default function VoucherEdit() {
       // Destination entries are all other entries with the opposite direction
       // For Payment: entries with debit amounts (money going TO these accounts)
       // For Receipt: entries with credit amounts (money coming FROM these accounts)
-      const isLiabilityPayment = sourceEntry.supplierId || sourceEntry.employeeId;
+      const isLiabilityPayment = !!(sourceEntry.supplierId || sourceEntry.employeeId);
       const voucherEntries = voucher.entries.filter(entry => {
         if (entry.id === sourceEntry.id) return false;
         const amount = voucherType === "Payment"

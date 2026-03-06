@@ -3773,6 +3773,10 @@ export class DbStorage implements IStorage {
       
       const isOptional = voucher.optional;
 
+      if (!items || items.length === 0) {
+        throw new Error("No items provided for stock transfer");
+      }
+
       // Create the stock transfer voucher record (note: no global sourceLocationId)
       const [transfer] = await tx.insert(schema.stockTransferVouchers).values({
         voucherId,
@@ -4338,6 +4342,10 @@ export class DbStorage implements IStorage {
             .where(eq(schema.inventory.id, destInventory.id));
         }
         }
+      }
+
+      if (!items || items.length === 0) {
+        throw new Error("No items provided for stock transfer update");
       }
 
       // Step 3: Delete all existing stock transfer items
