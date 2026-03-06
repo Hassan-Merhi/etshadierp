@@ -918,7 +918,7 @@ export default function FactoryContainerLoadingScan() {
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Article Groups</span>
                 <span className="font-mono" data-testid="text-article-groups">
-                  {Object.keys(groupedBales).length}
+                  {Object.keys(groupedBalesMap).length}
                 </span>
               </div>
             </Card>
