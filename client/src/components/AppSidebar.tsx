@@ -96,13 +96,6 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "Daybook",
-    icon: Book,
-    items: [
-      { title: "Daybook", url: "/daybook", icon: Book },
-    ],
-  },
-  {
     title: "Sales & POS",
     icon: Store,
     items: [
@@ -118,19 +111,13 @@ const menuGroups: MenuGroup[] = [
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
     ],
   },
-  {
-    title: "Vouchers",
-    icon: Receipt,
-    items: [
-      { title: "Vouchers", url: "/vouchers", icon: Receipt },
-      { title: "Transfer Order", url: "/stock-transfer-order", icon: ArrowLeftRight },
-    ],
-  },
 ];
 
 const standaloneItems: MenuItem[] = [
   { title: "Create", url: "/create", icon: FolderPlus },
   { title: "Chat", url: "/chat", icon: MessageCircle },
+  { title: "Vouchers", url: "/vouchers", icon: Receipt },
+  { title: "Daybook", url: "/daybook", icon: Book },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

@@ -79,7 +79,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -104,6 +104,7 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import StockTransferOrder from "@/pages/StockTransferOrder";
 
 // Types
 interface BankAccount {
@@ -600,6 +601,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       label: "Inventory & Adjustments",
       items: [
         { key: "transfer", label: "Stock Transfer", icon: ArrowLeftRight },
+        { key: "transferorder", label: "Transfer Order", icon: ClipboardList },
         { key: "adjustment", label: "Adjustment", icon: SlidersHorizontal },
         { key: "creditnote", label: "Credit Note", icon: FileText },
       ],
@@ -612,7 +614,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const tabParam = searchParams.get('tab');
   const voucherIdToEdit = editParam ? parseInt(editParam) : null;
   
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote">(
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote">(
     (tabParam as any) || "payment"
   );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
@@ -5815,6 +5817,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           <div className="space-y-4">
             <CreditNoteTab allAccounts={allAccounts} editVoucherId={activeTab === "creditnote" ? editVoucherId : null} />
           </div>
+        )}
+
+        {!isPOS && activeTab === "transferorder" && (
+          <StockTransferOrder />
         )}
 
         </div>
