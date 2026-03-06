@@ -591,10 +591,10 @@ export default function FactoryContainerLoadingScan() {
                           <span>Wt: {group.totalWeight.toFixed(2)} kg</span>
                         </div>
                       </button>
-                      {viewMode === "detailed" && expandedGroups.has(group.articleCode) && (
+                      {viewMode === "detailed" && (
                         <Table>
                           <TableBody>
-                            {group.bales.map((bale) => (
+                            {[...group.bales].sort((a, b) => b.id - a.id).map((bale) => (
                               <TableRow
                                 key={bale.id}
                                 data-testid={`row-bale-${bale.id}`}
