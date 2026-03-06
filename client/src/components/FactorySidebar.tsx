@@ -109,6 +109,7 @@ const allMenuGroups: MenuGroup[] = [
     items: [
       { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
       { title: "Bales History", url: "/factory/bales-history", icon: History },
+      { title: "Barcode Lookup", url: "/factory/barcode-lookup", icon: Search },
     ],
   },
   {
@@ -168,13 +169,6 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Mix Optimizer", url: "/factory/intelligence/mix-optimizer", icon: Beaker, featureFlag: "mixOptimizerEnabled" },
       { title: "Cash Flow", url: "/factory/intelligence/cashflow", icon: DollarSign, featureFlag: "cashflowEnabled" },
       { title: "Intelligence Settings", url: "/factory/intelligence/settings", icon: Settings, adminOnly: true },
-    ],
-  },
-  {
-    title: "Traceability",
-    icon: Search,
-    items: [
-      { title: "Barcode Lookup", url: "/factory/barcode-lookup", icon: Search },
     ],
   },
 ];
