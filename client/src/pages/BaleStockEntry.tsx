@@ -388,7 +388,7 @@
               <SelectContent>
                 {activeLocations?.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.code} - {loc.name}
+                    {loc.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -619,7 +619,7 @@
                 {selectedLocationName && (
                   <div>
                     <div className="text-sm text-muted-foreground">Location</div>
-                    <div className="text-sm font-medium">{selectedLocationName.code} - {selectedLocationName.name}</div>
+                    <div className="text-sm font-medium">{selectedLocationName.name}</div>
                   </div>
                 )}
               </CardContent>
@@ -1637,7 +1637,7 @@
               <SelectContent>
                 {activeLocations?.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.code} - {loc.name}
+                    {loc.name}
                   </SelectItem>
                 ))}
               </SelectContent>
