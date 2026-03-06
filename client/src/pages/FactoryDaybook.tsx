@@ -102,7 +102,7 @@ export default function FactoryDaybook() {
   const [endDate, setEndDate] = useState(today);
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
-  const [isDetailed, setIsDetailed] = useState(false);
+  const [isDetailed, setIsDetailed] = useState(true);
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
