@@ -3154,6 +3154,7 @@ export class DbStorage implements IStorage {
     const finalRate = updates.rate !== undefined ? updates.rate : currentItem.rate;
     const qty = parseFloat(finalQuantity);
     const rate = parseFloat(finalRate);
+    if (isNaN(qty) || isNaN(rate)) throw new Error("Invalid quantity or rate value");
     updateData.totalAmount = (qty * rate).toFixed(2);
     
     const [updated] = await db
@@ -3181,6 +3182,7 @@ export class DbStorage implements IStorage {
     const finalRate = updates.rate !== undefined ? updates.rate : currentItem.rate;
     const qty = parseFloat(finalQuantity);
     const rate = parseFloat(finalRate);
+    if (isNaN(qty) || isNaN(rate)) throw new Error("Invalid quantity or rate value");
     updateData.totalAmount = (qty * rate).toFixed(2);
     
     const [updated] = await db

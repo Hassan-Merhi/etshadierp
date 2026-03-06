@@ -174,21 +174,23 @@ export default function ContainerLoadingScan() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables: { scanCode: string; locationId: number }) => {
       setScanFlash("success");
       setTimeout(() => setScanFlash(null), 500);
-      if (data?.baleReference && orderId) {
-        localStorage.setItem(`lastScannedBale_${orderId}`, data.baleReference);
-        setLastScannedRef(data.baleReference);
+      if (orderId) {
+        const scanned = variables.scanCode;
+        localStorage.setItem(`lastScannedBale_${orderId}`, scanned);
+        setLastScannedRef(scanned);
       }
-      if (data?.articleCode) {
+      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      if (newest?.articleCode) {
         setGroupOrder((prev) => {
-          const filtered = prev.filter((c) => c !== data.articleCode);
-          return [data.articleCode, ...filtered];
+          const filtered = prev.filter((c) => c !== newest.articleCode);
+          return [newest.articleCode, ...filtered];
         });
         setExpandedGroups((prev) => {
           const next = new Set(prev);
-          next.add(data.articleCode);
+          next.add(newest.articleCode);
           return next;
         });
       }

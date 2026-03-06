@@ -6446,8 +6446,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
 
       // Check if this scan code matches a bale already reserved (status = RESERVED_FOR_ORDER).
-      // This prevents scanning the same physical bale/ref code a second time from silently
-      // jumping to the next available bale instead of blocking with a clear error.
+      // Only match by unique bale identifiers (referenceNumber, baleCode) — NOT by articleCode or
+      // productName, which are shared across many bales and would falsely block scanning the next
+      // available bale of the same product type.
       const scanLower = scanCode.toLowerCase();
       const [reservedBale] = await db.select().from(factoryBales)
         .where(and(
@@ -6455,9 +6456,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(factoryBales.status, "RESERVED_FOR_ORDER"),
           or(
             sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.productName}) = ${scanLower}`
+            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`
           )
         ));
 
