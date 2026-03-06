@@ -228,8 +228,7 @@ export default function StockTransferOrder() {
       }
 
       if (existingTransfer.items && existingTransfer.items.length > 0) {
-        const sourceIds = Array.from(new Set<number>(existingTransfer.items.map((i: any) => i.sourceLocationId).filter(Boolean)));
-        setSelectedLocationIds(sourceIds as number[]);
+        setSelectedLocationIds(locations.map((l) => l.id));
 
         const preloaded: OrderItem[] = existingTransfer.items.map((item: any) => {
           const srcLoc = locations.find((l) => l.id === item.sourceLocationId);

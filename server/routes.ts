@@ -707,6 +707,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
   registerSupplierProformaRoutes(app, requireAuth);
 
+  // Lightweight health check for offline ping detection
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, ts: Date.now() });
+  });
+
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {
     try {

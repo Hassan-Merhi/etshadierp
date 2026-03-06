@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -506,6 +507,7 @@ function AuthenticatedApp() {
                   </kbd>
                 </Button>
               </header>
+              <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <Router user={user} posImportEnabled={posImportEnabled} />
@@ -590,6 +592,7 @@ function AuthenticatedApp() {
                   <ThemeToggle />
                 </div>
               </header>
+              <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <Switch>
@@ -709,6 +712,7 @@ function AuthenticatedApp() {
                 <ThemeToggle />
               </div>
             </header>
+            <OfflineBanner />
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">
               <div className="w-full">
                 <Router user={user} />

@@ -484,6 +484,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
+      if (error.name === "OfflineQueued") {
+        toast({ title: "Saved offline", description: "Will sync automatically when connected" });
+        return;
+      }
       toast({
         title: "Error",
         description: error.message || `Failed to ${editVoucherId ? 'update' : 'save'} sale`,

@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -67,6 +68,15 @@ export async function apiRequest(
       console.error(`[apiRequest] Request aborted (timeout) for ${method} ${url}`);
       throw new Error(`Request timeout after 30 seconds for ${method} ${url}`);
     }
+    if (error instanceof TypeError && isSafeToQueue(method, url)) {
+      const description = getDescriptionForRequest(url);
+      const body = data ? JSON.stringify(data) : "";
+      enqueueRequest(url, method, body, description);
+      const offlineError: any = new Error(`Saved offline — will sync when connected`);
+      offlineError.name = "OfflineQueued";
+      offlineError.description = description;
+      throw offlineError;
+    }
     console.error(`[apiRequest] Error in ${method} ${url}:`, error);
     throw error;
   }
@@ -97,8 +107,8 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true,
+      staleTime: 2 * 60 * 1000,
       retry: false,
     },
     mutations: {

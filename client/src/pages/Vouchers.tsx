@@ -1234,6 +1234,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     },
     onError: (error: any) => {
+      if (error.name === "OfflineQueued") {
+        toast({ title: "Saved offline", description: "Will sync automatically when connected" });
+        return;
+      }
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
@@ -1846,6 +1850,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     },
     onError: (error: any) => {
+      if (error.name === "OfflineQueued") {
+        toast({ title: "Saved offline", description: "Will sync automatically when connected" });
+        return;
+      }
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
