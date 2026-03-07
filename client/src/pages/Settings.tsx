@@ -2040,10 +2040,9 @@ function LoginHistoryTab() {
       enabled: !!selectedCompany && currentUser?.role === "Admin",
     });
 
-    // Factory users query (used in Users section when in factory mode)
+    // Factory users query (used in Users section in both modes)
     const { data: factoryUsersData = [], isLoading: isLoadingFactoryUsers } = useQuery<any[]>({
       queryKey: ["/api/factory/users"],
-      enabled: appMode === "factory",
     });
 
     const createFactoryUserMutation = useMutation({
@@ -3325,6 +3324,7 @@ function LoginHistoryTab() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-8"></TableHead>
                           <TableHead>Username</TableHead>
                           <TableHead>Display Name</TableHead>
                           <TableHead>ERP Access</TableHead>
@@ -3336,7 +3336,13 @@ function LoginHistoryTab() {
                       </TableHeader>
                       <TableBody>
                         {factoryUsersData.map((user: any) => (
+                          <>
                           <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
+                            <TableCell className="p-1">
+                              <Button variant="ghost" size="icon" onClick={() => toggleUserExpansion(user.id)} data-testid={`button-expand-user-${user.id}`}>
+                                {expandedUserId === user.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                            </TableCell>
                             <TableCell className="font-medium font-mono">{user.username}</TableCell>
                             <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
                             <TableCell>
@@ -3378,6 +3384,40 @@ function LoginHistoryTab() {
                               </div>
                             </TableCell>
                           </TableRow>
+                          {expandedUserId === user.id && (
+                            <TableRow key={`${user.id}-roles`} className="bg-muted/30">
+                              <TableCell colSpan={8} className="py-3 px-6">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <span className="text-sm font-semibold flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" />ERP Company Roles</span>
+                                    <Button size="sm" variant="outline" onClick={() => handleAddRole(user.id)} data-testid={`button-add-role-${user.id}`}>
+                                      <Plus className="h-3 w-3 mr-1" />Add Role
+                                    </Button>
+                                  </div>
+                                  {userCompanyRoles.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">No ERP roles assigned. Click "Add Role" to assign a role to a company.</p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {userCompanyRoles.map((role: any) => (
+                                        <div key={role.id} className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-background text-sm" data-testid={`role-item-${role.id}`}>
+                                          <span className="font-medium">{companies.find((c: any) => c.id === role.companyId)?.name || `Company ${role.companyId}`}</span>
+                                          <span className="text-muted-foreground">—</span>
+                                          <Badge variant={role.role === "Admin" ? "default" : role.role === "Owner" ? "default" : "secondary"} className="text-xs">{role.role}</Badge>
+                                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleEditRole(role)} data-testid={`button-edit-role-${role.id}`}>
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => handleDeleteRole(role.id, user.id)} data-testid={`button-delete-role-${role.id}`}>
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          </>
                         ))}
                       </TableBody>
                     </Table>
@@ -3431,16 +3471,17 @@ function LoginHistoryTab() {
                         <Switch checked={factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser) ? true : factoryUserFormData.hasFactoryAccess} disabled={!!factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)} onCheckedChange={(v) => setFactoryUserFormData({ ...factoryUserFormData, hasFactoryAccess: v })} data-testid="switch-form-factory-access" />
                       </div>
                     </div>
+                    {factoryUserFormData.hasFactoryAccess && !(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <Label className="text-base font-semibold">Page Access</Label>
+                        <Label className="text-base font-semibold">Factory Page Access</Label>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(new Set(ALL_FACTORY_PAGES_SETTINGS.map(p => p.key)))} data-testid="button-select-all-pages"><Check className="h-3 w-3 mr-1" />All</Button>
-                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(new Set())} data-testid="button-select-none-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_FACTORY_PAGES_SETTINGS.map(p => p.key)]))} data-testid="button-select-all-pages"><Check className="h-3 w-3 mr-1" />All</Button>
+                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_FACTORY_PAGES_SETTINGS.forEach(p => next.delete(p.key)); return next; })} data-testid="button-select-none-pages"><X className="h-3 w-3 mr-1" />None</Button>
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">Select which pages this user can see. If none selected, user gets full access.</p>
-                      <div className="space-y-4 border rounded-md p-4 max-h-72 overflow-y-auto">
+                      <p className="text-sm text-muted-foreground">Restrict which factory pages this user can see. If none selected, user gets full factory access.</p>
+                      <div className="space-y-4 border rounded-md p-4 max-h-60 overflow-y-auto">
                         {FACTORY_PAGE_GROUPS_SETTINGS.map(group => {
                           const groupPages = ALL_FACTORY_PAGES_SETTINGS.filter(p => p.group === group);
                           const allSelected = groupPages.every(p => factoryUserPages.has(p.key));
@@ -3465,6 +3506,54 @@ function LoginHistoryTab() {
                         })}
                       </div>
                     </div>
+                    )}
+                    {factoryUserFormData.hasErpAccess && !(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-base font-semibold">ERP Page Access</Label>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => new Set([...prev, ...ALL_ERP_PAGES.map(p => p.key)]))} data-testid="button-select-all-erp-pages"><Check className="h-3 w-3 mr-1" />All</Button>
+                          <Button variant="outline" size="sm" onClick={() => setFactoryUserPages(prev => { const next = new Set(prev); ALL_ERP_PAGES.forEach(p => next.delete(p.key)); return next; })} data-testid="button-select-none-erp-pages"><X className="h-3 w-3 mr-1" />None</Button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Restrict which ERP pages this user can see. If none selected, user gets full ERP access.</p>
+                      <div className="space-y-4 border rounded-md p-4 max-h-60 overflow-y-auto">
+                        {ERP_PAGE_GROUPS.map(group => {
+                          const groupPages = ALL_ERP_PAGES.filter(p => p.group === group);
+                          const allSelected = groupPages.every(p => factoryUserPages.has(p.key));
+                          const someSelected = groupPages.some(p => factoryUserPages.has(p.key));
+                          return (
+                            <div key={`erp-${group}`} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={allSelected}
+                                  onCheckedChange={() => {
+                                    setFactoryUserPages(prev => {
+                                      const next = new Set(prev);
+                                      if (allSelected) { groupPages.forEach(p => next.delete(p.key)); }
+                                      else { groupPages.forEach(p => next.add(p.key)); }
+                                      return next;
+                                    });
+                                  }}
+                                  data-testid={`checkbox-erp-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
+                                />
+                                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
+                                {someSelected && !allSelected && <Badge variant="secondary" className="text-xs">partial</Badge>}
+                              </div>
+                              <div className="ml-6 grid grid-cols-2 gap-1">
+                                {groupPages.map(page => (
+                                  <div key={page.key} className="flex items-center gap-2">
+                                    <Checkbox checked={factoryUserPages.has(page.key)} onCheckedChange={() => toggleFactoryUserPage(page.key)} data-testid={`checkbox-erp-page-${page.key}`} />
+                                    <span className="text-sm">{page.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    )}
                     {!(factoryEditingUser && isFactoryAdminOrOwner(factoryEditingUser)) && (
                       <div className="space-y-3">
                         <Label className="text-base font-semibold">Hidden Cost Fields</Label>
