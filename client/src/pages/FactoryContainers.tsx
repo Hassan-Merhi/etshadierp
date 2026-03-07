@@ -58,6 +58,8 @@ export default function FactoryContainers() {
     arrivalDate: "",
     notes: "",
     status: "PENDING",
+    commissionAmount: "",
+    commissionCurrencyCode: "USD",
   });
   const [currency, setCurrency] = useState("USD");
   const [fxRate, setFxRate] = useState("1");
@@ -104,6 +106,8 @@ export default function FactoryContainers() {
         currencyCode: currency,
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
+        commissionAmount: data.commissionAmount || "0",
+        commissionCurrencyCode: data.commissionCurrencyCode || "USD",
       };
       const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -131,6 +135,8 @@ export default function FactoryContainers() {
         currencyCode: currency,
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
+        commissionAmount: data.commissionAmount || "0",
+        commissionCurrencyCode: data.commissionCurrencyCode || "USD",
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -226,6 +232,8 @@ export default function FactoryContainers() {
         arrivalDate: get(["Arrival Date", "ArrivalDate", "arrival_date", "Date"]),
         notes: get(["Notes", "notes", "Remarks"]),
         status: get(["Status", "status"]) || "PENDING",
+        commissionAmount: get(["Commission Amount", "CommissionAmount", "commission_amount", "Commission"]) || "",
+        commissionCurrencyCode: get(["Commission Currency", "CommissionCurrency", "commission_currency_code", "Comm Currency"]) || "USD",
       };
     }).filter((r: any) => r.containerNumber);
 
@@ -236,8 +244,8 @@ export default function FactoryContainers() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes"];
-    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", "", "AUTO", "2024-06-01", "PENDING", "Sample row"];
+    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes", "Commission Amount", "Commission Currency"];
+    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", "", "AUTO", "2024-06-01", "PENDING", "Sample row", 500, "USD"];
     const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
@@ -254,6 +262,8 @@ export default function FactoryContainers() {
       arrivalDate: "",
       notes: "",
       status: "PENDING",
+      commissionAmount: "",
+      commissionCurrencyCode: "USD",
     });
     setCurrency("USD");
     setFxRate("1");
@@ -272,6 +282,8 @@ export default function FactoryContainers() {
       arrivalDate: c.arrivalDate || "",
       notes: c.notes || "",
       status: c.status,
+      commissionAmount: (c as any).commissionAmount || "",
+      commissionCurrencyCode: (c as any).commissionCurrencyCode || "USD",
     });
     setCurrency((c as any).currencyCode || "USD");
     setFxRate((c as any).fxRateToUsd || "1");
@@ -582,6 +594,36 @@ export default function FactoryContainers() {
                 Computed USD Rate/Kg: {formatNumber(parseFloat(formData.ratePerKg) * parseFloat(fxRate))} USD
               </div>
             )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Commission Amount</Label>
+                <Input
+                  type="number"
+                  value={formData.commissionAmount}
+                  onChange={(e) => setFormData({ ...formData, commissionAmount: e.target.value })}
+                  placeholder="0.00"
+                  data-testid="input-container-commission"
+                />
+              </div>
+              <div>
+                <Label>Commission Currency</Label>
+                <Select
+                  value={formData.commissionCurrencyCode}
+                  onValueChange={(val) => setFormData({ ...formData, commissionCurrencyCode: val })}
+                >
+                  <SelectTrigger data-testid="select-commission-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Arrival Date</Label>

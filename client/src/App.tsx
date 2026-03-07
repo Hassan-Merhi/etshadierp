@@ -109,6 +109,7 @@ import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
 import FactorySupplierReport from "@/pages/FactorySupplierReport";
+import FactorySupplierStatement from "@/pages/FactorySupplierStatement";
 import FactoryCustomers from "@/pages/FactoryCustomers";
 import FactoryInvoices from "@/pages/FactoryInvoices";
 import FactoryInvoiceCreate from "@/pages/FactoryInvoiceCreate";
@@ -639,6 +640,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/workers" component={FactoryWorkersHub} />
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
+                    <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
                     <Route path="/factory/users"><Redirect to="/factory/settings" /></Route>

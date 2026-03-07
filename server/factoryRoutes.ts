@@ -1259,6 +1259,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           date: c.arrivalDate || c.createdAt,
           origin: c.origin,
           status: c.status,
+          currencyCode: c.currencyCode || "USD",
+          fxRateToUsd: c.fxRateToUsd || "1",
           declaredKg: c.declaredKg,
           actualReceivedKg: c.actualReceivedKg,
           totalKg: c.totalKg,
@@ -1266,6 +1268,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           differenceKg: c.differenceKg,
           value: value.toFixed(2),
           finalPayableAmount: c.finalPayableAmount,
+          commissionAmount: c.commissionAmount || "0",
+          commissionCurrencyCode: c.commissionCurrencyCode || "USD",
           commissions: containerCommissions,
           totalCommission: totalCommission.toFixed(2),
           notes: c.notes,
@@ -1276,9 +1280,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalKg = statement.reduce((sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"), 0);
       const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
 
+      // Group by currency for multi-currency statement
+      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number }> = {};
+      for (const s of statement) {
+        const cc = s.currencyCode;
+        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0 };
+        byCurrency[cc].containers.push(s);
+        byCurrency[cc].totalKg += parseFloat(s.actualReceivedKg || s.totalKg || "0");
+        byCurrency[cc].totalValue += parseFloat(s.value);
+        byCurrency[cc].totalCommission += parseFloat(s.totalCommission);
+      }
+      const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => ({
+        currencyCode: cc,
+        containers: data.containers,
+        totalKg: data.totalKg.toFixed(3),
+        totalValue: data.totalValue.toFixed(2),
+        totalCommission: data.totalCommission.toFixed(2),
+        netPayable: (data.totalValue - data.totalCommission).toFixed(2),
+      }));
+
       res.json({
         supplier,
         statement,
+        currencyGroups,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),
@@ -2684,6 +2708,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
             const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRate;
 
+            const commAmt = row.commissionAmount ? String(parseFloat(row.commissionAmount) || 0) : "0";
+            const commCcy = (row.commissionCurrencyCode || "USD").toUpperCase();
+
             const [container] = await tx.insert(factoryContainers).values({
               companyId,
               containerNumber: row.containerNumber.trim(),
@@ -2700,6 +2727,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               arrivalDate: row.arrivalDate || null,
               notes: row.notes || null,
               status,
+              commissionAmount: commAmt,
+              commissionCurrencyCode: commCcy,
             }).returning();
 
             await writeDaybookEntry(tx, {

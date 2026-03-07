@@ -150,6 +150,7 @@ const allMenuGroups: MenuGroup[] = [
     icon: ClipboardCheck,
     items: [
       { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
+      { title: "Supplier Statement", url: "/factory/supplier-statement", icon: ClipboardCheck },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
     ],
