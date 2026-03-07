@@ -237,7 +237,6 @@ export default function FactoryContainerLoadingScan() {
           osc.start();
           setTimeout(() => { osc.stop(); ctx.close(); }, 180);
         });
-        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(speechMsg), { rate: 1.1 })); }, 250);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 1500);
       if (orderId) {
@@ -284,14 +283,14 @@ export default function FactoryContainerLoadingScan() {
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         const osc = ctx.createOscillator();
-        osc.type = "square";
+        osc.type = "sawtooth";
         osc.connect(ctx.destination);
-        osc.frequency.value = 220;
         ctx.resume().then(() => {
+          osc.frequency.setValueAtTime(700, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(160, ctx.currentTime + 0.42);
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 400);
+          setTimeout(() => { osc.stop(); ctx.close(); }, 460);
         });
-        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance("Rescan")); }, 450);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
       toast({
