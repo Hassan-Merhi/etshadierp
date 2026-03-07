@@ -410,6 +410,9 @@ export default function ContainerLoadingScan() {
               <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" data-testid="badge-bale-count">{bales.length} bales</Badge>
+                {bales.length > 0 && (
+                  <Badge variant="outline" data-testid="badge-total-weight">{totalWeight.toFixed(2)} kg</Badge>
+                )}
                 <Button
                   size="icon"
                   variant={viewMode === "detailed" ? "secondary" : "ghost"}

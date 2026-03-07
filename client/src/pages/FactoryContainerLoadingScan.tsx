@@ -573,6 +573,9 @@ export default function FactoryContainerLoadingScan() {
                 <Badge variant="secondary" data-testid="badge-bale-count">
                   {bales.length} bales
                 </Badge>
+                {bales.length > 0 && (
+                  <Badge variant="outline" data-testid="badge-total-weight">{totalWeight.toFixed(2)} kg</Badge>
+                )}
                 <Button
                   size="icon"
                   variant={viewMode === "detailed" ? "secondary" : "ghost"}
