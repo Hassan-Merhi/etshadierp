@@ -84,6 +84,7 @@ export default function ContainerLoadingScan() {
   const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
   const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
   const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
+  const [pendingBypassBaleRef, setPendingBypassBaleRef] = useState<string | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
 
@@ -172,13 +173,15 @@ export default function ContainerLoadingScan() {
   });
 
   const addBaleMutation = useMutation({
-    mutationFn: async (data: { scanCode: string; locationId: number }) => {
+    mutationFn: async (data: { scanCode: string; locationId: number; allowBypassProforma?: boolean }) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string; locationId: number }) => {
+    onSuccess: (data: any, variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean }) => {
+      setPendingBypassBaleRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
+      const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         const osc = ctx.createOscillator();
@@ -188,7 +191,7 @@ export default function ContainerLoadingScan() {
           osc.start();
           setTimeout(() => { osc.stop(); ctx.close(); }, 180);
         });
-        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance("Scanned successfully"), { rate: 1.1 })); }, 250);
+        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(speechMsg), { rate: 1.1 })); }, 250);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
       if (orderId) {
@@ -214,7 +217,26 @@ export default function ContainerLoadingScan() {
       setScanCode("");
       scannerRef.current?.focus();
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables: any) => {
+      if ((error as any).notInProforma) {
+        setPendingBypassBaleRef(variables.scanCode);
+        setScanFlash("error");
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          osc.connect(ctx.destination);
+          osc.frequency.value = 600;
+          ctx.resume().then(() => {
+            osc.start();
+            setTimeout(() => { osc.stop(); ctx.close(); }, 350);
+          });
+          setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance("Item loaded not requested. Please scan again to bypass.")); }, 400);
+        } catch { /* no audio support */ }
+        setTimeout(() => setScanFlash(null), 1500);
+        setScanCode("");
+        scannerRef.current?.focus();
+        return;
+      }
       setScanFlash("error");
       setShowScanErrorPopup(true);
       try {
@@ -278,8 +300,13 @@ export default function ContainerLoadingScan() {
   const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
     e.preventDefault();
-    addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
-  }, [scanCode, orderId, selectedLocationId, addBaleMutation]);
+    const trimmed = scanCode.trim();
+    const isBypass = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
+    if (pendingBypassBaleRef !== null && !isBypass) {
+      setPendingBypassBaleRef(null);
+    }
+    addBaleMutation.mutate({ scanCode: trimmed, locationId: parseInt(selectedLocationId), allowBypassProforma: isBypass || undefined });
+  }, [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, addBaleMutation]);
 
   const toggleGroup = useCallback((articleCode: string) => {
     setGroupOrder((prev) => {
@@ -364,6 +391,14 @@ export default function ContainerLoadingScan() {
           <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
             <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
             <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
+          </div>
+        </div>
+      )}
+      {pendingBypassBaleRef !== null && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+          <div className="bg-amber-400 text-amber-950 rounded-xl px-12 py-6 shadow-2xl border-4 border-amber-600 text-center">
+            <div className="text-3xl font-black tracking-wide">ITEM NOT REQUESTED</div>
+            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
           </div>
         </div>
       )}

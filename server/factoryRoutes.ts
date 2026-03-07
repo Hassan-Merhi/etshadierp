@@ -6523,14 +6523,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (alreadyAdded) return res.status(400).json({ message: "Bale already added to this order" });
 
       let priceUsed = "0";
+      let proformaLine: any = null;
       if (order.proformaIdUsed) {
-        const [proformaLine] = await db.select().from(customerProformaLines)
+        const [pl] = await db.select().from(customerProformaLines)
           .where(and(
             eq(customerProformaLines.proformaId, order.proformaIdUsed),
             eq(customerProformaLines.articleCode, bale.articleCode || "")
           ));
+        proformaLine = pl || null;
         if (proformaLine) {
           priceUsed = proformaLine.pricePerBale;
+        } else if (!req.body.allowBypassProforma) {
+          return res.status(400).json({
+            notInProforma: true,
+            message: "Item loaded not requested. Please scan again to bypass.",
+          });
         }
       }
 

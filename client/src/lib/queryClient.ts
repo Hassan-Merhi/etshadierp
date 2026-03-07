@@ -17,6 +17,7 @@ async function throwIfResNotOk(res: Response) {
     error.requiresConfirmation = errorData.requiresConfirmation;
     error.employeeBalance = errorData.employeeBalance;
     error.ledgerBalance = errorData.ledgerBalance;
+    error.notInProforma = errorData.notInProforma;
     throw error;
   }
 }
