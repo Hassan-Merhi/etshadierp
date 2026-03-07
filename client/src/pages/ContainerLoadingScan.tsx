@@ -81,7 +81,9 @@ export default function ContainerLoadingScan() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
-  const [lastScannedRef, setLastScannedRef] = useState<string | null>(null);
+  const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
+  const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
+  const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
 
@@ -136,7 +138,7 @@ export default function ContainerLoadingScan() {
       setSelectedLocationId(String(orderDetail.locationId || ""));
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
-        setLastScannedRef(stored);
+        try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
         setShowLastScannedPopup(true);
       }
       setTimeout(() => scannerRef.current?.focus(), 200);
@@ -176,11 +178,22 @@ export default function ContainerLoadingScan() {
     },
     onSuccess: (data: any, variables: { scanCode: string; locationId: number }) => {
       setScanFlash("success");
-      setTimeout(() => setScanFlash(null), 500);
+      setShowScanSuccessPopup(true);
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.start();
+        setTimeout(() => { osc.stop(); ctx.close(); }, 150);
+      } catch { /* no audio support */ }
+      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
       if (orderId) {
         const scanned = variables.scanCode;
-        localStorage.setItem(`lastScannedBale_${orderId}`, scanned);
-        setLastScannedRef(scanned);
+        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const lastScanned = { baleReference: newestForRef?.baleReference || scanned, baleName: newestForRef?.baleName || "", articleCode: newestForRef?.articleCode || "" };
+        localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
+        setLastScannedRef(lastScanned);
       }
       const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
       if (newest?.articleCode) {
@@ -200,7 +213,8 @@ export default function ContainerLoadingScan() {
     },
     onError: (error: Error) => {
       setScanFlash("error");
-      setTimeout(() => setScanFlash(null), 500);
+      setShowScanErrorPopup(true);
+      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
       toast({ title: "Scan Error", description: error.message, variant: "destructive" });
       setScanCode("");
       scannerRef.current?.focus();
@@ -322,6 +336,22 @@ export default function ContainerLoadingScan() {
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
+      {showScanSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-green-500 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-green-300 text-center">
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCANNED</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SUCCESSFULLY</div>
+          </div>
+        </div>
+      )}
+      {showScanErrorPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Container Loading</h1>
@@ -345,7 +375,7 @@ export default function ContainerLoadingScan() {
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
-          <Card className="flex-1 flex flex-col min-h-0 p-4">
+          <Card className={`flex-1 flex flex-col min-h-0 p-4 transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500 bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
               <div className="flex items-center gap-2">
@@ -379,6 +409,16 @@ export default function ContainerLoadingScan() {
                   autoFocus
                   data-testid="input-scan-code"
                 />
+              </div>
+            )}
+
+            {viewMode === "detailed" && lastScannedRef && (
+              <div className="mb-3 flex items-center gap-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2" data-testid="banner-last-scanned">
+                <div className="text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wide shrink-0">Last Scanned</div>
+                <div className="min-w-0">
+                  <div className="font-mono font-bold text-sm text-green-900 dark:text-green-100 truncate">{lastScannedRef.baleReference}</div>
+                  {lastScannedRef.baleName && <div className="text-xs text-green-700 dark:text-green-400 truncate">{lastScannedRef.baleName}</div>}
+                </div>
               </div>
             )}
 
@@ -776,7 +816,8 @@ export default function ContainerLoadingScan() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
             <div className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center" data-testid="text-last-scanned-ref">
-              {lastScannedRef}
+              {lastScannedRef?.baleReference}
+              {lastScannedRef?.baleName && <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>}
             </div>
             <Button className="w-full" onClick={() => setShowLastScannedPopup(false)} data-testid="button-dismiss-last-scanned">
               Continue Scanning

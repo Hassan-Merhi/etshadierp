@@ -113,7 +113,7 @@ export default function FactoryContainerLoadingScan() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
-  const [lastScannedRef, setLastScannedRef] = useState<string | null>(null);
+  const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
 
@@ -176,7 +176,7 @@ export default function FactoryContainerLoadingScan() {
       setSelectedLocationId(String(orderDetail.locationId || ""));
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
-        setLastScannedRef(stored);
+        try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
         setShowLastScannedPopup(true);
       }
       setTimeout(() => scannerRef.current?.focus(), 200);
@@ -249,8 +249,10 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
       if (orderId) {
         const scanned = variables.scanCode;
-        localStorage.setItem(`lastScannedBale_${orderId}`, scanned);
-        setLastScannedRef(scanned);
+        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const lastScanned = { baleReference: newestForRef?.baleReference || scanned, baleName: newestForRef?.baleName || "", articleCode: newestForRef?.articleCode || "" };
+        localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
+        setLastScannedRef(lastScanned);
       }
       const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
       if (newest?.articleCode) {
@@ -573,6 +575,16 @@ export default function FactoryContainerLoadingScan() {
                   autoFocus
                   data-testid="input-scan-code"
                 />
+              </div>
+            )}
+
+            {viewMode === "detailed" && lastScannedRef && (
+              <div className="mb-3 flex items-center gap-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2" data-testid="banner-last-scanned">
+                <div className="text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wide shrink-0">Last Scanned</div>
+                <div className="min-w-0">
+                  <div className="font-mono font-bold text-sm text-green-900 dark:text-green-100 truncate">{lastScannedRef.baleReference}</div>
+                  {lastScannedRef.baleName && <div className="text-xs text-green-700 dark:text-green-400 truncate">{lastScannedRef.baleName}</div>}
+                </div>
               </div>
             )}
 
@@ -1183,7 +1195,8 @@ export default function FactoryContainerLoadingScan() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
             <div className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center" data-testid="text-last-scanned-ref">
-              {lastScannedRef}
+              {lastScannedRef?.baleReference}
+              {lastScannedRef?.baleName && <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>}
             </div>
             <Button className="w-full" onClick={() => setShowLastScannedPopup(false)} data-testid="button-dismiss-last-scanned">
               Continue Scanning
