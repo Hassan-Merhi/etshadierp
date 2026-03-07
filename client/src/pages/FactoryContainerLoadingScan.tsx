@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import {
   ScanLine,
   Trash2,
@@ -100,6 +100,7 @@ interface OrderDetail {
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const search = useSearch();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -125,9 +126,9 @@ export default function FactoryContainerLoadingScan() {
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
-  // On mount: check for ?orderId= resume param
+  // Check for ?orderId= resume param using wouter's useSearch (reactive to URL changes)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(search);
     const resumeOrderId = params.get("orderId");
     if (resumeOrderId) {
       const id = parseInt(resumeOrderId);
@@ -136,7 +137,7 @@ export default function FactoryContainerLoadingScan() {
         setIsResuming(true);
       }
     }
-  }, []);
+  }, [search]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
