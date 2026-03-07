@@ -181,7 +181,7 @@ export default function ContainerLoadingScan() {
         });
         setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(speechMsg), { rate: 1.1 })); }, 250);
       } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
+      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 1500);
       if (orderId) {
         const scanned = variables.scanCode;
         const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
