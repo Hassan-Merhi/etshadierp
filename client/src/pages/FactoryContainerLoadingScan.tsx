@@ -242,9 +242,10 @@ export default function FactoryContainerLoadingScan() {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         const osc = ctx.createOscillator();
         osc.connect(ctx.destination);
-        osc.frequency.value = 880;
+        osc.frequency.value = 1000;
         osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); }, 150);
+        setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance("Scanned successfully"), { rate: 1.1 })); }, 250);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
       if (orderId) {
@@ -274,6 +275,16 @@ export default function FactoryContainerLoadingScan() {
     onError: (error: Error) => {
       setScanFlash("error");
       setShowScanErrorPopup(true);
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.connect(ctx.destination);
+        osc.frequency.value = 220;
+        osc.start();
+        setTimeout(() => { osc.stop(); ctx.close(); }, 400);
+        setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance("Rescan")); }, 450);
+      } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
       toast({
         title: "Scan Error",
