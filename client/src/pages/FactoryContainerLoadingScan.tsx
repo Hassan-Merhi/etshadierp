@@ -8,6 +8,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect } from "react";
+import * as XLSX from "xlsx";
 import {
   Select,
   SelectContent,
@@ -36,10 +37,12 @@ import {
   AlertTriangle,
   Rows3,
   AlignJustify,
+  Upload,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -115,7 +118,10 @@ export default function FactoryContainerLoadingScan() {
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importPreview, setImportPreview] = useState<Array<{ articleCode: string; qty: number }>>([]);
   const scannerRef = useRef<HTMLInputElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -336,6 +342,33 @@ export default function FactoryContainerLoadingScan() {
     },
   });
 
+  const bulkImportMutation = useMutation({
+    mutationFn: async (items: Array<{ articleCode: string; qty: number }>) => {
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-orders/${orderId}/bales/bulk-import`,
+        { locationId: parseInt(selectedLocationId), items },
+      );
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      setShowImportDialog(false);
+      setImportPreview([]);
+      const notFoundMsgs = (data.notFound || []).map((n: any) =>
+        `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
+      );
+      toast({
+        title: `Import complete — ${data.added} bale${data.added === 1 ? "" : "s"} added`,
+        description: notFoundMsgs.length > 0 ? `Short: ${notFoundMsgs.join(", ")}` : undefined,
+      });
+      setTimeout(() => scannerRef.current?.focus(), 100);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const finalizeMutation = useMutation({
     mutationFn: async () => {
       await modeApiRequest(
@@ -401,6 +434,38 @@ export default function FactoryContainerLoadingScan() {
     },
     [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, addBaleMutation],
   );
+
+  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[] = XLSX.utils.sheet_to_json(ws);
+        const parsed = rows
+          .map((r) => ({
+            articleCode: String(
+              r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
+            ).trim(),
+            qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
+          }))
+          .filter((r) => r.articleCode && r.qty > 0);
+        if (parsed.length === 0) {
+          toast({ title: "No valid rows found", description: "Ensure columns are Article Code and Qty", variant: "destructive" });
+          return;
+        }
+        setImportPreview(parsed);
+        setShowImportDialog(true);
+      } catch (err: any) {
+        toast({ title: "Parse error", description: err.message, variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }, [toast]);
 
   const toggleGroup = useCallback((articleCode: string) => {
     setExpandedGroups((prev) => {
@@ -589,10 +654,29 @@ export default function FactoryContainerLoadingScan() {
 
             {orderId && (
               <div className="mb-3">
-                <label className="text-sm font-medium mb-1 block">
-                  <ScanLine className="inline h-4 w-4 mr-1" />
-                  Scan Bale
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium">
+                    <ScanLine className="inline h-4 w-4 mr-1" />
+                    Scan Bale
+                  </label>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => importFileRef.current?.click()}
+                    data-testid="button-import-excel"
+                  >
+                    <Upload className="h-3 w-3 mr-1" />
+                    Import from Excel
+                  </Button>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImportFile}
+                    data-testid="input-import-file"
+                  />
+                </div>
                 <Input
                   ref={scannerRef}
                   value={scanCode}
@@ -1021,6 +1105,55 @@ export default function FactoryContainerLoadingScan() {
           )}
         </div>
       </div>
+
+      {/* Import from Excel Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={(open) => { setShowImportDialog(open); if (!open) setImportPreview([]); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Bales from Excel</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Bales will be added oldest-first (by production date) for each article code.
+            </p>
+            {importPreview.length > 0 && (
+              <div className="border rounded-md overflow-auto max-h-[320px]">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background">
+                    <TableRow>
+                      <TableHead>Article Code</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importPreview.map((row, i) => (
+                      <TableRow key={i} data-testid={`row-import-preview-${i}`}>
+                        <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{row.qty}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {importPreview.reduce((s, r) => s + r.qty, 0)} total bales across {importPreview.length} article code{importPreview.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview([]); }} data-testid="button-cancel-import">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => bulkImportMutation.mutate(importPreview)}
+              disabled={bulkImportMutation.isPending || importPreview.length === 0}
+              data-testid="button-confirm-import"
+            >
+              {bulkImportMutation.isPending ? "Importing…" : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Validate & Finalize Dialog */}
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>

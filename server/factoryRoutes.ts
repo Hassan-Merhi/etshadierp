@@ -6607,6 +6607,129 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const { locationId, items } = req.body;
+      if (!locationId || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "locationId and items are required" });
+      }
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) {
+        return res.status(400).json({ message: "Can only add bales to DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+      }
+
+      const parsedLocationId = parseInt(locationId);
+
+      // Get all products for this company for matching
+      const allProducts = await db.select().from(factoryBaleProducts)
+        .where(eq(factoryBaleProducts.companyId, companyId));
+
+      // Get bales already in this order
+      const existingOrderBales = await db.select({ baleId: customerOrderBales.baleId })
+        .from(customerOrderBales)
+        .where(eq(customerOrderBales.orderId, orderId));
+      const alreadyAddedBaleIds = new Set(existingOrderBales.map((b: any) => b.baleId));
+
+      let totalAdded = 0;
+      const notFound: Array<{ articleCode: string; requestedQty: number; foundQty: number }> = [];
+
+      for (const item of items) {
+        const articleCode = String(item.articleCode || "").trim();
+        const qty = parseInt(item.qty) || 0;
+        if (!articleCode || qty <= 0) continue;
+
+        const codeLower = articleCode.toLowerCase();
+
+        // Find matching product IDs (by articleCode or name)
+        const matchingProductIds = allProducts
+          .filter(p =>
+            (p.articleCode && p.articleCode.toLowerCase() === codeLower) ||
+            (p.name && p.name.toLowerCase() === codeLower)
+          )
+          .map(p => p.id);
+
+        // Build bale query conditions
+        const matchConditions = matchingProductIds.length > 0
+          ? or(
+              sql`LOWER(${factoryBales.articleCode}) = ${codeLower}`,
+              inArray(factoryBales.productId, matchingProductIds)
+            )
+          : sql`LOWER(${factoryBales.articleCode}) = ${codeLower}`;
+
+        // Find available bales, oldest first
+        const availableBales = await db.select().from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+            eq(factoryBales.erpLocationId, parsedLocationId),
+            matchConditions
+          ))
+          .orderBy(factoryBales.createdAt)
+          .limit(qty * 5);
+
+        // Filter out bales already in this order or reserved for another order
+        const candidateBales = availableBales.filter((b: any) => !alreadyAddedBaleIds.has(b.id));
+        const balesToAdd = candidateBales.slice(0, qty);
+
+        if (balesToAdd.length < qty) {
+          notFound.push({ articleCode, requestedQty: qty, foundQty: balesToAdd.length });
+        }
+
+        for (const bale of balesToAdd) {
+          // Determine price
+          let priceUsed = "0";
+          if (order.proformaIdUsed) {
+            const [pl] = await db.select().from(customerProformaLines)
+              .where(and(
+                eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                eq(customerProformaLines.articleCode, bale.articleCode || "")
+              ));
+            if (pl) priceUsed = pl.pricePerBale;
+          }
+          if (priceUsed === "0" && bale.productId) {
+            const product = allProducts.find((p: any) => p.id === bale.productId);
+            if (product?.sellingPrice) priceUsed = product.sellingPrice;
+          }
+
+          await db.insert(customerOrderBales).values({
+            orderId,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            locationId: parsedLocationId,
+            weight: bale.weightKg,
+            articleCode: bale.articleCode,
+            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            priceUsed,
+          });
+
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(eq(factoryBales.id, bale.id));
+
+          alreadyAddedBaleIds.add(bale.id);
+          totalAdded++;
+        }
+      }
+
+      await recalculateOrderTotals(db, orderId);
+
+      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+      res.json({ added: totalAdded, notFound, order: updatedOrder, bales: updatedBales });
+    } catch (error: any) {
+      console.error("Error bulk importing bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
