@@ -4,6 +4,7 @@ import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 import * as XLSX from "xlsx";
+import * as XLSXS from "xlsx-js-style";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,85 +36,111 @@ import {
 // Its initSheetData() reads celldata, builds an expanded matrix, then
 // OVERWRITES sheet.data — so passing dense data without celldata always
 // produces a blank sheet.
+
+// ─── Border style maps (Fortune Sheet number ↔ xlsx-js-style name) ──────────
+const FS_BORDER: Record<string, string> = {
+  "1": "thin",    "2": "hair",          "3": "dotted",
+  "4": "dashed",  "5": "dashDot",       "6": "dashDotDot",
+  "7": "double",  "8": "medium",        "9": "mediumDashed",
+  "10": "mediumDashDot", "11": "mediumDashDotDot", "12": "slantDashDot",
+  "13": "thick",
+};
+// ─── Fortune Sheet alignment encoding ───────────────────────────────────────
+// Horizontal: toolbar reveals value: 1=left, 0=center, 2=right
+const FS_HT: Record<string, string> = { "0": "center", "1": "left", "2": "right" };
+// Vertical:   toolbar reveals value: 1=top, 0=middle, 2=bottom
+const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom" };
+
 function xlsxToFortune(workbook: XLSX.WorkBook): FortuneSheet[] {
   return workbook.SheetNames.map((name, order) => {
-    const ws = workbook.Sheets[name];
+    const ws = workbook.Sheets[name] as any;
     const ref = ws["!ref"];
 
     if (!ref) {
-      return {
-        id: String(order + 1),
-        name,
-        status: order === 0 ? 1 : 0,
-        order,
-        celldata: [],
-        row: 50,
-        column: 26,
-      } as FortuneSheet;
+      return { id: String(order + 1), name, status: order === 0 ? 1 : 0, order, celldata: [], row: 50, column: 26 } as FortuneSheet;
     }
 
     const range = XLSX.utils.decode_range(ref);
     const rows = Math.max(50, range.e.r + 10);
     const cols = Math.max(26, range.e.c + 5);
-
     const celldata: any[] = [];
 
-    // Primary: sheet_to_json — XLSX.js's official, tested extraction path.
-    const aoa: any[][] = XLSX.utils.sheet_to_json(ws, {
-      header: 1,
-      defval: null,
-      blankrows: true,
-      raw: true,
-    }) as any[][];
+    // Iterate every cell address directly so formulas and styles are not lost
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        if (!cell) continue;
 
-    for (let r = 0; r < aoa.length; r++) {
-      const row = aoa[r];
-      if (!Array.isArray(row)) continue;
-      // sheet_to_json uses absolute column indices (A=0, B=1, ...)
-      for (let c = 0; c < row.length; c++) {
-        const val = row[c];
-        if (val === null || val === undefined) continue;
-        const absR = range.s.r + r;
-        const absC = c;
-        const addr = XLSX.utils.encode_cell({ r: absR, c: absC });
-        const wsCell = ws[addr];
-        const m = wsCell?.w !== undefined ? wsCell.w : String(val);
-        const t = typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s";
-        celldata.push({ r: absR, c: absC, v: { v: val, m, ct: { fa: "General", t } } });
+        const t = cell.t === "n" ? "n" : cell.t === "b" ? "b" : cell.t === "d" ? "d" : "s";
+        const fa = cell.z || "General";
+        const m = cell.w !== undefined ? cell.w : (cell.v !== undefined ? String(cell.v) : "");
+
+        const v: any = { v: cell.v, m, ct: { fa, t } };
+
+        // Preserve formula (cell.f is stored without leading "=" by SheetJS)
+        if (cell.f) v.f = cell.f;
+
+        // Background fill — SheetJS/xlsx-js-style exposes fgColor when cellStyles:true
+        const fg = cell.s?.fgColor?.rgb;
+        if (fg && cell.s?.patternType !== "none") v.bg = `#${fg}`;
+
+        celldata.push({ r, c, v });
       }
     }
 
-    // Fallback: if sheet_to_json found nothing, try direct cell access.
-    if (celldata.length === 0) {
-      for (let r = range.s.r; r <= range.e.r; r++) {
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const addr = XLSX.utils.encode_cell({ r, c });
-          const cell = ws[addr];
-          if (!cell) continue;
-          let val: any = cell.v;
-          let m: string;
-          if (val === undefined || val === null) {
-            if (cell.w !== undefined) { val = cell.w; m = cell.w; }
-            else if (cell.f !== undefined) { val = `=${cell.f}`; m = val; }
-            else continue;
-          } else {
-            m = cell.w !== undefined ? cell.w : String(val);
-          }
-          const t = cell.t === "n" ? "n" : cell.t === "b" ? "b" : "s";
-          celldata.push({ r, c, v: { v: val, m, ct: { fa: "General", t } } });
-        }
+    // ── Sheet-level properties ──────────────────────────────────────────────
+    const config: any = {};
+
+    // Merged cells → config.merge  (Fortune Sheet key format: "r_c")
+    const xlMerges: any[] = ws["!merges"] || [];
+    if (xlMerges.length > 0) {
+      config.merge = {};
+      for (const m of xlMerges) {
+        const key = `${m.s.r}_${m.s.c}`;
+        config.merge[key] = { r: m.s.r, c: m.s.c, rs: m.e.r - m.s.r + 1, cs: m.e.c - m.s.c + 1 };
       }
     }
 
-    return {
-      id: String(order + 1),
-      name,
-      status: order === 0 ? 1 : 0,
-      order,
-      celldata,
-      row: rows,
-      column: cols,
-    } as FortuneSheet;
+    // Column widths → config.columnlen; hidden → config.colhidden
+    const xlCols: any[] = ws["!cols"] || [];
+    const columnlen: Record<string, number> = {};
+    const colhidden: Record<string, number> = {};
+    for (let ci = 0; ci < xlCols.length; ci++) {
+      const col = xlCols[ci];
+      if (!col) continue;
+      if (col.wpx !== undefined) columnlen[ci] = col.wpx;
+      else if (col.wch !== undefined) columnlen[ci] = Math.round(col.wch * 7);
+      if (col.hidden) colhidden[ci] = 0;
+    }
+    if (Object.keys(columnlen).length > 0) config.columnlen = columnlen;
+    if (Object.keys(colhidden).length > 0) config.colhidden = colhidden;
+
+    // Row heights → config.rowlen; hidden → config.rowhidden
+    const xlRows: any[] = ws["!rows"] || [];
+    const rowlen: Record<string, number> = {};
+    const rowhidden: Record<string, number> = {};
+    for (let ri = 0; ri < xlRows.length; ri++) {
+      const row = xlRows[ri];
+      if (!row) continue;
+      if (row.hpx !== undefined) rowlen[ri] = row.hpx;
+      else if (row.hpt !== undefined) rowlen[ri] = Math.round(row.hpt * 1.333);
+      if (row.hidden) rowhidden[ri] = 0;
+    }
+    if (Object.keys(rowlen).length > 0) config.rowlen = rowlen;
+    if (Object.keys(rowhidden).length > 0) config.rowhidden = rowhidden;
+
+    // Auto filter → filter_select
+    let filter_select: any = null;
+    const af = ws["!autofilter"];
+    if (af?.ref) {
+      const fr = XLSX.utils.decode_range(af.ref);
+      filter_select = { row: [fr.s.r, fr.e.r], column: [fr.s.c, fr.e.c] };
+    }
+
+    const sheet: any = { id: String(order + 1), name, status: order === 0 ? 1 : 0, order, celldata, row: rows, column: cols, config };
+    if (filter_select) sheet.filter_select = filter_select;
+    return sheet as FortuneSheet;
   });
 }
 
@@ -138,54 +165,151 @@ function ensureCelldata(sheet: any): any {
   return { ...rest, celldata };
 }
 
-function fortuneToXlsx(sheets: FortuneSheet[]): XLSX.WorkBook {
-  const wb = XLSX.utils.book_new();
+function fortuneToXlsx(sheets: FortuneSheet[]): any {
+  const wb = XLSXS.utils.book_new();
+
   for (const sheet of sheets) {
-    const ws: XLSX.WorkSheet = {};
+    const ws: any = {};
     let maxR = 0;
     let maxC = 0;
+
+    const writeCell = (r: number, c: number, v: any) => {
+      if (!v) return;
+      const hasValue = v.v !== undefined || v.m !== undefined || v.f;
+      if (!hasValue) return;
+
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const val = v.v ?? v.m;
+      const xlCell: any = {
+        v: val,
+        t: v.f ? "f" : (typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s"),
+        w: v.m !== undefined ? String(v.m) : (val !== undefined ? String(val) : ""),
+      };
+
+      // Formula: stored without "=" in both SheetJS and Fortune Sheet
+      if (v.f) xlCell.f = v.f;
+
+      // Number format
+      const fa = v.ct?.fa;
+      if (fa && fa !== "General" && fa !== "@") xlCell.z = fa;
+
+      // Style object
+      const s: any = {};
+
+      // Font
+      if (v.bl || v.it || v.un || v.cl || v.fs || v.fc || v.ff) {
+        s.font = {};
+        if (v.bl) s.font.bold = true;
+        if (v.it) s.font.italic = true;
+        if (v.un) s.font.underline = true;
+        if (v.cl) s.font.strike = true;
+        if (v.fs) s.font.sz = Number(v.fs);
+        if (v.fc) s.font.color = { rgb: v.fc.replace("#", "").toUpperCase() };
+        if (v.ff) s.font.name = v.ff;
+      }
+
+      // Fill / background
+      if (v.bg) {
+        s.fill = { patternType: "solid", fgColor: { rgb: v.bg.replace("#", "").toUpperCase() } };
+      }
+
+      // Alignment
+      const ht = FS_HT[String(v.ht)];
+      const vt = FS_VT[String(v.vt)];
+      const wrap = v.tb === "2" || v.tb === 2;
+      if (ht || vt || wrap) {
+        s.alignment = {};
+        if (ht) s.alignment.horizontal = ht;
+        if (vt) s.alignment.vertical = vt;
+        if (wrap) s.alignment.wrapText = true;
+      }
+
+      // Borders
+      if (v.b) {
+        const sides: Record<string, string> = { l: "left", r: "right", t: "top", b: "bottom" };
+        const border: any = {};
+        for (const [fs, xl] of Object.entries(sides)) {
+          const bd = v.b[fs];
+          if (bd?.style) {
+            border[xl] = {
+              style: FS_BORDER[String(bd.style)] || "thin",
+              color: { rgb: (bd.color || "#000000").replace("#", "").toUpperCase() },
+            };
+          }
+        }
+        if (Object.keys(border).length > 0) s.border = border;
+      }
+
+      if (Object.keys(s).length > 0) xlCell.s = s;
+
+      ws[addr] = xlCell;
+      maxR = Math.max(maxR, r);
+      maxC = Math.max(maxC, c);
+    };
 
     const sheetData = (sheet as any).data as any[][] | undefined;
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
-        for (let c = 0; c < sheetData[r].length; c++) {
-          const v = sheetData[r][c];
-          if (v && (v.v !== undefined || v.m !== undefined)) {
-            const addr = XLSX.utils.encode_cell({ r, c });
-            const val = v.v ?? v.m;
-            ws[addr] = {
-              v: val,
-              t: typeof val === "number" ? "n" : "s",
-              w: v.m !== undefined ? String(v.m) : String(val),
-            };
-            maxR = Math.max(maxR, r);
-            maxC = Math.max(maxC, c);
-          }
-        }
+        for (let c = 0; c < sheetData[r].length; c++) writeCell(r, c, sheetData[r][c]);
       }
     } else {
-      for (const cell of (sheet.celldata || []) as any[]) {
-        const { r, c, v } = cell;
-        if (v && (v.v !== undefined || v.m !== undefined)) {
-          const addr = XLSX.utils.encode_cell({ r, c });
-          const val = v.v ?? v.m;
-          ws[addr] = {
-            v: val,
-            t: typeof val === "number" ? "n" : "s",
-            w: v.m !== undefined ? String(v.m) : String(val),
-          };
-          maxR = Math.max(maxR, r);
-          maxC = Math.max(maxC, c);
-        }
-      }
+      for (const cell of (sheet.celldata || []) as any[]) writeCell(cell.r, cell.c, cell.v);
     }
 
-    ws["!ref"] = XLSX.utils.encode_range({
-      s: { r: 0, c: 0 },
-      e: { r: maxR, c: maxC },
-    });
-    XLSX.utils.book_append_sheet(wb, ws, sheet.name || "Sheet");
+    ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+
+    const cfg = (sheet as any).config || {};
+
+    // Merged cells
+    if (cfg.merge) {
+      ws["!merges"] = Object.values(cfg.merge).map((m: any) => ({
+        s: { r: m.r, c: m.c },
+        e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 },
+      }));
+    }
+
+    // Column widths + hidden
+    if (cfg.columnlen || cfg.colhidden) {
+      const cMax = Math.max(
+        ...Object.keys(cfg.columnlen || {}).map(Number),
+        ...Object.keys(cfg.colhidden || {}).map(Number),
+        maxC,
+      );
+      const xlCols: any[] = Array.from({ length: cMax + 1 }, () => ({}));
+      for (const [ci, w] of Object.entries(cfg.columnlen || {})) {
+        xlCols[Number(ci)].wpx = w;
+        xlCols[Number(ci)].wch = Math.round((w as number) / 7 * 100) / 100;
+      }
+      for (const ci of Object.keys(cfg.colhidden || {})) xlCols[Number(ci)].hidden = true;
+      ws["!cols"] = xlCols;
+    }
+
+    // Row heights + hidden
+    if (cfg.rowlen || cfg.rowhidden) {
+      const rMax = Math.max(
+        ...Object.keys(cfg.rowlen || {}).map(Number),
+        ...Object.keys(cfg.rowhidden || {}).map(Number),
+        maxR,
+      );
+      const xlRows: any[] = Array.from({ length: rMax + 1 }, () => ({}));
+      for (const [ri, h] of Object.entries(cfg.rowlen || {})) {
+        xlRows[Number(ri)].hpx = h;
+        xlRows[Number(ri)].hpt = Math.round((h as number) / 1.333 * 100) / 100;
+      }
+      for (const ri of Object.keys(cfg.rowhidden || {})) xlRows[Number(ri)].hidden = true;
+      ws["!rows"] = xlRows;
+    }
+
+    // Auto filter
+    const fs = (sheet as any).filter_select;
+    if (fs) {
+      const c1 = XLSX.utils.encode_col(fs.column[0]);
+      const c2 = XLSX.utils.encode_col(fs.column[1]);
+      ws["!autofilter"] = { ref: `${c1}${fs.row[0] + 1}:${c2}${fs.row[1] + 1}` };
+    }
+
+    XLSXS.utils.book_append_sheet(wb, ws, sheet.name || "Sheet");
   }
   return wb;
 }
@@ -530,7 +654,8 @@ export default function SpreadsheetEditor() {
     reader.onload = (evt) => {
       try {
         const buffer = new Uint8Array(evt.target!.result as ArrayBuffer);
-        const wb = XLSX.read(buffer, { type: "array" });
+        // cellFormula preserves formulas; cellStyles exposes fill; cellNF exposes number formats
+        const wb = XLSXS.read(buffer, { type: "array", cellFormula: true, cellStyles: true, cellNF: true, cellDates: true });
         const data = xlsxToFortune(wb);
         const name = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
         createMutation.mutate({ name, data });
@@ -553,7 +678,7 @@ export default function SpreadsheetEditor() {
         : (openedSheet?.data ?? []);
     if (!data.length) return;
     const wb = fortuneToXlsx(data);
-    XLSX.writeFile(wb, `${sheetName}.xlsx`);
+    XLSXS.writeFile(wb, `${sheetName}.xlsx`);
   };
 
   const startRename = () => {
