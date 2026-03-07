@@ -107,6 +107,7 @@ export default function FactoryContainerLoadingScan() {
   const [isResuming, setIsResuming] = useState(false);
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
+  const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
@@ -235,7 +236,16 @@ export default function FactoryContainerLoadingScan() {
     },
     onSuccess: (data: any, variables: { scanCode: string; locationId: number }) => {
       setScanFlash("success");
-      setTimeout(() => setScanFlash(null), 500);
+      setShowScanSuccessPopup(true);
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.start();
+        setTimeout(() => { osc.stop(); ctx.close(); }, 150);
+      } catch { /* no audio support */ }
+      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
       if (orderId) {
         const scanned = variables.scanCode;
         localStorage.setItem(`lastScannedBale_${orderId}`, scanned);
@@ -471,6 +481,14 @@ export default function FactoryContainerLoadingScan() {
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
+      {showScanSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-green-500 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-green-300 text-center">
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCANNED</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SUCCESSFULLY</div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
@@ -502,7 +520,7 @@ export default function FactoryContainerLoadingScan() {
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
-          <Card className="flex-1 flex flex-col min-h-0 p-4">
+          <Card className={`flex-1 flex flex-col min-h-0 p-4 transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500 bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <h2
                 className="font-semibold text-lg"
