@@ -235,10 +235,10 @@ export default function FactoryContainerLoadingScan() {
         osc.frequency.value = 1000;
         ctx.resume().then(() => {
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+          setTimeout(() => { osc.stop(); ctx.close(); }, 120);
         });
       } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 1500);
+      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
         const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
@@ -270,11 +270,10 @@ export default function FactoryContainerLoadingScan() {
           osc.frequency.value = 600;
           ctx.resume().then(() => {
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 350);
+            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
           });
-          setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance("Item loaded not requested. Please scan again to bypass.")); }, 400);
         } catch { /* no audio support */ }
-        setTimeout(() => setScanFlash(null), 1500);
+        setTimeout(() => setScanFlash(null), 600);
         setScanCode("");
         return;
       }
@@ -287,12 +286,12 @@ export default function FactoryContainerLoadingScan() {
         osc.connect(ctx.destination);
         ctx.resume().then(() => {
           osc.frequency.setValueAtTime(700, ctx.currentTime);
-          osc.frequency.linearRampToValueAtTime(160, ctx.currentTime + 0.42);
+          osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.18);
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 460);
+          setTimeout(() => { osc.stop(); ctx.close(); }, 220);
         });
       } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
+      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 1500);
       toast({
         title: "Scan Error",
         description: error.message,
