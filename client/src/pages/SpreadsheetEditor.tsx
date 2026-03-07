@@ -5,6 +5,13 @@ import "@fortune-sheet/react/dist/index.css";
 import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 import * as XLSX from "xlsx";
 import * as XLSXS from "xlsx-js-style";
+import { excelToFortune } from "@/lib/excelImport";
+import {
+  isExcelMode,
+  type SpreadsheetData,
+  arrayBufferToBase64,
+  syncFortuneToXlsx,
+} from "@/lib/excelSync";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,98 +58,6 @@ const FS_HT: Record<string, string> = { "0": "center", "1": "left", "2": "right"
 // Vertical:   toolbar reveals value: 1=top, 0=middle, 2=bottom
 const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom" };
 
-function xlsxToFortune(workbook: XLSX.WorkBook): FortuneSheet[] {
-  return workbook.SheetNames.map((name, order) => {
-    const ws = workbook.Sheets[name] as any;
-    const ref = ws["!ref"];
-
-    if (!ref) {
-      return { id: String(order + 1), name, status: order === 0 ? 1 : 0, order, celldata: [], row: 50, column: 26 } as FortuneSheet;
-    }
-
-    const range = XLSX.utils.decode_range(ref);
-    const rows = Math.max(50, range.e.r + 10);
-    const cols = Math.max(26, range.e.c + 5);
-    const celldata: any[] = [];
-
-    // Iterate every cell address directly so formulas and styles are not lost
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        const cell = ws[addr];
-        if (!cell) continue;
-
-        const t = cell.t === "n" ? "n" : cell.t === "b" ? "b" : cell.t === "d" ? "d" : "s";
-        const fa = cell.z || "General";
-        const m = cell.w !== undefined ? cell.w : (cell.v !== undefined ? String(cell.v) : "");
-
-        const v: any = { v: cell.v, m, ct: { fa, t } };
-
-        // Preserve formula (cell.f is stored without leading "=" by SheetJS)
-        if (cell.f) v.f = cell.f;
-
-        // Background fill — SheetJS/xlsx-js-style exposes fgColor when cellStyles:true
-        const fg = cell.s?.fgColor?.rgb;
-        if (fg && cell.s?.patternType !== "none") v.bg = `#${fg}`;
-
-        celldata.push({ r, c, v });
-      }
-    }
-
-    // ── Sheet-level properties ──────────────────────────────────────────────
-    const config: any = {};
-
-    // Merged cells → config.merge  (Fortune Sheet key format: "r_c")
-    const xlMerges: any[] = ws["!merges"] || [];
-    if (xlMerges.length > 0) {
-      config.merge = {};
-      for (const m of xlMerges) {
-        const key = `${m.s.r}_${m.s.c}`;
-        config.merge[key] = { r: m.s.r, c: m.s.c, rs: m.e.r - m.s.r + 1, cs: m.e.c - m.s.c + 1 };
-      }
-    }
-
-    // Column widths → config.columnlen; hidden → config.colhidden
-    const xlCols: any[] = ws["!cols"] || [];
-    const columnlen: Record<string, number> = {};
-    const colhidden: Record<string, number> = {};
-    for (let ci = 0; ci < xlCols.length; ci++) {
-      const col = xlCols[ci];
-      if (!col) continue;
-      if (col.wpx !== undefined) columnlen[ci] = col.wpx;
-      else if (col.wch !== undefined) columnlen[ci] = Math.round(col.wch * 7);
-      if (col.hidden) colhidden[ci] = 0;
-    }
-    if (Object.keys(columnlen).length > 0) config.columnlen = columnlen;
-    if (Object.keys(colhidden).length > 0) config.colhidden = colhidden;
-
-    // Row heights → config.rowlen; hidden → config.rowhidden
-    const xlRows: any[] = ws["!rows"] || [];
-    const rowlen: Record<string, number> = {};
-    const rowhidden: Record<string, number> = {};
-    for (let ri = 0; ri < xlRows.length; ri++) {
-      const row = xlRows[ri];
-      if (!row) continue;
-      if (row.hpx !== undefined) rowlen[ri] = row.hpx;
-      else if (row.hpt !== undefined) rowlen[ri] = Math.round(row.hpt * 1.333);
-      if (row.hidden) rowhidden[ri] = 0;
-    }
-    if (Object.keys(rowlen).length > 0) config.rowlen = rowlen;
-    if (Object.keys(rowhidden).length > 0) config.rowhidden = rowhidden;
-
-    // Auto filter → filter_select
-    let filter_select: any = null;
-    const af = ws["!autofilter"];
-    if (af?.ref) {
-      const fr = XLSX.utils.decode_range(af.ref);
-      filter_select = { row: [fr.s.r, fr.e.r], column: [fr.s.c, fr.e.c] };
-    }
-
-    const sheet: any = { id: String(order + 1), name, status: order === 0 ? 1 : 0, order, celldata, row: rows, column: cols, config };
-    if (filter_select) sheet.filter_select = filter_select;
-    return sheet as FortuneSheet;
-  });
-}
 
 // Fortune Sheet's onChange delivers sheets in dense `data` format.
 // When re-opening a saved sheet, convert back to sparse `celldata` so
@@ -381,6 +296,8 @@ export default function SpreadsheetEditor() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const workbookRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Caches the base64 rawXlsx for Excel-mode sheets so autosave and download can use it
+  const rawXlsxRef = useRef<string>("");
   // Keyboard shortcut sequence state: tracks partial multi-key sequences
   const seqRef = useRef<string>("");
   const seqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -445,11 +362,14 @@ export default function SpreadsheetEditor() {
   });
 
   const scheduleSave = useCallback(
-    (data: FortuneSheet[]) => {
+    (sheets: FortuneSheet[]) => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         if (openSheetId !== null) {
           setSaveStatus("saving");
+          const data: SpreadsheetData = rawXlsxRef.current
+            ? { mode: "excel", rawXlsx: rawXlsxRef.current, sheets }
+            : sheets;
           updateMutation.mutate({ id: openSheetId, fields: { data } });
         }
       }, 1500);
@@ -482,6 +402,15 @@ export default function SpreadsheetEditor() {
     setSaveStatus("saved");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
   }, [openSheetId]);
+
+  // Cache rawXlsx whenever the opened sheet changes (Excel mode vs native mode)
+  useEffect(() => {
+    if (openedSheet && isExcelMode(openedSheet.data)) {
+      rawXlsxRef.current = openedSheet.data.rawXlsx;
+    } else {
+      rawXlsxRef.current = "";
+    }
+  }, [openedSheet]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   // Implemented in capture phase so we intercept before Fortune Sheet's own
@@ -647,38 +576,59 @@ export default function SpreadsheetEditor() {
     createMutation.mutate({ name: "Untitled Spreadsheet", data });
   };
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target!.result as ArrayBuffer);
-        // cellFormula preserves formulas; cellStyles exposes fill; cellNF exposes number formats
-        const wb = XLSXS.read(buffer, { type: "array", cellFormula: true, cellStyles: true, cellNF: true, cellDates: true });
-        const data = xlsxToFortune(wb);
-        const name = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
-        createMutation.mutate({ name, data });
-      } catch {
-        toast({
-          title: "Could not read file",
-          description: "Make sure it is a valid .xlsx or .csv file.",
-          variant: "destructive",
-        });
-      }
-    };
-    reader.readAsArrayBuffer(file);
     e.target.value = "";
+    try {
+      const buf = await file.arrayBuffer();
+      const sheets = await excelToFortune(buf);
+      const rawXlsx = arrayBufferToBase64(buf);
+      const name = file.name.replace(/\.(xlsx|xls)$/i, "");
+      createMutation.mutate({ name, data: { mode: "excel", rawXlsx, sheets } });
+    } catch {
+      toast({
+        title: "Could not read file",
+        description: "Make sure it is a valid .xlsx file.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDownload = () => {
-    const data =
+  const handleDownload = async () => {
+    const d = openedSheet?.data;
+    const currentSheets: FortuneSheet[] =
       currentDataRef.current.length > 0
         ? currentDataRef.current
-        : (openedSheet?.data ?? []);
-    if (!data.length) return;
-    const wb = fortuneToXlsx(data);
-    XLSXS.writeFile(wb, `${sheetName}.xlsx`);
+        : isExcelMode(d)
+          ? d.sheets
+          : Array.isArray(d)
+            ? d
+            : [];
+
+    if (rawXlsxRef.current) {
+      // Excel mode: sync Fortune Sheet edits back into the original workbook,
+      // preserving advanced features (tables, condFmt, data validation, named ranges)
+      try {
+        const buf = await syncFortuneToXlsx(rawXlsxRef.current, currentSheets);
+        const blob = new Blob([buf], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${sheetName}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast({ title: "Download failed", variant: "destructive" });
+      }
+    } else {
+      // Native mode: existing xlsx-js-style export path (unchanged)
+      if (!currentSheets.length) return;
+      const wb = fortuneToXlsx(currentSheets);
+      XLSXS.writeFile(wb, `${sheetName}.xlsx`);
+    }
   };
 
   const startRename = () => {
@@ -696,12 +646,20 @@ export default function SpreadsheetEditor() {
     setEditingName(false);
   };
 
-  // Convert dense data (from Fortune Sheet's onChange) back to sparse celldata
-  // so Fortune Sheet's initSheetData() can correctly populate the grid.
-  const initialData: FortuneSheet[] =
-    openedSheet?.data && Array.isArray(openedSheet.data) && openedSheet.data.length > 0
-      ? openedSheet.data.map(ensureCelldata)
-      : defaultBlankSheets();
+  // Build the initial data passed to Fortune Sheet.
+  // Excel mode: use the ExcelJS-extracted sheets stored in data.sheets.
+  // Native mode: use data directly (FortuneSheet[]).
+  // Always run through ensureCelldata to convert dense→sparse for Fortune Sheet init.
+  const initialData: FortuneSheet[] = (() => {
+    if (!openedSheet?.data) return defaultBlankSheets();
+    const d = openedSheet.data;
+    const sheets = isExcelMode(d)
+      ? d.sheets
+      : Array.isArray(d)
+        ? d
+        : [];
+    return sheets.length > 0 ? sheets.map(ensureCelldata) : defaultBlankSheets();
+  })();
 
   if (openSheetId !== null) {
     return (
