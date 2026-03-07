@@ -598,7 +598,7 @@ export default function FactoryContainerLoadingScan() {
                   value={scanCode}
                   onChange={(e) => setScanCode(e.target.value)}
                   onKeyDown={handleScan}
-                  placeholder="Scan barcode, ref no., article code, or item name…"
+                  placeholder="Scan barcode, ref no., article code, item name (partial ok)…"
                   disabled={
                     !orderId || !selectedLocationId || addBaleMutation.isPending
                   }

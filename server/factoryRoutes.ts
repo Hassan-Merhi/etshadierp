@@ -6515,7 +6515,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(factoryBaleProducts.companyId, companyId),
           or(
             sql`LOWER(${factoryBaleProducts.name}) = ${scanLower}`,
-            ilike(factoryBaleProducts.name, `%${scanCode.trim()}%`)
+            ilike(factoryBaleProducts.name, `%${scanCode.trim()}%`),
+            sql`LOWER(${factoryBaleProducts.articleCode}) = ${scanLower}`,
+            ilike(factoryBaleProducts.articleCode, `%${scanCode.trim()}%`)
           )
         ));
       const matchingProductIds = matchingProductsByName.map((p: any) => p.id);
