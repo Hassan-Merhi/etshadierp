@@ -6507,17 +6507,40 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return res.status(400).json({ message: `Bale ${reservedBale.referenceNumber || scanCode} is reserved for another loading order` });
       }
 
+      // Also look up product IDs whose current name or articleCode matches the scan code
+      const matchingProductsByName = await db
+        .select({ id: factoryBaleProducts.id })
+        .from(factoryBaleProducts)
+        .where(and(
+          eq(factoryBaleProducts.companyId, companyId),
+          or(
+            sql`LOWER(${factoryBaleProducts.name}) = ${scanLower}`,
+            ilike(factoryBaleProducts.name, `%${scanCode.trim()}%`)
+          )
+        ));
+      const matchingProductIds = matchingProductsByName.map((p: any) => p.id);
+
+      const nameConditions = matchingProductIds.length > 0
+        ? or(
+            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.productName}) = ${scanLower}`,
+            inArray(factoryBales.productId, matchingProductIds)
+          )
+        : or(
+            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
+            sql`LOWER(${factoryBales.productName}) = ${scanLower}`
+          );
+
       const [bale] = await db.select().from(factoryBales)
         .where(and(
           eq(factoryBales.companyId, companyId),
           or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
           eq(factoryBales.erpLocationId, parseInt(locationId)),
-          or(
-            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.articleCode}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.productName}) = ${scanLower}`
-          )
+          nameConditions
         ))
         .orderBy(factoryBales.id)
         .limit(1);
