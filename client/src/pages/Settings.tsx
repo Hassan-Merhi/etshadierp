@@ -3336,8 +3336,8 @@ function LoginHistoryTab() {
                       </TableHeader>
                       <TableBody>
                         {factoryUsersData.map((user: any) => (
-                          <>
-                          <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
+                          <Fragment key={user.id}>
+                          <TableRow data-testid={`row-factory-user-${user.id}`}>
                             <TableCell className="p-1">
                               <Button variant="ghost" size="icon" onClick={() => toggleUserExpansion(user.id)} data-testid={`button-expand-user-${user.id}`}>
                                 {expandedUserId === user.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -3417,7 +3417,7 @@ function LoginHistoryTab() {
                               </TableCell>
                             </TableRow>
                           )}
-                          </>
+                          </Fragment>
                         ))}
                       </TableBody>
                     </Table>
