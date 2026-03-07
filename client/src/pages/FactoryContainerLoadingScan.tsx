@@ -108,6 +108,7 @@ export default function FactoryContainerLoadingScan() {
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
+  const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
@@ -270,7 +271,8 @@ export default function FactoryContainerLoadingScan() {
     },
     onError: (error: Error) => {
       setScanFlash("error");
-      setTimeout(() => setScanFlash(null), 500);
+      setShowScanErrorPopup(true);
+      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
       toast({
         title: "Scan Error",
         description: error.message,
@@ -486,6 +488,14 @@ export default function FactoryContainerLoadingScan() {
           <div className="bg-green-500 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-green-300 text-center">
             <div className="text-5xl font-black tracking-wide drop-shadow-md">SCANNED</div>
             <div className="text-5xl font-black tracking-wide drop-shadow-md">SUCCESSFULLY</div>
+          </div>
+        </div>
+      )}
+      {showScanErrorPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
           </div>
         </div>
       )}
