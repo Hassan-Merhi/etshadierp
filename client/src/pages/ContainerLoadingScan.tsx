@@ -184,8 +184,10 @@ export default function ContainerLoadingScan() {
         const osc = ctx.createOscillator();
         osc.connect(ctx.destination);
         osc.frequency.value = 1000;
-        osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+        ctx.resume().then(() => {
+          osc.start();
+          setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+        });
         setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance("Scanned successfully"), { rate: 1.1 })); }, 250);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 4000);
@@ -221,8 +223,10 @@ export default function ContainerLoadingScan() {
         osc.type = "square";
         osc.connect(ctx.destination);
         osc.frequency.value = 220;
-        osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); }, 400);
+        ctx.resume().then(() => {
+          osc.start();
+          setTimeout(() => { osc.stop(); ctx.close(); }, 400);
+        });
         setTimeout(() => { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance("Rescan")); }, 450);
       } catch { /* no audio support */ }
       setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 4000);
