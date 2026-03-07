@@ -1279,16 +1279,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalValue = statement.reduce((sum: number, s: any) => sum + parseFloat(s.value), 0);
       const totalKg = statement.reduce((sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"), 0);
       const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
+      const totalDirectCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.commissionAmount || "0"), 0);
 
       // Group by currency for multi-currency statement
-      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number }> = {};
+      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number }> = {};
       for (const s of statement) {
         const cc = s.currencyCode;
-        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0 };
+        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
         byCurrency[cc].containers.push(s);
         byCurrency[cc].totalKg += parseFloat(s.actualReceivedKg || s.totalKg || "0");
         byCurrency[cc].totalValue += parseFloat(s.value);
         byCurrency[cc].totalCommission += parseFloat(s.totalCommission);
+        byCurrency[cc].totalDirectCommission += parseFloat(s.commissionAmount || "0");
       }
       const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => ({
         currencyCode: cc,
@@ -1296,7 +1298,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalKg: data.totalKg.toFixed(3),
         totalValue: data.totalValue.toFixed(2),
         totalCommission: data.totalCommission.toFixed(2),
+        totalDirectCommission: data.totalDirectCommission.toFixed(2),
         netPayable: (data.totalValue - data.totalCommission).toFixed(2),
+        totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
       }));
 
       res.json({
@@ -1308,7 +1312,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalKg: totalKg.toFixed(3),
           totalValue: totalValue.toFixed(2),
           totalCommissions: totalCommissions.toFixed(2),
+          totalDirectCommissions: totalDirectCommissions.toFixed(2),
           netPayable: (totalValue - totalCommissions).toFixed(2),
+          totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },
       });
     } catch (error: any) {

@@ -264,19 +264,21 @@ export default function FactorySuppliers() {
                   </div>
                 </CardContent>
               </Card>
+              {parseFloat(statementData.summary.totalDirectCommissions || "0") > 0 && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Commission Owed</div>
+                    <div className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400" data-testid="text-statement-direct-commissions">
+                      ${formatNum(statementData.summary.totalDirectCommissions)}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Commissions</div>
-                  <div className="text-xl font-bold mt-1 text-destructive" data-testid="text-statement-commissions">
-                    ${formatNum(statementData.summary.totalCommissions)}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Net Payable</div>
-                  <div className="text-xl font-bold mt-1" data-testid="text-statement-net-payable">
-                    ${formatNum(statementData.summary.netPayable)}
+                  <div className="text-xs text-muted-foreground">Total Owed</div>
+                  <div className="text-xl font-bold mt-1" data-testid="text-statement-total-owed">
+                    ${formatNum(statementData.summary.totalOwed || statementData.summary.totalValue)}
                   </div>
                 </CardContent>
               </Card>

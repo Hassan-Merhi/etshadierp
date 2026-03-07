@@ -64,7 +64,7 @@ export default function FactorySupplierStatement() {
   const estimatedUsdTotal = statement?.currencyGroups
     ? statement.currencyGroups.reduce((sum: number, g: any) => {
         const rate = getRate(g.currencyCode);
-        return sum + parseFloat(g.netPayable) * rate;
+        return sum + parseFloat(g.totalOwed || g.netPayable) * rate;
       }, 0)
     : 0;
 
@@ -157,8 +157,8 @@ export default function FactorySupplierStatement() {
                         <TableHead className="text-right">Kg</TableHead>
                         <TableHead className="text-right">Rate</TableHead>
                         <TableHead className="text-right">Value ({group.currencyCode})</TableHead>
-                        <TableHead className="text-right">Commission</TableHead>
-                        <TableHead className="text-right">Net Payable</TableHead>
+                        <TableHead className="text-right">Commission Owed</TableHead>
+                        <TableHead className="text-right">Total Owed</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -181,18 +181,15 @@ export default function FactorySupplierStatement() {
                           <TableCell className="text-right font-mono font-medium">
                             {formatNumber(parseFloat(c.value))}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {parseFloat(c.totalCommission) > 0
-                              ? `${formatNumber(parseFloat(c.totalCommission))}`
-                              : "—"}
-                            {parseFloat(c.commissionAmount || "0") > 0 && (
-                              <span className="ml-1 text-xs">
-                                ({formatNumber(parseFloat(c.commissionAmount))} {c.commissionCurrencyCode})
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(c.commissionAmount || "0") > 0 ? (
+                              <span className="text-amber-600 dark:text-amber-400">
+                                {formatNumber(parseFloat(c.commissionAmount))} {c.commissionCurrencyCode}
                               </span>
-                            )}
+                            ) : "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {formatNumber(parseFloat(c.value) - parseFloat(c.totalCommission))}
+                            {formatNumber(parseFloat(c.value) + parseFloat(c.commissionAmount || "0"))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -210,13 +207,15 @@ export default function FactorySupplierStatement() {
                       <span className="text-muted-foreground">Total Value</span>
                       <span className="font-mono font-medium">{formatNumber(parseFloat(group.totalValue))} {group.currencyCode}</span>
                     </div>
-                    <div className="flex justify-between gap-8">
-                      <span className="text-muted-foreground">Commission</span>
-                      <span className="font-mono text-muted-foreground">−{formatNumber(parseFloat(group.totalCommission))}</span>
-                    </div>
+                    {parseFloat(group.totalDirectCommission || "0") > 0 && (
+                      <div className="flex justify-between gap-8">
+                        <span className="text-amber-600 dark:text-amber-400">Commission Owed</span>
+                        <span className="font-mono text-amber-600 dark:text-amber-400">+{formatNumber(parseFloat(group.totalDirectCommission))} {group.currencyCode}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between gap-8 border-t pt-1">
-                      <span className="font-medium">Net Payable</span>
-                      <span className="font-mono font-bold">{formatNumber(parseFloat(group.netPayable))} {group.currencyCode}</span>
+                      <span className="font-medium">Total Owed</span>
+                      <span className="font-mono font-bold">{formatNumber(parseFloat(group.totalOwed || group.totalValue))} {group.currencyCode}</span>
                     </div>
                   </div>
                 </div>
@@ -259,10 +258,11 @@ export default function FactorySupplierStatement() {
                 <div className="space-y-2 text-sm">
                   {statement.currencyGroups.map((g: any) => {
                     const rate = getRate(g.currencyCode);
-                    const usdEq = parseFloat(g.netPayable) * rate;
+                    const totalOwed = parseFloat(g.totalOwed || g.netPayable);
+                    const usdEq = totalOwed * rate;
                     return (
                       <div key={g.currencyCode} className="flex justify-between gap-8 max-w-sm text-muted-foreground">
-                        <span>{formatNumber(parseFloat(g.netPayable))} {g.currencyCode} × {rate || "?"}</span>
+                        <span>{formatNumber(totalOwed)} {g.currencyCode} × {rate || "?"}</span>
                         <span className="font-mono">{rate ? `≈ ${formatNumber(usdEq)} USD` : "—"}</span>
                       </div>
                     );

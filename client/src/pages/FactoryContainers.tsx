@@ -60,6 +60,7 @@ export default function FactoryContainers() {
     status: "PENDING",
     commissionAmount: "",
     commissionCurrencyCode: "USD",
+    commissionAccountId: "",
   });
   const [currency, setCurrency] = useState("USD");
   const [fxRate, setFxRate] = useState("1");
@@ -98,6 +99,10 @@ export default function FactoryContainers() {
     queryKey: ["/api/factory/suppliers"],
   });
 
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts"],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const payload = {
@@ -108,6 +113,7 @@ export default function FactoryContainers() {
         fxRateSource,
         commissionAmount: data.commissionAmount || "0",
         commissionCurrencyCode: data.commissionCurrencyCode || "USD",
+        commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -137,6 +143,7 @@ export default function FactoryContainers() {
         fxRateSource,
         commissionAmount: data.commissionAmount || "0",
         commissionCurrencyCode: data.commissionCurrencyCode || "USD",
+        commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -264,6 +271,7 @@ export default function FactoryContainers() {
       status: "PENDING",
       commissionAmount: "",
       commissionCurrencyCode: "USD",
+      commissionAccountId: "",
     });
     setCurrency("USD");
     setFxRate("1");
@@ -284,6 +292,7 @@ export default function FactoryContainers() {
       status: c.status,
       commissionAmount: (c as any).commissionAmount || "",
       commissionCurrencyCode: (c as any).commissionCurrencyCode || "USD",
+      commissionAccountId: (c as any).commissionAccountId ? String((c as any).commissionAccountId) : "",
     });
     setCurrency((c as any).currencyCode || "USD");
     setFxRate((c as any).fxRateToUsd || "1");
@@ -623,6 +632,25 @@ export default function FactoryContainers() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>Commission Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Select
+                value={formData.commissionAccountId || "__none__"}
+                onValueChange={(val) => setFormData({ ...formData, commissionAccountId: val === "__none__" ? "" : val })}
+              >
+                <SelectTrigger data-testid="select-commission-account">
+                  <SelectValue placeholder="Select account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {ledgerAccounts.map((acc: any) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
