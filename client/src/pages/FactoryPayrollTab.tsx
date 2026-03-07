@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
   Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users,
 } from "lucide-react";
@@ -43,12 +44,13 @@ function fmt(val: string | number | null | undefined) {
   return isNaN(n) ? "0.00" : n.toFixed(2);
 }
 
-function fmtDate(d: string | null | undefined) {
+function fmtDate(d: string | null | undefined, fmt: (d: string | Date) => string) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return fmt(d);
 }
 
 export default function FactoryPayrollTab() {
+  const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
 
   const [runOpen, setRunOpen] = useState(false);
@@ -307,7 +309,7 @@ export default function FactoryPayrollTab() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}
+                          {fmtDate(p.periodStart, formatDisplayDate)} – {fmtDate(p.periodEnd, formatDisplayDate)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">${fmt(p.baseSalary)}</TableCell>
                         <TableCell className="text-right font-mono text-sm">${fmt(p.bonuses)}</TableCell>
@@ -318,7 +320,7 @@ export default function FactoryPayrollTab() {
                             {cfg.label}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt) : "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
                         <TableCell>
                           {canPay && (
                             <Button

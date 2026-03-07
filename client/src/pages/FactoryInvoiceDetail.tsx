@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +69,7 @@ interface OrderDetail {
 }
 
 export default function FactoryInvoiceDetail() {
+  const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
@@ -183,7 +185,7 @@ export default function FactoryInvoiceDetail() {
             {getStatusBadge(order.status)}
           </div>
           <p className="text-muted-foreground text-sm mt-1" data-testid="text-order-date">
-            {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "-"}
+            {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
           </p>
         </div>
       </div>

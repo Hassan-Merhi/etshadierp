@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -47,6 +48,7 @@ import { Package, Scan, Upload, Trash2, Plus, Search } from "lucide-react";
 import { z } from "zod";
 
 export default function Bales() {
+  const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -384,7 +386,7 @@ export default function Bales() {
                     <Badge variant="outline">{bale.origin}</Badge>
                   </TableCell>
                   <TableCell className="text-right font-mono">{parseFloat(bale.weight).toLocaleString()}</TableCell>
-                  <TableCell>{new Date(bale.datePressed).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDisplayDate(bale.datePressed)}</TableCell>
                   <TableCell>
                     <Badge
                       variant={

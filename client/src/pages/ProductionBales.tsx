@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CheckCircle, Trash2, Package, ScanLine, AlertCircle,
@@ -316,7 +317,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             Batch #{batch.id}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {new Date(batch.createdAt).toLocaleDateString()} | {expectedCount} bales pending | {formatNumber(totalWeight)} kg
+            {formatDisplayDate(batch.createdAt)} | {expectedCount} bales pending | {formatNumber(totalWeight)} kg
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -571,6 +572,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 }
 
 export default function ProductionBales() {
+  const { formatDisplayDate } = useDateFormat();
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const { toast } = useToast();
 
@@ -665,7 +667,7 @@ export default function ProductionBales() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5" />
-                          {new Date(batch.createdAt).toLocaleDateString()}
+                          {formatDisplayDate(batch.createdAt)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Hash className="h-3.5 w-3.5" />

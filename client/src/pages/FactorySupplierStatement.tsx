@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { DollarSign, FileText, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import { formatNumber } from "@/lib/formatNumber";
 const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
 
 export default function FactorySupplierStatement() {
+  const { formatDisplayDate } = useDateFormat();
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [supplierId, setSupplierId] = useState<string>("");
   const [estimatedRates, setEstimatedRates] = useState<Record<string, string>>({});
@@ -166,7 +168,7 @@ export default function FactorySupplierStatement() {
                         <TableRow key={c.id} data-testid={`row-container-${c.id}`}>
                           <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
                           <TableCell className="text-muted-foreground text-sm">
-                            {c.date ? new Date(c.date).toLocaleDateString() : "—"}
+                            {c.date ? formatDisplayDate(c.date) : "—"}
                           </TableCell>
                           <TableCell>{c.origin || "—"}</TableCell>
                           <TableCell>

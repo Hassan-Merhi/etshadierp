@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, useLocation } from "wouter";
 import { ArrowLeft, Calendar, Package } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -74,6 +75,7 @@ interface BaleDetail {
 }
 
 export default function FactoryBaleProductHistory() {
+  const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const productId = params.productId || "0";
   const locationId = params.locationId || "0";
@@ -465,13 +467,8 @@ export function FactoryBaleProductMonthDetail() {
 
   const formatDateTime = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return `${formatDisplayDate(d)} ${time}`;
   };
 
   if (isLoading) {

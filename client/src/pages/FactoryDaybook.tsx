@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { BookOpen, Edit, History, List, AlignJustify } from "lucide-react";
@@ -87,6 +88,7 @@ const VOUCHER_TX_TYPES: Record<string, string> = {
 };
 
 export default function FactoryDaybook() {
+  const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const today = new Date().toISOString().split("T")[0];
@@ -344,7 +346,7 @@ export default function FactoryDaybook() {
                     {condensedRows.map((row, idx) => (
                       <TableRow key={idx} data-testid={`row-condensed-${row.date}-${row.txType}`}>
                         <TableCell className="font-mono text-sm whitespace-nowrap">
-                          {new Date(row.date + "T00:00:00").toLocaleDateString()}
+                          {formatDisplayDate(row.date + "T00:00:00")}
                         </TableCell>
                         <TableCell>
                           <Badge variant="default">{formatTxType(row.txType)}</Badge>
@@ -406,7 +408,7 @@ export default function FactoryDaybook() {
                       onClick={isClickable ? (e) => handleEntryClick(entry, e) : undefined}
                     >
                       <TableCell className="font-mono text-sm whitespace-nowrap">
-                        {new Date(entry.txDate + "T00:00:00").toLocaleDateString()}
+                        {formatDisplayDate(entry.txDate + "T00:00:00")}
                       </TableCell>
                       <TableCell>
                         <Badge variant="default">

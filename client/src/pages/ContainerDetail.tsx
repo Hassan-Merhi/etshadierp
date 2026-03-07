@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,6 +38,7 @@ const saleFormSchema = z.object({
 });
 
 export default function ContainerDetail() {
+  const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const containerId = params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
@@ -438,7 +440,7 @@ export default function ContainerDetail() {
             Container {container.containerNumber}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Imported on {new Date(container.importDate).toLocaleDateString()}
+            Imported on {formatDisplayDate(container.importDate)}
           </p>
         </div>
         <Badge variant={container.status === "OTW" ? "default" : "secondary"} data-testid="badge-status">
@@ -560,7 +562,7 @@ export default function ContainerDetail() {
               <div>
                 <p className="text-sm text-muted-foreground">Sale Date</p>
                 <p className="font-semibold" data-testid="text-sale-date">
-                  {new Date(containerSale.saleDate).toLocaleDateString()}
+                  {formatDisplayDate(containerSale.saleDate)}
                 </p>
               </div>
             </div>
@@ -913,7 +915,7 @@ export default function ContainerDetail() {
                     </div>
                   </div>
                   {fr.dueDate && (
-                    <p className="text-xs text-muted-foreground">Due: {new Date(fr.dueDate).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">Due: {formatDisplayDate(fr.dueDate)}</p>
                   )}
                   {fr.notes && <p className="text-xs text-muted-foreground">{fr.notes}</p>}
 
@@ -922,7 +924,7 @@ export default function ContainerDetail() {
                       <p className="text-xs font-medium text-muted-foreground">Payments</p>
                       {fr.payments.map((p: any) => (
                         <div key={p.id} className="flex items-center justify-between text-sm" data-testid={`payment-row-${p.id}`}>
-                          <span>{new Date(p.paymentDate).toLocaleDateString()} - {p.method || "Cash"} {p.reference ? `(${p.reference})` : ""}</span>
+                          <span>{formatDisplayDate(p.paymentDate)} - {p.method || "Cash"} {p.reference ? `(${p.reference})` : ""}</span>
                           <div className="flex items-center gap-1">
                             <span className="font-mono">{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate({ freightId: fr.id, paymentId: p.id }); }} data-testid={`button-delete-payment-${p.id}`}>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ interface ContainerOption {
 }
 
 export default function ProductionRawStock() {
+  const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
@@ -520,7 +522,7 @@ export default function ProductionRawStock() {
                         ${formatNumber(parseFloat(row.valueRemaining))}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(row.lastOffloaded).toLocaleDateString()}
+                        {formatDisplayDate(row.lastOffloaded)}
                       </TableCell>
                     </TableRow>
                   );

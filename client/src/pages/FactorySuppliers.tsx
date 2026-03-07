@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
@@ -65,6 +66,7 @@ interface StatementResponse {
 }
 
 export default function FactorySuppliers() {
+  const { formatDisplayDate } = useDateFormat();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
@@ -186,7 +188,7 @@ export default function FactorySuppliers() {
 
   const formatDate = (val: string | null | undefined) => {
     if (!val) return "-";
-    return new Date(val).toLocaleDateString();
+    return formatDisplayDate(val);
   };
 
   const statusColor = (status: string) => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ interface TrackingEdit {
 }
 
 export default function Containers() {
+  const { formatDisplayDate } = useDateFormat();
   const [activeTab, setActiveTab] = useState("active");
 
   const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
@@ -332,7 +334,7 @@ export default function Containers() {
       Supplier: getSupplierName(container.supplierId),
       Status: container.status,
       Amount: parseFloat(container.grandTotal || "0"),
-      "Import Date": new Date(container.importDate).toLocaleDateString(),
+      "Import Date": formatDisplayDate(container.importDate),
     }));
 
     const worksheet = utils.json_to_sheet(data);
@@ -1041,9 +1043,7 @@ export default function Containers() {
                             )}
                           </TableCell>}
                           <TableCell className="font-mono">
-                            {new Date(
-                              container.importDate,
-                            ).toLocaleDateString()}
+                            {formatDisplayDate(container.importDate)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Link href={`/containers/${container.id}`}>
@@ -1085,7 +1085,7 @@ export default function Containers() {
                             {formatAmount(parseFloat(container.grandTotal || "0"))}
                           </span>}
                           <span className="text-xs text-muted-foreground">
-                            {new Date(container.importDate).toLocaleDateString()}
+                            {formatDisplayDate(container.importDate)}
                           </span>
                         </div>
                       </div>
@@ -1697,7 +1697,7 @@ export default function Containers() {
                           className="font-mono"
                           data-testid={`text-sale-date-${sale.saleId}`}
                         >
-                          {new Date(sale.saleDate).toLocaleDateString()}
+                          {formatDisplayDate(sale.saleDate)}
                         </TableCell>
                         <TableCell
                           className="text-right font-mono"
@@ -1744,7 +1744,7 @@ export default function Containers() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-mono font-medium text-sm">{sale.containerNumber}</span>
                         <span className="text-xs text-muted-foreground" data-testid={`text-sale-date-${sale.saleId}`}>
-                          {new Date(sale.saleDate).toLocaleDateString()}
+                          {formatDisplayDate(sale.saleDate)}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground mb-1" data-testid={`text-customer-${sale.saleId}`}>

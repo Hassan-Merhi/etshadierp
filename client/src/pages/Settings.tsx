@@ -1436,7 +1436,7 @@ function FileStorageTab() {
                     <TableCell className="text-muted-foreground max-w-[200px] truncate">{file.description || "—"}</TableCell>
                     <TableCell className="text-muted-foreground font-mono text-sm">{formatSize(file.fileSize)}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(file.uploadedAt).toLocaleDateString()}
+                      {formatDisplayDate(file.uploadedAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -1926,7 +1926,7 @@ function LoginHistoryTab() {
                       <td className="p-3 font-medium" data-testid={`text-login-user-${entry.id}`}>{entry.username}</td>
                       <td className="p-3 text-muted-foreground" data-testid={`text-login-company-${entry.id}`}>{entry.companyName || "-"}</td>
                       <td className="p-3 text-muted-foreground" data-testid={`text-login-date-${entry.id}`}>
-                        {loginDate.toLocaleDateString()} {loginDate.toLocaleTimeString()}
+                        {formatDisplayDate(loginDate)} {loginDate.toLocaleTimeString()}
                       </td>
                       <td className="p-3 font-mono text-xs text-muted-foreground" data-testid={`text-login-ip-${entry.id}`}>{entry.ipAddress || "-"}</td>
                       <td className="p-3 text-muted-foreground" data-testid={`text-login-location-${entry.id}`}>{locationStr}</td>
@@ -1950,7 +1950,7 @@ function LoginHistoryTab() {
   export default function Settings() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
-    const { dateFormat, setDateFormat, isPending: isDateFormatPending } = useDateFormat();
+    const { dateFormat, setDateFormat, formatDisplayDate, isPending: isDateFormatPending } = useDateFormat();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
     const [isDialogOpen, setIsDialogOpen] = useState(false);

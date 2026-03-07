@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Package, CheckCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 const BatchDetail = lazy(() => import("./BatchDetail"));
 
 export default function MixBatches() {
+  const { formatDisplayDate } = useDateFormat();
   const [statusFilter, setStatusFilter] = useState<string>("ACTIVE");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
@@ -177,7 +179,7 @@ export default function MixBatches() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(batch.createdAt).toLocaleDateString()}
+                        {formatDisplayDate(batch.createdAt)}
                       </TableCell>
                     </TableRow>
                   );

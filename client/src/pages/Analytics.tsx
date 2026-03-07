@@ -1,5 +1,6 @@
 import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -302,6 +303,7 @@ function formatSmartNumber(num: number | string): string {
 }
 
 export default function Analytics() {
+  const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const { selectedCompany } = useCompany();
@@ -1605,7 +1607,7 @@ export default function Analytics() {
                               {transaction.voucherNumber}
                             </TableCell>
                             <TableCell>
-                              {new Date(transaction.voucherDate).toLocaleDateString()}
+                              {formatDisplayDate(transaction.voucherDate)}
                             </TableCell>
                             <TableCell className="text-right">
                               {transaction.itemCount}
@@ -1627,7 +1629,7 @@ export default function Analytics() {
                           <CardContent className="p-3 space-y-1">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-mono text-sm">{transaction.voucherNumber}</span>
-                              <span className="text-sm text-muted-foreground">{new Date(transaction.voucherDate).toLocaleDateString()}</span>
+                              <span className="text-sm text-muted-foreground">{formatDisplayDate(transaction.voucherDate)}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>

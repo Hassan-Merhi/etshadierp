@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { ArrowRightLeft, Plus, Check, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,6 +97,7 @@ interface BaleRow {
 }
 
 export default function BaleTransfers() {
+  const { formatDisplayDate } = useDateFormat();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
@@ -322,7 +324,7 @@ export default function BaleTransfers() {
                             )}
                           </TableCell>
                           <TableCell className="text-sm" data-testid={`text-transfer-date-${transfer.id}`}>
-                            {new Date(transfer.transferDate).toLocaleDateString()}
+                            {formatDisplayDate(transfer.transferDate)}
                           </TableCell>
                           <TableCell data-testid={`text-from-location-${transfer.id}`}>
                             {transfer.fromLocationName || getLocationName(transfer.fromLocationId)}
