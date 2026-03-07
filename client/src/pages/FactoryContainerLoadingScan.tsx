@@ -113,7 +113,6 @@ export default function FactoryContainerLoadingScan() {
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
-  const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
@@ -184,18 +183,6 @@ export default function FactoryContainerLoadingScan() {
     }
   }, [isResuming, orderDetail, selectedCustomerId]);
 
-  // Keep groupOrder in sync when new article groups appear (server refetch)
-  useEffect(() => {
-    if (!orderDetail?.bales) return;
-    setGroupOrder((prev) => {
-      const newCodes = orderDetail.bales
-        .map((b) => b.articleCode)
-        .filter((c) => !prev.includes(c));
-      if (newCodes.length === 0) return prev;
-      return [...newCodes, ...prev];
-    });
-  }, [orderDetail?.bales]);
-
   const createOrderMutation = useMutation({
     mutationFn: async (data: {
       customerId: number;
@@ -262,10 +249,6 @@ export default function FactoryContainerLoadingScan() {
       }
       const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
       if (newest?.articleCode) {
-        setGroupOrder((prev) => {
-          const filtered = prev.filter((c) => c !== newest.articleCode);
-          return [newest.articleCode, ...filtered];
-        });
         setExpandedGroups((prev) => {
           const next = new Set(prev);
           next.add(newest.articleCode);
@@ -422,10 +405,6 @@ export default function FactoryContainerLoadingScan() {
   );
 
   const toggleGroup = useCallback((articleCode: string) => {
-    setGroupOrder((prev) => {
-      const filtered = prev.filter((c) => c !== articleCode);
-      return [articleCode, ...filtered];
-    });
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(articleCode)) next.delete(articleCode);
@@ -461,10 +440,11 @@ export default function FactoryContainerLoadingScan() {
     return acc;
   }, {});
 
-  const orderedGroups = [
-    ...groupOrder.filter((c) => groupedBalesMap[c]),
-    ...Object.keys(groupedBalesMap).filter((c) => !groupOrder.includes(c)),
-  ].map((c) => groupedBalesMap[c]);
+  const orderedGroups = Object.values(groupedBalesMap).sort((a, b) => {
+    const maxA = Math.max(...a.bales.map((x) => x.id));
+    const maxB = Math.max(...b.bales.map((x) => x.id));
+    return maxB - maxA;
+  });
 
   const totalWeight = bales.reduce(
     (sum, b) => sum + parseFloat(b.weight || "0"),
