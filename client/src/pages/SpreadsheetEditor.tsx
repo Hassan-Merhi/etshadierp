@@ -31,45 +31,113 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Fortune Sheet REQUIRES celldata (sparse format) for initialization.
+// Its initSheetData() reads celldata, builds an expanded matrix, then
+// OVERWRITES sheet.data — so passing dense data without celldata always
+// produces a blank sheet.
 function xlsxToFortune(workbook: XLSX.WorkBook): FortuneSheet[] {
   return workbook.SheetNames.map((name, order) => {
     const ws = workbook.Sheets[name];
     const ref = ws["!ref"];
-    const range = ref
-      ? XLSX.utils.decode_range(ref)
-      : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
 
+    if (!ref) {
+      return {
+        id: String(order + 1),
+        name,
+        status: order === 0 ? 1 : 0,
+        order,
+        celldata: [],
+        row: 50,
+        column: 26,
+      } as FortuneSheet;
+    }
+
+    const range = XLSX.utils.decode_range(ref);
     const rows = Math.max(50, range.e.r + 10);
     const cols = Math.max(26, range.e.c + 5);
 
-    const data: any[][] = Array.from({ length: rows }, () => Array(cols).fill(null));
+    const celldata: any[] = [];
 
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        const cell = ws[addr];
-        if (cell !== undefined && cell.v !== undefined) {
+    // Primary: sheet_to_json — XLSX.js's official, tested extraction path.
+    const aoa: any[][] = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      defval: null,
+      blankrows: true,
+      raw: true,
+    }) as any[][];
+
+    for (let r = 0; r < aoa.length; r++) {
+      const row = aoa[r];
+      if (!Array.isArray(row)) continue;
+      // sheet_to_json uses absolute column indices (A=0, B=1, ...)
+      for (let c = 0; c < row.length; c++) {
+        const val = row[c];
+        if (val === null || val === undefined) continue;
+        const absR = range.s.r + r;
+        const absC = c;
+        const addr = XLSX.utils.encode_cell({ r: absR, c: absC });
+        const wsCell = ws[addr];
+        const m = wsCell?.w !== undefined ? wsCell.w : String(val);
+        const t = typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s";
+        celldata.push({ r: absR, c: absC, v: { v: val, m, ct: { fa: "General", t } } });
+      }
+    }
+
+    // Fallback: if sheet_to_json found nothing, try direct cell access.
+    if (celldata.length === 0) {
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[addr];
+          if (!cell) continue;
+          let val: any = cell.v;
+          let m: string;
+          if (val === undefined || val === null) {
+            if (cell.w !== undefined) { val = cell.w; m = cell.w; }
+            else if (cell.f !== undefined) { val = `=${cell.f}`; m = val; }
+            else continue;
+          } else {
+            m = cell.w !== undefined ? cell.w : String(val);
+          }
           const t = cell.t === "n" ? "n" : cell.t === "b" ? "b" : "s";
-          const display = cell.w !== undefined ? cell.w : String(cell.v ?? "");
-          data[r][c] = {
-            v: cell.v,
-            m: display,
-            ct: { fa: "General", t },
-          };
+          celldata.push({ r, c, v: { v: val, m, ct: { fa: "General", t } } });
         }
       }
     }
+
+    console.log(`[xlsxToFortune] "${name}": ${celldata.length} cells (range ${ref})`);
 
     return {
       id: String(order + 1),
       name,
       status: order === 0 ? 1 : 0,
       order,
-      data,
+      celldata,
       row: rows,
       column: cols,
     } as FortuneSheet;
   });
+}
+
+// Fortune Sheet's onChange delivers sheets in dense `data` format.
+// When re-opening a saved sheet, convert back to sparse `celldata` so
+// Fortune Sheet's initSheetData() correctly populates the grid.
+function ensureCelldata(sheet: any): any {
+  if (sheet.celldata !== undefined) return sheet; // already sparse
+  if (!Array.isArray(sheet.data)) return sheet;
+  const celldata: any[] = [];
+  for (let r = 0; r < sheet.data.length; r++) {
+    const row = sheet.data[r];
+    if (!Array.isArray(row)) continue;
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c];
+      if (v !== null && v !== undefined) {
+        celldata.push({ r, c, v });
+      }
+    }
+  }
+  const { data: _data, ...rest } = sheet;
+  return { ...rest, celldata };
 }
 
 function fortuneToXlsx(sheets: FortuneSheet[]): XLSX.WorkBook {
@@ -131,7 +199,7 @@ function defaultBlankSheets(): FortuneSheet[] {
       name: "Sheet1",
       status: 1,
       order: 0,
-      data: Array.from({ length: 50 }, () => Array(26).fill(null)),
+      celldata: [],
       row: 50,
       column: 26,
     } as FortuneSheet,
@@ -333,10 +401,18 @@ export default function SpreadsheetEditor() {
     setEditingName(false);
   };
 
+  // Convert dense data (from Fortune Sheet's onChange) back to sparse celldata
+  // so Fortune Sheet's initSheetData() can correctly populate the grid.
   const initialData: FortuneSheet[] =
     openedSheet?.data && Array.isArray(openedSheet.data) && openedSheet.data.length > 0
-      ? openedSheet.data
+      ? openedSheet.data.map(ensureCelldata)
       : defaultBlankSheets();
+
+  if (openSheetId !== null && openedSheet) {
+    const totalCells = initialData.reduce((acc: number, s: any) =>
+      acc + (Array.isArray(s.celldata) ? s.celldata.length : 0), 0);
+    console.log(`[SpreadsheetEditor] openSheet=${openSheetId} sheets=${initialData.length} celldata cells=${totalCells}`);
+  }
 
   if (openSheetId !== null) {
     return (
