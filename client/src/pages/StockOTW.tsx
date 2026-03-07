@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import CombinedInventory from "@/pages/CombinedInventory";
 import type { Container, Supplier } from "@shared/schema";
 
@@ -472,12 +472,12 @@ function StockOTWContent() {
 
 export default function StockOTW() {
   const [location, navigate] = useLocation();
-  const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
   const activeTab = params.get("tab") || "otw";
 
   const switchTab = (tab: string) => {
-    const base = location.split("?")[0];
-    navigate(tab === "otw" ? base : `${base}?tab=${tab}`);
+    navigate(tab === "otw" ? location : `${location}?tab=${tab}`);
   };
 
   return (

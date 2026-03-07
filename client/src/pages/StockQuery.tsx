@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -175,12 +175,12 @@ function StockQueryContent() {
 
 export default function StockQuery() {
   const [location, navigate] = useLocation();
-  const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
   const activeTab = params.get("tab") || "query";
 
   const switchTab = (tab: string) => {
-    const base = location.split("?")[0];
-    navigate(tab === "query" ? base : `${base}?tab=${tab}`);
+    navigate(tab === "query" ? location : `${location}?tab=${tab}`);
   };
 
   return (
