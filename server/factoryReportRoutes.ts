@@ -291,7 +291,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         companyId,
         txDate: today,
         txType: "REPORT_GENERATED",
-        description: `Supplier Usage Report generated (${format.toUpperCase()}) for ${startDate} to ${endDate}${supplierId ? ` - Supplier ID: ${supplierId}` : " - All Suppliers"}`,
+        description: `Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ? ` – ${supplierMap.get(supplierId)?.name || `Supplier #${supplierId}`}` : " – All Suppliers"}`,
         metaJson: JSON.stringify({ format, startDate, endDate, supplierId: supplierId || null }),
       });
 

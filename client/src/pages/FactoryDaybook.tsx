@@ -3,7 +3,7 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Edit, History, List, AlignJustify } from "lucide-react";
+import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +38,7 @@ interface DaybookEntry {
   txDate: string;
   txType: string;
   referenceId: number | null;
+  referenceTable: string | null;
   description: string;
   currencyCode: string;
   amountCurrency: string;
@@ -234,6 +235,23 @@ export default function FactoryDaybook() {
     if ((e.target as HTMLElement).closest("button")) return;
     if (entry.txType === "BALE_TRANSFER") {
       navigate("/factory/bale-transfers");
+    }
+  };
+
+  const openSourceRecord = (entry: DaybookEntry) => {
+    if (entry.txType === "INVOICE" && entry.referenceId) {
+      navigate(`/factory/sales/invoices/${entry.referenceId}`);
+      return;
+    }
+    const tab = VOUCHER_TX_TYPES[entry.txType];
+    if (tab && entry.referenceId) {
+      navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
+    }
+  };
+
+  const editSourceRecord = (entry: DaybookEntry) => {
+    if (entry.txType === "INVOICE" && entry.referenceId) {
+      navigate(`/factory/sales/invoices/${entry.referenceId}`);
       return;
     }
     const tab = VOUCHER_TX_TYPES[entry.txType];
@@ -434,13 +452,15 @@ export default function FactoryDaybook() {
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry) => {
-                    const isClickable = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId;
+                    const hasSource = (!!VOUCHER_TX_TYPES[entry.txType] || entry.txType === "INVOICE") && !!entry.referenceId;
+                    const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                    const isRowClickable = isBaleTransfer;
                     return (
                     <TableRow
                       key={entry.id}
                       data-testid={`row-daybook-${entry.id}`}
-                      className={isClickable ? "cursor-pointer hover-elevate" : ""}
-                      onClick={isClickable ? (e) => handleEntryClick(entry, e) : undefined}
+                      className={isRowClickable ? "cursor-pointer hover-elevate" : ""}
+                      onClick={isRowClickable ? (e) => handleEntryClick(entry, e) : undefined}
                     >
                       <TableCell className="font-mono text-sm whitespace-nowrap">
                         {formatDisplayDate(entry.txDate + "T00:00:00")}
@@ -467,12 +487,40 @@ export default function FactoryDaybook() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {canEditDaybook && (
-                            <Button size="icon" variant="ghost" onClick={() => openEditDialog(entry)} data-testid={`button-edit-daybook-${entry.id}`}>
-                              <Edit className="h-3 w-3" />
+                          {hasSource && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="View"
+                              onClick={(e) => { e.stopPropagation(); openSourceRecord(entry); }}
+                              data-testid={`button-view-source-${entry.id}`}
+                            >
+                              <Eye className="h-3 w-3" />
                             </Button>
                           )}
-                          <Button size="icon" variant="ghost" onClick={() => setShowHistory(entry.id)} data-testid={`button-history-daybook-${entry.id}`}>
+                          {hasSource && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Edit"
+                              onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+                              data-testid={`button-edit-source-${entry.id}`}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {canEditDaybook && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Edit daybook entry"
+                              onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }}
+                              data-testid={`button-edit-daybook-${entry.id}`}
+                            >
+                              <SlidersHorizontal className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" title="Edit history" onClick={(e) => { e.stopPropagation(); setShowHistory(entry.id); }} data-testid={`button-history-daybook-${entry.id}`}>
                             <History className="h-3 w-3" />
                           </Button>
                         </div>

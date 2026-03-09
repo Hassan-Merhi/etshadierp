@@ -4783,12 +4783,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
 
       const today = new Date().toISOString().split('T')[0];
+      const [finalizeLocation] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, erpLocationId));
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
         txType: "BALE_FINALIZE",
         referenceId: pressingBatchId,
-        description: `Finalized ${result.updated} bales into location`,
+        description: `Finalized ${result.updated} bale${result.updated !== 1 ? "s" : ""} to ${finalizeLocation?.name || `location #${erpLocationId}`}`,
         amountCurrency: 0,
       });
 
@@ -8241,7 +8242,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         txDate: today,
         txType: "INVOICE",
         referenceId: result.orderId || orderId,
-        description: `Invoice ${result.invoiceNumber} for customer`,
+        referenceTable: "customer_orders",
+        description: `Invoice ${result.invoiceNumber} – ${result.customerName || "Customer"}`,
         amountCurrency: parseFloat(result.grandTotal || "0"),
         amountUsd: parseFloat(result.grandTotal || "0"),
       });
