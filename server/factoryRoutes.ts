@@ -3578,7 +3578,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierName, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes,
+      const { supplierName, supplierId: reqSupplierId, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes,
         commissionPersonName: reqCommPersonName, commissionAmount: reqCommAmount, commissionCurrencyCode: reqCommCurrency,
         commissionFxRateToUsd: reqCommFxRate, commissionLedgerAccountId: reqCommAccountId } = req.body;
 
@@ -3596,22 +3596,34 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const trimmedSupplierName = String(supplierName).trim();
 
       const result = await db.transaction(async (tx: any) => {
-        // Find or create factory supplier by name
-        let [existingSupplier] = await tx
-          .select()
-          .from(factorySuppliers)
-          .where(and(
-            eq(factorySuppliers.companyId, companyId),
-            sql`lower(${factorySuppliers.name}) = lower(${trimmedSupplierName})`
-          ))
-          .limit(1);
-
-        if (!existingSupplier) {
-          const [newSupplier] = await tx
-            .insert(factorySuppliers)
-            .values({ companyId, name: trimmedSupplierName, isActive: true })
-            .returning();
-          existingSupplier = newSupplier;
+        // Use supplierId directly if provided, otherwise find-or-create by name
+        let existingSupplier: any = null;
+        if (reqSupplierId) {
+          const [found] = await tx
+            .select()
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, parseInt(reqSupplierId)), eq(factorySuppliers.companyId, companyId)))
+            .limit(1);
+          existingSupplier = found;
+          if (!existingSupplier) return res.status(404).json({ message: "Supplier not found" });
+        } else {
+          const [found] = await tx
+            .select()
+            .from(factorySuppliers)
+            .where(and(
+              eq(factorySuppliers.companyId, companyId),
+              sql`lower(${factorySuppliers.name}) = lower(${trimmedSupplierName})`
+            ))
+            .limit(1);
+          if (found) {
+            existingSupplier = found;
+          } else {
+            const [newSupplier] = await tx
+              .insert(factorySuppliers)
+              .values({ companyId, name: trimmedSupplierName, isActive: true })
+              .returning();
+            existingSupplier = newSupplier;
+          }
         }
 
         const year = new Date().getFullYear();

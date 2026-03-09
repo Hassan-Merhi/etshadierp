@@ -163,6 +163,7 @@ export default function ProductionRawStock() {
   const [confirmDutyNotes, setConfirmDutyNotes] = useState("");
   const [obDialogOpen, setObDialogOpen] = useState(false);
   const [obSupplierName, setObSupplierName] = useState("");
+  const [obSupplierId, setObSupplierId] = useState<number | null>(null);
   const [obSupplierOpen, setObSupplierOpen] = useState(false);
   const [obSupplierSearch, setObSupplierSearch] = useState("");
   const [obReceivedKg, setObReceivedKg] = useState("");
@@ -386,6 +387,7 @@ export default function ProductionRawStock() {
   const handleCloseObDialog = () => {
     setObDialogOpen(false);
     setObSupplierName("");
+    setObSupplierId(null);
     setObSupplierOpen(false);
     setObSupplierSearch("");
     setObReceivedKg("");
@@ -435,6 +437,7 @@ export default function ProductionRawStock() {
     const commAmt = parseFloat(obCommissionAmount || "0");
     openingBalanceMutation.mutate({
       supplierName: obSupplierName.trim(),
+      supplierId: obSupplierId || undefined,
       receivedKg: obReceivedKg,
       costPerKg: obCostPerKg,
       currencyCode: obCurrency,
@@ -1083,26 +1086,65 @@ export default function ProductionRawStock() {
                     />
                     <CommandList>
                       <CommandGroup>
-                        {(factorySuppliers ?? [])
-                          .filter((s) =>
-                            s.name.toLowerCase().includes(obSupplierSearch.toLowerCase())
-                          )
-                          .map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              value={s.name}
-                              onSelect={() => {
-                                setObSupplierName(s.name);
-                                setObSupplierSearch("");
-                                setObSupplierOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${obSupplierName === s.name ? "opacity-100" : "opacity-0"}`}
-                              />
-                              {s.name}
-                            </CommandItem>
-                          ))}
+                        {(() => {
+                          const all = factorySuppliers ?? [];
+                          const topLevel = all.filter((s: any) => !s.parentId);
+                          const subsByParent: Record<number, typeof all> = {};
+                          for (const s of all) {
+                            if ((s as any).parentId) {
+                              const pid = (s as any).parentId;
+                              if (!subsByParent[pid]) subsByParent[pid] = [];
+                              subsByParent[pid].push(s);
+                            }
+                          }
+                          const search = obSupplierSearch.toLowerCase();
+                          const rows: JSX.Element[] = [];
+                          for (const parent of topLevel) {
+                            const children = subsByParent[parent.id] || [];
+                            const parentMatch = parent.name.toLowerCase().includes(search);
+                            const childMatches = children.filter((c) => c.name.toLowerCase().includes(search));
+                            if (!search || parentMatch || childMatches.length > 0) {
+                              if (!search || parentMatch) {
+                                rows.push(
+                                  <CommandItem
+                                    key={parent.id}
+                                    value={`supplier-${parent.id}`}
+                                    onSelect={() => {
+                                      setObSupplierName(parent.name);
+                                      setObSupplierId(parent.id);
+                                      setObSupplierSearch("");
+                                      setObSupplierOpen(false);
+                                    }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${obSupplierId === parent.id ? "opacity-100" : "opacity-0"}`} />
+                                    {parent.name}
+                                    {children.length > 0 && <span className="ml-1 text-xs text-muted-foreground">({children.length} sub)</span>}
+                                  </CommandItem>
+                                );
+                              }
+                              for (const child of (search ? childMatches : children)) {
+                                rows.push(
+                                  <CommandItem
+                                    key={child.id}
+                                    value={`supplier-${child.id}`}
+                                    onSelect={() => {
+                                      setObSupplierName(child.name);
+                                      setObSupplierId(child.id);
+                                      setObSupplierSearch("");
+                                      setObSupplierOpen(false);
+                                    }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${obSupplierId === child.id ? "opacity-100" : "opacity-0"}`} />
+                                    <span className="ml-4 text-muted-foreground">↳</span>
+                                    <span className="ml-1">{child.name}</span>
+                                    <span className="ml-1 text-xs text-muted-foreground italic">sub-account</span>
+                                  </CommandItem>
+                                );
+                              }
+                            }
+                          }
+                          return rows;
+                        })()}
                         {obSupplierSearch.trim() &&
                           !(factorySuppliers ?? []).some(
                             (s) => s.name.toLowerCase() === obSupplierSearch.toLowerCase().trim()
@@ -1111,12 +1153,13 @@ export default function ProductionRawStock() {
                               value={`__create__${obSupplierSearch}`}
                               onSelect={() => {
                                 setObSupplierName(obSupplierSearch.trim());
+                                setObSupplierId(null);
                                 setObSupplierSearch("");
                                 setObSupplierOpen(false);
                               }}
                             >
                               <Plus className="mr-2 h-4 w-4" />
-                              Create &ldquo;{obSupplierSearch.trim()}&rdquo;
+                              Create &ldquo;{obSupplierSearch.trim()}&rdquo; as new supplier
                             </CommandItem>
                           )}
                       </CommandGroup>
@@ -1127,6 +1170,9 @@ export default function ProductionRawStock() {
                   </Command>
                 </PopoverContent>
               </Popover>
+              {!obSupplierId && obSupplierName && (
+                <p className="text-xs text-muted-foreground">New supplier will be created as top-level. To create a sub-account first, go to the Suppliers page.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
