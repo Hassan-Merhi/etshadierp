@@ -2362,6 +2362,7 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
   commissionFxRateToUsd: decimal("commission_fx_rate_to_usd", { precision: 20, scale: 8 }),
   commissionAmountUsd: decimal("commission_amount_usd", { precision: 20, scale: 4 }),
   commissionLedgerAccountId: integer("commission_ledger_account_id"),
+  commissionSupplierId: integer("commission_supplier_id"),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2384,6 +2385,7 @@ export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).o
   commissionFxRateToUsd: z.string().optional().nullable(),
   commissionAmountUsd: z.string().optional().nullable(),
   commissionLedgerAccountId: z.number().optional().nullable(),
+  commissionSupplierId: z.number().optional().nullable(),
 });
 
 export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;

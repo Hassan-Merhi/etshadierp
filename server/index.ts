@@ -258,6 +258,7 @@ app.use((req, res, next) => {
     `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_fx_rate_to_usd decimal(20,8)`,
     `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_amount_usd decimal(20,4)`,
     `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_ledger_account_id integer`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_supplier_id integer`,
     // Factory supplier payments table
     `CREATE TABLE IF NOT EXISTS factory_supplier_payments (
       id serial PRIMARY KEY,

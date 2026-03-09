@@ -171,11 +171,9 @@ export default function ProductionRawStock() {
   const [obCurrency, setObCurrency] = useState("USD");
   const [obFxRate, setObFxRate] = useState("1");
   const [obNotes, setObNotes] = useState("");
-  const [obCommissionPersonName, setObCommissionPersonName] = useState("");
   const [obCommissionAmount, setObCommissionAmount] = useState("");
   const [obCommissionCurrency, setObCommissionCurrency] = useState("USD");
   const [obCommissionFxRate, setObCommissionFxRate] = useState("1");
-  const [obCommissionAccountId, setObCommissionAccountId] = useState("");
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -395,11 +393,9 @@ export default function ProductionRawStock() {
     setObCurrency("USD");
     setObFxRate("1");
     setObNotes("");
-    setObCommissionPersonName("");
     setObCommissionAmount("");
     setObCommissionCurrency("USD");
     setObCommissionFxRate("1");
-    setObCommissionAccountId("");
   };
 
   const recalcUsedMutation = useMutation({
@@ -443,12 +439,10 @@ export default function ProductionRawStock() {
       currencyCode: obCurrency,
       fxRateToUsd: obFxRate,
       notes: obNotes || undefined,
-      ...(obCommissionPersonName.trim() && commAmt > 0 ? {
-        commissionPersonName: obCommissionPersonName.trim(),
+      ...(commAmt > 0 ? {
         commissionAmount: obCommissionAmount,
         commissionCurrencyCode: obCommissionCurrency,
         commissionFxRateToUsd: obCommissionFxRate,
-        commissionLedgerAccountId: obCommissionAccountId || undefined,
       } : {}),
     });
   };
@@ -1239,15 +1233,6 @@ export default function ProductionRawStock() {
             <div>
               <Label className="text-sm font-semibold">Commission (optional)</Label>
               <div className="space-y-3 mt-2">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Commission Person</Label>
-                  <Input
-                    value={obCommissionPersonName}
-                    onChange={(e) => setObCommissionPersonName(e.target.value)}
-                    placeholder="Person name"
-                    data-testid="input-ob-commission-person"
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-muted-foreground text-xs">Amount</Label>
@@ -1289,17 +1274,10 @@ export default function ProductionRawStock() {
                     />
                   </div>
                 )}
-                {obCommissionPersonName.trim() && parseFloat(obCommissionAmount || "0") > 0 && (
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Book to Account</Label>
-                    <AccountCombobox
-                      value={obCommissionAccountId}
-                      onValueChange={setObCommissionAccountId}
-                      accounts={ledgerAccounts || []}
-                      placeholder="Select account (optional)"
-                      testId="select-ob-commission-account"
-                    />
-                  </div>
+                {obSupplierName && parseFloat(obCommissionAmount || "0") > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Commission will be booked under <span className="font-medium text-foreground">{obSupplierName} Commission</span> (auto-created as a sub-account if it doesn't exist yet).
+                  </p>
                 )}
               </div>
             </div>
