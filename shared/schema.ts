@@ -3535,3 +3535,50 @@ export const insertSpreadsheetSchema = createInsertSchema(spreadsheets).omit({
 
 export type InsertSpreadsheet = z.infer<typeof insertSpreadsheetSchema>;
 export type Spreadsheet = typeof spreadsheets.$inferSelect;
+
+// ─── Bale Recode / Relabeling Tables ───
+
+export const baleRecodeSessions = pgTable("bale_recode_sessions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  performedBy: varchar("performed_by", { length: 255 }),
+  uploadedFilename: text("uploaded_filename"),
+  printFormat: text("print_format").notNull().default("A4"),
+  designColor: text("design_color"),
+  totalRows: integer("total_rows").notNull().default(0),
+  validRows: integer("valid_rows").notNull().default(0),
+  invalidRows: integer("invalid_rows").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBaleRecodeSessionSchema = createInsertSchema(baleRecodeSessions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1),
+});
+
+export type InsertBaleRecodeSession = z.infer<typeof insertBaleRecodeSessionSchema>;
+export type BaleRecodeSession = typeof baleRecodeSessions.$inferSelect;
+
+export const baleRecodeItems = pgTable("bale_recode_items", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  oldReferenceCode: text("old_reference_code").notNull(),
+  newReferenceCode: text("new_reference_code"),
+  productName: text("product_name"),
+  articleCode: text("article_code"),
+  weightKg: text("weight_kg"),
+  status: text("status").notNull().default("SUCCESS"),
+  errorMessage: text("error_message"),
+});
+
+export const insertBaleRecodeItemSchema = createInsertSchema(baleRecodeItems).omit({
+  id: true,
+}).extend({
+  sessionId: z.number().min(1),
+  oldReferenceCode: z.string().min(1),
+});
+
+export type InsertBaleRecodeItem = z.infer<typeof insertBaleRecodeItemSchema>;
+export type BaleRecodeItem = typeof baleRecodeItems.$inferSelect;

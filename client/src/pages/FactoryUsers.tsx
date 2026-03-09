@@ -65,6 +65,7 @@ const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
   { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
   { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
   { key: "factory/stock-query", label: "Stock Query", group: "Inventory" },
+  { key: "factory/bale-relabeling", label: "Bale Relabeling", group: "Inventory" },
   { key: "factory/vouchers", label: "Vouchers", group: "Accounting" },
   { key: "factory/accounts", label: "Accounts", group: "Accounting" },
   { key: "factory/workers", label: "Workers", group: "Finance" },

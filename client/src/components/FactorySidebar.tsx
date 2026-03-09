@@ -28,6 +28,7 @@ import {
   HardHat,
   ClipboardCheck,
   Activity,
+  RefreshCw,
   Bell,
   Award,
   Beaker,
@@ -112,6 +113,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
       { title: "Stock OTW", url: "/factory/stock-otw", icon: Ship },
       { title: "Stock Query", url: "/factory/stock-query", icon: Database },
+      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: RefreshCw },
     ],
   },
   {

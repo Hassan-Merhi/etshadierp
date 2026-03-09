@@ -295,6 +295,30 @@ app.use((req, res, next) => {
     `DELETE FROM factory_user_page_access WHERE page_key IN ('factory/mix-batches', 'factory/sales/new', 'factory/bale-transfers', 'factory/create', 'factory/users', 'factory/daybook')`,
     // Add ledger account link to customer order charges
     `ALTER TABLE customer_order_charges ADD COLUMN IF NOT EXISTS ledger_account_id integer`,
+    // Bale recode / relabeling audit tables
+    `CREATE TABLE IF NOT EXISTS bale_recode_sessions (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      performed_by varchar(255),
+      uploaded_filename text,
+      print_format text NOT NULL DEFAULT 'A4',
+      design_color text,
+      total_rows integer NOT NULL DEFAULT 0,
+      valid_rows integer NOT NULL DEFAULT 0,
+      invalid_rows integer NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS bale_recode_items (
+      id serial PRIMARY KEY,
+      session_id integer NOT NULL,
+      old_reference_code text NOT NULL,
+      new_reference_code text,
+      product_name text,
+      article_code text,
+      weight_kg text,
+      status text NOT NULL DEFAULT 'SUCCESS',
+      error_message text
+    )`,
   ];
   for (const migration of migrations) {
     try {
