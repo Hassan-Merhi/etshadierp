@@ -230,6 +230,17 @@ app.use((req, res, next) => {
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_name text`,
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_type text`,
     `ALTER TABLE direct_messages ADD COLUMN IF NOT EXISTS file_size integer`,
+    `CREATE TABLE IF NOT EXISTS stored_files (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL REFERENCES companies(id),
+      file_name text NOT NULL,
+      file_type text NOT NULL,
+      file_size integer NOT NULL,
+      file_data text NOT NULL,
+      description text,
+      uploaded_by integer,
+      uploaded_at timestamp NOT NULL DEFAULT now()
+    )`,
     `CREATE TABLE IF NOT EXISTS spreadsheets (
       id serial PRIMARY KEY,
       company_id integer NOT NULL REFERENCES companies(id),

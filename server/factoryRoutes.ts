@@ -2790,6 +2790,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           supplierId: factoryContainers.supplierId,
           supplierName: factorySuppliers.name,
           origin: factoryContainers.origin,
+          containerStatus: factoryContainers.status,
+          currencyCode: factoryContainers.currencyCode,
         })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
@@ -2798,7 +2800,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const supplierMap = new Map<string, any>();
       for (const r of results) {
-        const key = r.supplierName || `unknown-${r.containerId}`;
+        const isOB = r.containerStatus === "OPENING_BALANCE";
+        const key = (r.supplierName || `unknown-${r.containerId}`) + (isOB ? "__OB" : "__CT");
         const received = parseFloat(r.receivedKg as string) || 0;
         const used = parseFloat(r.usedKg as string) || 0;
         const costPerKg = parseFloat(r.costPerKg as string) || 0;
@@ -2819,6 +2822,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           supplierMap.set(key, {
             supplierName: r.supplierName || "Unknown",
             supplierId: r.supplierId,
+            sourceType: isOB ? "OPENING_BALANCE" : "CONTAINER",
+            currencyCode: r.currencyCode || "USD",
             _totalReceived: received,
             _totalUsed: used,
             _avgCostPerKg: costPerKg,
@@ -2833,6 +2838,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
+          sourceType: s.sourceType,
+          currencyCode: s.currencyCode,
           receivedKg: s._totalReceived.toFixed(3),
           usedKg: s._totalUsed.toFixed(3),
           remainingKg: remainingKg.toFixed(3),
@@ -5375,6 +5382,199 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Opening Raw Stock Recalc Helper ────────────────────────────────────────
+  // Allocation rule: for each supplierId, sum all factory_mix_batch_sources.weightKg
+  // attributed to that supplier, then FIFO-allocate against that supplier's OPENING_BALANCE
+  // factory_raw_stock records (ordered by offloadedAt ASC, id ASC).
+  // Idempotent: resets usedKg to 0 on all OB records before recalculating.
+  // Only OB raw stock (containers with status='OPENING_BALANCE') is touched.
+  // Non-OB (container offload) raw stock is never modified.
+  async function recalcOpeningStockUsage(companyId: number): Promise<{ suppliersProcessed: number; totalAllocatedKg: number; unmatchedKg: number }> {
+    const obRawStocks = await db
+      .select({
+        id: factoryRawStock.id,
+        receivedKg: factoryRawStock.receivedKg,
+        supplierId: factoryContainers.supplierId,
+        offloadedAt: factoryRawStock.offloadedAt,
+      })
+      .from(factoryRawStock)
+      .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+      .where(and(
+        eq(factoryRawStock.companyId, companyId),
+        eq(factoryContainers.status, "OPENING_BALANCE")
+      ))
+      .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
+
+    if (obRawStocks.length === 0) return { suppliersProcessed: 0, totalAllocatedKg: 0, unmatchedKg: 0 };
+
+    const obIds = obRawStocks.map((r: any) => r.id);
+    await db.update(factoryRawStock)
+      .set({ usedKg: "0" })
+      .where(inArray(factoryRawStock.id, obIds));
+
+    const consumed = await db
+      .select({
+        supplierId: factoryMixBatchSources.supplierId,
+        totalKg: sql<string>`COALESCE(SUM(${factoryMixBatchSources.weightKg}), '0')`,
+      })
+      .from(factoryMixBatchSources)
+      .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+      .where(and(
+        eq(factoryMixBatches.companyId, companyId),
+        sql`${factoryMixBatchSources.supplierId} IS NOT NULL`
+      ))
+      .groupBy(factoryMixBatchSources.supplierId);
+
+    const consumedBySupplier = new Map<number, number>();
+    for (const row of consumed) {
+      if (row.supplierId != null) {
+        consumedBySupplier.set(row.supplierId, parseFloat(row.totalKg) || 0);
+      }
+    }
+
+    const obBySupplier = new Map<number, typeof obRawStocks>();
+    for (const r of obRawStocks) {
+      if (r.supplierId == null) continue;
+      if (!obBySupplier.has(r.supplierId)) obBySupplier.set(r.supplierId, []);
+      obBySupplier.get(r.supplierId)!.push(r);
+    }
+
+    let totalAllocatedKg = 0;
+    let unmatchedKg = 0;
+    const suppliersProcessed = consumedBySupplier.size;
+
+    for (const [supplierId, totalConsumed] of consumedBySupplier) {
+      const records = obBySupplier.get(supplierId) || [];
+      let remaining = totalConsumed;
+
+      for (const rec of records) {
+        if (remaining <= 0.001) break;
+        const cap = parseFloat(rec.receivedKg as string) || 0;
+        const deduct = Math.min(remaining, cap);
+        await db.update(factoryRawStock)
+          .set({ usedKg: String(deduct.toFixed(3)) })
+          .where(eq(factoryRawStock.id, rec.id));
+        remaining -= deduct;
+        totalAllocatedKg += deduct;
+      }
+
+      if (remaining > 0.001) unmatchedKg += remaining;
+    }
+
+    return { suppliersProcessed, totalAllocatedKg, unmatchedKg };
+  }
+
+  app.post("/api/factory/raw-stock/recalc-opening", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const stats = await recalcOpeningStockUsage(companyId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error recalculating opening stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/import/opening-raw-stock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "No items provided" });
+      }
+
+      let imported = 0;
+      const errors: string[] = [];
+
+      const existingOBs = await db
+        .select({ containerNumber: factoryContainers.containerNumber })
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.companyId, companyId), sql`${factoryContainers.containerNumber} LIKE ${"OB-%"}`));
+
+      let nextNum = 1;
+      for (const c of existingOBs) {
+        const parts = c.containerNumber.split("-");
+        const num = parseInt(parts[parts.length - 1]) || 0;
+        if (num >= nextNum) nextNum = num + 1;
+      }
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          const supplierStr = String(item.supplier || "").trim();
+          const kgVal = parseFloat(item.kg);
+          const rateVal = parseFloat(item.costPerKg);
+          const currency = String(item.currency || "USD").trim();
+          const fxRate = parseFloat(item.fxRateToUsd || "1");
+          const openingDate = String(item.openingDate || "").trim();
+
+          if (!supplierStr) { errors.push(`Row ${i + 1}: supplier is required`); continue; }
+          if (isNaN(kgVal) || kgVal <= 0) { errors.push(`Row ${i + 1}: kg must be > 0`); continue; }
+          if (isNaN(rateVal) || rateVal < 0) { errors.push(`Row ${i + 1}: costPerKg must be >= 0`); continue; }
+          if (!currency) { errors.push(`Row ${i + 1}: currency is required`); continue; }
+          if (isNaN(fxRate) || fxRate <= 0) { errors.push(`Row ${i + 1}: fxRateToUsd must be > 0`); continue; }
+          if (!openingDate) { errors.push(`Row ${i + 1}: openingDate is required`); continue; }
+
+          const [supplier] = await db
+            .select()
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, supplierStr)));
+
+          if (!supplier) { errors.push(`Row ${i + 1}: supplier "${supplierStr}" not found`); continue; }
+
+          const costPerKgUsd = currency === "USD" ? rateVal : rateVal * fxRate;
+          const containerNumber = `OB-${String(nextNum).padStart(4, "0")}`;
+          nextNum++;
+
+          const [container] = await db.insert(factoryContainers).values({
+            companyId,
+            containerNumber,
+            supplierId: supplier.id,
+            origin: "Opening Import",
+            totalKg: String(kgVal),
+            ratePerKg: String(rateVal),
+            declaredKg: String(kgVal),
+            actualReceivedKg: String(kgVal),
+            finalPayableAmount: String(kgVal * rateVal),
+            differenceKg: "0",
+            currencyCode: currency,
+            fxRateToUsd: String(fxRate),
+            ratePerKgUsd: String(costPerKgUsd),
+            finalPayableAmountUsd: String(kgVal * costPerKgUsd),
+            notes: String(item.notes || "Opening stock import"),
+            status: "OPENING_BALANCE",
+          }).returning();
+
+          await db.insert(factoryRawStock).values({
+            companyId,
+            containerId: container.id,
+            receivedKg: String(kgVal),
+            usedKg: "0",
+            costPerKg: String(rateVal),
+            costPerKgUsd: String(costPerKgUsd),
+          });
+
+          imported++;
+        } catch (err: any) {
+          errors.push(`Row ${i + 1}: ${err.message}`);
+        }
+      }
+
+      let recalcStats = null;
+      if (imported > 0) {
+        recalcStats = await recalcOpeningStockUsage(companyId);
+      }
+
+      res.json({ imported, errors, recalcStats });
+    } catch (error: any) {
+      console.error("Error importing opening raw stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/import/template/:type", requireAuth, async (req: any, res: any) => {
     try {
       const type = req.params.type;
@@ -5394,8 +5594,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           csv = "baleCode,articleCode,productName,category,grade,weightKg,costPerKg,status";
           filename = "factory_bales_template.csv";
           break;
+        case "opening-raw-stock":
+          csv = "supplier,kg,costPerKg,currency,fxRateToUsd,openingDate,notes";
+          filename = "factory_opening_raw_stock_template.csv";
+          break;
         default:
-          return res.status(400).json({ message: "Invalid template type. Use: suppliers, raw-stock, or bales" });
+          return res.status(400).json({ message: "Invalid template type. Use: suppliers, raw-stock, bales, or opening-raw-stock" });
       }
 
       res.setHeader("Content-Type", "text/csv");

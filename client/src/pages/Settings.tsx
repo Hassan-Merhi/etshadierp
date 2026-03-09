@@ -1281,6 +1281,7 @@ function PosSettingsTab() {
 
 function FileStorageTab() {
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -1851,6 +1852,7 @@ const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
 
 
 function LoginHistoryTab() {
+  const { formatDisplayDate } = useDateFormat();
   const { data: history, isLoading } = useQuery<any[]>({
     queryKey: ["/api/login-history"],
   });

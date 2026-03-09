@@ -117,6 +117,8 @@ interface AdditionalChargeRow {
 interface RawStockRow {
   supplierName: string;
   supplierId: number | null;
+  sourceType?: string;
+  currencyCode?: string;
   receivedKg: string;
   usedKg: string;
   remainingKg: string;
@@ -488,6 +490,7 @@ export default function ProductionRawStock() {
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead>Supplier</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="text-right">Received (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
@@ -499,10 +502,17 @@ export default function ProductionRawStock() {
               <TableBody>
                 {rawStock.map((row, idx) => {
                   const remaining = parseFloat(row.remainingKg);
+                  const isOB = row.sourceType === "OPENING_BALANCE";
+                  const currency = row.currencyCode || "USD";
                   return (
-                    <TableRow key={row.supplierId || idx} data-testid={`row-raw-stock-${row.supplierId || idx}`}>
+                    <TableRow key={(row.supplierId || idx) + (isOB ? "_ob" : "_ct")} data-testid={`row-raw-stock-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}>
                       <TableCell className="font-medium" data-testid={`text-supplier-${row.supplierId || idx}`}>
                         {row.supplierName}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={isOB ? "secondary" : "outline"} data-testid={`badge-source-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}>
+                          {isOB ? "Opening" : "Container"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(row.receivedKg))}
@@ -516,7 +526,7 @@ export default function ProductionRawStock() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${parseFloat(row.costPerKg).toFixed(4)}
+                        {currency !== "USD" ? `${currency} ` : "$"}{parseFloat(row.costPerKg).toFixed(4)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${formatNumber(parseFloat(row.valueRemaining))}
