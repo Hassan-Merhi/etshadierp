@@ -760,7 +760,17 @@ export default function FactoryLocationInventory() {
   if (!selectedLocation) {
     return (
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
-        <h1 className="text-xl md:text-3xl font-bold mb-6" data-testid="text-page-title">Factory Location Inventory</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 flex-wrap">
+          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">Factory Location Inventory</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/api/factory/location-inventory/export/all", "_blank")}
+            data-testid="button-export-all-locations"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export All (Excel)
+          </Button>
+        </div>
 
         <Card className="p-4 w-full">
           <div className="relative mb-4">
@@ -848,6 +858,14 @@ export default function FactoryLocationInventory() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => handlePrint()} data-testid="button-print">
               <Printer className="h-4 w-4 mr-1" /> Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`/api/factory/location-inventory/${selectedLocation.id}/export/excel`, "_blank")}
+              data-testid="button-export-location-excel"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
             </Button>
           </div>
         </div>

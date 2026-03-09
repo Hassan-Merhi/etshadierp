@@ -919,6 +919,46 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const tr = sheet.addRow(totalRowData);
       tr.font = { bold: true };
 
+      // Sheet 2: Bale Details — one row per bale with reference number
+      const baleSheet = workbook.addWorksheet("Bale Details");
+      const baleColumns: any[] = [
+        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Status", key: "status", width: 14 },
+      ];
+      if (includeCost) {
+        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      baleSheet.columns = baleColumns;
+      const baleHeaderRow = baleSheet.getRow(1);
+      baleHeaderRow.font = { bold: true };
+      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+
+      const sortedBales = [...bales].sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
+      for (const b of sortedBales) {
+        const rowData: any = {
+          referenceNumber: b.referenceNumber,
+          baleCode: b.baleCode,
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(b.productId ?? 0) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: parseFloat(String(b.weightKg || "0")),
+          status: b.status,
+        };
+        if (includeCost) {
+          rowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rowData.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        baleSheet.addRow(rowData);
+      }
+
       const dateStr = new Date().toISOString().split("T")[0];
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
@@ -926,6 +966,200 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.end();
     } catch (error: any) {
       console.error("Error exporting inventory Excel:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export ALL locations inventory to Excel — summary + full bale detail with ref numbers
+  app.get("/api/factory/location-inventory/export/all", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const includeCost = req.query.includeCost !== "0";
+
+      // Fetch all in-stock / finalized bales
+      const bales = await db
+        .select()
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+          )
+        )
+        .orderBy(factoryBales.erpLocationId, factoryBales.productName);
+
+      // Build lookup maps
+      const locationIds = [...new Set(bales.map(b => b.erpLocationId).filter((id): id is number => id != null))];
+      const locationRecords = locationIds.length > 0
+        ? await db.select().from(locations).where(inArray(locations.id, locationIds))
+        : [];
+      const locationMap = new Map(locationRecords.map(l => [l.id, l.name]));
+
+      const productIds = [...new Set(bales.map(b => b.productId).filter((id): id is number => id != null && id > 0))];
+      const products = productIds.length > 0
+        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+        : [];
+      const categoryIds = [...new Set(products.map(p => p.categoryId).filter((id): id is number => id != null))];
+      const categories = categoryIds.length > 0
+        ? await db.select().from(factoryCategories).where(and(eq(factoryCategories.companyId, companyId), inArray(factoryCategories.id, categoryIds)))
+        : [];
+
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const productCategoryNameMap = new Map(products.map(p => [p.id, categoryMap.get(p.categoryId!) || ""]));
+      const productProductionPriceMap = new Map(products.map(p => [p.id, parseFloat((p as any).productionPrice || "0")]));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+
+      // Sheet 1: Summary grouped by Location → Product
+      const summarySheet = workbook.addWorksheet("Summary");
+      const summaryColumns: any[] = [
+        { header: "Location", key: "locationName", width: 22 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Bales", key: "baleCount", width: 10 },
+        { header: "Wt/Bale (kg)", key: "weightPerBale", width: 14 },
+        { header: "Total KG", key: "totalWeight", width: 14 },
+      ];
+      if (includeCost) {
+        summaryColumns.push({ header: "Avg Rate (Cost)", key: "productionPrice", width: 16 });
+        summaryColumns.push({ header: "Total Value", key: "totalValue", width: 16 });
+      }
+      summarySheet.columns = summaryColumns;
+      const summaryHeader = summarySheet.getRow(1);
+      summaryHeader.font = { bold: true };
+      summaryHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+
+      // Group bales by locationId + productId
+      const grouped = new Map<string, { locationName: string; articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
+      for (const b of bales) {
+        const locId = b.erpLocationId ?? 0;
+        const pid = b.productId ?? 0;
+        const key = `${locId}::${pid}`;
+        const weight = parseFloat(String(b.weightKg || "0"));
+        const productionPrice = productProductionPriceMap.get(pid) || 0;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.totalWeight += weight;
+          existing.baleCount += 1;
+        } else {
+          grouped.set(key, {
+            locationName: locationMap.get(locId) || `Location #${locId}`,
+            articleCode: b.articleCode || b.baleCode || "",
+            productName: b.productName || "Unknown",
+            category: productCategoryNameMap.get(pid) || b.category || "",
+            totalWeight: weight,
+            baleCount: 1,
+            productionPrice,
+          });
+        }
+      }
+
+      const summaryRows = Array.from(grouped.values()).sort((a, b) =>
+        a.locationName.localeCompare(b.locationName) || a.productName.localeCompare(b.productName)
+      );
+
+      let totalBales = 0, totalKg = 0, totalValue = 0;
+      let lastLocation = "";
+      for (const row of summaryRows) {
+        // Add a blank separator row when location changes
+        if (row.locationName !== lastLocation && lastLocation !== "") {
+          summarySheet.addRow({});
+        }
+        lastLocation = row.locationName;
+
+        const weightPerBale = row.baleCount > 0 ? row.totalWeight / row.baleCount : 0;
+        const rowTotalValue = row.productionPrice * row.baleCount;
+        totalBales += row.baleCount;
+        totalKg += row.totalWeight;
+        totalValue += rowTotalValue;
+
+        const rowData: any = {
+          locationName: row.locationName,
+          articleCode: row.articleCode,
+          productName: row.productName,
+          category: row.category,
+          baleCount: row.baleCount,
+          weightPerBale: parseFloat(weightPerBale.toFixed(2)),
+          totalWeight: parseFloat(row.totalWeight.toFixed(2)),
+        };
+        if (includeCost) {
+          rowData.productionPrice = row.productionPrice;
+          rowData.totalValue = parseFloat(rowTotalValue.toFixed(2));
+        }
+        summarySheet.addRow(rowData);
+      }
+
+      summarySheet.addRow({});
+      const totalsData: any = {
+        locationName: "GRAND TOTAL",
+        articleCode: "",
+        productName: `${summaryRows.length} products across ${locationRecords.length} locations`,
+        category: "",
+        baleCount: totalBales,
+        weightPerBale: "",
+        totalWeight: parseFloat(totalKg.toFixed(2)),
+      };
+      if (includeCost) {
+        totalsData.productionPrice = "";
+        totalsData.totalValue = parseFloat(totalValue.toFixed(2));
+      }
+      const totalRow = summarySheet.addRow(totalsData);
+      totalRow.font = { bold: true };
+
+      // Sheet 2: Bale Details — one row per bale with reference number
+      const baleSheet = workbook.addWorksheet("Bale Details");
+      const baleColumns: any[] = [
+        { header: "Location", key: "locationName", width: 22 },
+        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Status", key: "status", width: 14 },
+      ];
+      if (includeCost) {
+        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      baleSheet.columns = baleColumns;
+      const baleHeaderRow = baleSheet.getRow(1);
+      baleHeaderRow.font = { bold: true };
+      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+
+      for (const b of bales) {
+        const locId = b.erpLocationId ?? 0;
+        const pid = b.productId ?? 0;
+        const rowData: any = {
+          locationName: locationMap.get(locId) || `Location #${locId}`,
+          referenceNumber: b.referenceNumber,
+          baleCode: b.baleCode,
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(pid) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: parseFloat(String(b.weightKg || "0")),
+          status: b.status,
+        };
+        if (includeCost) {
+          rowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          rowData.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        baleSheet.addRow(rowData);
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="inventory_all_locations_${dateStr}.xlsx"`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting all-locations inventory Excel:", error);
       res.status(500).json({ message: error.message });
     }
   });
