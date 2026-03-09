@@ -1815,7 +1815,6 @@ const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
   { key: "create", label: "Create Voucher", group: "Vouchers" },
   { key: "analytics", label: "Analytics", group: "Analytics" },
   { key: "sales_report", label: "Sales Report", group: "Analytics" },
-  { key: "factory_production", label: "Factory Production", group: "Analytics" },
   { key: "settings", label: "Settings", group: "System" },
 ];
 
