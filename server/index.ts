@@ -251,6 +251,8 @@ app.use((req, res, next) => {
     )`,
     // Factory supplier hierarchy
     `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS parent_id integer`,
+    // Factory supplier support in voucher entries
+    `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS factory_supplier_id integer`,
     // Factory raw stock OB commission fields
     `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_person_name text`,
     `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_amount decimal(20,4)`,

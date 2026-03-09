@@ -98,6 +98,7 @@ import {
   userLocations,
   userCompanyRoles,
   factoryBales,
+  factorySuppliers,
   loginHistory,
   storedFiles,
 } from "@shared/schema";
@@ -12718,6 +12719,9 @@ if (asOfDate) {
       const employees = await storage.getAllEmployees(companyId);
       const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
       const employeesData = await storage.getAllEmployees(companyId);
+      const fSuppliers = isFactoryCompany
+        ? await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
+        : [];
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
@@ -12744,6 +12748,7 @@ if (asOfDate) {
       const assetBalances = new Map<number, { debits: number; credits: number }>();
       const supplierBalances = new Map<number, number>();
       const employeeBalances = new Map<number, { debits: number; credits: number }>();
+      const factorySupplierBalances = new Map<number, number>();
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -12780,6 +12785,16 @@ if (asOfDate) {
             supplierBalances.set(entry.supplierId, existing + credit); // Increase payable
           } else if (debit > 0 && credit === 0) {
             supplierBalances.set(entry.supplierId, existing - debit); // Decrease payable
+          }
+        }
+
+        if ((entry as any).factorySupplierId) {
+          const fsId = (entry as any).factorySupplierId as number;
+          const existing = factorySupplierBalances.get(fsId) || 0;
+          if (credit > 0 && debit === 0) {
+            factorySupplierBalances.set(fsId, existing + credit);
+          } else if (debit > 0 && credit === 0) {
+            factorySupplierBalances.set(fsId, existing - debit);
           }
         }
 
@@ -12888,6 +12903,20 @@ if (asOfDate) {
             type: "supplier",
             name: supplier.legalName,
             code: supplier.code,
+            balance,
+          };
+        }),
+        // Factory Suppliers — only included for factory companies
+        ...fSuppliers.map((supplier) => {
+          const transactionBalance = factorySupplierBalances.get(supplier.id) || 0;
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          const balance = -(openingBalance + transactionBalance);
+
+          return {
+            id: supplier.id,
+            type: "factorySupplier",
+            name: supplier.name,
+            code: String(supplier.id),
             balance,
           };
         }),
@@ -13675,6 +13704,8 @@ if (asOfDate) {
               entryAccountField.bankAccountId = entry.accountId;
             } else if (entry.accountType === "supplier") {
               entryAccountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "factorySupplier") {
+              entryAccountField.factorySupplierId = entry.accountId;
             } else if (entry.accountType === "employee") {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
@@ -13691,6 +13722,8 @@ if (asOfDate) {
               paymentAccountField.bankAccountId = paymentAccountId;
             } else if (paymentAccountType === "supplier") {
               paymentAccountField.supplierId = paymentAccountId;
+            } else if (paymentAccountType === "factorySupplier") {
+              paymentAccountField.factorySupplierId = paymentAccountId;
             } else if (paymentAccountType === "employee") {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
@@ -13699,7 +13732,7 @@ if (asOfDate) {
               paymentAccountField.customerId = paymentAccountId;
             }
 
-            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
+            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "factorySupplier" || paymentAccountType === "employee";
 
             if (voucherType === "Payment") {
               if (isLiabilityPaymentAccount) {
@@ -13936,6 +13969,8 @@ if (asOfDate) {
               entryAccountField.bankAccountId = entry.accountId;
             } else if (entry.accountType === "supplier") {
               entryAccountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "factorySupplier") {
+              entryAccountField.factorySupplierId = entry.accountId;
             } else if (entry.accountType === "employee") {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
@@ -13952,6 +13987,8 @@ if (asOfDate) {
               paymentAccountField.bankAccountId = paymentAccountId;
             } else if (paymentAccountType === "supplier") {
               paymentAccountField.supplierId = paymentAccountId;
+            } else if (paymentAccountType === "factorySupplier") {
+              paymentAccountField.factorySupplierId = paymentAccountId;
             } else if (paymentAccountType === "employee") {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
@@ -13960,7 +13997,7 @@ if (asOfDate) {
               paymentAccountField.customerId = paymentAccountId;
             }
 
-            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "employee";
+            const isLiabilityPaymentAccount = paymentAccountType === "supplier" || paymentAccountType === "factorySupplier" || paymentAccountType === "employee";
 
             if (voucherType === "Payment") {
               if (isLiabilityPaymentAccount) {

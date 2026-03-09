@@ -150,7 +150,7 @@ interface FixedAsset {
 }
 
 interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
+  accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -158,7 +158,7 @@ interface VoucherEntry {
 
 interface JournalEntry {
   type: "DR" | "CR";
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
+  accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -196,7 +196,7 @@ interface StockAdjustmentEntry {
 }
 
 const voucherEntrySchema = z.object({
-  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -208,7 +208,7 @@ const voucherEntrySchema = z.object({
 
 const journalEntrySchema = z.object({
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -219,7 +219,7 @@ const journalEntrySchema = z.object({
 });
 
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -665,6 +665,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/suppliers", selectedCompany?.id],
   });
 
+  const { data: factorySuppliersData = [] } = useQuery<{ id: number; name: string; parentId?: number | null }[]>({
+    queryKey: [`/api/factory/suppliers`],
+    enabled: isFactoryCompany,
+  });
+
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
   });
@@ -744,12 +749,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         name: a.bankName,
         code: a.accountNumber,
       })),
-      ...suppliers.map((s) => ({
+      // ERP suppliers only for non-factory companies
+      ...(isFactoryCompany ? [] : suppliers.map((s) => ({
         type: "supplier" as const,
         id: s.id,
         name: s.legalName,
         code: s.code,
-      })),
+      }))),
+      // Factory suppliers only for factory companies
+      ...(isFactoryCompany ? factorySuppliersData.map((s) => ({
+        type: "factorySupplier" as const,
+        id: s.id,
+        name: s.name,
+        code: String(s.id),
+      })) : []),
       ...employees.map((e) => ({
         type: "employee" as const,
         id: e.id,
@@ -773,7 +786,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       })),
     ];
     return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets, customers]);
+  }, [ledgerAccounts, bankAccounts, suppliers, factorySuppliersData, isFactoryCompany, employees, fixedAssets, customers]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -834,13 +847,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Fallback: liability (supplier/employee) with DR > 0 (paying down a liability).
         paymentEntry = allEntries.find((entry: any) => {
           const cr = parseFloat(entry.creditAmount || "0");
-          const isLiability = entry.supplierId || entry.employeeId;
+          const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
           return !isLiability && cr > 0;
         });
         if (!paymentEntry) {
           paymentEntry = allEntries.find((entry: any) => {
             const dr = parseFloat(entry.debitAmount || "0");
-            const isLiability = entry.supplierId || entry.employeeId;
+            const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
             return isLiability && dr > 0;
           });
         }
@@ -850,13 +863,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Fallback: liability (supplier/employee) with CR > 0.
         paymentEntry = allEntries.find((entry: any) => {
           const dr = parseFloat(entry.debitAmount || "0");
-          const isLiability = entry.supplierId || entry.employeeId;
+          const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
           return !isLiability && dr > 0;
         });
         if (!paymentEntry) {
           paymentEntry = allEntries.find((entry: any) => {
             const cr = parseFloat(entry.creditAmount || "0");
-            const isLiability = entry.supplierId || entry.employeeId;
+            const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
             return isLiability && cr > 0;
           });
         }
@@ -884,6 +897,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentId = paymentEntry.supplierId;
         const supplier = suppliers.find(s => s.id === paymentId);
         paymentName = supplier?.legalName || "";
+      } else if (paymentEntry.factorySupplierId) {
+        paymentType = "factorySupplier";
+        paymentId = paymentEntry.factorySupplierId;
+        const fs = factorySuppliersData.find(s => s.id === paymentId);
+        paymentName = fs?.name || "";
       } else if (paymentEntry.employeeId) {
         paymentType = "employee";
         paymentId = paymentEntry.employeeId;
@@ -901,6 +919,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const payFromLedgerId = paymentEntry.ledgerAccountId || null;
       const payFromBankId = paymentEntry.bankAccountId || null;
       const payFromSupplierId = paymentEntry.supplierId || null;
+      const payFromFactorySupplierId = paymentEntry.factorySupplierId || null;
       const payFromEmployeeId = paymentEntry.employeeId || null;
 
       // Convert contra entries (all entries except payment entry and duplicate Pay From entries) to form format
@@ -911,12 +930,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           if (payFromLedgerId && entry.ledgerAccountId === payFromLedgerId) return false;
           if (payFromBankId && entry.bankAccountId === payFromBankId) return false;
           if (payFromSupplierId && entry.supplierId === payFromSupplierId) return false;
+          if (payFromFactorySupplierId && entry.factorySupplierId === payFromFactorySupplierId) return false;
           if (payFromEmployeeId && entry.employeeId === payFromEmployeeId) return false;
           if (payFromCustomerId && entry.customerId === payFromCustomerId) return false;
           return true;
         })
         .map((entry: any) => {
-        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer" = "ledger";
         let accountId = 0;
         let accountName = "";
         let amount = "0";
@@ -936,6 +956,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.supplierId;
           const supplier = suppliers.find(s => s.id === accountId);
           accountName = supplier?.legalName || "";
+        } else if (entry.factorySupplierId) {
+          accountType = "factorySupplier";
+          accountId = entry.factorySupplierId;
+          const fs = factorySuppliersData.find(s => s.id === accountId);
+          accountName = fs?.name || "";
         } else if (entry.employeeId) {
           accountType = "employee";
           accountId = entry.employeeId;
@@ -956,7 +981,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Extract the amount from the contra entry
         // For asset payment accounts: Payment contra=DR, Receipt contra=CR
         // For liability payment accounts: Payment contra=CR, Receipt contra=DR
-        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.customerId;
+        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.factorySupplierId || paymentEntry.employeeId || paymentEntry.customerId;
         if (voucherToEdit.voucherType === "Payment") {
           amount = isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0");
         } else if (voucherToEdit.voucherType === "Receipt") {
@@ -1160,6 +1185,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return sum + debit - credit;
         }, openingBalance);
         return balance;
+      } else if (paymentAccountType === "factorySupplier") {
+        // Use sidebar balance for factory suppliers (credit balance = positive = we owe them)
+        const sidebarAcc = sidebarAccounts.find(a => a.type === "factorySupplier" && a.id === paymentAccountId);
+        return sidebarAcc ? Math.abs(sidebarAcc.balance ?? 0) : 0;
       }
       return 0;
     },
@@ -1360,7 +1389,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const accountObj: Account = {
         id: account.id,
         name: account.name,
-        type: account.type as "ledger" | "bank" | "supplier" | "employee" | "fixedAsset",
+        type: account.type as "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer",
         code: "",
       };
       handleSidebarAccountSelect(accountObj);
@@ -1716,7 +1745,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
       const formEntries = voucherToEdit.entries.map((entry: any) => {
-        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer" = "ledger";
         let accountId = 0;
         let accountName = "";
         let type: "DR" | "CR" = "DR";
@@ -1738,6 +1767,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.supplierId;
           const supplier = suppliers.find(s => s.id === accountId);
           accountName = supplier?.legalName || "";
+        } else if (entry.factorySupplierId) {
+          accountType = "factorySupplier";
+          accountId = entry.factorySupplierId;
+          const fs = factorySuppliersData.find(s => s.id === accountId);
+          accountName = fs?.name || "";
         } else if (entry.employeeId) {
           accountType = "employee";
           accountId = entry.employeeId;
