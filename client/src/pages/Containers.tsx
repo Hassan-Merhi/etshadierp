@@ -22,6 +22,7 @@ import {
   MapPin,
   Upload,
   FileSpreadsheet,
+  Pencil,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +107,8 @@ export default function Containers() {
   const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
   const [otwDocReceivedFilter, setOtwDocReceivedFilter] = useState("ALL");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingNumberId, setEditingNumberId] = useState<number | null>(null);
+  const [editingNumberValue, setEditingNumberValue] = useState("");
   const [trackingEdits, setTrackingEdits] = useState<TrackingEdit>({});
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
@@ -216,6 +219,24 @@ export default function Containers() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const editContainerNumberMutation = useMutation({
+    mutationFn: async ({ id, containerNumber }: { id: number; containerNumber: string }) => {
+      const res = await apiRequest("PATCH", `/api/containers/${id}/number`, { containerNumber });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/sold"] });
+      setEditingNumberId(null);
+      setEditingNumberValue("");
+      toast({ title: "Updated", description: "Container number changed" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1021,7 +1042,34 @@ export default function Containers() {
                           data-testid={`row-container-${container.id}`}
                         >
                           <TableCell className="font-mono font-medium sticky left-0 bg-background z-10">
-                            {container.containerNumber}
+                            {editingNumberId === container.id ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  className="h-7 w-36 font-mono text-xs px-2"
+                                  value={editingNumberValue}
+                                  onChange={(e) => setEditingNumberValue(e.target.value.toUpperCase())}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue });
+                                    if (e.key === "Escape") { setEditingNumberId(null); setEditingNumberValue(""); }
+                                  }}
+                                  autoFocus
+                                  data-testid={`input-container-number-${container.id}`}
+                                />
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue })} disabled={editContainerNumberMutation.isPending} data-testid={`button-save-number-${container.id}`}>
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingNumberId(null); setEditingNumberValue(""); }} data-testid={`button-cancel-number-${container.id}`}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 group">
+                                <span>{container.containerNumber}</span>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => { setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }} data-testid={`button-edit-number-${container.id}`}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             {getSupplierName(container.supplierId)}

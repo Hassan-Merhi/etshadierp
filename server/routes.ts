@@ -10292,6 +10292,38 @@ if (asOfDate) {
     }
   });
 
+  // Update container number
+  app.patch("/api/containers/:id/number", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid container ID" });
+      const { containerNumber } = req.body;
+      if (!containerNumber || !String(containerNumber).trim()) {
+        return res.status(400).json({ message: "Container number is required" });
+      }
+      const newNumber = String(containerNumber).trim().toUpperCase();
+      const [existing] = await db
+        .select({ id: containers.id })
+        .from(containers)
+        .where(and(eq(containers.companyId, companyId), eq(containers.containerNumber, newNumber)))
+        .limit(1);
+      if (existing && existing.id !== id) {
+        return res.status(409).json({ message: `Container number "${newNumber}" is already in use` });
+      }
+      const [updated] = await db
+        .update(containers)
+        .set({ containerNumber: newNumber })
+        .where(and(eq(containers.id, id), eq(containers.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Container not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk import container tracking from Excel data
   app.post("/api/containers/tracking/import", requireAuth, requireNonPOS, async (req, res) => {
     try {
