@@ -163,6 +163,8 @@ export default function ProductionRawStock() {
   const [confirmDutyNotes, setConfirmDutyNotes] = useState("");
   const [obDialogOpen, setObDialogOpen] = useState(false);
   const [obSupplierName, setObSupplierName] = useState("");
+  const [obSupplierOpen, setObSupplierOpen] = useState(false);
+  const [obSupplierSearch, setObSupplierSearch] = useState("");
   const [obReceivedKg, setObReceivedKg] = useState("");
   const [obCostPerKg, setObCostPerKg] = useState("");
   const [obCurrency, setObCurrency] = useState("USD");
@@ -184,6 +186,11 @@ export default function ProductionRawStock() {
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: offloadDialogOpen,
+  });
+
+  const { data: factorySuppliers } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/factory/suppliers"],
+    enabled: obDialogOpen,
   });
 
   const selectedContainer = useMemo(() => {
@@ -374,6 +381,8 @@ export default function ProductionRawStock() {
   const handleCloseObDialog = () => {
     setObDialogOpen(false);
     setObSupplierName("");
+    setObSupplierOpen(false);
+    setObSupplierSearch("");
     setObReceivedKg("");
     setObCostPerKg("");
     setObCurrency("USD");
@@ -1031,13 +1040,75 @@ export default function ProductionRawStock() {
 
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div className="space-y-2">
-              <Label>Supplier Name</Label>
-              <Input
-                value={obSupplierName}
-                onChange={(e) => setObSupplierName(e.target.value)}
-                placeholder="e.g. ABC Textiles"
-                data-testid="input-ob-supplier-name"
-              />
+              <Label>Supplier</Label>
+              <Popover open={obSupplierOpen} onOpenChange={setObSupplierOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-normal"
+                    data-testid="button-ob-supplier-select"
+                  >
+                    <span className={obSupplierName ? "" : "text-muted-foreground"}>
+                      {obSupplierName || "Select or create supplier..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Search or type new name..."
+                      value={obSupplierSearch}
+                      onValueChange={setObSupplierSearch}
+                      data-testid="input-ob-supplier-search"
+                    />
+                    <CommandList>
+                      <CommandGroup>
+                        {(factorySuppliers ?? [])
+                          .filter((s) =>
+                            s.name.toLowerCase().includes(obSupplierSearch.toLowerCase())
+                          )
+                          .map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={s.name}
+                              onSelect={() => {
+                                setObSupplierName(s.name);
+                                setObSupplierSearch("");
+                                setObSupplierOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${obSupplierName === s.name ? "opacity-100" : "opacity-0"}`}
+                              />
+                              {s.name}
+                            </CommandItem>
+                          ))}
+                        {obSupplierSearch.trim() &&
+                          !(factorySuppliers ?? []).some(
+                            (s) => s.name.toLowerCase() === obSupplierSearch.toLowerCase().trim()
+                          ) && (
+                            <CommandItem
+                              value={`__create__${obSupplierSearch}`}
+                              onSelect={() => {
+                                setObSupplierName(obSupplierSearch.trim());
+                                setObSupplierSearch("");
+                                setObSupplierOpen(false);
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create &ldquo;{obSupplierSearch.trim()}&rdquo;
+                            </CommandItem>
+                          )}
+                      </CommandGroup>
+                      {!obSupplierSearch && (!factorySuppliers || factorySuppliers.length === 0) && (
+                        <CommandEmpty>No suppliers yet. Type a name to create one.</CommandEmpty>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
