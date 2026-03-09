@@ -2800,6 +2800,7 @@ function LoginHistoryTab() {
         role: role.role,
         assignedLocationId: role.assignedLocationId,
         posStation: role.posStation,
+        canSellNegativeStock: role.canSellNegativeStock ?? false,
       });
       if (role.role?.startsWith("POS")) {
         try {
@@ -5233,6 +5234,26 @@ function LoginHistoryTab() {
                   )}
                 />
   
+                <FormField
+                  control={roleForm.control}
+                  name="canSellNegativeStock"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <FormLabel className="cursor-pointer">Allow Selling 0-Stock Items</FormLabel>
+                        <p className="text-xs text-muted-foreground mt-0.5">Lets this user add items to POS even when stock is at 0</p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-can-sell-negative-stock"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
                 <div className="flex gap-2 justify-end border-t pt-4">
                   <Button
                     type="button"

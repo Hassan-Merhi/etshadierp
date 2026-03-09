@@ -856,7 +856,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const selectItem = (item: InventoryItem & { stockItemId: number }) => {
-    if (item.stock === 0) {
+    const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
+    if (item.stock === 0 && !canSellZeroStock) {
       setZeroStockItem(item.name);
       setZeroStockAlert(true);
       return;
@@ -1174,7 +1175,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const selectMobileItem = (item: InventoryItem & { stockItemId: number }) => {
-    if (item.stock === 0) {
+    const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
+    if (item.stock === 0 && !canSellZeroStock) {
       setZeroStockItem(item.name);
       setZeroStockAlert(true);
       return;
