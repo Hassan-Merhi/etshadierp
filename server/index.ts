@@ -249,6 +249,29 @@ app.use((req, res, next) => {
       created_by text,
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Factory supplier hierarchy
+    `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS parent_id integer`,
+    // Factory raw stock OB commission fields
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_person_name text`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_amount decimal(20,4)`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_currency_code varchar(10)`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_fx_rate_to_usd decimal(20,8)`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_amount_usd decimal(20,4)`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS commission_ledger_account_id integer`,
+    // Factory supplier payments table
+    `CREATE TABLE IF NOT EXISTS factory_supplier_payments (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      supplier_id integer NOT NULL,
+      date varchar(20) NOT NULL,
+      amount decimal(20,4) NOT NULL,
+      currency_code varchar(10) NOT NULL DEFAULT 'USD',
+      fx_rate_to_usd decimal(20,8) NOT NULL DEFAULT 1,
+      amount_usd decimal(20,4) NOT NULL,
+      paid_from_account_id integer,
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   for (const migration of migrations) {
     try {

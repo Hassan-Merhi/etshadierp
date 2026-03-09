@@ -84,6 +84,8 @@ import {
   vouchers,
   suppliers,
   containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -1300,6 +1302,76 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // 1c. Factory Supplier Payments
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/supplier-payments", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = req.query.supplierId ? parseInt(req.query.supplierId as string) : null;
+
+      // Also fetch all sub-accounts of the supplier to include their payments
+      let supplierIds: number[] = supplierId ? [supplierId] : [];
+      if (supplierId) {
+        const children = await db
+          .select({ id: factorySuppliers.id })
+          .from(factorySuppliers)
+          .where(and(eq(factorySuppliers.companyId, companyId), eq((factorySuppliers as any).parentId, supplierId)));
+        children.forEach((c: any) => supplierIds.push(c.id));
+      }
+
+      let query = db
+        .select()
+        .from(factorySupplierPayments)
+        .where(eq(factorySupplierPayments.companyId, companyId))
+        .orderBy(desc(factorySupplierPayments.date));
+
+      if (supplierIds.length > 0) {
+        query = query.where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          inArray(factorySupplierPayments.supplierId, supplierIds)
+        ));
+      }
+
+      const payments = await query;
+      res.json(payments);
+    } catch (error: any) {
+      console.error("Error fetching supplier payments:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/supplier-payments", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
+      const [created] = await db.insert(factorySupplierPayments).values(parsed).returning();
+      res.json(created);
+    } catch (error: any) {
+      console.error("Error creating supplier payment:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/supplier-payments/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      await db
+        .delete(factorySupplierPayments)
+        .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
+      res.json({ message: "Payment deleted" });
+    } catch (error: any) {
+      console.error("Error deleting supplier payment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
   // 1b. Factory Suppliers - Balances & Statement
   // ───────────────────────────────────────────────
 
@@ -1318,6 +1390,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .select()
         .from(factoryContainers)
         .where(eq(factoryContainers.companyId, companyId));
+
+      const allPayments = await db
+        .select()
+        .from(factorySupplierPayments)
+        .where(eq(factorySupplierPayments.companyId, companyId));
 
       const suppliersWithBalances = suppliersList.map((s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
@@ -1341,13 +1418,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             }, null)
           : null;
 
-        const balance = parseFloat(s.openingBalance || "0") + containerValue;
+        // Sum payments for this supplier (direct payments to this supplierId)
+        const totalPaid = allPayments
+          .filter((p: any) => p.supplierId === s.id)
+          .reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
+        const balance = parseFloat(s.openingBalance || "0") + containerValue - totalPaid;
 
         return {
           ...s,
           totalContainers,
           totalKg: totalKg.toFixed(3),
           totalValue: balance.toFixed(2),
+          totalPaid: totalPaid.toFixed(2),
           pendingContainers,
           receivedContainers,
           lastContainerDate,
@@ -1476,11 +1559,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }));
       const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
 
+      // Fetch payments for this supplier
+      const payments = await db
+        .select()
+        .from(factorySupplierPayments)
+        .where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          eq(factorySupplierPayments.supplierId, supplierId)
+        ))
+        .orderBy(desc(factorySupplierPayments.date));
+
+      const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
       res.json({
         supplier,
         statement,
         currencyGroups,
         obCommissions,
+        payments,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),
@@ -1488,7 +1584,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalCommissions: totalCommissions.toFixed(2),
           totalDirectCommissions: totalDirectCommissions.toFixed(2),
           totalObCommissions: totalObCommissions.toFixed(2),
-          netPayable: (totalValue - totalCommissions).toFixed(2),
+          totalPayments: totalPayments.toFixed(2),
+          netPayable: (totalValue - totalCommissions - totalPayments).toFixed(2),
           totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },
       });

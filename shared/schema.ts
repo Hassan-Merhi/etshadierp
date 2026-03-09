@@ -2389,6 +2389,28 @@ export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).o
 export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;
 export type FactoryRawStock = typeof factoryRawStock.$inferSelect;
 
+export const factorySupplierPayments = pgTable("factory_supplier_payments", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  supplierId: integer("supplier_id").notNull(),
+  date: varchar("date", { length: 20 }).notNull(),
+  amount: decimal("amount", { precision: 20, scale: 4 }).notNull(),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
+  amountUsd: decimal("amount_usd", { precision: 20, scale: 4 }).notNull(),
+  paidFromAccountId: integer("paid_from_account_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactorySupplierPaymentSchema = createInsertSchema(factorySupplierPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactorySupplierPayment = z.infer<typeof insertFactorySupplierPaymentSchema>;
+export type FactorySupplierPayment = typeof factorySupplierPayments.$inferSelect;
+
 export const factoryMixBatches = pgTable("factory_mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

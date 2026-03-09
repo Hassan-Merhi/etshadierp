@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,9 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -65,10 +68,23 @@ interface ObCommission {
   ledgerAccountId: number | null;
 }
 
+interface SupplierPayment {
+  id: number;
+  supplierId: number;
+  date: string;
+  amount: string;
+  currencyCode: string;
+  fxRateToUsd: string;
+  amountUsd: string;
+  paidFromAccountId: number | null;
+  notes: string | null;
+}
+
 interface StatementResponse {
   supplier: FactorySupplier;
   statement: StatementEntry[];
   obCommissions: ObCommission[];
+  payments: SupplierPayment[];
   summary: {
     totalContainers: number;
     totalKg: string;
@@ -76,7 +92,9 @@ interface StatementResponse {
     totalCommissions: string;
     totalDirectCommissions: string;
     totalObCommissions: string;
+    totalPayments: string;
     netPayable: string;
+    totalOwed: string;
   };
 }
 
@@ -111,6 +129,88 @@ export default function FactorySuppliers() {
     },
     enabled: !!statementSupplierId,
   });
+
+  // Payment state
+  const today = new Date().toISOString().slice(0, 10);
+  const [paymentDialogSupplier, setPaymentDialogSupplier] = useState<SupplierWithBalance | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    supplierId: 0,
+    date: today,
+    amount: "",
+    currencyCode: "USD",
+    fxRateToUsd: "1",
+    paidFromAccountId: "",
+    notes: "",
+  });
+
+  const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/ledger-accounts"],
+  });
+
+  const paymentMutation = useMutation({
+    mutationFn: async (data: typeof paymentForm) => {
+      const fxRate = parseFloat(data.fxRateToUsd) || 1;
+      const amt = parseFloat(data.amount) || 0;
+      const amountUsd = data.currencyCode === "USD" ? amt : amt / fxRate;
+      const payload = {
+        supplierId: data.supplierId,
+        date: data.date,
+        amount: data.amount,
+        currencyCode: data.currencyCode,
+        fxRateToUsd: data.fxRateToUsd,
+        amountUsd: amountUsd.toFixed(4),
+        paidFromAccountId: data.paidFromAccountId ? parseInt(data.paidFromAccountId) : null,
+        notes: data.notes || null,
+      };
+      const res = await factoryApiRequest("POST", "/api/factory/supplier-payments", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to record payment");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+      }
+      toast({ title: "Payment recorded", description: "Supplier balance updated" });
+      setPaymentDialogSupplier(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/supplier-payments/${id}`);
+      if (!res.ok) throw new Error("Failed to delete payment");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+      }
+      toast({ title: "Payment deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const openPaymentDialog = (sup: SupplierWithBalance) => {
+    setPaymentDialogSupplier(sup);
+    setPaymentForm({
+      supplierId: sup.id,
+      date: today,
+      amount: "",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      paidFromAccountId: "",
+      notes: "",
+    });
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -541,6 +641,77 @@ export default function FactorySuppliers() {
                 </CardContent>
               </Card>
             )}
+
+            {statementData.payments && statementData.payments.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Payments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Notes</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">USD Amount</TableHead>
+                          <TableHead className="w-8" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statementData.payments.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="text-sm whitespace-nowrap">{formatDate(p.date)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{p.notes || "-"}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}{formatNum(p.amount)}
+                              {p.currencyCode !== "USD" && p.fxRateToUsd && (
+                                <span className="text-xs text-muted-foreground ml-1">@ {formatNum(p.fxRateToUsd)}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              ${formatNum(p.amountUsd)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); }}
+                                data-testid={`button-delete-payment-${p.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="border-t-2 font-bold">
+                          <TableCell colSpan={2}>Total Paid</TableCell>
+                          <TableCell />
+                          <TableCell className="text-right tabular-nums">
+                            ${formatNum(statementData.summary.totalPayments)}
+                          </TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {parseFloat(statementData.summary.totalPayments || "0") > 0 && (
+              <Card className="border-primary/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Net Balance (after payments)</span>
+                    <span className="text-xl font-bold tabular-nums text-primary" data-testid="text-statement-net-balance">
+                      ${formatNum(statementData.summary.netPayable)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         ) : null}
       </div>
@@ -712,6 +883,17 @@ export default function FactorySuppliers() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-1">
+                          {sup.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); openPaymentDialog(sup); }}
+                              title="Record Payment"
+                              data-testid={`button-pay-supplier-${sup.id}`}
+                            >
+                              <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            </Button>
+                          )}
                           {sup.isActive && !isChild && (
                             <Button
                               variant="ghost"
@@ -799,6 +981,157 @@ export default function FactorySuppliers() {
           )}
         </CardContent>
       </Card>
+
+      {/* Payment Dialog */}
+      <Dialog open={!!paymentDialogSupplier} onOpenChange={(open) => { if (!open) setPaymentDialogSupplier(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              {paymentDialogSupplier
+                ? `Pay to: ${paymentDialogSupplier.name} — Balance: $${formatNum(paymentDialogSupplier.totalValue)}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Sub-account selector: if this supplier has children, show them as options */}
+            {paymentDialogSupplier && (() => {
+              const children = (suppliers || []).filter((s: any) => s.parentId === paymentDialogSupplier.id);
+              if (children.length === 0) return null;
+              return (
+                <div>
+                  <Label>Pay to (account)</Label>
+                  <Select
+                    value={String(paymentForm.supplierId)}
+                    onValueChange={(v) => setPaymentForm(prev => ({ ...prev, supplierId: parseInt(v) }))}
+                  >
+                    <SelectTrigger data-testid="select-payment-target">
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={String(paymentDialogSupplier.id)}>
+                        {paymentDialogSupplier.name} (main)
+                      </SelectItem>
+                      {children.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name} (sub-account)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })()}
+
+            <div>
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={paymentForm.date}
+                onChange={(e) => setPaymentForm(prev => ({ ...prev, date: e.target.value }))}
+                data-testid="input-payment-date"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Amount</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
+                  data-testid="input-payment-amount"
+                />
+              </div>
+              <div>
+                <Label>Currency</Label>
+                <Select
+                  value={paymentForm.currencyCode}
+                  onValueChange={(v) => setPaymentForm(prev => ({
+                    ...prev,
+                    currencyCode: v,
+                    fxRateToUsd: v === "USD" ? "1" : prev.fxRateToUsd,
+                  }))}
+                >
+                  <SelectTrigger data-testid="select-payment-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                    <SelectItem value="TRY">TRY</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {paymentForm.currencyCode !== "USD" && (
+              <div>
+                <Label>FX Rate (units of {paymentForm.currencyCode} per 1 USD)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 89000 for LBP"
+                  value={paymentForm.fxRateToUsd}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
+                  data-testid="input-payment-fx-rate"
+                />
+                {paymentForm.amount && paymentForm.fxRateToUsd && parseFloat(paymentForm.fxRateToUsd) > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    = ${(parseFloat(paymentForm.amount || "0") / parseFloat(paymentForm.fxRateToUsd)).toFixed(2)} USD
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <Label>Paid From Account (optional)</Label>
+              <Select
+                value={paymentForm.paidFromAccountId}
+                onValueChange={(v) => setPaymentForm(prev => ({ ...prev, paidFromAccountId: v }))}
+              >
+                <SelectTrigger data-testid="select-payment-from-account">
+                  <SelectValue placeholder="Select account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(ledgerAccounts || []).map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.code ? `${a.code} — ` : ""}{a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Notes (optional)</Label>
+              <Input
+                placeholder="e.g. Bank transfer ref #123"
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
+                data-testid="input-payment-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialogSupplier(null)}>Cancel</Button>
+            <Button
+              onClick={() => paymentMutation.mutate(paymentForm)}
+              disabled={!paymentForm.amount || !paymentForm.date || paymentMutation.isPending}
+              data-testid="button-submit-payment"
+            >
+              {paymentMutation.isPending ? "Saving..." : "Record Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen || !!editingSupplier} onOpenChange={(open) => {
         if (!open) { setCreateOpen(false); setEditingSupplier(null); resetForm(); }
