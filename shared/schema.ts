@@ -2752,6 +2752,7 @@ export const customerOrderCharges = pgTable("customer_order_charges", {
   name: text("name").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   chargeType: text("charge_type").notNull().default("OTHER"),
+  ledgerAccountId: integer("ledger_account_id"),
 }, (t) => ({
   orderIdx: index("customer_order_charges_order_idx").on(t.orderId),
 }));

@@ -97,6 +97,7 @@ export default function FactoryPendingInvoiceVerify() {
   const [chargeName, setChargeName] = useState("");
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeType, setChargeType] = useState("FREIGHT");
+  const [chargeLedgerAccountId, setChargeLedgerAccountId] = useState<string>("");
 
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
@@ -122,6 +123,11 @@ export default function FactoryPendingInvoiceVerify() {
     enabled: !!orderId,
   });
 
+  const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
+    queryKey: ["/api/ledger-accounts"],
+    enabled: true,
+  });
+
   useEffect(() => {
     if (orderDetail && !containerInitialized) {
       setContainerNumber(orderDetail.containerNumber || "");
@@ -136,8 +142,9 @@ export default function FactoryPendingInvoiceVerify() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/verify`, data);
     },
     onSuccess: () => {
-      toast({ title: "Order verified", description: "The order has been approved and verified" });
-      navigate("/factory/sales/pending-invoices");
+      toast({ title: "Order verified", description: "Now add charges and finalize the invoice" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -171,12 +178,13 @@ export default function FactoryPendingInvoiceVerify() {
   });
 
   const addChargeMutation = useMutation({
-    mutationFn: async (data: { name: string; amount: number; chargeType: string }) => {
+    mutationFn: async (data: { name: string; amount: number; chargeType: string; ledgerAccountId?: number }) => {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setChargeName("");
+      setChargeLedgerAccountId("");
       setChargeAmount("");
       toast({ title: "Charge added" });
     },
@@ -219,6 +227,7 @@ export default function FactoryPendingInvoiceVerify() {
       name,
       amount: parseFloat(chargeAmount),
       chargeType,
+      ledgerAccountId: chargeLedgerAccountId ? parseInt(chargeLedgerAccountId) : undefined,
     });
   };
 
@@ -541,74 +550,97 @@ export default function FactoryPendingInvoiceVerify() {
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-sm">Charges</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {charges.length > 0 && (
-            <div className="space-y-1">
-              {charges.map((charge) => (
-                <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
-                  <span className="text-sm">{charge.name}</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeChargeMutation.mutate(charge.id)}
-                      disabled={removeChargeMutation.isPending}
-                      data-testid={`button-remove-charge-${charge.id}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Select value={chargeType} onValueChange={setChargeType}>
-              <SelectTrigger data-testid="select-charge-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FREIGHT">Freight</SelectItem>
-                <SelectItem value="OTHER">Other</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {chargeType === "OTHER" && (
-              <Input
-                value={chargeName}
-                onChange={(e) => setChargeName(e.target.value)}
-                placeholder="Charge name..."
-                data-testid="input-charge-name"
-              />
+      {isVerified && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
+            <p className="text-xs text-muted-foreground">These will be billed to the customer and posted to the selected account</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {charges.length > 0 && (
+              <div className="space-y-1">
+                {charges.map((charge) => {
+                  const acct = ledgerAccounts.find((a) => a.id === charge.ledgerAccountId);
+                  return (
+                    <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium">{charge.name}</span>
+                        {acct && <span className="text-xs text-muted-foreground">{acct.name}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeChargeMutation.mutate(charge.id)}
+                          disabled={removeChargeMutation.isPending}
+                          data-testid={`button-remove-charge-${charge.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                value={chargeAmount}
-                onChange={(e) => setChargeAmount(e.target.value)}
-                placeholder="Amount"
-                data-testid="input-charge-amount"
-              />
-              <Button
-                variant="outline"
-                onClick={handleAddCharge}
-                disabled={!chargeAmount || addChargeMutation.isPending}
-                data-testid="button-add-charge"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+            <div className="space-y-2 pt-2 border-t">
+              <p className="text-xs font-medium text-muted-foreground">Add Charge</p>
+              <Select value={chargeType} onValueChange={setChargeType}>
+                <SelectTrigger data-testid="select-charge-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FREIGHT">Freight</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {chargeType === "OTHER" && (
+                <Input
+                  value={chargeName}
+                  onChange={(e) => setChargeName(e.target.value)}
+                  placeholder="Charge name..."
+                  data-testid="input-charge-name"
+                />
+              )}
+
+              <Select value={chargeLedgerAccountId} onValueChange={setChargeLedgerAccountId}>
+                <SelectTrigger data-testid="select-charge-account">
+                  <SelectValue placeholder="Select account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ledgerAccounts.map((acct) => (
+                    <SelectItem key={acct.id} value={String(acct.id)} data-testid={`option-account-${acct.id}`}>
+                      {acct.name} <span className="text-muted-foreground text-xs">({acct.code})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={chargeAmount}
+                  onChange={(e) => setChargeAmount(e.target.value)}
+                  placeholder="Amount"
+                  data-testid="input-charge-amount"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleAddCharge}
+                  disabled={!chargeAmount || addChargeMutation.isPending}
+                  data-testid="button-add-charge"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <Button

@@ -195,7 +195,13 @@ export default function FactoryCustomers() {
                   filtered.map((customer) => (
                     <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                       <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
-                        {customer.legalName}
+                        <button
+                          className="text-left hover:underline text-foreground"
+                          onClick={() => navigate(`/factory/customers/${customer.id}`)}
+                          data-testid={`button-open-statement-${customer.id}`}
+                        >
+                          {customer.legalName}
+                        </button>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {customer.phone || "-"}

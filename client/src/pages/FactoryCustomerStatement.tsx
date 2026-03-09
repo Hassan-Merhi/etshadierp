@@ -1,0 +1,282 @@
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowLeft, FileText, User } from "lucide-react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useState } from "react";
+
+interface CustomerInfo {
+  id: number;
+  code: string;
+  legalName: string;
+  phone: string | null;
+  openingBalance: string | null;
+  openingBalanceSide: string | null;
+  active: boolean;
+}
+
+interface Invoice {
+  id: number;
+  invoiceNumber: string;
+  orderDate: string;
+  grandTotal: string;
+  subtotalBales: string;
+  freightAmount: string;
+  otherChargesTotal: string;
+  totalQtyBales: number;
+  status: string;
+  createdAt: string;
+}
+
+interface BalanceEntry {
+  id: number;
+  transactionDate: string;
+  transactionType: string;
+  description: string | null;
+  referenceType: string | null;
+  referenceId: number | null;
+  debitAmount: string;
+  creditAmount: string;
+  balance: string;
+  currency: string;
+  runningBalance: number;
+  runningBalanceSide: string;
+}
+
+interface StatementData {
+  customer: CustomerInfo;
+  invoices: Invoice[];
+  balanceHistory: BalanceEntry[];
+  currentBalance: number;
+  currentBalanceSide: string;
+  openingBalance: number;
+  openingBalanceSide: string;
+}
+
+export default function FactoryCustomerStatement() {
+  const { formatDisplayDate } = useDateFormat();
+  const [, navigate] = useLocation();
+  const params = useParams<{ id: string }>();
+  const customerId = params.id;
+  const [activeTab, setActiveTab] = useState<"invoices" | "statement">("invoices");
+
+  const { data: statement, isLoading } = useQuery<StatementData>({
+    queryKey: [`/api/factory/customers/${customerId}/statement`],
+    enabled: !!customerId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full p-6 space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!statement) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6">
+        <p className="text-muted-foreground" data-testid="text-not-found">Customer not found</p>
+        <Button variant="outline" className="mt-4" onClick={() => navigate("/factory/customers")} data-testid="button-back">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Customers
+        </Button>
+      </div>
+    );
+  }
+
+  const { customer, invoices, balanceHistory, currentBalance, currentBalanceSide, openingBalance, openingBalanceSide } = statement;
+
+  return (
+    <div className="flex flex-col h-full p-6 overflow-y-auto">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/factory/customers")}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-customer-name">
+              {customer.legalName}
+            </h1>
+            <Badge variant={customer.active ? "default" : "secondary"} data-testid="badge-customer-status">
+              {customer.active ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground text-sm mt-1" data-testid="text-customer-code">
+            {customer.code}{customer.phone ? ` · ${customer.phone}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+            <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
+              {currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">{currentBalanceSide}</Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
+            <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
+              {Number(openingBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
+            <p className="text-2xl font-bold" data-testid="text-total-invoices">{invoices.length}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <Button
+          variant={activeTab === "invoices" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTab("invoices")}
+          data-testid="button-tab-invoices"
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          Invoices ({invoices.length})
+        </Button>
+        <Button
+          variant={activeTab === "statement" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTab("statement")}
+          data-testid="button-tab-statement"
+        >
+          <User className="mr-2 h-4 w-4" />
+          Statement ({balanceHistory.length})
+        </Button>
+      </div>
+
+      {activeTab === "invoices" && (
+        <Card className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice #</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Bales</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead className="text-right">Charges</TableHead>
+                <TableHead className="text-right">Grand Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8" data-testid="text-no-invoices">
+                    No finalized invoices yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                invoices.map((inv) => (
+                  <TableRow
+                    key={inv.id}
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => navigate(`/factory/sales/invoices/${inv.id}`)}
+                    data-testid={`row-invoice-${inv.id}`}
+                  >
+                    <TableCell className="font-mono font-semibold" data-testid={`text-invoice-number-${inv.id}`}>
+                      {inv.invoiceNumber || `#${inv.id}`}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-invoice-date-${inv.id}`}>
+                      {inv.orderDate ? formatDisplayDate(inv.orderDate) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-bales-${inv.id}`}>
+                      {inv.totalQtyBales ?? "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-subtotal-${inv.id}`}>
+                      {Number(inv.subtotalBales || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-charges-${inv.id}`}>
+                      {(Number(inv.freightAmount || 0) + Number(inv.otherChargesTotal || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold" data-testid={`text-invoice-total-${inv.id}`}>
+                      {Number(inv.grandTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      {activeTab === "statement" && (
+        <Card className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Debit</TableHead>
+                <TableHead className="text-right">Credit</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Side</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {balanceHistory.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                    No transactions yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                balanceHistory.map((entry) => (
+                  <TableRow key={entry.id} data-testid={`row-balance-${entry.id}`}>
+                    <TableCell className="text-sm font-mono" data-testid={`text-balance-date-${entry.id}`}>
+                      {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-balance-type-${entry.id}`}>
+                      <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-desc-${entry.id}`}>
+                      {entry.description || "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
+                      {Number(entry.debitAmount || 0) > 0
+                        ? Number(entry.debitAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
+                      {Number(entry.creditAmount || 0) > 0
+                        ? Number(entry.creditAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
+                      {Math.abs(entry.runningBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">{entry.runningBalanceSide}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
+}

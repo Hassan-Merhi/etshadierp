@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2 } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -44,9 +44,11 @@ interface OrderBale {
 }
 
 interface OrderCharge {
+  id: number;
   name: string;
-  amount: number;
+  amount: string;
   chargeType: string;
+  ledgerAccountId?: number;
 }
 
 interface OrderDetail {
@@ -80,20 +82,26 @@ export default function FactoryInvoiceDetail() {
   const orderId = params?.id ? parseInt(params.id) : null;
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
-    queryKey: ["/api/factory/customer-orders", orderId],
+    queryKey: [`/api/factory/customer-orders/${orderId}`],
     enabled: !!orderId,
   });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return <Badge variant="secondary">Draft</Badge>;
+        return <Badge variant="secondary" data-testid="badge-status-draft">Draft</Badge>;
+      case "LOADING":
+        return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" data-testid="badge-status-loading">Loading</Badge>;
+      case "PENDING_VERIFICATION":
+        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-status-pending">Pending Verification</Badge>;
+      case "VERIFIED":
+        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-status-verified">Verified</Badge>;
       case "FINALIZED":
-        return <Badge variant="default">Finalized</Badge>;
+        return <Badge variant="default" data-testid="badge-status-finalized">Finalized</Badge>;
       case "CANCELLED":
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="destructive" data-testid="badge-status-cancelled">Cancelled</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary" data-testid="badge-status-unknown">{status}</Badge>;
     }
   };
 
@@ -166,6 +174,10 @@ export default function FactoryInvoiceDetail() {
   const grandTotal = parseFloat(order.grandTotal || "0");
   const totalBalesQty = sortedLines.reduce((sum, line) => sum + (line.qty || 0), 0);
 
+  const isPendingVerification = order.status === "PENDING_VERIFICATION";
+  const isVerifiedStatus = order.status === "VERIFIED";
+  const isLoadingStatus = order.status === "LOADING";
+
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
       <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -180,7 +192,7 @@ export default function FactoryInvoiceDetail() {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-invoice-number">
-              {order.invoiceNumber || `Draft #${order.id}`}
+              {order.invoiceNumber || `Order #${order.id}`}
             </h1>
             {getStatusBadge(order.status)}
           </div>
@@ -205,6 +217,30 @@ export default function FactoryInvoiceDetail() {
               data-testid="button-continue-editing"
             >
               Continue Editing
+            </Button>
+          )}
+          {(isPendingVerification || isVerifiedStatus || isLoadingStatus) && (
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
+              data-testid="button-go-to-verify"
+            >
+              {isPendingVerification ? (
+                <>
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  View Verification
+                </>
+              ) : isVerifiedStatus ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Charges &amp; Finalize
+                </>
+              ) : (
+                <>
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  View Loading
+                </>
+              )}
             </Button>
           )}
           <Button
@@ -239,7 +275,7 @@ export default function FactoryInvoiceDetail() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
+                    This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
                     Any bales assigned to this order will be returned to stock. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -313,7 +349,7 @@ export default function FactoryInvoiceDetail() {
 
       {(freightCharges.length > 0 || otherCharges.length > 0) && (
         <Card className="p-4 mb-6">
-          <h3 className="font-semibold mb-3" data-testid="text-charges-header">Charges</h3>
+          <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
           <div className="space-y-2">
             {freightCharges.map((charge, idx) => (
               <div key={`freight-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>

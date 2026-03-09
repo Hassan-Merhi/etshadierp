@@ -291,6 +291,8 @@ app.use((req, res, next) => {
     `DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/pending-invoices'`,
     // Delete obsolete keys that have no equivalent in the current sidebar
     `DELETE FROM factory_user_page_access WHERE page_key IN ('factory/mix-batches', 'factory/sales/new', 'factory/bale-transfers', 'factory/create', 'factory/users', 'factory/daybook')`,
+    // Add ledger account link to customer order charges
+    `ALTER TABLE customer_order_charges ADD COLUMN IF NOT EXISTS ledger_account_id integer`,
   ];
   for (const migration of migrations) {
     try {

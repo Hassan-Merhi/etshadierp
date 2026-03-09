@@ -6606,6 +6606,82 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // CUSTOMER STATEMENT
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customers/:id/statement", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const [customer] = await db.select().from(customers)
+        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      // Get finalized invoices
+      const invoices = await db
+        .select({
+          id: customerOrders.id,
+          invoiceNumber: customerOrders.invoiceNumber,
+          orderDate: customerOrders.orderDate,
+          grandTotal: customerOrders.grandTotal,
+          subtotalBales: customerOrders.subtotalBales,
+          freightAmount: customerOrders.freightAmount,
+          otherChargesTotal: customerOrders.otherChargesTotal,
+          totalQtyBales: customerOrders.totalQtyBales,
+          status: customerOrders.status,
+          createdAt: customerOrders.createdAt,
+        })
+        .from(customerOrders)
+        .where(and(
+          eq(customerOrders.companyId, companyId),
+          eq(customerOrders.customerId, customerId),
+          eq(customerOrders.status, "FINALIZED"),
+        ))
+        .orderBy(desc(customerOrders.createdAt));
+
+      // Get all balance history entries ordered by date
+      const balanceRows = await db.select().from(customerBalances)
+        .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
+        .orderBy(customerBalances.transactionDate, customerBalances.id);
+
+      // Build running balance
+      const openingBalance = parseFloat(customer.openingBalance || "0");
+      const openingSide = customer.openingBalanceSide || "Dr";
+      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+
+      const balanceHistory = balanceRows.map((row: any) => {
+        const debit = parseFloat(row.debitAmount || "0");
+        const credit = parseFloat(row.creditAmount || "0");
+        runningBalance += debit - credit;
+        return {
+          ...row,
+          runningBalance,
+          runningBalanceSide: runningBalance >= 0 ? "Dr" : "Cr",
+        };
+      });
+
+      const currentBalance = Math.abs(runningBalance);
+      const currentBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
+
+      res.json({
+        customer,
+        invoices,
+        balanceHistory,
+        currentBalance,
+        currentBalanceSide,
+        openingBalance,
+        openingBalanceSide: openingSide,
+      });
+    } catch (error: any) {
+      console.error("Error fetching customer statement:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // CUSTOMER PROFORMAS CRUD
   // ───────────────────────────────────────────────
 
@@ -7576,7 +7652,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
-      const { name, amount, chargeType } = req.body;
+      const { name, amount, chargeType, ledgerAccountId } = req.body;
       if (!name || !amount) return res.status(400).json({ message: "name and amount are required" });
 
       const [order] = await db.select().from(customerOrders)
@@ -7588,6 +7664,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         name,
         amount: String(amount),
         chargeType: chargeType || "OTHER",
+        ledgerAccountId: ledgerAccountId ? parseInt(ledgerAccountId) : null,
       });
 
       await recalculateOrderTotals(db, orderId);
@@ -7724,6 +7801,48 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           description: `Invoice ${invoiceNumber}`,
           currency: "USD",
         });
+
+        // Create journal entries for charges that have a ledgerAccountId
+        const chargesForJournal = await tx.select().from(customerOrderCharges)
+          .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.ledgerAccountId} IS NOT NULL`));
+
+        if (chargesForJournal.length > 0) {
+          const [customer] = await tx.select().from(customers).where(eq(customers.id, order.customerId));
+          if (customer?.ledgerAccountId) {
+            for (const charge of chargesForJournal) {
+              const chargeAmount = parseFloat(charge.amount || "0");
+              if (chargeAmount <= 0) continue;
+              // Create a voucher for each charge
+              const chargeVoucherNumber = `CHARGE-${invoiceNumber}-${charge.id}-${Date.now()}`;
+              const [chargeVoucher] = await tx.insert(vouchers).values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: chargeVoucherNumber,
+                voucherDate: today,
+                description: `${charge.name} - ${invoiceNumber}`,
+                totalAmount: String(chargeAmount),
+                sourceModule: "FACTORY",
+              }).returning();
+              // Dr Customer Account (charge billed to customer)
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: customer.ledgerAccountId,
+                customerId: order.customerId,
+                debitAmount: String(chargeAmount),
+                creditAmount: "0",
+                narration: `${charge.name} billed to customer - ${invoiceNumber}`,
+              });
+              // Cr Charge Account (freight/other charges income account)
+              await tx.insert(voucherEntries).values({
+                voucherId: chargeVoucher.id,
+                ledgerAccountId: charge.ledgerAccountId!,
+                debitAmount: "0",
+                creditAmount: String(chargeAmount),
+                narration: `${charge.name} - ${invoiceNumber}`,
+              });
+            }
+          }
+        }
 
         const [finalOrder] = await tx
           .select({
