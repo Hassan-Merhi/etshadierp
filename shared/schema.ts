@@ -2164,6 +2164,7 @@ export const factorySuppliers = pgTable("factory_suppliers", {
   notes: text("notes"),
   openingBalance: decimal("opening_balance", { precision: 20, scale: 4 }).notNull().default("0"),
   linkedSupplierId: integer("linked_supplier_id"),
+  parentId: integer("parent_id"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2185,6 +2186,7 @@ export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers).
   notes: z.string().optional().nullable(),
   openingBalance: z.string().optional(),
   linkedSupplierId: z.number().optional().nullable(),
+  parentId: z.number().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -2354,6 +2356,12 @@ export const factoryRawStock = pgTable("factory_raw_stock", {
   usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
   costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 4 }),
+  commissionPersonName: text("commission_person_name"),
+  commissionAmount: decimal("commission_amount", { precision: 20, scale: 4 }),
+  commissionCurrencyCode: varchar("commission_currency_code", { length: 10 }),
+  commissionFxRateToUsd: decimal("commission_fx_rate_to_usd", { precision: 20, scale: 8 }),
+  commissionAmountUsd: decimal("commission_amount_usd", { precision: 20, scale: 4 }),
+  commissionLedgerAccountId: integer("commission_ledger_account_id"),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2370,6 +2378,12 @@ export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).o
   usedKg: z.string().optional(),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
   costPerKgUsd: z.string().optional().nullable(),
+  commissionPersonName: z.string().optional().nullable(),
+  commissionAmount: z.string().optional().nullable(),
+  commissionCurrencyCode: z.string().optional().nullable(),
+  commissionFxRateToUsd: z.string().optional().nullable(),
+  commissionAmountUsd: z.string().optional().nullable(),
+  commissionLedgerAccountId: z.number().optional().nullable(),
 });
 
 export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;

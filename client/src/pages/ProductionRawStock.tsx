@@ -170,6 +170,11 @@ export default function ProductionRawStock() {
   const [obCurrency, setObCurrency] = useState("USD");
   const [obFxRate, setObFxRate] = useState("1");
   const [obNotes, setObNotes] = useState("");
+  const [obCommissionPersonName, setObCommissionPersonName] = useState("");
+  const [obCommissionAmount, setObCommissionAmount] = useState("");
+  const [obCommissionCurrency, setObCommissionCurrency] = useState("USD");
+  const [obCommissionFxRate, setObCommissionFxRate] = useState("1");
+  const [obCommissionAccountId, setObCommissionAccountId] = useState("");
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -185,7 +190,7 @@ export default function ProductionRawStock() {
 
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
-    enabled: offloadDialogOpen,
+    enabled: offloadDialogOpen || obDialogOpen,
   });
 
   const { data: factorySuppliers } = useQuery<{ id: number; name: string }[]>({
@@ -388,6 +393,11 @@ export default function ProductionRawStock() {
     setObCurrency("USD");
     setObFxRate("1");
     setObNotes("");
+    setObCommissionPersonName("");
+    setObCommissionAmount("");
+    setObCommissionCurrency("USD");
+    setObCommissionFxRate("1");
+    setObCommissionAccountId("");
   };
 
   const recalcUsedMutation = useMutation({
@@ -422,6 +432,7 @@ export default function ProductionRawStock() {
       return;
     }
 
+    const commAmt = parseFloat(obCommissionAmount || "0");
     openingBalanceMutation.mutate({
       supplierName: obSupplierName.trim(),
       receivedKg: obReceivedKg,
@@ -429,6 +440,13 @@ export default function ProductionRawStock() {
       currencyCode: obCurrency,
       fxRateToUsd: obFxRate,
       notes: obNotes || undefined,
+      ...(obCommissionPersonName.trim() && commAmt > 0 ? {
+        commissionPersonName: obCommissionPersonName.trim(),
+        commissionAmount: obCommissionAmount,
+        commissionCurrencyCode: obCommissionCurrency,
+        commissionFxRateToUsd: obCommissionFxRate,
+        commissionLedgerAccountId: obCommissionAccountId || undefined,
+      } : {}),
     });
   };
 
@@ -1170,6 +1188,75 @@ export default function ProductionRawStock() {
                 Rate in USD: <span className="font-mono font-medium">${obRateUsd.toFixed(4)}/kg</span>
               </div>
             )}
+
+            <Separator />
+            <div>
+              <Label className="text-sm font-semibold">Commission (optional)</Label>
+              <div className="space-y-3 mt-2">
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Commission Person</Label>
+                  <Input
+                    value={obCommissionPersonName}
+                    onChange={(e) => setObCommissionPersonName(e.target.value)}
+                    placeholder="Person name"
+                    data-testid="input-ob-commission-person"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Amount</Label>
+                    <Input
+                      type="number"
+                      value={obCommissionAmount}
+                      onChange={(e) => setObCommissionAmount(e.target.value)}
+                      placeholder="0.00"
+                      step="0.01"
+                      data-testid="input-ob-commission-amount"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Currency</Label>
+                    <Select value={obCommissionCurrency} onValueChange={(v) => { setObCommissionCurrency(v); if (v === "USD") setObCommissionFxRate("1"); }}>
+                      <SelectTrigger data-testid="select-ob-commission-currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="AUD">AUD</SelectItem>
+                        <SelectItem value="LBP">LBP</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {obCommissionCurrency !== "USD" && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                    <Input
+                      type="number"
+                      value={obCommissionFxRate}
+                      onChange={(e) => setObCommissionFxRate(e.target.value)}
+                      placeholder="1.0"
+                      step="0.0001"
+                      data-testid="input-ob-commission-fx-rate"
+                    />
+                  </div>
+                )}
+                {obCommissionPersonName.trim() && parseFloat(obCommissionAmount || "0") > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Book to Account</Label>
+                    <AccountCombobox
+                      value={obCommissionAccountId}
+                      onValueChange={setObCommissionAccountId}
+                      accounts={ledgerAccounts || []}
+                      placeholder="Select account (optional)"
+                      testId="select-ob-commission-account"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label className="text-muted-foreground text-xs">Notes (optional)</Label>

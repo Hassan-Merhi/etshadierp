@@ -1389,6 +1389,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factoryContainerCommissions)
         .where(eq(factoryContainerCommissions.companyId, companyId));
 
+      // OB commissions — raw stock entries with commission data for this supplier
+      const obRawStockWithCommission = containers.length > 0
+        ? await db
+            .select()
+            .from(factoryRawStock)
+            .where(and(
+              eq(factoryRawStock.companyId, companyId),
+              inArray(factoryRawStock.containerId, containers.map((c: any) => c.id))
+            ))
+        : [];
+
       const statement = containers.map((c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
@@ -1446,16 +1457,37 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
       }));
 
+      // Build OB commissions list
+      const containerMap: Record<number, any> = {};
+      for (const c of containers) containerMap[c.id] = c;
+      const obCommissions = (obRawStockWithCommission as any[])
+        .filter((r: any) => r.commissionAmount && parseFloat(r.commissionAmount) > 0)
+        .map((r: any) => ({
+          rawStockId: r.id,
+          containerId: r.containerId,
+          containerNumber: containerMap[r.containerId]?.containerNumber || "",
+          date: containerMap[r.containerId]?.createdAt || r.createdAt,
+          personName: r.commissionPersonName || "",
+          amount: r.commissionAmount,
+          currencyCode: r.commissionCurrencyCode || "USD",
+          fxRateToUsd: r.commissionFxRateToUsd || "1",
+          amountUsd: r.commissionAmountUsd || r.commissionAmount,
+          ledgerAccountId: r.commissionLedgerAccountId,
+        }));
+      const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
+
       res.json({
         supplier,
         statement,
         currencyGroups,
+        obCommissions,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),
           totalValue: totalValue.toFixed(2),
           totalCommissions: totalCommissions.toFixed(2),
           totalDirectCommissions: totalDirectCommissions.toFixed(2),
+          totalObCommissions: totalObCommissions.toFixed(2),
           netPayable: (totalValue - totalCommissions).toFixed(2),
           totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },
@@ -3449,7 +3481,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierName, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes } = req.body;
+      const { supplierName, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes,
+        commissionPersonName: reqCommPersonName, commissionAmount: reqCommAmount, commissionCurrencyCode: reqCommCurrency,
+        commissionFxRateToUsd: reqCommFxRate, commissionLedgerAccountId: reqCommAccountId } = req.body;
 
       if (!supplierName || !String(supplierName).trim()) return res.status(400).json({ message: "Supplier name is required" });
       if (!receivedKg || parseFloat(receivedKg) <= 0) return res.status(400).json({ message: "Received KG must be positive" });
@@ -3519,6 +3553,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           })
           .returning();
 
+        // Commission processing
+        const hasCommission = reqCommPersonName && String(reqCommPersonName).trim() && reqCommAmount && parseFloat(reqCommAmount) > 0;
+        const commCurrency = reqCommCurrency || "USD";
+        const commFxRate = parseFloat(reqCommFxRate || "1");
+        const commAmountNum = hasCommission ? parseFloat(reqCommAmount) : 0;
+        const commAmountUsd = hasCommission ? (commCurrency === "USD" ? commAmountNum : commAmountNum * commFxRate) : 0;
+
         const [rawStock] = await tx
           .insert(factoryRawStock)
           .values({
@@ -3527,6 +3568,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             receivedKg: String(kgVal),
             costPerKg: String(rateVal),
             costPerKgUsd: String(costPerKgUsd),
+            ...(hasCommission ? {
+              commissionPersonName: String(reqCommPersonName).trim(),
+              commissionAmount: String(commAmountNum),
+              commissionCurrencyCode: commCurrency,
+              commissionFxRateToUsd: String(commFxRate),
+              commissionAmountUsd: String(commAmountUsd),
+              commissionLedgerAccountId: reqCommAccountId ? parseInt(reqCommAccountId) : null,
+            } : {}),
           })
           .returning();
 

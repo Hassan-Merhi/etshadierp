@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, Clock, X
+  ChevronRight, ChevronDown, Clock, X, GitBranch
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,14 +52,30 @@ interface StatementEntry {
   notes: string | null;
 }
 
+interface ObCommission {
+  rawStockId: number;
+  containerId: number;
+  containerNumber: string;
+  date: string;
+  personName: string;
+  amount: string;
+  currencyCode: string;
+  fxRateToUsd: string;
+  amountUsd: string;
+  ledgerAccountId: number | null;
+}
+
 interface StatementResponse {
   supplier: FactorySupplier;
   statement: StatementEntry[];
+  obCommissions: ObCommission[];
   summary: {
     totalContainers: number;
     totalKg: string;
     totalValue: string;
     totalCommissions: string;
+    totalDirectCommissions: string;
+    totalObCommissions: string;
     netPayable: string;
   };
 }
@@ -70,6 +86,8 @@ export default function FactorySuppliers() {
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
+  const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     contactPerson: "",
@@ -77,6 +95,7 @@ export default function FactorySuppliers() {
     email: "",
     address: "",
     notes: "",
+    parentId: null as number | null,
   });
   const { toast } = useToast();
 
@@ -170,7 +189,8 @@ export default function FactorySuppliers() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "" });
+    setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", parentId: null });
+    setCreateSubAccountParentId(null);
   };
 
   const openEdit = (s: FactorySupplier) => {
@@ -182,6 +202,23 @@ export default function FactorySuppliers() {
       email: s.email || "",
       address: s.address || "",
       notes: s.notes || "",
+      parentId: (s as any).parentId ?? null,
+    });
+  };
+
+  const openCreateSubAccount = (parentSupplier: SupplierWithBalance) => {
+    resetForm();
+    setFormData(prev => ({ ...prev, parentId: parentSupplier.id }));
+    setCreateSubAccountParentId(parentSupplier.id);
+    setCreateOpen(true);
+  };
+
+  const toggleExpanded = (id: number) => {
+    setExpandedSupplierIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
@@ -224,9 +261,21 @@ export default function FactorySuppliers() {
     }
   };
 
-  const activeSuppliers = suppliers?.filter((s) => s.isActive) || [];
-  const inactiveSuppliers = suppliers?.filter((s) => !s.isActive) || [];
-  const displayedSuppliers = showInactive ? suppliers || [] : activeSuppliers;
+  const allSuppliers = suppliers || [];
+  const activeSuppliers = allSuppliers.filter((s) => s.isActive);
+  const inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
+  // Top-level: no parentId
+  const topLevelSuppliers = allSuppliers.filter((s) => !(s as any).parentId);
+  const displayedTopLevel = showInactive ? topLevelSuppliers : topLevelSuppliers.filter((s) => s.isActive);
+  // Sub-accounts by parentId
+  const subAccountsByParent: Record<number, SupplierWithBalance[]> = {};
+  for (const s of allSuppliers) {
+    const pid = (s as any).parentId;
+    if (pid) {
+      if (!subAccountsByParent[pid]) subAccountsByParent[pid] = [];
+      subAccountsByParent[pid].push(s);
+    }
+  }
 
   const totalBalance = activeSuppliers.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
   const totalContainers = activeSuppliers.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
@@ -447,6 +496,51 @@ export default function FactorySuppliers() {
                 )}
               </CardContent>
             </Card>
+
+            {statementData.obCommissions && statementData.obCommissions.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Opening Balance Commissions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Person</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Amount (USD)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statementData.obCommissions.map((oc) => (
+                          <TableRow key={oc.rawStockId}>
+                            <TableCell className="text-sm whitespace-nowrap">{formatDate(oc.date)}</TableCell>
+                            <TableCell className="text-sm font-mono">{oc.containerNumber}</TableCell>
+                            <TableCell className="text-sm">{oc.personName || "-"}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {oc.currencyCode !== "USD" ? `${oc.currencyCode} ` : "$"}{formatNum(oc.amount)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">
+                              ${formatNum(oc.amountUsd)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="border-t-2 font-bold">
+                          <TableCell colSpan={3}>Total Commissions</TableCell>
+                          <TableCell />
+                          <TableCell className="text-right tabular-nums">
+                            ${formatNum(statementData.summary.totalObCommissions)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         ) : null}
       </div>
@@ -523,138 +617,178 @@ export default function FactorySuppliers() {
 
       <Card>
         <CardContent className="p-0">
-          {displayedSuppliers.length > 0 ? (
+          {displayedTopLevel.length > 0 ? (
             <div className="divide-y">
-              {displayedSuppliers.map((s) => (
-                <div
-                  key={s.id}
-                  className={`p-4 ${!s.isActive ? "opacity-60" : ""}`}
-                  data-testid={`row-factory-supplier-${s.id}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => setStatementSupplierId(s.id)}
-                          className="text-base font-semibold hover:underline text-left"
-                          data-testid={`link-supplier-statement-${s.id}`}
-                        >
-                          {s.name}
-                        </button>
-                        {!s.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
-                        {s.pendingContainers > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {s.pendingContainers} pending
-                          </Badge>
-                        )}
-                      </div>
+              {displayedTopLevel.map((s) => {
+                const childAccounts = subAccountsByParent[s.id] || [];
+                const hasChildren = childAccounts.length > 0;
+                const isExpanded = expandedSupplierIds.has(s.id);
 
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
-                        {s.contactPerson && (
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {s.contactPerson}
-                          </span>
-                        )}
-                        {s.phone && (
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3.5 w-3.5" />
-                            {s.phone}
-                          </span>
-                        )}
-                        {s.email && (
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3.5 w-3.5" />
-                            {s.email}
-                          </span>
-                        )}
-                        {s.address && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {s.address}
-                          </span>
-                        )}
-                      </div>
+                const SupplierRow = ({ sup, isChild }: { sup: SupplierWithBalance; isChild?: boolean }) => (
+                  <div
+                    className={`p-4 ${!sup.isActive ? "opacity-60" : ""} ${isChild ? "bg-muted/30 pl-8 border-t" : ""}`}
+                    data-testid={`row-factory-supplier-${sup.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isChild && <GitBranch className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                          <button
+                            onClick={() => setStatementSupplierId(sup.id)}
+                            className="text-base font-semibold hover:underline text-left"
+                            data-testid={`link-supplier-statement-${sup.id}`}
+                          >
+                            {sup.name}
+                          </button>
+                          {!sup.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                          {isChild && <Badge variant="outline" className="text-xs">Sub-account</Badge>}
+                          {sup.pendingContainers > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {sup.pendingContainers} pending
+                            </Badge>
+                          )}
+                        </div>
 
-                      {s.notes && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">{s.notes}</p>
-                      )}
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
+                          {sup.contactPerson && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3.5 w-3.5" />
+                              {sup.contactPerson}
+                            </span>
+                          )}
+                          {sup.phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3.5 w-3.5" />
+                              {sup.phone}
+                            </span>
+                          )}
+                          {sup.email && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3.5 w-3.5" />
+                              {sup.email}
+                            </span>
+                          )}
+                          {sup.address && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {sup.address}
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="flex items-center gap-4 mt-2 text-sm flex-wrap">
-                        <span className="flex items-center gap-1" data-testid={`text-supplier-containers-${s.id}`}>
-                          <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                          {s.totalContainers} container{s.totalContainers !== 1 ? "s" : ""}
-                        </span>
-                        {s.pendingContainers > 0 && (
-                          <span className="flex items-center gap-1 text-amber-500" data-testid={`text-supplier-otw-${s.id}`}>
-                            <Clock className="h-3.5 w-3.5" />
-                            {s.pendingContainers} OTW
-                          </span>
+                        {sup.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">{sup.notes}</p>
                         )}
-                        <span className="flex items-center gap-1" data-testid={`text-supplier-kg-${s.id}`}>
-                          <Weight className="h-3.5 w-3.5 text-muted-foreground" />
-                          {formatKg(s.totalKg)}
-                        </span>
-                        {s.lastContainerDate && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <Calendar className="h-3.5 w-3.5" />
-                            Last: {formatDate(s.lastContainerDate)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Balance</div>
-                        <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${s.id}`}>
-                          ${formatNum(s.totalValue)}
+                        <div className="flex items-center gap-4 mt-2 text-sm flex-wrap">
+                          <span className="flex items-center gap-1" data-testid={`text-supplier-containers-${sup.id}`}>
+                            <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                            {sup.totalContainers} container{sup.totalContainers !== 1 ? "s" : ""}
+                          </span>
+                          {sup.pendingContainers > 0 && (
+                            <span className="flex items-center gap-1 text-amber-500" data-testid={`text-supplier-otw-${sup.id}`}>
+                              <Clock className="h-3.5 w-3.5" />
+                              {sup.pendingContainers} OTW
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1" data-testid={`text-supplier-kg-${sup.id}`}>
+                            <Weight className="h-3.5 w-3.5 text-muted-foreground" />
+                            {formatKg(sup.totalKg)}
+                          </span>
+                          {sup.lastContainerDate && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              Last: {formatDate(sup.lastContainerDate)}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        {s.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); openEdit(s); }}
-                            data-testid={`button-edit-supplier-${s.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {s.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(s.id); }}
-                            data-testid={`button-delete-supplier-${s.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                        {!s.isActive && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${s.name}"? This cannot be undone.`)) permanentDeleteMutation.mutate(s.id); }}
-                            data-testid={`button-permanent-delete-supplier-${s.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground">Balance</div>
+                          <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
+                            ${formatNum(sup.totalValue)}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {sup.isActive && !isChild && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); openCreateSubAccount(sup); }}
+                              title="Add Sub-Account"
+                              data-testid={`button-add-subaccount-${sup.id}`}
+                            >
+                              <GitBranch className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {sup.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); openEdit(sup); }}
+                              data-testid={`button-edit-supplier-${sup.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {sup.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(sup.id); }}
+                              data-testid={`button-delete-supplier-${sup.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                          {!sup.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${sup.name}"? This cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
+                              data-testid={`button-permanent-delete-supplier-${sup.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setStatementSupplierId(sup.id)}
+                          data-testid={`button-view-statement-${sup.id}`}
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setStatementSupplierId(s.id)}
-                        data-testid={`button-view-statement-${s.id}`}
-                      >
-                        <ChevronRight className="h-5 w-5" />
-                      </Button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+
+                return (
+                  <div key={s.id}>
+                    <div className="relative">
+                      <SupplierRow sup={s} />
+                      {hasChildren && (
+                        <button
+                          onClick={() => toggleExpanded(s.id)}
+                          className="absolute top-4 left-4 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+                          data-testid={`button-expand-supplier-${s.id}`}
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5" />
+                            : <ChevronRight className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                    {isExpanded && childAccounts.map((child) => (
+                      <SupplierRow key={child.id} sup={child} isChild />
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
@@ -671,9 +805,15 @@ export default function FactorySuppliers() {
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add Factory Supplier"}</DialogTitle>
+            <DialogTitle>
+              {editingSupplier ? "Edit Supplier" : createSubAccountParentId ? "Add Sub-Account" : "Add Factory Supplier"}
+            </DialogTitle>
             <DialogDescription>
-              {editingSupplier ? "Update supplier details" : "Create a new factory supplier"}
+              {editingSupplier
+                ? "Update supplier details"
+                : createSubAccountParentId
+                  ? `Sub-account under: ${allSuppliers.find(s => s.id === createSubAccountParentId)?.name || ""}`
+                  : "Create a new factory supplier"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
