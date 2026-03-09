@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -32,6 +33,7 @@ function getDefaultDateRange() {
 }
 
 export default function FactoryWaste() {
+  const { formatDisplayDate } = useDateFormat();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -264,7 +266,7 @@ export default function FactoryWaste() {
                 <TableBody>
                   {wasteQuery.data.map((entry, idx) => (
                     <TableRow key={entry.id ?? idx} data-testid={`row-waste-${entry.id}`}>
-                      <TableCell className="font-mono text-sm">{entry.date}</TableCell>
+                      <TableCell className="font-mono text-sm">{entry.date ? formatDisplayDate(entry.date) : "—"}</TableCell>
                       <TableCell className="font-mono">{entry.kgWaste}</TableCell>
                       <TableCell>{entry.reason || "—"}</TableCell>
                       <TableCell className="font-mono">{entry.mixBatchId ?? "—"}</TableCell>

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -50,12 +51,19 @@ const TX_TYPE_LABELS: Record<string, string> = {
   CONTAINER_IMPORT: "Container Import",
   OFFLOAD_RAW_STOCK: "Offload Raw Stock",
   COMMISSION: "Commission",
+  DUTY: "Duty",
   BALE_PRESSING: "Bale Pressing",
   BALE_FINALIZE: "Bale Finalize",
   BALE_STOCK_ENTRY: "Bale Stock Entry",
   BALE_REMOVAL: "Bale Removal",
   BALE_TRANSFER: "Bale Transfer",
-  OPENING_BALANCE_RAW: "Opening Balance Raw",
+  BALE_IMPORT: "Bale Import",
+  BALE_REIMPORT: "Bale Reimport",
+  OPENING_BALANCE_RAW: "Opening Balance",
+  MIX_BATCH_CREATED: "Mix Batch Created",
+  LOADING_CREATED: "Loading Created",
+  LOADING_SUBMITTED: "Loading Submitted",
+  ORDER_VERIFIED: "Order Verified",
   INVOICE: "Invoice",
   PAYMENT: "Payment",
   RECEIPT: "Receipt",
@@ -68,9 +76,13 @@ const TX_TYPE_LABELS: Record<string, string> = {
   FREIGHT_PAYMENT_DELETE: "Freight Pmt Delete",
   WORKER_CREATED: "Worker Created",
   WORKER_EDITED: "Worker Edited",
+  WORKER_IMPORT: "Worker Import",
   CONTRACT_ENDED: "Contract Ended",
+  CONTRACT_SETTLED: "Contract Settled",
   WORKER_PHOTO_UPLOADED: "Worker Photo",
   PAYROLL_GENERATED: "Payroll Generated",
+  PAYROLL_PAYMENT: "Payroll Payment",
+  PAYROLL_STATUS_CHANGE: "Payroll Status",
   REPORT_GENERATED: "Report Generated",
 };
 
@@ -111,6 +123,26 @@ export default function FactoryDaybook() {
   const [editAmountUsd, setEditAmountUsd] = useState("");
   const [editReason, setEditReason] = useState("");
   const [showHistory, setShowHistory] = useState<number | null>(null);
+
+  // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const fmt = "yyyy-MM-dd";
+      if (e.key === "-") {
+        e.preventDefault();
+        setStartDate((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
+        setEndDate((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
+      } else if (e.key === "+" && e.shiftKey) {
+        e.preventDefault();
+        setStartDate((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
+        setEndDate((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.set("startDate", startDate);
@@ -508,7 +540,7 @@ export default function FactoryDaybook() {
               {editHistory.map((edit: any) => (
                 <div key={edit.id} className="rounded-md border p-3 space-y-1" data-testid={`edit-history-${edit.id}`}>
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{new Date(edit.editedAt).toLocaleString()}</span>
+                    <span>{formatDisplayDate(edit.editedAt)} {new Date(edit.editedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                     <span>User #{edit.editedBy || "?"}</span>
                   </div>
                   <p className="text-sm font-medium">Reason: {edit.reason}</p>

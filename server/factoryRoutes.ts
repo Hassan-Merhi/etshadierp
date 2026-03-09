@@ -394,11 +394,26 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
 
       const today = new Date().toISOString().split('T')[0];
+      // Build a meaningful description with product names and reference codes
+      const productGroups = new Map<string, string[]>();
+      for (const bale of result.bales) {
+        const name = (bale as any).productName || (bale as any).articleCode || "Unknown";
+        const ref = (bale as any).referenceNumber || (bale as any).baleCode || "";
+        if (!productGroups.has(name)) productGroups.set(name, []);
+        if (ref) productGroups.get(name)!.push(ref);
+      }
+      const descParts = Array.from(productGroups.entries()).map(([name, refs]) => {
+        if (refs.length === 0) return name;
+        const shown = refs.slice(0, 4);
+        const extra = refs.length > 4 ? ` +${refs.length - 4} more` : "";
+        return `${name} – ${shown.join(", ")}${extra}`;
+      });
+      const stockEntryDesc = `Stock entry: ${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} – ${descParts.join(" | ")}`;
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
         txType: "BALE_STOCK_ENTRY",
-        description: `Stock entry: ${result.bales.length} bales entered into location`,
+        description: stockEntryDesc,
       });
 
       res.json({ bales: result.bales, totalWeight: result.totalWeight });
@@ -4089,6 +4104,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return mixBatch;
       });
 
+      const mbToday = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: mbToday,
+        txType: "MIX_BATCH_CREATED",
+        referenceId: result.id,
+        description: `Mix batch created: ${result.batchCode}${result.name ? ` – ${result.name}` : ""} (${parseFloat(result.totalWeightKg || "0").toFixed(1)} kg)`,
+        amountCurrency: parseFloat(result.totalCost || "0"),
+        amountUsd: parseFloat(result.totalCost || "0"),
+      });
+
       res.json(result);
     } catch (error: any) {
       console.error("Error creating mix batch:", error);
@@ -6682,6 +6708,308 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Customer Statement: PDF Export ──────────────────────────────────────
+  app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const [customer] = await db.select().from(customers)
+        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+
+      const balanceRows = await db.select().from(customerBalances)
+        .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
+        .orderBy(customerBalances.transactionDate, customerBalances.id);
+
+      const openingBalance = parseFloat(customer.openingBalance || "0");
+      const openingSide = customer.openingBalanceSide || "Dr";
+      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+
+      const rows = balanceRows.map((row: any) => {
+        const debit = parseFloat(row.debitAmount || "0");
+        const credit = parseFloat(row.creditAmount || "0");
+        runningBalance += debit - credit;
+        return { ...row, debit, credit };
+      });
+
+      const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
+      const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
+      const closingBalance = Math.abs(runningBalance);
+      const closingBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
+
+      const fmtAmt = (n: number) => n > 0 ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+      const fmtDate = (d: string) => {
+        if (!d) return "";
+        const [y, m, day] = d.split("-");
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+      };
+      const txLabel = (type: string) => {
+        const map: Record<string, string> = { SALE: "Sale", PAYMENT: "Payment", RECEIPT: "Receipt", ADJUSTMENT: "Adjustment", JOURNAL: "Journal", OPENING_BALANCE: "Opening Bal." };
+        return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      };
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const companyName = (company as any)?.legalName || "Company";
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.code || customerId).toString().replace(/\s+/g, "_")}.pdf`);
+      doc.pipe(res);
+
+      // ── Dark header bar ──
+      doc.rect(40, 40, 515, 44).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(15)
+        .text(companyName, 52, 47, { width: 400 });
+      doc.font("Helvetica").fontSize(9)
+        .text("Account Statement", 52, 65, { width: 300 });
+      const printDate = fmtDate(new Date().toISOString().split("T")[0]);
+      doc.fontSize(8).text(`Printed: ${printDate}`, 450, 58, { width: 105, align: "right" });
+
+      // ── Customer info block ──
+      const infoY = 96;
+      doc.fillColor("#000000").font("Helvetica").fontSize(9);
+      doc.text("Customer:", 40, infoY).font("Helvetica-Bold").text(customer.legalName, 40, infoY + 12);
+      doc.font("Helvetica").text(`Code: ${customer.code || "—"}`, 40, infoY + 24);
+      doc.text(`Phone: ${customer.phone || "—"}`, 40, infoY + 36);
+      const obLabel = `${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`;
+      doc.text(`Opening Balance: `, 300, infoY + 12, { continued: true }).font("Helvetica-Bold").text(obLabel);
+      doc.font("Helvetica");
+
+      // ── Table ──
+      const colX   = [40,  115, 185, 380, 468];
+      const colW   = [75,   70, 195,  88,  87];
+      const colHdr = ["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)"];
+      const colAlign: Array<"left" | "right"> = ["left", "left", "left", "right", "right"];
+      const tableTop = infoY + 68;
+
+      doc.rect(40, tableTop, 515, 14).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
+      colHdr.forEach((h, i) => {
+        doc.text(h, colX[i] + 2, tableTop + 3, { width: colW[i] - 4, align: colAlign[i] });
+      });
+
+      doc.fillColor("#000000").font("Helvetica").fontSize(8);
+      let y = tableTop + 16;
+
+      // Opening balance row if non-zero
+      if (openingBalance > 0) {
+        doc.rect(40, y, 515, 13).fill("#EFF3FB");
+        doc.fillColor("#000000");
+        doc.text(fmtDate(new Date().toISOString().split("T")[0]), colX[0] + 2, y + 3, { width: colW[0] - 4 });
+        doc.text("Opening Bal.", colX[1] + 2, y + 3, { width: colW[1] - 4 });
+        doc.text("Opening Balance", colX[2] + 2, y + 3, { width: colW[2] - 4 });
+        if (openingSide === "Dr") {
+          doc.text(obLabel, colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
+        } else {
+          doc.text(obLabel, colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
+        }
+        y += 13;
+      }
+
+      rows.forEach((row: any, idx: number) => {
+        if (y > 760) { doc.addPage(); y = 40; }
+        if (idx % 2 === 1) { doc.rect(40, y, 515, 13).fill("#F8F8F8"); doc.fillColor("#000000"); }
+        doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4 });
+        doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4 });
+        doc.text(row.description || "—", colX[2] + 2, y + 3, { width: colW[2] - 4, lineBreak: false });
+        if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
+        if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
+        y += 13;
+      });
+
+      // Separator
+      y += 3;
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      y += 6;
+
+      // Totals row
+      doc.rect(40, y, 515, 15).fill("#1F3864");
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
+      doc.text("TOTAL", colX[2] + 2, y + 4, { width: colW[2] - 4 });
+      doc.text(fmtAmt(totalDr) || "0.00", colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+      doc.text(fmtAmt(totalCr) || "0.00", colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+      y += 17;
+
+      // Closing balance row
+      doc.rect(40, y, 515, 15).fill("#EFF3FB");
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
+      doc.text("Closing Balance", colX[2] + 2, y + 4, { width: colW[2] - 4 });
+      const closingStr = closingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + closingBalanceSide;
+      if (closingBalanceSide === "Dr") {
+        doc.text(closingStr, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+      } else {
+        doc.text(closingStr, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+      }
+
+      doc.end();
+    } catch (error: any) {
+      console.error("Error exporting customer statement PDF:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Customer Statement: Excel Export ────────────────────────────────────
+  app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const customerId = parseInt(req.params.id);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
+
+      const [customer] = await db.select().from(customers)
+        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+
+      const balanceRows = await db.select().from(customerBalances)
+        .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
+        .orderBy(customerBalances.transactionDate, customerBalances.id);
+
+      const openingBalance = parseFloat(customer.openingBalance || "0");
+      const openingSide = customer.openingBalanceSide || "Dr";
+      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+
+      const rows = balanceRows.map((row: any) => {
+        const debit = parseFloat(row.debitAmount || "0");
+        const credit = parseFloat(row.creditAmount || "0");
+        runningBalance += debit - credit;
+        return { ...row, debit, credit };
+      });
+
+      const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
+      const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
+      const closingBalance = Math.abs(runningBalance);
+      const closingBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
+
+      const txLabel = (type: string) => {
+        const map: Record<string, string> = { SALE: "Sale", PAYMENT: "Payment", RECEIPT: "Receipt", ADJUSTMENT: "Adjustment", JOURNAL: "Journal", OPENING_BALANCE: "Opening Bal." };
+        return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      };
+      const numFmt = "#,##0.00";
+      const navyFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF1F3864" } };
+      const lightBlueFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFEFF3FB" } };
+      const greyFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF5F5F5" } };
+      const allBorders = {
+        top: { style: "thin" as const }, bottom: { style: "thin" as const },
+        left: { style: "thin" as const }, right: { style: "thin" as const },
+      };
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Statement");
+
+      sheet.columns = [
+        { key: "date",  width: 14 },
+        { key: "type",  width: 16 },
+        { key: "desc",  width: 36 },
+        { key: "dr",    width: 16 },
+        { key: "cr",    width: 16 },
+      ];
+
+      // Rows 1–5: Customer info block
+      const companyName = (company as any)?.legalName || "Company";
+      const r1 = sheet.addRow([companyName]);
+      r1.getCell(1).font = { bold: true, size: 14 };
+      sheet.mergeCells(`A1:E1`);
+      const r2 = sheet.addRow(["Account Statement"]);
+      r2.getCell(1).font = { bold: true, size: 11 };
+      sheet.mergeCells(`A2:E2`);
+      sheet.addRow([`Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`]);
+      sheet.mergeCells(`A3:E3`);
+      sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
+      sheet.mergeCells(`A4:E4`);
+      sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
+      sheet.mergeCells(`A5:E5`);
+      // Row 6: spacer
+      sheet.addRow([]);
+
+      // Row 7: Column headers
+      const hdrRow = sheet.addRow(["Date", "Type", "Description", "Debit (Dr)", "Credit (Cr)"]);
+      hdrRow.eachCell((cell) => {
+        cell.fill = navyFill;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.border = allBorders;
+        cell.alignment = { horizontal: "center" };
+      });
+
+      // Opening balance row if non-zero
+      if (openingBalance > 0) {
+        const obRow = sheet.addRow([
+          new Date().toLocaleDateString("en-GB"),
+          "Opening Bal.",
+          "Opening Balance",
+          openingSide === "Dr" ? openingBalance : null,
+          openingSide === "Cr" ? openingBalance : null,
+        ]);
+        obRow.eachCell((cell) => {
+          cell.fill = lightBlueFill;
+          cell.border = allBorders;
+        });
+        obRow.getCell(4).numFmt = numFmt;
+        obRow.getCell(5).numFmt = numFmt;
+      }
+
+      // Data rows
+      rows.forEach((row: any, idx: number) => {
+        const dr = row.debit > 0 ? row.debit : null;
+        const cr = row.credit > 0 ? row.credit : null;
+        const dateVal = row.transactionDate
+          ? new Date(row.transactionDate + "T00:00:00")
+          : "";
+        const dr2 = sheet.addRow([dateVal, txLabel(row.transactionType), row.description || "—", dr, cr]);
+        dr2.eachCell((cell) => { cell.border = allBorders; });
+        if (idx % 2 === 0) {
+          dr2.eachCell((cell) => { cell.fill = greyFill; });
+        }
+        dr2.getCell(1).numFmt = "dd/mm/yyyy";
+        dr2.getCell(4).numFmt = numFmt;
+        dr2.getCell(5).numFmt = numFmt;
+        dr2.getCell(4).alignment = { horizontal: "right" };
+        dr2.getCell(5).alignment = { horizontal: "right" };
+      });
+
+      // Totals row
+      const totRow = sheet.addRow(["", "", "TOTAL", totalDr, totalCr]);
+      totRow.eachCell((cell) => {
+        cell.fill = navyFill;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.border = allBorders;
+      });
+      totRow.getCell(4).numFmt = numFmt;
+      totRow.getCell(5).numFmt = numFmt;
+      totRow.getCell(4).alignment = { horizontal: "right" };
+      totRow.getCell(5).alignment = { horizontal: "right" };
+
+      // Closing balance row
+      const closingDr = closingBalanceSide === "Dr" ? closingBalance : null;
+      const closingCr = closingBalanceSide === "Cr" ? closingBalance : null;
+      const cbRow = sheet.addRow(["", "", "Closing Balance", closingDr, closingCr]);
+      cbRow.eachCell((cell) => {
+        cell.fill = lightBlueFill;
+        cell.font = { bold: true };
+        cell.border = allBorders;
+      });
+      cbRow.getCell(4).numFmt = numFmt;
+      cbRow.getCell(5).numFmt = numFmt;
+      cbRow.getCell(4).alignment = { horizontal: "right" };
+      cbRow.getCell(5).alignment = { horizontal: "right" };
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.legalName || "customer").replace(/\s+/g, "_")}.xlsx`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting customer statement Excel:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // CUSTOMER PROFORMAS CRUD
   // ───────────────────────────────────────────────
 
@@ -7942,6 +8270,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         loadingStartedAt: new Date(),
       }).returning();
 
+      const [loadingCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, parseInt(customerId)));
+      const loadingToday = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: loadingToday,
+        txType: "LOADING_CREATED",
+        referenceId: order.id,
+        description: `Loading started for customer: ${loadingCustomer?.legalName || customerId}`,
+      });
+
       res.json(order);
     } catch (error: any) {
       console.error("Error creating loading order:", error);
@@ -7968,6 +8306,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         loadingFinalizedAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(customerOrders.id, orderId)).returning();
+
+      const [lsCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
+      const lsToday = new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: lsToday,
+        txType: "LOADING_SUBMITTED",
+        referenceId: orderId,
+        description: `Loading submitted for verification: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
+      });
 
       res.json(updated);
     } catch (error: any) {
@@ -8086,6 +8434,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           containerNotes: notes || order.containerNotes,
           updatedAt: new Date(),
         }).where(eq(customerOrders.id, orderId)).returning();
+        const [verifyCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
+        const verifyToday = new Date().toISOString().split('T')[0];
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: verifyToday,
+          txType: "ORDER_VERIFIED",
+          referenceId: orderId,
+          description: `Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ? ` – ${notes}` : ""}`,
+        });
         res.json(updated);
       } else {
         const [updated] = await db.update(customerOrders).set({

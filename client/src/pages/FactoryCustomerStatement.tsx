@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText, User } from "lucide-react";
+import { ArrowLeft, FileText, User, Download, FileSpreadsheet } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useState } from "react";
 
@@ -116,6 +116,26 @@ export default function FactoryCustomerStatement() {
           <p className="text-muted-foreground text-sm mt-1" data-testid="text-customer-code">
             {customer.code}{customer.phone ? ` · ${customer.phone}` : ""}
           </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`/api/factory/customers/${customerId}/statement/export-pdf`, "_blank")}
+            data-testid="button-export-pdf"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`/api/factory/customers/${customerId}/statement/export-excel`, "_blank")}
+            data-testid="button-export-excel"
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Export Excel
+          </Button>
         </div>
       </div>
 

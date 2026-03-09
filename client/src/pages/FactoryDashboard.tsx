@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +79,7 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 }
 
 export default function FactoryDashboard() {
+  const { formatDisplayDate } = useDateFormat();
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
   const [showNetDetails, setShowNetDetails] = useState(false);
@@ -513,7 +515,7 @@ export default function FactoryDashboard() {
                 <TableBody>
                   {data.recentActivity.map((entry, idx) => (
                     <TableRow key={entry.id ?? idx} data-testid={`row-activity-${entry.id ?? idx}`}>
-                      <TableCell className="font-mono text-sm">{entry.date}</TableCell>
+                      <TableCell className="font-mono text-sm">{entry.date ? formatDisplayDate(entry.date) : "—"}</TableCell>
                       <TableCell><Badge variant="outline">{entry.txType}</Badge></TableCell>
                       <TableCell className="text-muted-foreground">{entry.description}</TableCell>
                     </TableRow>
