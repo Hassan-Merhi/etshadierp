@@ -2,7 +2,7 @@ import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -97,11 +97,9 @@ export function VoucherEntriesTable({
     } else if (e.key === "Enter") {
       e.preventDefault();
       
-      // Get the current account name from the form
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
       
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
-        // Check for EXACT match (case-insensitive)
         const exactMatch = filteredSidebarAccounts.find(
           (acc) => acc.name.toLowerCase() === currentName.toLowerCase()
         );
@@ -109,14 +107,12 @@ export function VoucherEntriesTable({
         if (exactMatch) {
           handleSidebarAccountSelect(exactMatch);
         } else {
-          // No exact match - auto-create for factory
           const newAccount = await onAutoCreateAccount(currentName);
           if (newAccount) {
             handleSidebarAccountSelect(newAccount);
           }
         }
       } else if (filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
-        // Non-factory: select highlighted account
         const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
         if (highlightedAccount) {
           handleSidebarAccountSelect(highlightedAccount);
@@ -131,15 +127,12 @@ export function VoucherEntriesTable({
       const amount = Number(entries[index]?.amount);
       
       if (!isNaN(amount) && amount > 0) {
-        // Call commit callback to clear selection and refocus search
         if (onAmountCommit) {
           onAmountCommit(index);
         }
         
-        // Then add a new row
         handleAddRow();
         
-        // Focus the new row's account input
         requestAnimationFrame(() => {
           const newRowIndex = entries.length;
           const newInput = document.querySelector(`[data-testid="input-account-${newRowIndex}"]`) as HTMLInputElement;
@@ -166,20 +159,44 @@ export function VoucherEntriesTable({
     }
   };
 
+  const sharedAmountBlur = (e: React.FocusEvent<HTMLInputElement>, index: number) => {
+    const enteredAmount = Number(e.target.value);
+    if (!isNaN(enteredAmount) && enteredAmount > 0) {
+      if (selectedCurrency !== "USD") {
+        const usdAmount = convertToUSD(enteredAmount);
+        form.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
+      }
+      if (onAmountCommit) {
+        onAmountCommit(index);
+      }
+    }
+  };
+
   return (
-    <div className="border rounded-md overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-muted/50">
-          <tr>
-            <th className="text-left p-3 font-medium w-[60%]">Account</th>
-            <th className="text-right p-3 font-medium w-[35%]">Amount</th>
-            <th className="w-[5%]"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {fields.map((field, index) => (
-            <tr key={field.id} className="border-t hover-elevate">
-              <td className="p-2">
+    <div className="space-y-0">
+      {/* ── Mobile card layout (< md) ── */}
+      <div className="block md:hidden space-y-3">
+        {fields.map((field, index) => {
+          const bal = getEntryBalance(index);
+          return (
+            <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
+              {/* Account row */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-medium text-muted-foreground">Account</label>
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => remove(index)}
+                      data-testid={`button-remove-${index}`}
+                      className="h-7 w-7 text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
                 <FormField
                   control={form.control}
                   name={`entries.${index}.accountName`}
@@ -194,32 +211,25 @@ export function VoucherEntriesTable({
                           onChange={(e) => {
                             field.onChange(e);
                             setSidebarSearchValue(e.target.value);
-                            // Don't reset highlightedIndex here - let the useEffect in Vouchers.tsx handle it
                           }}
-                          onFocus={() => {
-                            onRowFocus(index, "account");
-                          }}
+                          onFocus={() => onRowFocus(index, "account")}
                           onKeyDown={(e) => handleAccountKeyDown(e, index)}
-                          onBlur={() => {
-                            setTimeout(() => onRowBlur(), 200);
-                          }}
+                          onBlur={() => setTimeout(() => onRowBlur(), 200)}
                         />
                       </FormControl>
-                      {(() => {
-                        const bal = getEntryBalance(index);
-                        if (bal == null) return null;
-                        return (
-                          <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                            Balance: {formatAmount(bal)}
-                          </p>
-                        );
-                      })()}
+                      {bal != null && (
+                        <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                          Balance: {formatAmount(bal)}
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </td>
-              <td className="p-2">
+              </div>
+              {/* Amount row */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Amount</label>
                 <FormField
                   control={form.control}
                   name={`entries.${index}.amount`}
@@ -234,19 +244,7 @@ export function VoucherEntriesTable({
                           className="font-mono text-right"
                           data-testid={`input-amount-${index}`}
                           onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                          onBlur={(e) => {
-                            const enteredAmount = Number(e.target.value);
-                            if (!isNaN(enteredAmount) && enteredAmount > 0) {
-                              // Convert from display currency to USD for storage
-                              if (selectedCurrency !== "USD") {
-                                const usdAmount = convertToUSD(enteredAmount);
-                                form.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
-                              }
-                              if (onAmountCommit) {
-                                onAmountCommit(index);
-                              }
-                            }
-                          }}
+                          onBlur={(e) => sharedAmountBlur(e, index)}
                           onFocus={() => onRowFocus(index, "amount")}
                         />
                       </FormControl>
@@ -254,46 +252,144 @@ export function VoucherEntriesTable({
                     </FormItem>
                   )}
                 />
-              </td>
-              <td className="p-2">
-                {fields.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => remove(index)}
-                    data-testid={`button-remove-${index}`}
-                  >
-                    ×
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot className="bg-muted/30 border-t-2">
-          <tr>
-            <td colSpan={1} className="p-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddRow}
-                data-testid="button-add-row"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Row
-              </Button>
-            </td>
-            <td className="p-3">
-              <div className="text-right font-bold font-mono">
-                {formatAmount(total)}
               </div>
-            </td>
-            <td colSpan={1}></td>
-          </tr>
-        </tfoot>
-      </table>
+            </div>
+          );
+        })}
+        {/* Mobile footer */}
+        <div className="flex items-center justify-between pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddRow}
+            data-testid="button-add-row"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Row
+          </Button>
+          <div className="text-sm font-bold font-mono pr-1">
+            {formatAmount(total)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop table layout (≥ md) ── */}
+      <div className="hidden md:block border rounded-md overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-3 font-medium w-[60%]">Account</th>
+              <th className="text-right p-3 font-medium w-[35%]">Amount</th>
+              <th className="w-[5%]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map((field, index) => (
+              <tr key={field.id} className="border-t hover-elevate">
+                <td className="p-2">
+                  <FormField
+                    control={form.control}
+                    name={`entries.${index}.accountName`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Type to search..."
+                            className="text-sm"
+                            data-testid={`input-account-${index}`}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setSidebarSearchValue(e.target.value);
+                            }}
+                            onFocus={() => {
+                              onRowFocus(index, "account");
+                            }}
+                            onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                            onBlur={() => {
+                              setTimeout(() => onRowBlur(), 200);
+                            }}
+                          />
+                        </FormControl>
+                        {(() => {
+                          const bal = getEntryBalance(index);
+                          if (bal == null) return null;
+                          return (
+                            <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                              Balance: {formatAmount(bal)}
+                            </p>
+                          );
+                        })()}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </td>
+                <td className="p-2">
+                  <FormField
+                    control={form.control}
+                    name={`entries.${index}.amount`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="font-mono text-right"
+                            data-testid={`input-amount-${index}`}
+                            onKeyDown={(e) => handleAmountKeyDown(e, index)}
+                            onBlur={(e) => sharedAmountBlur(e, index)}
+                            onFocus={() => onRowFocus(index, "amount")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </td>
+                <td className="p-2">
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => remove(index)}
+                      data-testid={`button-remove-${index}`}
+                    >
+                      ×
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-muted/30 border-t-2">
+            <tr>
+              <td colSpan={1} className="p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddRow}
+                  data-testid="button-add-row"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Row
+                </Button>
+              </td>
+              <td className="p-3">
+                <div className="text-right font-bold font-mono">
+                  {formatAmount(total)}
+                </div>
+              </td>
+              <td colSpan={1}></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

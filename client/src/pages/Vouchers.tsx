@@ -79,7 +79,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, Trash2 } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -3718,9 +3718,34 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
+      {/* Mobile horizontal pill nav (hidden on md+) */}
+      {!isPOS && (
+        <div className="flex md:hidden overflow-x-auto gap-2 pb-3 snap-x -mx-1 px-1">
+          {sidebarGroups.flatMap((g) => g.items).map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key as typeof activeTab)}
+                data-testid={`tab-${item.key}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap snap-start shrink-0 transition-colors border ${
+                  isActive
+                    ? "bg-primary text-primary-foreground font-medium border-primary"
+                    : "bg-muted text-muted-foreground border-transparent hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex gap-6">
         {!isPOS && (
-          <nav className="w-56 shrink-0 space-y-4">
+          <nav className="hidden md:flex flex-col w-56 shrink-0 space-y-4">
             {sidebarGroups.map((group) => (
               <div key={group.label}>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
@@ -3911,8 +3936,121 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     />
                   </div>
 
-                  {/* Spreadsheet table */}
-                  <div className="border rounded-md overflow-hidden overflow-x-auto">
+                  {/* Mobile journal card layout (< md) */}
+                  <div className="block md:hidden space-y-3">
+                    {journalFields.map((field, index) => {
+                      const entry = journalEntries[index];
+                      return (
+                        <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
+                          <div className="flex items-center justify-between gap-2">
+                            <FormField
+                              control={journalForm.control}
+                              name={`entries.${index}.type`}
+                              render={({ field }) => (
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={field.value === "DR" ? "default" : "outline"}
+                                    onClick={() => handleJournalTypeChange(index, "DR")}
+                                    data-testid={`button-journal-dr-${index}`}
+                                  >DR</Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={field.value === "CR" ? "default" : "outline"}
+                                    onClick={() => handleJournalTypeChange(index, "CR")}
+                                    data-testid={`button-journal-cr-${index}`}
+                                  >CR</Button>
+                                </div>
+                              )}
+                            />
+                            {journalFields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeJournal(index)}
+                                data-testid={`button-journal-remove-${index}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={journalForm.control}
+                            name={`entries.${index}.accountName`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs text-muted-foreground">Account</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="Type to search account..."
+                                    data-testid={`input-journal-account-${index}`}
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      setJournalAccountSearchTerm(e.target.value);
+                                      setJournalAccountHighlightedIndex(0);
+                                    }}
+                                    onFocus={() => {
+                                      setActiveJournalRow(index);
+                                      setShowAccountSidebar(true);
+                                      setJournalAccountSearchTerm(journalEntries[index]?.accountName || "");
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={journalForm.control}
+                            name={`entries.${index}.amount`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs text-muted-foreground">Amount</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    className="font-mono text-right"
+                                    data-testid={`input-journal-amount-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
+                        data-testid="button-journal-add-row"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-xs text-muted-foreground">
+                        DR: {formatAmount(totalDebit)} | CR: {formatAmount(totalCredit)}
+                      </div>
+                    </div>
+                    {Math.abs(totalDebit - totalCredit) > 0.01 && (
+                      <div className="text-center text-sm text-destructive">
+                        Debits and Credits must be equal. Difference: {formatAmount(Math.abs(totalDebit - totalCredit))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop journal table (≥ md) */}
+                  <div className="hidden md:block border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/50 sticky top-0 z-10">
                         <tr>
@@ -4553,7 +4691,135 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main Spreadsheet Area */}
                 <Card className="flex-1 overflow-hidden min-w-0">
-                  <div className="overflow-x-auto">
+                  {/* Mobile transfer card layout (< md) */}
+                  <div className="block md:hidden p-3 space-y-3">
+                    {transferFields.map((field, index) => (
+                      <div key={field.id} className="rounded-md border p-3 space-y-2 bg-card">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Entry {index + 1}</span>
+                          {transferFields.length > 1 && (
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeTransfer(index)} data-testid={`button-transfer-remove-${index}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                        {!isPOS && (
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">Source Location</label>
+                            <input
+                              type="text"
+                              value={activeTransferRow === index && activeFieldType === 'source' ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
+                              onChange={(e) => {
+                                setTransferSourceSearchTerm(e.target.value);
+                                setTransferSourceHighlightedIndex(0);
+                              }}
+                              onFocus={() => {
+                                setActiveTransferRow(index);
+                                setActiveFieldType('source');
+                                setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
+                                setShowSourceSidebar(true);
+                                setShowItemSidebar(false);
+                              }}
+                              placeholder="Type location..."
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              data-testid={`input-source-${index}`}
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Item</label>
+                          <input
+                            type="text"
+                            value={activeTransferRow === index && activeFieldType === 'item' ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
+                            onChange={(e) => {
+                              setTransferSearchTerm(e.target.value);
+                              setTransferHighlightedIndex(0);
+                              if (!e.target.value) {
+                                stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                stockTransferForm.setValue(`entries.${index}.stockItemCode`, "");
+                                stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
+                              }
+                            }}
+                            onFocus={() => {
+                              setActiveTransferRow(index);
+                              setActiveFieldType('item');
+                              setTransferHighlightedIndex(0);
+                              setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
+                              setShowItemSidebar(true);
+                              setShowSourceSidebar(false);
+                              if (transferEntries[index]?.sourceLocationId > 0) {
+                                setTransferInventorySource(transferEntries[index].sourceLocationId);
+                              }
+                            }}
+                            placeholder="Type to search item..."
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            data-testid={`input-item-name-${index}`}
+                          />
+                        </div>
+                        <div className={`grid gap-2 ${!isPOS ? "grid-cols-2" : "grid-cols-1"}`}>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">Qty</label>
+                            <input
+                              type="number"
+                              step="0.001"
+                              value={transferEntries[index]?.quantity || ""}
+                              onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                              placeholder="0"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
+                              data-testid={`input-qty-${index}`}
+                            />
+                          </div>
+                          {!isPOS && (
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground">Rate</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={transferEntries[index]?.rate || ""}
+                                onChange={(e) => stockTransferForm.setValue(`entries.${index}.rate`, e.target.value)}
+                                placeholder="0.00"
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
+                                data-testid={`input-rate-${index}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {!isPOS && (
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-xs text-muted-foreground">Amount</span>
+                            <span className="text-sm font-mono font-medium">
+                              {formatAmount((parseFloat(transferEntries[index]?.quantity || "0")) * (parseFloat(transferEntries[index]?.rate || "0")))}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const lastEntry = transferEntries[transferEntries.length - 1];
+                        appendTransfer({
+                          sourceLocationId: lastEntry?.sourceLocationId || 0,
+                          sourceLocationName: lastEntry?.sourceLocationName || "",
+                          stockItemId: 0,
+                          stockItemCode: "",
+                          stockItemName: "",
+                          quantity: "",
+                          rate: lastEntry?.rate || "0",
+                          amount: "0",
+                        });
+                      }}
+                      data-testid="button-add-transfer-row"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Row
+                    </Button>
+                  </div>
+
+                  {/* Desktop transfer table (≥ md) */}
+                  <div className="hidden md:block overflow-x-auto">
                     <div className="min-w-[400px]">
                       {/* Header */}
                       <div className="flex bg-muted/50 border-b sticky top-0 z-10">
@@ -5380,7 +5646,109 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <div className="flex flex-col lg:flex-row gap-4">
                     {/* Main Spreadsheet Area */}
                     <Card className="flex-1 overflow-hidden min-w-0">
-                      <div className="overflow-x-auto">
+                      {/* Mobile adjustment card layout (< md) */}
+                      <div className="block md:hidden p-3 space-y-3">
+                        {adjustmentFields.map((field, index) => {
+                          const currentEntry = adjustmentEntries[index];
+                          const inventoryItem = adjustmentItemsWithInventory.find(
+                            item => item.stockItemId === currentEntry?.stockItemId
+                          );
+                          const availableQty = inventoryItem?.quantity || "0";
+                          return (
+                            <div key={field.id} className="rounded-md border p-3 space-y-2 bg-card">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={currentEntry?.type === "PRODUCE" ? "default" : "outline"}
+                                    onClick={() => stockAdjustmentForm.setValue(`entries.${index}.type`, "PRODUCE")}
+                                    data-testid={`button-adj-produce-${index}`}
+                                  >Produce</Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={currentEntry?.type === "CONSUME" ? "default" : "outline"}
+                                    onClick={() => stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME")}
+                                    data-testid={`button-adj-consume-${index}`}
+                                  >Consume</Button>
+                                </div>
+                                {adjustmentFields.length > 1 && (
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAdjustment(index)} data-testid={`button-adjustment-remove-${index}`}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground">Item</label>
+                                <input
+                                  type="text"
+                                  value={activeAdjustmentRow === index ? adjustmentSearchTerm : (currentEntry?.stockItemName || "")}
+                                  onChange={(e) => {
+                                    setAdjustmentSearchTerm(e.target.value);
+                                    setAdjustmentHighlightedIndex(0);
+                                    if (!e.target.value) {
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, 0);
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, "");
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, "");
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    setActiveAdjustmentRow(index);
+                                    setAdjustmentSearchTerm(currentEntry?.stockItemName || "");
+                                    setShowAdjustmentSidebar(true);
+                                  }}
+                                  placeholder="Type to search item..."
+                                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  data-testid={`input-adjustment-item-${index}`}
+                                />
+                                {currentEntry?.stockItemId > 0 && (
+                                  <p className="text-xs text-muted-foreground">Avail: {formatNumber(parseFloat(availableQty))}</p>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">Qty</label>
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    value={currentEntry?.quantity || ""}
+                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                                    placeholder="0"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
+                                    data-testid={`input-adjustment-qty-${index}`}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">Rate</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={currentEntry?.rate || ""}
+                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.rate`, e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
+                                    data-testid={`input-adjustment-rate-${index}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => appendAdjustment({ type: "CONSUME", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "0" })}
+                          data-testid="button-add-adjustment-row"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Row
+                        </Button>
+                      </div>
+
+                      {/* Desktop adjustment table (≥ md) */}
+                      <div className="hidden md:block overflow-x-auto">
                         <div className="min-w-[400px]">
                           {/* Header */}
                           <div className="flex bg-muted/50 border-b sticky top-0 z-10">

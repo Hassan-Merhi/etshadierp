@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Printer, FileDown, ChevronDown } from "lucide-react";
+import { CalendarIcon, Printer, FileDown, ChevronDown, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -102,15 +109,40 @@ export function PaymentVoucherTab({
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
+  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
   const canPrint = canRunActions && hasAnyEntry;
   const canExport = canRunActions && hasAnyEntry && hasExport;
 
+  const accountSidebarProps = {
+    accounts: sidebarAccounts,
+    filteredAccounts: filteredSidebarAccounts,
+    onSelectAccount: (account: Account) => {
+      handleSidebarAccountSelect(account);
+      setMobileAccountOpen(false);
+    },
+    searchValue: sidebarSearchValue,
+    onSearchChange: setSidebarSearchValue,
+    selectedAccountId,
+    selectedAccountType,
+    highlightedIndex: sidebarHighlightedIndex,
+    onHighlightedIndexChange: setSidebarHighlightedIndex,
+    entries,
+    mode: activeTab,
+    paymentAccountId,
+    paymentAccountType,
+    voucherTotal: total,
+    onCreateAccount: isFactoryCompany ? undefined : onCreateAccount,
+    isFactoryCompany,
+    onAutoCreateAccount,
+    isAutoCreating,
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-4">
-      {/* Left column: Form */}
+      {/* Form column */}
       <div className="flex-1 min-w-0">
         <Card>
           <CardHeader className="p-4 sm:p-6">
@@ -187,7 +219,7 @@ export function PaymentVoucherTab({
                     )}
                   />
 
-                  {/* Date picker (narrower) */}
+                  {/* Date picker */}
                   <FormField
                     control={form.control}
                     name="voucherDate"
@@ -228,9 +260,8 @@ export function PaymentVoucherTab({
                     )}
                   />
 
-                  {/* Single Actions dropdown (Print + Export) */}
+                  {/* Actions dropdown */}
                   <div className="flex flex-col gap-1 lg:items-end">
-                    {/* spacer to align with other labeled controls */}
                     <div className="text-sm font-medium text-transparent select-none">
                       Actions
                     </div>
@@ -285,6 +316,20 @@ export function PaymentVoucherTab({
                   </div>
                 </div>
 
+                {/* Mobile: Select Account button (opens Sheet) */}
+                <div className="block lg:hidden">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setMobileAccountOpen(true)}
+                    data-testid="button-mobile-select-account"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Select Account for Entry
+                  </Button>
+                </div>
+
                 {/* Entries table */}
                 <VoucherEntriesTable
                   form={form}
@@ -306,12 +351,9 @@ export function PaymentVoucherTab({
                       const currentAccountName =
                         entries[rowIndex]?.accountName || "";
                       setSidebarSearchValue(currentAccountName);
-                      // Don't set highlightedIndex here - let the useEffect in Vouchers.tsx handle it
                     }
                   }}
-                  onRowBlur={() => {
-                    // Don't clear activeRow on blur - let amount commit handle it
-                  }}
+                  onRowBlur={() => {}}
                   isFactoryCompany={isFactoryCompany}
                   onAutoCreateAccount={onAutoCreateAccount}
                   isAutoCreating={isAutoCreating}
@@ -374,32 +416,25 @@ export function PaymentVoucherTab({
         </Card>
       </div>
 
-      {/* Right column: Account Sidebar (40%) */}
+      {/* Desktop sidebar (≥ lg) */}
       <div
-        className="sticky top-4 h-fit"
+        className="hidden lg:block sticky top-4 h-fit"
         style={{ width: "40%", maxHeight: "calc(100vh - 2rem)" }}
       >
-        <AccountSidebar
-          accounts={sidebarAccounts}
-          filteredAccounts={filteredSidebarAccounts}
-          onSelectAccount={handleSidebarAccountSelect}
-          searchValue={sidebarSearchValue}
-          onSearchChange={setSidebarSearchValue}
-          selectedAccountId={selectedAccountId}
-          selectedAccountType={selectedAccountType}
-          highlightedIndex={sidebarHighlightedIndex}
-          onHighlightedIndexChange={setSidebarHighlightedIndex}
-          entries={entries}
-          mode={activeTab}
-          paymentAccountId={paymentAccountId}
-          paymentAccountType={paymentAccountType}
-          voucherTotal={total}
-          onCreateAccount={isFactoryCompany ? undefined : onCreateAccount}
-          isFactoryCompany={isFactoryCompany}
-          onAutoCreateAccount={onAutoCreateAccount}
-          isAutoCreating={isAutoCreating}
-        />
+        <AccountSidebar {...accountSidebarProps} onSelectAccount={handleSidebarAccountSelect} />
       </div>
+
+      {/* Mobile sidebar Sheet (< lg) */}
+      <Sheet open={mobileAccountOpen} onOpenChange={setMobileAccountOpen}>
+        <SheetContent side="bottom" className="h-[82vh] p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-2 border-b">
+            <SheetTitle>Select Account</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden">
+            <AccountSidebar {...accountSidebarProps} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
