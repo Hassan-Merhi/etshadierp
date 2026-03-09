@@ -857,8 +857,47 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Inventory");
 
+      // Sheet 1: Bale Details — one row per bale with reference number (opens first)
+      const baleSheet = workbook.addWorksheet("Bale Details");
+      const baleColumns: any[] = [
+        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Status", key: "status", width: 14 },
+      ];
+      if (includeCost) {
+        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      baleSheet.columns = baleColumns;
+      const baleHeaderRow = baleSheet.getRow(1);
+      baleHeaderRow.font = { bold: true };
+      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+
+      const sortedBales = [...bales].sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
+      for (const b of sortedBales) {
+        const baleRowData: any = {
+          referenceNumber: b.referenceNumber,
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(b.productId ?? 0) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: parseFloat(String(b.weightKg || "0")),
+          status: b.status,
+        };
+        if (includeCost) {
+          baleRowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          baleRowData.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        baleSheet.addRow(baleRowData);
+      }
+
+      // Sheet 2: Inventory Summary — grouped by product
+      const sheet = workbook.addWorksheet("Inventory Summary");
       const columns: any[] = [
         { header: "Article Code", key: "articleCode", width: 18 },
         { header: "Product Name", key: "productName", width: 35 },
@@ -919,46 +958,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const tr = sheet.addRow(totalRowData);
       tr.font = { bold: true };
 
-      // Sheet 2: Bale Details — one row per bale with reference number
-      const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleColumns: any[] = [
-        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
-        { header: "Bale Code", key: "baleCode", width: 18 },
-        { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
-        { header: "Grade", key: "grade", width: 12 },
-        { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Status", key: "status", width: 14 },
-      ];
-      if (includeCost) {
-        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
-        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
-      }
-      baleSheet.columns = baleColumns;
-      const baleHeaderRow = baleSheet.getRow(1);
-      baleHeaderRow.font = { bold: true };
-      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
-
-      const sortedBales = [...bales].sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
-      for (const b of sortedBales) {
-        const rowData: any = {
-          referenceNumber: b.referenceNumber,
-          baleCode: b.baleCode,
-          articleCode: b.articleCode || "",
-          productName: b.productName || "",
-          category: productCategoryNameMap.get(b.productId ?? 0) || b.category || "",
-          grade: (b as any).grade || "",
-          weightKg: parseFloat(String(b.weightKg || "0")),
-          status: b.status,
-        };
-        if (includeCost) {
-          rowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
-          rowData.totalCost = parseFloat(String(b.totalCost || "0"));
-        }
-        baleSheet.addRow(rowData);
-      }
-
       const dateStr = new Date().toISOString().split("T")[0];
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
@@ -1013,7 +1012,77 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
 
-      // Sheet 1: Summary grouped by Location → Product
+      // Group bales by locationId + productId (needed for summary sheet)
+      const grouped = new Map<string, { locationName: string; articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
+      for (const b of bales) {
+        const locId = b.erpLocationId ?? 0;
+        const pid = b.productId ?? 0;
+        const key = `${locId}::${pid}`;
+        const weight = parseFloat(String(b.weightKg || "0"));
+        const productionPrice = productProductionPriceMap.get(pid) || 0;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.totalWeight += weight;
+          existing.baleCount += 1;
+        } else {
+          grouped.set(key, {
+            locationName: locationMap.get(locId) || `Location #${locId}`,
+            articleCode: b.articleCode || "",
+            productName: b.productName || "Unknown",
+            category: productCategoryNameMap.get(pid) || b.category || "",
+            totalWeight: weight,
+            baleCount: 1,
+            productionPrice,
+          });
+        }
+      }
+
+      const summaryRows = Array.from(grouped.values()).sort((a, b) =>
+        a.locationName.localeCompare(b.locationName) || a.productName.localeCompare(b.productName)
+      );
+
+      // Sheet 1: Bale Details — one row per bale with ref # (opens first in Excel)
+      const baleSheet = workbook.addWorksheet("Bale Details");
+      const baleColumns: any[] = [
+        { header: "Location", key: "locationName", width: 22 },
+        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 35 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Status", key: "status", width: 14 },
+      ];
+      if (includeCost) {
+        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
+        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
+      }
+      baleSheet.columns = baleColumns;
+      const baleHeaderRow = baleSheet.getRow(1);
+      baleHeaderRow.font = { bold: true };
+      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
+
+      for (const b of bales) {
+        const locId = b.erpLocationId ?? 0;
+        const pid = b.productId ?? 0;
+        const baleRowData: any = {
+          locationName: locationMap.get(locId) || `Location #${locId}`,
+          referenceNumber: b.referenceNumber,
+          articleCode: b.articleCode || "",
+          productName: b.productName || "",
+          category: productCategoryNameMap.get(pid) || b.category || "",
+          grade: (b as any).grade || "",
+          weightKg: parseFloat(String(b.weightKg || "0")),
+          status: b.status,
+        };
+        if (includeCost) {
+          baleRowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
+          baleRowData.totalCost = parseFloat(String(b.totalCost || "0"));
+        }
+        baleSheet.addRow(baleRowData);
+      }
+
+      // Sheet 2: Summary grouped by Location → Product
       const summarySheet = workbook.addWorksheet("Summary");
       const summaryColumns: any[] = [
         { header: "Location", key: "locationName", width: 22 },
@@ -1033,39 +1102,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       summaryHeader.font = { bold: true };
       summaryHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
 
-      // Group bales by locationId + productId
-      const grouped = new Map<string, { locationName: string; articleCode: string; productName: string; category: string; baleCount: number; totalWeight: number; productionPrice: number }>();
-      for (const b of bales) {
-        const locId = b.erpLocationId ?? 0;
-        const pid = b.productId ?? 0;
-        const key = `${locId}::${pid}`;
-        const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = productProductionPriceMap.get(pid) || 0;
-        const existing = grouped.get(key);
-        if (existing) {
-          existing.totalWeight += weight;
-          existing.baleCount += 1;
-        } else {
-          grouped.set(key, {
-            locationName: locationMap.get(locId) || `Location #${locId}`,
-            articleCode: b.articleCode || b.baleCode || "",
-            productName: b.productName || "Unknown",
-            category: productCategoryNameMap.get(pid) || b.category || "",
-            totalWeight: weight,
-            baleCount: 1,
-            productionPrice,
-          });
-        }
-      }
-
-      const summaryRows = Array.from(grouped.values()).sort((a, b) =>
-        a.locationName.localeCompare(b.locationName) || a.productName.localeCompare(b.productName)
-      );
-
       let totalBales = 0, totalKg = 0, totalValue = 0;
       let lastLocation = "";
       for (const row of summaryRows) {
-        // Add a blank separator row when location changes
         if (row.locationName !== lastLocation && lastLocation !== "") {
           summarySheet.addRow({});
         }
@@ -1109,49 +1148,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
       const totalRow = summarySheet.addRow(totalsData);
       totalRow.font = { bold: true };
-
-      // Sheet 2: Bale Details — one row per bale with reference number
-      const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleColumns: any[] = [
-        { header: "Location", key: "locationName", width: 22 },
-        { header: "Bale Ref #", key: "referenceNumber", width: 22 },
-        { header: "Bale Code", key: "baleCode", width: 18 },
-        { header: "Article Code", key: "articleCode", width: 18 },
-        { header: "Product Name", key: "productName", width: 35 },
-        { header: "Category", key: "category", width: 20 },
-        { header: "Grade", key: "grade", width: 12 },
-        { header: "Weight (kg)", key: "weightKg", width: 14 },
-        { header: "Status", key: "status", width: 14 },
-      ];
-      if (includeCost) {
-        baleColumns.push({ header: "Cost/kg", key: "costPerKg", width: 14 });
-        baleColumns.push({ header: "Total Cost", key: "totalCost", width: 14 });
-      }
-      baleSheet.columns = baleColumns;
-      const baleHeaderRow = baleSheet.getRow(1);
-      baleHeaderRow.font = { bold: true };
-      baleHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0E4FF" } };
-
-      for (const b of bales) {
-        const locId = b.erpLocationId ?? 0;
-        const pid = b.productId ?? 0;
-        const rowData: any = {
-          locationName: locationMap.get(locId) || `Location #${locId}`,
-          referenceNumber: b.referenceNumber,
-          baleCode: b.baleCode,
-          articleCode: b.articleCode || "",
-          productName: b.productName || "",
-          category: productCategoryNameMap.get(pid) || b.category || "",
-          grade: (b as any).grade || "",
-          weightKg: parseFloat(String(b.weightKg || "0")),
-          status: b.status,
-        };
-        if (includeCost) {
-          rowData.costPerKg = parseFloat(String(b.costPerKg || "0"));
-          rowData.totalCost = parseFloat(String(b.totalCost || "0"));
-        }
-        baleSheet.addRow(rowData);
-      }
 
       const dateStr = new Date().toISOString().split("T")[0];
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -5029,6 +5025,57 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json(results);
     } catch (error: any) {
       console.error("Error fetching factory bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/factory/bales/bulk-status", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids must be a non-empty array" });
+      if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
+
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED"];
+      if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
+
+      const result = await db
+        .update(factoryBales)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, ids.map(Number))))
+        .returning({ id: factoryBales.id });
+
+      res.json({ updated: result.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/factory/bales/:id/status", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
+
+      const { status } = req.body;
+      if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
+
+      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED"];
+      if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
+
+      const [updated] = await db
+        .update(factoryBales)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
+        .returning({ id: factoryBales.id, status: factoryBales.status });
+
+      if (!updated) return res.status(404).json({ message: "Bale not found" });
+      res.json(updated);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

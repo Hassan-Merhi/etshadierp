@@ -413,18 +413,18 @@ export default function BaleProducts() {
     });
   };
 
-  const groupedProducts: GroupedProduct[] = (() => {
+  const groupedProducts: (GroupedProduct & { _key: string })[] = (() => {
     if (!activeProducts) return [];
-    const groups: Record<string, GroupedProduct> = {};
+    const groups: Record<string, GroupedProduct & { _key: string }> = {};
     for (const p of activeProducts) {
       const key = p.articleCode || p.code;
       if (!groups[key]) {
-        groups[key] = { articleCode: key, name: p.name, count: 0, items: [] };
+        groups[key] = { _key: key, articleCode: p.articleCode || "", name: p.name, count: 0, items: [] };
       }
       groups[key].count++;
       groups[key].items.push(p);
     }
-    return Object.values(groups).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+    return Object.values(groups).sort((a, b) => (a.articleCode || "").localeCompare(b.articleCode || ""));
   })();
 
   return (
@@ -626,19 +626,19 @@ export default function BaleProducts() {
                   {groupedProducts.map((group) => (
                     <>
                       <TableRow
-                        key={group.articleCode}
+                        key={group._key}
                         className="cursor-pointer hover-elevate"
-                        onClick={() => toggleGroup(group.articleCode)}
-                        data-testid={`row-group-${group.articleCode}`}
+                        onClick={() => toggleGroup(group._key)}
+                        data-testid={`row-group-${group._key}`}
                       >
                         <TableCell>
-                          {expandedGroups.has(group.articleCode) ? (
+                          {expandedGroups.has(group._key) ? (
                             <ChevronDown className="h-4 w-4" />
                           ) : (
                             <ChevronRight className="h-4 w-4" />
                           )}
                         </TableCell>
-                        <TableCell className="font-mono font-medium">{group.articleCode}</TableCell>
+                        <TableCell className="font-mono font-medium">{group.articleCode || "-"}</TableCell>
                         <TableCell className="font-medium">{group.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {group.items[0]?.categoryId ? categoryMap.get(group.items[0].categoryId) || "-" : "-"}
@@ -649,7 +649,7 @@ export default function BaleProducts() {
                           <Badge variant="secondary">{group.count}</Badge>
                         </TableCell>
                       </TableRow>
-                      {expandedGroups.has(group.articleCode) &&
+                      {expandedGroups.has(group._key) &&
                         group.items.map((product) => (
                           <TableRow key={product.id} className="bg-muted/30" data-testid={`row-product-${product.id}`}>
                             <TableCell></TableCell>
