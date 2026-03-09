@@ -409,11 +409,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return `${name} – ${shown.join(", ")}${extra}`;
       });
       const stockEntryDesc = `Stock entry: ${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} – ${descParts.join(" | ")}`;
+      const baleMetaJson = JSON.stringify({
+        bales: result.bales.map((b: any) => ({
+          id: b.id,
+          ref: b.referenceNumber,
+          productName: b.productName || b.articleCode || "Unknown",
+          weightKg: b.weightKg,
+          status: b.status || "IN_STOCK",
+        })),
+      });
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
         txType: "BALE_STOCK_ENTRY",
         description: stockEntryDesc,
+        metaJson: baleMetaJson,
       });
 
       res.json({ bales: result.bales, totalWeight: result.totalWeight });

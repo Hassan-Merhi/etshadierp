@@ -3,7 +3,7 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal } from "lucide-react";
+import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal, Package } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -40,12 +40,31 @@ interface DaybookEntry {
   referenceId: number | null;
   referenceTable: string | null;
   description: string;
+  metaJson: string | null;
   currencyCode: string;
   amountCurrency: string;
   fxRateToUsd: string;
   amountUsd: string;
   createdAt: string;
   createdBy: number | null;
+}
+
+interface BaleMeta {
+  id: number;
+  ref: string;
+  productName: string;
+  weightKg: string;
+  status: string;
+}
+
+function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
+  if (!entry.metaJson) return [];
+  try {
+    const parsed = JSON.parse(entry.metaJson);
+    return Array.isArray(parsed.bales) ? parsed.bales : [];
+  } catch {
+    return [];
+  }
 }
 
 const TX_TYPE_LABELS: Record<string, string> = {
@@ -127,6 +146,8 @@ export default function FactoryDaybook() {
   const [editAmountUsd, setEditAmountUsd] = useState("");
   const [editReason, setEditReason] = useState("");
   const [showHistory, setShowHistory] = useState<number | null>(null);
+  const [baleViewerEntry, setBaleViewerEntry] = useState<DaybookEntry | null>(null);
+  const [baleChooserEntry, setBaleChooserEntry] = useState<DaybookEntry | null>(null);
 
   // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
   useEffect(() => {
@@ -239,6 +260,15 @@ export default function FactoryDaybook() {
   };
 
   const openSourceRecord = (entry: DaybookEntry) => {
+    if (entry.txType === "BALE_STOCK_ENTRY") {
+      const bales = parseBalesMeta(entry);
+      if (bales.length === 1) {
+        navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bales[0].ref)}`);
+      } else if (bales.length > 1) {
+        setBaleViewerEntry(entry);
+      }
+      return;
+    }
     if (entry.txType === "INVOICE" && entry.referenceId) {
       navigate(`/factory/sales/invoices/${entry.referenceId}`);
       return;
@@ -250,6 +280,15 @@ export default function FactoryDaybook() {
   };
 
   const editSourceRecord = (entry: DaybookEntry) => {
+    if (entry.txType === "BALE_STOCK_ENTRY") {
+      const bales = parseBalesMeta(entry);
+      if (bales.length === 1) {
+        navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bales[0].ref)}`);
+      } else if (bales.length > 1) {
+        setBaleChooserEntry(entry);
+      }
+      return;
+    }
     if (entry.txType === "INVOICE" && entry.referenceId) {
       navigate(`/factory/sales/invoices/${entry.referenceId}`);
       return;
@@ -452,7 +491,9 @@ export default function FactoryDaybook() {
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry) => {
-                    const hasSource = (!!VOUCHER_TX_TYPES[entry.txType] || entry.txType === "INVOICE") && !!entry.referenceId;
+                    const balesMeta = parseBalesMeta(entry);
+                    const hasSource = (!!VOUCHER_TX_TYPES[entry.txType] || entry.txType === "INVOICE") && !!entry.referenceId
+                      || (entry.txType === "BALE_STOCK_ENTRY" && balesMeta.length > 0);
                     const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                     const isRowClickable = isBaleTransfer;
                     return (
@@ -613,6 +654,92 @@ export default function FactoryDaybook() {
               ))}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bale Viewer Dialog — shows all bales from a multi-bale stock entry */}
+      <Dialog open={baleViewerEntry !== null} onOpenChange={(open) => { if (!open) setBaleViewerEntry(null); }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-bale-viewer">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Bales from this stock entry
+            </DialogTitle>
+            <DialogDescription>
+              {baleViewerEntry && (() => {
+                const bales = parseBalesMeta(baleViewerEntry);
+                return `${bales.length} bale${bales.length !== 1 ? "s" : ""} created`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          {baleViewerEntry && (() => {
+            const bales = parseBalesMeta(baleViewerEntry);
+            return (
+              <div className="max-h-80 overflow-y-auto space-y-1">
+                {bales.map((bale) => (
+                  <div
+                    key={bale.ref}
+                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate cursor-pointer"
+                    onClick={() => { setBaleViewerEntry(null); navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
+                    data-testid={`bale-viewer-row-${bale.ref}`}
+                  >
+                    <div>
+                      <span className="font-mono font-medium">{bale.ref}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
+                      <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
+                        {bale.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bale Chooser Dialog — choose a bale then open Barcode Lookup */}
+      <Dialog open={baleChooserEntry !== null} onOpenChange={(open) => { if (!open) setBaleChooserEntry(null); }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-bale-chooser">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Choose a bale
+            </DialogTitle>
+            <DialogDescription>
+              Select a bale to open in Barcode Lookup
+            </DialogDescription>
+          </DialogHeader>
+          {baleChooserEntry && (() => {
+            const bales = parseBalesMeta(baleChooserEntry);
+            return (
+              <div className="max-h-80 overflow-y-auto space-y-1">
+                {bales.map((bale) => (
+                  <button
+                    key={bale.ref}
+                    type="button"
+                    className="w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate text-left"
+                    onClick={() => { setBaleChooserEntry(null); navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
+                    data-testid={`bale-chooser-row-${bale.ref}`}
+                  >
+                    <div>
+                      <span className="font-mono font-medium">{bale.ref}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
+                      <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
+                        {bale.status}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Search, Package, Tag, Clock, User, Scale, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,16 @@ export default function BarcodeLookup() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      setActiveTab("reference");
+      setSearchValue(ref);
+      setTimeout(() => referenceLookup.mutate(ref), 0);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
