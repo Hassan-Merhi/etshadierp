@@ -127,11 +127,6 @@ interface RawStockRow {
   lastOffloaded: string;
 }
 
-interface SupplierOption {
-  id: number;
-  name: string;
-}
-
 interface ContainerOption {
   id: number;
   containerNumber: string;
@@ -167,7 +162,7 @@ export default function ProductionRawStock() {
   const [confirmDutyAmount, setConfirmDutyAmount] = useState("");
   const [confirmDutyNotes, setConfirmDutyNotes] = useState("");
   const [obDialogOpen, setObDialogOpen] = useState(false);
-  const [obSupplierId, setObSupplierId] = useState("");
+  const [obSupplierName, setObSupplierName] = useState("");
   const [obReceivedKg, setObReceivedKg] = useState("");
   const [obCostPerKg, setObCostPerKg] = useState("");
   const [obCurrency, setObCurrency] = useState("USD");
@@ -189,11 +184,6 @@ export default function ProductionRawStock() {
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: offloadDialogOpen,
-  });
-
-  const { data: suppliers } = useQuery<SupplierOption[]>({
-    queryKey: ["/api/factory/suppliers"],
-    enabled: obDialogOpen,
   });
 
   const selectedContainer = useMemo(() => {
@@ -383,7 +373,7 @@ export default function ProductionRawStock() {
 
   const handleCloseObDialog = () => {
     setObDialogOpen(false);
-    setObSupplierId("");
+    setObSupplierName("");
     setObReceivedKg("");
     setObCostPerKg("");
     setObCurrency("USD");
@@ -391,9 +381,27 @@ export default function ProductionRawStock() {
     setObNotes("");
   };
 
+  const recalcUsedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await modeApiRequest("POST", "/api/factory/raw-stock/recalculate-used", {});
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Failed to recalculate");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      toast({ title: "Recalculated", description: data.message || "Remaining balances updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSubmitOpeningBalance = () => {
-    if (!obSupplierId) {
-      toast({ title: "Missing fields", description: "Please select a supplier", variant: "destructive" });
+    if (!obSupplierName.trim()) {
+      toast({ title: "Missing fields", description: "Please enter a supplier name", variant: "destructive" });
       return;
     }
     if (!obReceivedKg || obKg <= 0) {
@@ -406,7 +414,7 @@ export default function ProductionRawStock() {
     }
 
     openingBalanceMutation.mutate({
-      supplierId: obSupplierId,
+      supplierName: obSupplierName.trim(),
       receivedKg: obReceivedKg,
       costPerKg: obCostPerKg,
       currencyCode: obCurrency,
@@ -428,6 +436,9 @@ export default function ProductionRawStock() {
           <p className="text-muted-foreground mt-1">Supplier-based raw material tracking for production</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => recalcUsedMutation.mutate()} disabled={recalcUsedMutation.isPending} data-testid="button-recalc-balance">
+            {recalcUsedMutation.isPending ? "Recalculating..." : "Recalculate Balance"}
+          </Button>
           <Button variant="outline" onClick={() => setObDialogOpen(true)} data-testid="button-opening-balance">
             <Upload className="h-4 w-4 mr-2" />
             Add Opening Balance
@@ -1020,19 +1031,13 @@ export default function ProductionRawStock() {
 
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             <div className="space-y-2">
-              <Label>Supplier</Label>
-              <Select value={obSupplierId} onValueChange={setObSupplierId}>
-                <SelectTrigger data-testid="select-ob-supplier">
-                  <SelectValue placeholder="Select supplier" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers?.map((s) => (
-                    <SelectItem key={s.id} value={s.id.toString()}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Supplier Name</Label>
+              <Input
+                value={obSupplierName}
+                onChange={(e) => setObSupplierName(e.target.value)}
+                placeholder="e.g. ABC Textiles"
+                data-testid="input-ob-supplier-name"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1141,7 +1146,7 @@ export default function ProductionRawStock() {
               </Button>
               <Button
                 onClick={handleSubmitOpeningBalance}
-                disabled={openingBalanceMutation.isPending || !obSupplierId}
+                disabled={openingBalanceMutation.isPending || !obSupplierName.trim()}
                 data-testid="button-confirm-ob"
               >
                 {openingBalanceMutation.isPending ? "Adding..." : "Add Opening Balance"}

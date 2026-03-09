@@ -31,7 +31,6 @@ interface SupplierWithBalance extends FactorySupplier {
   pendingContainers: number;
   receivedContainers: number;
   lastContainerDate: string | null;
-  linkedErpSupplierName: string | null;
 }
 
 
@@ -146,6 +145,24 @@ export default function FactorySuppliers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       toast({ title: "Deleted", description: "Supplier deactivated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/suppliers/${id}/permanent`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to permanently delete supplier");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      toast({ title: "Deleted", description: "Supplier permanently removed" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -525,7 +542,6 @@ export default function FactorySuppliers() {
                           {s.name}
                         </button>
                         {!s.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
-                        {(s as any).isErpOnly && <Badge variant="outline" className="text-xs">ERP</Badge>}
                         {s.pendingContainers > 0 && (
                           <Badge variant="outline" className="text-xs">
                             {s.pendingContainers} pending
@@ -595,16 +611,17 @@ export default function FactorySuppliers() {
                           ${formatNum(s.totalValue)}
                         </div>
                       </div>
-                      {!(s as any).isErpOnly && (
                       <div className="flex flex-col gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => { e.stopPropagation(); openEdit(s); }}
-                          data-testid={`button-edit-supplier-${s.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        {s.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => { e.stopPropagation(); openEdit(s); }}
+                            data-testid={`button-edit-supplier-${s.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                         {s.isActive && (
                           <Button
                             variant="ghost"
@@ -615,18 +632,25 @@ export default function FactorySuppliers() {
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         )}
+                        {!s.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${s.name}"? This cannot be undone.`)) permanentDeleteMutation.mutate(s.id); }}
+                            data-testid={`button-permanent-delete-supplier-${s.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
-                      )}
-                      {!(s as any).isErpOnly && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setStatementSupplierId(s.id)}
-                          data-testid={`button-view-statement-${s.id}`}
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setStatementSupplierId(s.id)}
+                        data-testid={`button-view-statement-${s.id}`}
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
                     </div>
                   </div>
                 </div>

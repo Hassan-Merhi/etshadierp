@@ -1265,6 +1265,40 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Hard-delete an inactive factory supplier (only if no container records reference it)
+  app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [supplier] = await db
+        .select()
+        .from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)));
+
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+      if (supplier.isActive) return res.status(400).json({ message: "Supplier must be deactivated before permanent deletion" });
+
+      const [containerRef] = await db
+        .select({ id: factoryContainers.id })
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, id)))
+        .limit(1);
+
+      if (containerRef) return res.status(400).json({ message: "Cannot delete: supplier has container records. Remove or reassign containers first." });
+
+      await db
+        .delete(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)));
+
+      res.json({ message: "Supplier permanently deleted" });
+    } catch (error: any) {
+      console.error("Error permanently deleting factory supplier:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 1b. Factory Suppliers - Balances & Statement
   // ───────────────────────────────────────────────
@@ -1284,83 +1318,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .select()
         .from(factoryContainers)
         .where(eq(factoryContainers.companyId, companyId));
-
-      // Fetch ERP supplier voucher entries for balance computation
-      const linkedSupplierIds = suppliersList
-        .map((s: any) => s.linkedSupplierId)
-        .filter(Boolean);
-
-      let voucherEntryMap: Record<number, { credits: number; debits: number }> = {};
-      if (linkedSupplierIds.length > 0) {
-        const entries = await db
-          .select({
-            supplierId: voucherEntries.supplierId,
-            creditAmount: voucherEntries.creditAmount,
-            debitAmount: voucherEntries.debitAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(
-            and(
-              eq(vouchers.companyId, companyId),
-              inArray(voucherEntries.supplierId, linkedSupplierIds),
-              sql`${vouchers.deleted_at} IS NULL`
-            )
-          );
-        for (const e of entries) {
-          if (!e.supplierId) continue;
-          if (!voucherEntryMap[e.supplierId]) voucherEntryMap[e.supplierId] = { credits: 0, debits: 0 };
-          voucherEntryMap[e.supplierId].credits += parseFloat(e.creditAmount || "0");
-          voucherEntryMap[e.supplierId].debits += parseFloat(e.debitAmount || "0");
-        }
-      }
-
-      // Fetch ALL ERP suppliers (suppliers table has no company_id; identify relevant ones via vouchers)
-      // First, collect all supplier IDs that have voucher entries for this company
-      const allCompanyVoucherEntries = await db
-        .select({ supplierId: voucherEntries.supplierId })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} IS NULL`));
-
-      const allCompanySupplierIds = [...new Set(
-        allCompanyVoucherEntries.map((e: any) => e.supplierId).filter(Boolean)
-      )] as number[];
-
-      // Populate voucherEntryMap for unlinked ERP supplier IDs not already fetched above
-      const alreadyMapped = new Set(linkedSupplierIds);
-      const unlinkdErpIdsToFetch = allCompanySupplierIds.filter((id: number) => !alreadyMapped.has(id));
-      if (unlinkdErpIdsToFetch.length > 0) {
-        const allEntries = await db
-          .select({
-            supplierId: voucherEntries.supplierId,
-            creditAmount: voucherEntries.creditAmount,
-            debitAmount: voucherEntries.debitAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(
-            and(
-              eq(vouchers.companyId, companyId),
-              inArray(voucherEntries.supplierId, unlinkdErpIdsToFetch),
-              sql`${vouchers.deletedAt} IS NULL`
-            )
-          );
-        for (const e of allEntries) {
-          if (!e.supplierId) continue;
-          if (!voucherEntryMap[e.supplierId]) voucherEntryMap[e.supplierId] = { credits: 0, debits: 0 };
-          voucherEntryMap[e.supplierId].credits += parseFloat(e.creditAmount || "0");
-          voucherEntryMap[e.supplierId].debits += parseFloat(e.debitAmount || "0");
-        }
-      }
-
-      // Fetch ERP supplier details for company-relevant supplier IDs
-      const erpSuppliers = allCompanySupplierIds.length > 0
-        ? await db
-            .select({ id: suppliers.id, name: suppliers.legalName, phone: suppliers.phone, email: suppliers.email, address: suppliers.address, openingBalance: suppliers.openingBalance, active: suppliers.active })
-            .from(suppliers)
-            .where(and(inArray(suppliers.id, allCompanySupplierIds), sql`${suppliers.deletedAt} IS NULL`))
-        : [];
 
       const suppliersWithBalances = suppliersList.map((s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
@@ -1384,16 +1341,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             }, null)
           : null;
 
-        // Compute actual balance: openingBalance + containerValue + voucherCredits - voucherDebits
-        let balance = parseFloat(s.openingBalance || "0") + containerValue;
-        if (s.linkedSupplierId && voucherEntryMap[s.linkedSupplierId]) {
-          const { credits, debits } = voucherEntryMap[s.linkedSupplierId];
-          balance = balance + credits - debits;
-        }
-
-        const linkedErpSupplierName = s.linkedSupplierId
-          ? (erpSuppliers.find((e: any) => e.id === s.linkedSupplierId)?.name || null)
-          : null;
+        const balance = parseFloat(s.openingBalance || "0") + containerValue;
 
         return {
           ...s,
@@ -1403,45 +1351,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           pendingContainers,
           receivedContainers,
           lastContainerDate,
-          linkedErpSupplierName,
-          isErpOnly: false,
         };
       });
 
-      // ── Merge unlinked ERP suppliers ──────────────────────────────────────────
-      // Show ERP suppliers that are not already linked to any factory supplier entry
-      const linkedErpIds = new Set(suppliersList.map((s: any) => s.linkedSupplierId).filter(Boolean));
-      const erpOnlyEntries = erpSuppliers
-        .filter((e: any) => !linkedErpIds.has(e.id) && e.active !== false)
-        .map((e: any) => {
-          const vm = voucherEntryMap[e.id];
-          const balance = parseFloat(e.openingBalance || "0") + (vm ? vm.credits - vm.debits : 0);
-          return {
-            id: -(e.id),              // negative id signals ERP-only entry
-            companyId,
-            name: e.name,
-            contactPerson: null,
-            phone: e.phone || null,
-            email: e.email || null,
-            address: e.address || null,
-            notes: null,
-            openingBalance: e.openingBalance || "0",
-            linkedSupplierId: e.id,
-            isActive: true,
-            createdAt: null,
-            updatedAt: null,
-            totalContainers: 0,
-            totalKg: "0.000",
-            totalValue: balance.toFixed(2),
-            pendingContainers: 0,
-            receivedContainers: 0,
-            lastContainerDate: null,
-            linkedErpSupplierName: e.name,
-            isErpOnly: true,           // flag for frontend to show badge/disable edit
-          };
-        });
-
-      res.json([...suppliersWithBalances, ...erpOnlyEntries].sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      res.json(suppliersWithBalances.sort((a: any, b: any) => a.name.localeCompare(b.name)));
     } catch (error: any) {
       console.error("Error fetching factory suppliers with balances:", error);
       res.status(500).json({ message: error.message });
@@ -3536,9 +3449,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierId, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes } = req.body;
+      const { supplierName, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes } = req.body;
 
-      if (!supplierId) return res.status(400).json({ message: "Supplier is required" });
+      if (!supplierName || !String(supplierName).trim()) return res.status(400).json({ message: "Supplier name is required" });
       if (!receivedKg || parseFloat(receivedKg) <= 0) return res.status(400).json({ message: "Received KG must be positive" });
       if (!costPerKg || parseFloat(costPerKg) < 0) return res.status(400).json({ message: "Cost per KG must be non-negative" });
 
@@ -3549,8 +3462,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const costPerKgUsd = currencyCode === "USD" ? rateVal : rateVal * fxRate;
       const totalPayable = kgVal * rateVal;
       const totalPayableUsd = kgVal * costPerKgUsd;
+      const trimmedSupplierName = String(supplierName).trim();
 
       const result = await db.transaction(async (tx: any) => {
+        // Find or create factory supplier by name
+        let [existingSupplier] = await tx
+          .select()
+          .from(factorySuppliers)
+          .where(and(
+            eq(factorySuppliers.companyId, companyId),
+            sql`lower(${factorySuppliers.name}) = lower(${trimmedSupplierName})`
+          ))
+          .limit(1);
+
+        if (!existingSupplier) {
+          const [newSupplier] = await tx
+            .insert(factorySuppliers)
+            .values({ companyId, name: trimmedSupplierName, isActive: true })
+            .returning();
+          existingSupplier = newSupplier;
+        }
+
         const year = new Date().getFullYear();
         const existingOBs = await tx
           .select({ containerNumber: factoryContainers.containerNumber })
@@ -3570,7 +3502,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .values({
             companyId,
             containerNumber,
-            supplierId: parseInt(supplierId),
+            supplierId: existingSupplier.id,
             origin: "Opening Balance",
             totalKg: String(kgVal),
             ratePerKg: String(rateVal),
@@ -3617,6 +3549,78 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error creating opening balance:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Recalculate usedKg for all factory_raw_stock records based on finalized bales
+  app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allRawStock = await db
+        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId })
+        .from(factoryRawStock)
+        .where(eq(factoryRawStock.companyId, companyId));
+
+      if (allRawStock.length === 0) return res.json({ updated: 0 });
+
+      const containerIds = allRawStock.map((r: any) => r.containerId);
+
+      // Get mix batch sources that reference these containers
+      const sources = await db
+        .select({
+          containerId: factoryMixBatchSources.containerId,
+          mixBatchId: factoryMixBatchSources.mixBatchId,
+          weightKg: factoryMixBatchSources.weightKg,
+        })
+        .from(factoryMixBatchSources)
+        .where(inArray(factoryMixBatchSources.containerId, containerIds));
+
+      // Get finalized bales per mix batch
+      const mixBatchIds = [...new Set(sources.map((s: any) => s.mixBatchId))] as number[];
+      let baleWeightByMix: Record<number, number> = {};
+      if (mixBatchIds.length > 0) {
+        const bales = await db
+          .select({ mixBatchId: factoryBales.mixBatchId, weightKg: factoryBales.weightKg })
+          .from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.status, "FINALIZED"),
+            inArray(factoryBales.mixBatchId, mixBatchIds)
+          ));
+        for (const b of bales) {
+          if (!b.mixBatchId) continue;
+          baleWeightByMix[b.mixBatchId] = (baleWeightByMix[b.mixBatchId] || 0) + parseFloat(b.weightKg);
+        }
+      }
+
+      // Compute used KG per raw stock record proportionally
+      let updated = 0;
+      const now = new Date();
+      for (const rs of allRawStock) {
+        const relatedSources = sources.filter((s: any) => s.containerId === rs.containerId);
+        let usedKg = 0;
+        for (const src of relatedSources) {
+          const mixTotal = sources.filter((s: any) => s.mixBatchId === src.mixBatchId)
+            .reduce((sum: number, s: any) => sum + parseFloat(s.weightKg), 0);
+          const baleWeight = baleWeightByMix[src.mixBatchId] || 0;
+          if (mixTotal > 0) {
+            const proportion = parseFloat(src.weightKg) / mixTotal;
+            usedKg += proportion * baleWeight;
+          }
+        }
+        await db
+          .update(factoryRawStock)
+          .set({ usedKg: String(usedKg.toFixed(3)), updatedAt: now } as any)
+          .where(eq(factoryRawStock.id, rs.id));
+        updated++;
+      }
+
+      res.json({ updated, message: `Recalculated used KG for ${updated} raw stock records.` });
+    } catch (error: any) {
+      console.error("Error recalculating raw stock used:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -4338,7 +4342,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           throw new Error(`Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`);
         }
 
-        const costPerKg = parseFloat(mixBatch.costPerKg);
+        // Derive bale cost from raw stock source prices (not mix batch blended cost).
+        // This ensures duty updates after mix batch creation are reflected in bale costs.
+        const mixSources = await tx
+          .select({
+            weightKg: factoryMixBatchSources.weightKg,
+            costPerKg: factoryMixBatchSources.costPerKg,
+            containerId: factoryMixBatchSources.containerId,
+          })
+          .from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, mixBatchId));
+
+        let costPerKg: number;
+        if (mixSources.length > 0) {
+          const sourceContainerIds = mixSources.map((s: any) => s.containerId).filter(Boolean) as number[];
+          const rawStockCostMap: Record<number, number> = {};
+          if (sourceContainerIds.length > 0) {
+            const rawStockRecs = await tx
+              .select({ containerId: factoryRawStock.containerId, costPerKg: factoryRawStock.costPerKg })
+              .from(factoryRawStock)
+              .where(inArray(factoryRawStock.containerId, sourceContainerIds));
+            for (const r of rawStockRecs) {
+              rawStockCostMap[r.containerId] = parseFloat(r.costPerKg);
+            }
+          }
+          let sourceTotalCost = 0;
+          let sourceTotalWeight = 0;
+          for (const src of mixSources) {
+            const w = parseFloat(src.weightKg);
+            const c = src.containerId && rawStockCostMap[src.containerId] !== undefined
+              ? rawStockCostMap[src.containerId]
+              : parseFloat(src.costPerKg);
+            sourceTotalCost += w * c;
+            sourceTotalWeight += w;
+          }
+          costPerKg = sourceTotalWeight > 0 ? sourceTotalCost / sourceTotalWeight : parseFloat(mixBatch.costPerKg);
+        } else {
+          costPerKg = parseFloat(mixBatch.costPerKg);
+        }
+
         const now = new Date();
         const updatedBales: any[] = [];
 
@@ -4502,6 +4544,90 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error finalizing pressing batch:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Backfill historical bale costs from raw stock source prices
+  app.post("/api/factory/bales/backfill-costs", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const balesWithMix = await db
+        .select({
+          id: factoryBales.id,
+          weightKg: factoryBales.weightKg,
+          mixBatchId: factoryBales.mixBatchId,
+          articleCode: factoryBales.articleCode,
+        })
+        .from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.status, "FINALIZED"),
+          sql`${factoryBales.mixBatchId} IS NOT NULL`
+        ));
+
+      if (balesWithMix.length === 0) return res.json({ updated: 0 });
+
+      const uniqueMixIds = [...new Set(balesWithMix.map((b: any) => b.mixBatchId))] as number[];
+
+      const allSources = await db
+        .select({
+          mixBatchId: factoryMixBatchSources.mixBatchId,
+          weightKg: factoryMixBatchSources.weightKg,
+          costPerKg: factoryMixBatchSources.costPerKg,
+          containerId: factoryMixBatchSources.containerId,
+        })
+        .from(factoryMixBatchSources)
+        .where(inArray(factoryMixBatchSources.mixBatchId, uniqueMixIds));
+
+      const allContainerIds = [...new Set(allSources.map((s: any) => s.containerId).filter(Boolean))] as number[];
+      const rawStockCostMap: Record<number, number> = {};
+      if (allContainerIds.length > 0) {
+        const rawStockRecs = await db
+          .select({ containerId: factoryRawStock.containerId, costPerKg: factoryRawStock.costPerKg })
+          .from(factoryRawStock)
+          .where(inArray(factoryRawStock.containerId, allContainerIds));
+        for (const r of rawStockRecs) {
+          rawStockCostMap[r.containerId] = parseFloat(r.costPerKg);
+        }
+      }
+
+      const mixCostMap: Record<number, number> = {};
+      for (const mixId of uniqueMixIds) {
+        const sources = allSources.filter((s: any) => s.mixBatchId === mixId);
+        if (sources.length === 0) continue;
+        let totalCost = 0, totalWt = 0;
+        for (const src of sources) {
+          const w = parseFloat(src.weightKg);
+          const c = src.containerId && rawStockCostMap[src.containerId] !== undefined
+            ? rawStockCostMap[src.containerId]
+            : parseFloat(src.costPerKg);
+          totalCost += w * c;
+          totalWt += w;
+        }
+        if (totalWt > 0) mixCostMap[mixId] = totalCost / totalWt;
+      }
+
+      let updated = 0;
+      const now = new Date();
+      for (const bale of balesWithMix) {
+        const isGarbage = bale.articleCode?.startsWith("HMD16");
+        if (isGarbage) continue;
+        const newCost = bale.mixBatchId ? mixCostMap[bale.mixBatchId] : undefined;
+        if (newCost === undefined) continue;
+        const newTotal = parseFloat(bale.weightKg) * newCost;
+        await db
+          .update(factoryBales)
+          .set({ costPerKg: String(newCost), totalCost: String(newTotal), updatedAt: now })
+          .where(eq(factoryBales.id, bale.id));
+        updated++;
+      }
+
+      res.json({ updated, message: `Updated cost for ${updated} finalized bales using raw stock prices.` });
+    } catch (error: any) {
+      console.error("Error backfilling bale costs:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

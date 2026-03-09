@@ -33,6 +33,8 @@ import POS from "@/pages/POS";
 import StockItems from "@/pages/StockItems";
 import Containers from "@/pages/Containers";
 import Accounts from "@/pages/Accounts";
+import FactoryAccounts from "@/pages/FactoryAccounts";
+import FactoryVouchers from "@/pages/FactoryVouchers";
 import Suppliers from "@/pages/Suppliers";
 import Vouchers from "@/pages/Vouchers";
 import Daybook from "@/pages/Daybook";
@@ -618,8 +620,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-otw" component={StockOTW} />
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
-                    <Route path="/factory/accounts" component={Accounts} />
-                    <Route path="/factory/vouchers">{() => <Vouchers />}</Route>
+                    <Route path="/factory/accounts" component={FactoryAccounts} />
+                    <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
                     <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
                     <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
                     <Route path="/factory/create" component={AccountingCreate} />
