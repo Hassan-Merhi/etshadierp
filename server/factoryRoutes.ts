@@ -8080,10 +8080,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be verified" });
 
       if (approved) {
-        const userId = (req.session as any).userId || null;
         const [updated] = await db.update(customerOrders).set({
           status: "VERIFIED",
-          verifiedByUserId: userId,
           verifiedAt: new Date(),
           containerNotes: notes || order.containerNotes,
           updatedAt: new Date(),

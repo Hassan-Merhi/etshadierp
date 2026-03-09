@@ -1759,6 +1759,7 @@ const ALL_FACTORY_PAGES_SETTINGS: { key: string; label: string; group: string }[
   { key: "factory/customers", label: "Customers", group: "Sales" },
   { key: "factory/sales/loadings", label: "Loadings", group: "Sales" },
   { key: "factory/sales/proformas", label: "Proformas", group: "Sales" },
+  { key: "factory/sales/pending-invoices", label: "Pending Invoices", group: "Sales" },
   { key: "factory/sales/invoices", label: "Invoices", group: "Sales" },
   { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
   { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
