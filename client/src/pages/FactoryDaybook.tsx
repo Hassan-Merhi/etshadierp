@@ -83,6 +83,9 @@ const TX_TYPE_LABELS: Record<string, string> = {
   PAYROLL_GENERATED: "Payroll Generated",
   PAYROLL_PAYMENT: "Payroll Payment",
   PAYROLL_STATUS_CHANGE: "Payroll Status",
+  SUPPLIER_PAYMENT: "Supplier Payment",
+  SUPPLIER_PAYMENT_DELETE: "Supplier Pmt. Deleted",
+  ORDER_CANCELLED: "Order Cancelled",
   REPORT_GENERATED: "Report Generated",
 };
 

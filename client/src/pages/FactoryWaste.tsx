@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -45,6 +46,26 @@ export default function FactoryWaste() {
   const [formMixBatchId, setFormMixBatchId] = useState("");
   const [formSupplierId, setFormSupplierId] = useState("");
   const [formContainerId, setFormContainerId] = useState("");
+
+  // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const fmt = "yyyy-MM-dd";
+      if (e.key === "-") {
+        e.preventDefault();
+        setFrom((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
+        setTo((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
+      } else if (e.key === "+" && e.shiftKey) {
+        e.preventDefault();
+        setFrom((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
+        setTo((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const wasteQuery = useQuery<WasteEntry[]>({
     queryKey: ["/api/factory/waste", from, to],

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ interface PendingLoad {
 }
 
 export default function FactoryPendingLoadings() {
+  const { formatDisplayDate } = useDateFormat();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
 
@@ -36,7 +38,9 @@ export default function FactoryPendingLoadings() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const date = formatDisplayDate(dateStr.split("T")[0]);
+    const time = new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
   };
 
   return (

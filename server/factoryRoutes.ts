@@ -1364,6 +1364,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(factorySupplierPayments).values(parsed).returning();
+      const [spSupplier] = await db.select({ name: factorySuppliers.name })
+        .from(factorySuppliers).where(eq(factorySuppliers.id, created.supplierId));
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: created.date,
+        txType: "SUPPLIER_PAYMENT",
+        referenceId: created.id,
+        description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
+        amountCurrency: parseFloat(created.amount),
+        amountUsd: parseFloat(created.amountUsd),
+        currencyCode: created.currencyCode,
+      });
       res.json(created);
     } catch (error: any) {
       console.error("Error creating supplier payment:", error);
@@ -1376,9 +1388,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
+      const [payment] = await db.select().from(factorySupplierPayments)
+        .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
+      const [spDelSupplier] = payment
+        ? await db.select({ name: factorySuppliers.name }).from(factorySuppliers).where(eq(factorySuppliers.id, payment.supplierId))
+        : [null];
       await db
         .delete(factorySupplierPayments)
         .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
+      if (payment) {
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: new Date().toISOString().split("T")[0],
+          txType: "SUPPLIER_PAYMENT_DELETE",
+          description: `Supplier payment deleted: ${spDelSupplier?.name || "Unknown"} – ${parseFloat(payment.amount).toFixed(2)} ${payment.currencyCode} (dated ${payment.date})`,
+        });
+      }
       res.json({ message: "Payment deleted" });
     } catch (error: any) {
       console.error("Error deleting supplier payment:", error);
@@ -2735,6 +2760,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             }
           });
 
+          if (totalBalesCreated > 0) {
+            const excelImportToday = new Date().toISOString().split("T")[0];
+            await writeDaybookEntry(db, {
+              companyId,
+              txDate: excelImportToday,
+              txType: "BALE_IMPORT",
+              description: `Bale Excel import: ${totalBalesCreated} bale${totalBalesCreated !== 1 ? "s" : ""} created${skippedRows > 0 ? ` (${skippedRows} rows skipped)` : ""}`,
+            });
+          }
           res.json({ totalBalesCreated, skippedRows, skippedDetails: skippedDetails.slice(0, 20) });
         } catch (innerError: any) {
           console.error("Error processing bale Excel import:", innerError);
@@ -8239,6 +8273,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .set({ status: "CANCELLED", updatedAt: new Date() })
         .where(eq(customerOrders.id, orderId))
         .returning();
+
+      const [cancelCustomer] = await db.select({ legalName: customers.legalName })
+        .from(customers).where(eq(customers.id, order.customerId));
+      const cancelToday = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: cancelToday,
+        txType: "ORDER_CANCELLED",
+        referenceId: orderId,
+        description: `Order cancelled: ${cancelCustomer?.legalName || "Customer"}, ${orderBales.length} bale${orderBales.length !== 1 ? "s" : ""} released`,
+      });
 
       res.json(updated);
     } catch (error: any) {

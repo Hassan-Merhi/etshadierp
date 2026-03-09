@@ -794,6 +794,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         } as any);
         created++;
       }
+      const payrollToday = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: periodStart,
+        txType: "PAYROLL_GENERATED",
+        description: `Payroll generated: ${created} worker${created !== 1 ? "s" : ""} for period ${periodStart} – ${periodEnd}`,
+      });
       res.json({ created });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -812,6 +819,19 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
         .returning();
       if (!updated) return res.status(404).json({ message: "Payroll record not found" });
+      const [prWorker] = await db.select({ firstName: factoryWorkers.firstName, lastName: factoryWorkers.lastName })
+        .from(factoryWorkers).where(eq(factoryWorkers.id, updated.workerId));
+      const workerName = prWorker ? `${prWorker.firstName} ${prWorker.lastName}`.trim() : `Worker #${updated.workerId}`;
+      const prToday = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: prToday,
+        txType: "PAYROLL_PAYMENT",
+        referenceId: updated.id,
+        description: `Payroll paid: ${workerName} – ${parseFloat(updated.netSalary || "0").toFixed(2)} (${updated.periodStart} – ${updated.periodEnd})`,
+        amountCurrency: parseFloat(updated.netSalary || "0"),
+        amountUsd: parseFloat(updated.netSalary || "0"),
+      });
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -829,6 +849,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       await db.update(factoryPayrolls)
         .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
         .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
+      const bulkPrToday = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: bulkPrToday,
+        txType: "PAYROLL_PAYMENT",
+        description: `Payroll bulk paid: ${payrollIds.length} worker${payrollIds.length !== 1 ? "s" : ""}`,
+      });
       res.json({ updated: payrollIds.length });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

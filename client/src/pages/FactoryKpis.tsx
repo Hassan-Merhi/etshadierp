@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +47,7 @@ function getWasteColor(percent: number): string {
 }
 
 export default function FactoryKpis() {
+  const { formatDisplayDate } = useDateFormat();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -144,7 +146,7 @@ export default function FactoryKpis() {
                     <TableBody>
                       {dailyQuery.data.map((row, idx) => (
                         <TableRow key={row.date ?? idx} data-testid={`row-daily-${idx}`}>
-                          <TableCell className="font-mono text-sm">{row.date}</TableCell>
+                          <TableCell className="font-mono text-sm">{row.date ? formatDisplayDate(row.date) : "—"}</TableCell>
                           <TableCell className="font-mono">{row.balesProduced}</TableCell>
                           <TableCell className="font-mono">{row.kgPressed}</TableCell>
                           <TableCell className="font-mono">{row.wasteKg}</TableCell>
