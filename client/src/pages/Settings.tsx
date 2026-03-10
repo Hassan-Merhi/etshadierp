@@ -1987,6 +1987,7 @@ function LoginHistoryTab() {
     const [isExportingCompanyData, setIsExportingCompanyData] = useState(false);
     const [isImportingCompanyData, setIsImportingCompanyData] = useState(false);
     const [importCompanyResult, setImportCompanyResult] = useState<any>(null);
+    const [isRecalcAllLoading, setIsRecalcAllLoading] = useState(false);
 
     // Factory user management state
     const [factoryCreateOpen, setFactoryCreateOpen] = useState(false);
@@ -4101,52 +4102,93 @@ function LoginHistoryTab() {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      onClick={async () => {
-                        try {
-                          const balanceRes = await fetch("/api/stats/import-cycle-balance", {
-                            credentials: "include",
-                          });
-                          if (!balanceRes.ok) {
-                            throw new Error("Failed to fetch current balance");
-                          }
-                          const balanceData = await balanceRes.json();
-                          // T004: Use rawNetBalance (pre-adjustment, pre-rounding) so the backend
-                          // always computes the adjustment against the true DB value, not a stale cached display.
-                          const rawBalance = balanceData.precisionTrace?.rawNetBalance ?? balanceData.netImportCycleBalance;
-
-                          const response = await fetch("/api/admin/recalculate-equity-adjustment", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ rawBalance }),
-                          });
-                          const result = await response.json();
-                          if (response.ok) {
-                            toast({
-                              title: "Equity Adjusted",
-                              description: result.message,
+                    <div className="flex items-center gap-2">
+                      <Button
+                        disabled={isRecalcAllLoading}
+                        onClick={async () => {
+                          try {
+                            const balanceRes = await fetch("/api/stats/import-cycle-balance", {
+                              credentials: "include",
                             });
-                            queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
-                          } else {
+                            if (!balanceRes.ok) {
+                              throw new Error("Failed to fetch current balance");
+                            }
+                            const balanceData = await balanceRes.json();
+                            // T004: Use rawNetBalance (pre-adjustment, pre-rounding) so the backend
+                            // always computes the adjustment against the true DB value, not a stale cached display.
+                            const rawBalance = balanceData.precisionTrace?.rawNetBalance ?? balanceData.netImportCycleBalance;
+
+                            const response = await fetch("/api/admin/recalculate-equity-adjustment", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              credentials: "include",
+                              body: JSON.stringify({ rawBalance }),
+                            });
+                            const result = await response.json();
+                            if (response.ok) {
+                              toast({
+                                title: "Equity Adjusted",
+                                description: result.message,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: result.message,
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error: any) {
                             toast({
                               title: "Error",
-                              description: result.message,
+                              description: error.message,
                               variant: "destructive",
                             });
                           }
-                        } catch (error: any) {
-                          toast({
-                            title: "Error",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      data-testid="button-recalc-equity"
-                    >
-                      Recalculate
-                    </Button>
+                        }}
+                        data-testid="button-recalc-equity"
+                      >
+                        Recalculate
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={isRecalcAllLoading}
+                        onClick={async () => {
+                          setIsRecalcAllLoading(true);
+                          try {
+                            const response = await fetch("/api/admin/recalculate-equity-adjustment-all", {
+                              method: "POST",
+                              credentials: "include",
+                            });
+                            const result = await response.json();
+                            if (response.ok) {
+                              toast({
+                                title: "All Companies Adjusted",
+                                description: result.message,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: result.message,
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error.message,
+                              variant: "destructive",
+                            });
+                          } finally {
+                            setIsRecalcAllLoading(false);
+                          }
+                        }}
+                        data-testid="button-recalc-equity-all"
+                      >
+                        {isRecalcAllLoading ? "Processing..." : "All Companies"}
+                      </Button>
+                    </div>
                   </div>
                 </Card>
 
