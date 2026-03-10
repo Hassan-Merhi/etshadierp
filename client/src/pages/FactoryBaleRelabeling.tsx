@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag
+  Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag, FileSpreadsheet, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,6 +113,90 @@ function downloadCsv(items: ApplyItem[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function downloadExcelTemplate() {
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ["current_reference_code"],
+    ["REF00001"],
+    ["REF00002"],
+    ["REF00003"],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [{ wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, "Bale References");
+  XLSX.writeFile(wb, "bale-relabeling-template.xlsx");
+}
+
+interface LabelPreviewCardProps {
+  item: ApplyItem;
+  designColor: A4DesignColor;
+  printFormat: "A4" | "A5" | "STICKER";
+}
+
+function LabelPreviewCard({ item, designColor, printFormat }: LabelPreviewCardProps) {
+  const colorOpt = A4_DESIGN_OPTIONS.find((o) => o.value === designColor);
+  const accentColor = colorOpt?.color ?? "#6d28d9";
+
+  if (printFormat === "STICKER") {
+    return (
+      <div
+        className="rounded-md border bg-white text-black overflow-hidden shrink-0"
+        style={{ width: "3in", minWidth: "3in", height: "1.97in", padding: "3mm 4mm", fontFamily: "Arial, Helvetica, sans-serif", display: "flex", flexDirection: "column", gap: "1mm" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div style={{ fontSize: "11pt", fontWeight: 900, letterSpacing: "1px" }}>HMD</div>
+          <div style={{ textAlign: "right", fontSize: "7pt", lineHeight: 1.3 }}>
+            <div><strong>PIECES:</strong> 1</div>
+            <div><strong>ARTICLE:</strong> {item.articleCode || "—"}</div>
+            <div><strong>APRX WEIGHT:</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <img
+            src={`/api/barcode/${encodeURIComponent(item.newRef)}`}
+            alt="barcode"
+            style={{ width: "100%", height: "11mm", objectFit: "fill" }}
+          />
+          <div style={{ fontSize: "11pt", fontWeight: 900, letterSpacing: "2px", marginTop: "0.5mm" }}>{item.newRef}</div>
+        </div>
+        <div style={{ textAlign: "center", fontSize: "7pt", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5px", flexShrink: 0 }}>
+          {item.productName}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-md border bg-white text-black overflow-hidden shrink-0"
+      style={{ width: "220px", fontFamily: "Arial, Helvetica, sans-serif" }}
+    >
+      <div style={{ background: accentColor, color: "#fff", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: "10pt", fontWeight: 900, letterSpacing: "1px" }}>HMD</span>
+        <span style={{ fontSize: "7pt", fontWeight: 700, opacity: 0.9 }}>{printFormat}</span>
+      </div>
+      <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div style={{ fontSize: "7pt", lineHeight: 1.4 }}>
+          <div><strong>PIECES:</strong> 1</div>
+          <div><strong>ARTICLE:</strong> {item.articleCode || "—"}</div>
+          <div><strong>WEIGHT:</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS</div>
+        </div>
+        <div style={{ textAlign: "center", borderTop: "1px solid #eee", paddingTop: "4px" }}>
+          <img
+            src={`/api/barcode/${encodeURIComponent(item.newRef)}`}
+            alt="barcode"
+            style={{ width: "100%", height: "32px", objectFit: "fill" }}
+          />
+          <div style={{ fontSize: "9pt", fontWeight: 900, letterSpacing: "2px", marginTop: "2px" }}>{item.newRef}</div>
+        </div>
+        <div style={{ textAlign: "center", fontSize: "7pt", fontWeight: 700, textTransform: "uppercase", color: "#333", borderTop: "1px solid #eee", paddingTop: "4px" }}>
+          {item.productName}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FactoryBaleRelabeling() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
@@ -129,6 +213,7 @@ export default function FactoryBaleRelabeling() {
 
   const [applyResult, setApplyResult] = useState<{ sessionId: number; items: ApplyItem[] } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showLabelPreview, setShowLabelPreview] = useState(true);
 
   const validRows = validationResults.filter((r) => r.valid);
   const invalidRows = validationResults.filter((r) => !r.valid);
@@ -253,16 +338,35 @@ export default function FactoryBaleRelabeling() {
       {step === "upload" && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              Upload Excel File
-            </CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Excel File
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadExcelTemplate}
+                data-testid="button-download-template"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Download Template
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Upload a <code>.xlsx</code>, <code>.xls</code>, or <code>.csv</code> file with a column containing current bale reference codes.
               Accepted column names: <code>current_reference_code</code>, <code>reference_code</code>, <code>barcode</code>, <code>ref</code>, etc.
             </p>
+
+            {/* Template hint */}
+            <div className="flex items-start gap-2 rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
+              <FileSpreadsheet className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <span>
+                Not sure of the format? Click <strong>Download Template</strong> above to get a pre-formatted Excel file. Fill in your bale reference codes in the <code>current_reference_code</code> column and upload it here.
+              </span>
+            </div>
 
             <div
               className="border-2 border-dashed rounded-md p-8 text-center cursor-pointer hover-elevate"
@@ -517,6 +621,50 @@ export default function FactoryBaleRelabeling() {
               <Download className="h-4 w-4 mr-2" /> Export Result CSV
             </Button>
           </div>
+
+          {/* ── Label Preview ── */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Label Preview
+                  <Badge variant="secondary" className="text-xs font-normal">{printFormat}</Badge>
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowLabelPreview((v) => !v)}
+                  data-testid="button-toggle-preview"
+                >
+                  {showLabelPreview ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {showLabelPreview ? "Hide" : "Show"}
+                </Button>
+              </div>
+            </CardHeader>
+            {showLabelPreview && (
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Preview of your labels — showing {Math.min(applyResult.items.length, 6)} of {applyResult.items.length}. Click <strong>Print Labels</strong> above to print all.
+                </p>
+                <div className="flex gap-4 overflow-x-auto pb-3">
+                  {applyResult.items.slice(0, 6).map((item, i) => (
+                    <LabelPreviewCard
+                      key={i}
+                      item={item}
+                      designColor={designColor}
+                      printFormat={printFormat}
+                    />
+                  ))}
+                </div>
+                {applyResult.items.length > 6 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    +{applyResult.items.length - 6} more labels will be included when printing.
+                  </p>
+                )}
+              </CardContent>
+            )}
+          </Card>
 
           {/* Mapping table */}
           <Card>
