@@ -117,10 +117,15 @@ export function PaymentVoucherTab({
   const canPrint = canRunActions && hasAnyEntry;
   const canExport = canRunActions && hasAnyEntry && hasExport;
 
+  const queryVisible = (testId: string): HTMLInputElement | null => {
+    const els = document.querySelectorAll(`[data-testid="${testId}"]`);
+    return (Array.from(els).find(el => (el as HTMLElement).offsetParent !== null) as HTMLInputElement) ?? null;
+  };
+
   const focusFirstVoucherRow = () => {
     requestAnimationFrame(() => {
-      const acct = document.querySelector('[data-testid="input-account-0"]') as HTMLInputElement | null;
-      const amt = document.querySelector('[data-testid="input-amount-0"]') as HTMLElement | null;
+      const acct = queryVisible("input-account-0");
+      const amt = queryVisible("input-amount-0");
       const target = (acct && acct.value === "") ? acct : (amt ?? acct);
       target?.focus();
     });

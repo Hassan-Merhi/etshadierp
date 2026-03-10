@@ -87,9 +87,14 @@ export function VoucherEntriesTable({
       ? "text-emerald-600 dark:text-emerald-400"
       : "text-muted-foreground";
 
+  const queryVisible = (testId: string): HTMLInputElement | null => {
+    const els = document.querySelectorAll(`[data-testid="${testId}"]`);
+    return (Array.from(els).find(el => (el as HTMLElement).offsetParent !== null) as HTMLInputElement) ?? null;
+  };
+
   const focusAmountField = (index: number) => {
     requestAnimationFrame(() => {
-      const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement | null;
+      const amountInput = queryVisible(`input-amount-${index}`);
       if (amountInput) {
         amountInput.focus();
         amountInput.select();
@@ -163,9 +168,7 @@ export function VoucherEntriesTable({
 
         requestAnimationFrame(() => {
           const newRowIndex = entries.length;
-          const newInput = document.querySelector(
-            `[data-testid="input-account-${newRowIndex}"]`
-          ) as HTMLInputElement;
+          const newInput = queryVisible(`input-account-${newRowIndex}`);
           if (newInput) {
             newInput.focus();
             newInput.select();
@@ -174,18 +177,14 @@ export function VoucherEntriesTable({
       }
     } else if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
-      const prevInput = document.querySelector(
-        `[data-testid="input-amount-${index - 1}"]`
-      ) as HTMLInputElement;
+      const prevInput = queryVisible(`input-amount-${index - 1}`);
       if (prevInput) {
         prevInput.focus();
         prevInput.select();
       }
     } else if (e.key === "ArrowDown" && index < entries.length - 1) {
       e.preventDefault();
-      const nextInput = document.querySelector(
-        `[data-testid="input-amount-${index + 1}"]`
-      ) as HTMLInputElement;
+      const nextInput = queryVisible(`input-amount-${index + 1}`);
       if (nextInput) {
         nextInput.focus();
         nextInput.select();
