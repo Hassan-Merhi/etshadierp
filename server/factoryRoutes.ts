@@ -10529,9 +10529,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           .where(eq(factoryBaleSequences.companyId, companyId))
           .for("update");
 
-        const [dbMaxRow] = await tx.execute(
+        const dbMaxResult = await tx.execute(
           sql`SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 100875) as maxnum FROM factory_bales WHERE company_id = ${companyId}`
         );
+        const dbMaxRow: any = Array.isArray(dbMaxResult) ? dbMaxResult[0] : (dbMaxResult?.rows?.[0] ?? {});
         const dbMax = Number(dbMaxRow?.maxnum ?? 100875);
         const storedNext = seqRow?.nextNumber ?? 1;
         let nextNumber = Math.max(storedNext, dbMax + 1);

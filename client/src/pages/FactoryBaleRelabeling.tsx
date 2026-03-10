@@ -6,6 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -208,8 +209,23 @@ export default function FactoryBaleRelabeling() {
   const [parseError, setParseError] = useState("");
 
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
-  const [printFormat, setPrintFormat] = useState<"A4" | "A5" | "STICKER">("A4");
+  const [printFormats, setPrintFormats] = useState<Set<"A4" | "A5" | "STICKER">>(new Set(["A4"]));
   const [designColor, setDesignColor] = useState<A4DesignColor>("purple");
+
+  const toggleFormat = (fmt: "A4" | "A5" | "STICKER") => {
+    setPrintFormats((prev) => {
+      const next = new Set(prev);
+      if (next.has(fmt)) {
+        if (next.size === 1) return prev;
+        next.delete(fmt);
+      } else {
+        next.add(fmt);
+      }
+      return next;
+    });
+  };
+
+  const printFormatLabel = Array.from(printFormats).join("+");
 
   const [applyResult, setApplyResult] = useState<{ sessionId: number; items: ApplyItem[] } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -246,8 +262,8 @@ export default function FactoryBaleRelabeling() {
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", "/api/factory/bales/relabel/apply", {
         rows: validRows.map((r) => ({ currentRef: r.currentRef })),
-        printFormat,
-        designColor: printFormat === "A4" ? designColor : undefined,
+        printFormat: printFormatLabel,
+        designColor: printFormats.has("A4") ? designColor : undefined,
         filename: fileName,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
@@ -286,16 +302,25 @@ export default function FactoryBaleRelabeling() {
       productName: item.productName || "",
     }));
 
-    let html = "";
-    if (printFormat === "A4") html = generateCombinedLabelsHtml(labels, designColor);
-    else if (printFormat === "A5") html = generateA5LabelsHtml(labels);
-    else html = generateStickerLabelsHtml(labels);
+    let opened = 0;
+    const formatsToOpen = Array.from(printFormats);
+    for (const fmt of formatsToOpen) {
+      let html = "";
+      if (fmt === "A4") html = generateCombinedLabelsHtml(labels, designColor);
+      else if (fmt === "A5") html = generateA5LabelsHtml(labels);
+      else html = generateStickerLabelsHtml(labels);
 
-    const win = window.open("", "_blank");
-    if (!win) { toast({ title: "Popup blocked", description: "Allow popups to print labels", variant: "destructive" }); return; }
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 500);
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast({ title: "Popup blocked", description: "Allow popups to print labels", variant: "destructive" });
+        return;
+      }
+      win.document.write(html);
+      win.document.close();
+      const delay = opened * 600;
+      setTimeout(() => win.print(), 500 + delay);
+      opened++;
+    }
   };
 
   const handleReset = () => {
@@ -516,41 +541,51 @@ export default function FactoryBaleRelabeling() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Print Formats (select one or more)</Label>
+                <div className="flex flex-wrap gap-4">
+                  {(["A4", "A5", "STICKER"] as const).map((fmt) => (
+                    <label
+                      key={fmt}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                      data-testid={`checkbox-format-${fmt}`}
+                    >
+                      <Checkbox
+                        checked={printFormats.has(fmt)}
+                        onCheckedChange={() => toggleFormat(fmt)}
+                      />
+                      <span className="text-sm font-medium">
+                        {fmt === "A4" ? "A4 (Full Page)" : fmt === "A5" ? "A5 (Half Page)" : 'Sticker (3"×2")'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {printFormats.size > 1 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {printFormats.size} formats selected — each will open in a separate print window.
+                  </p>
+                )}
+              </div>
+              {printFormats.has("A4") && (
                 <div className="space-y-1.5">
-                  <Label>Paper Format</Label>
-                  <Select value={printFormat} onValueChange={(v) => setPrintFormat(v as any)} data-testid="select-print-format">
-                    <SelectTrigger>
+                  <Label>A4 Label Design</Label>
+                  <Select value={designColor} onValueChange={(v) => setDesignColor(v as A4DesignColor)} data-testid="select-design-color">
+                    <SelectTrigger className="max-w-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="A4">A4 (Full Page)</SelectItem>
-                      <SelectItem value="A5">A5 (Half Page)</SelectItem>
-                      <SelectItem value="STICKER">Sticker (3"×2")</SelectItem>
+                      {A4_DESIGN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full border" style={{ backgroundColor: opt.color }} />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                {printFormat === "A4" && (
-                  <div className="space-y-1.5">
-                    <Label>Label Design</Label>
-                    <Select value={designColor} onValueChange={(v) => setDesignColor(v as A4DesignColor)} data-testid="select-design-color">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {A4_DESIGN_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            <div className="flex items-center gap-2">
-                              <div className="h-3 w-3 rounded-full border" style={{ backgroundColor: opt.color }} />
-                              {opt.label}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -597,7 +632,7 @@ export default function FactoryBaleRelabeling() {
             <Card>
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground">Format</p>
-                <p className="text-2xl font-bold">{printFormat}</p>
+                <p className="text-2xl font-bold">{printFormatLabel}</p>
               </CardContent>
             </Card>
             <Card>
@@ -611,7 +646,7 @@ export default function FactoryBaleRelabeling() {
           {/* Action buttons */}
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handlePrint} data-testid="button-print-labels">
-              <Printer className="h-4 w-4 mr-2" /> Print Labels ({printFormat})
+              <Printer className="h-4 w-4 mr-2" /> Print Labels ({printFormatLabel})
             </Button>
             <Button
               variant="outline"
@@ -629,7 +664,7 @@ export default function FactoryBaleRelabeling() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <Eye className="h-4 w-4" />
                   Label Preview
-                  <Badge variant="secondary" className="text-xs font-normal">{printFormat}</Badge>
+                  <Badge variant="secondary" className="text-xs font-normal">{printFormatLabel}</Badge>
                 </CardTitle>
                 <Button
                   variant="ghost"
@@ -643,25 +678,29 @@ export default function FactoryBaleRelabeling() {
               </div>
             </CardHeader>
             {showLabelPreview && (
-              <CardContent>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Preview of your labels — showing {Math.min(applyResult.items.length, 6)} of {applyResult.items.length}. Click <strong>Print Labels</strong> above to print all.
+              <CardContent className="space-y-4">
+                {Array.from(printFormats).map((fmt) => (
+                  <div key={fmt}>
+                    {printFormats.size > 1 && (
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                        {fmt === "A4" ? "A4 (Full Page)" : fmt === "A5" ? "A5 (Half Page)" : 'Sticker (3"×2")'}
+                      </p>
+                    )}
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                      {applyResult.items.slice(0, 4).map((item, i) => (
+                        <LabelPreviewCard
+                          key={i}
+                          item={item}
+                          designColor={designColor}
+                          printFormat={fmt}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  Showing up to 4 per format — {applyResult.items.length} total bales will print. Click <strong>Print Labels</strong> above to print all.
                 </p>
-                <div className="flex gap-4 overflow-x-auto pb-3">
-                  {applyResult.items.slice(0, 6).map((item, i) => (
-                    <LabelPreviewCard
-                      key={i}
-                      item={item}
-                      designColor={designColor}
-                      printFormat={printFormat}
-                    />
-                  ))}
-                </div>
-                {applyResult.items.length > 6 && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    +{applyResult.items.length - 6} more labels will be included when printing.
-                  </p>
-                )}
               </CardContent>
             )}
           </Card>
