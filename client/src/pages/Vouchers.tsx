@@ -1660,46 +1660,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
-  // Journal sidebar state for account selection (like Stock Transfer's item sidebar)
-  const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
-  const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
-  const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
-
   // Create account modal state
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [createAccountContext, setCreateAccountContext] = useState<{
     tab: "payment" | "receipt" | "journal";
     rowIndex?: number;
   } | null>(null);
-
-  // Filter accounts for journal sidebar
-  const filteredJournalAccounts = useMemo(() => {
-    if (!journalAccountSearchTerm.trim()) return allAccounts;
-    const term = journalAccountSearchTerm.toLowerCase();
-    return allAccounts.filter((acc) =>
-      (acc.name || '').toLowerCase().includes(term) ||
-      (acc.code || '').toLowerCase().includes(term)
-    );
-  }, [allAccounts, journalAccountSearchTerm]);
-
-  // Handle account selection from sidebar
-  const handleJournalAccountSelect = (account: CombinedAccount) => {
-    if (activeJournalRow !== null) {
-      const rowIndex = activeJournalRow;
-      journalForm.setValue(`entries.${rowIndex}.accountType`, account.type);
-      journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
-      journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
-      setJournalAccountSearchTerm("");
-      setActiveJournalRow(null);
-      setTimeout(() => {
-        const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
-        if (amountInput) {
-          amountInput.focus();
-          amountInput.select();
-        }
-      }, 50);
-    }
-  };
 
   // Helper function to get account balance from sidebarAccounts
   const getAccountBalance = (accountType: string, accountId: number): number => {
@@ -3918,120 +3884,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     />
                   </div>
 
-                  {/* Mobile journal card layout (< md) */}
-                  <div className="block md:hidden space-y-3">
-                    {journalFields.map((field, index) => {
-                      const entry = journalEntries[index];
-                      return (
-                        <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
-                          <div className="flex items-center justify-between gap-2">
-                            <FormField
-                              control={journalForm.control}
-                              name={`entries.${index}.type`}
-                              render={({ field }) => (
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={field.value === "DR" ? "default" : "outline"}
-                                    onClick={() => handleJournalTypeChange(index, "DR")}
-                                    data-testid={`button-journal-dr-${index}`}
-                                  >DR</Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={field.value === "CR" ? "default" : "outline"}
-                                    onClick={() => handleJournalTypeChange(index, "CR")}
-                                    data-testid={`button-journal-cr-${index}`}
-                                  >CR</Button>
-                                </div>
-                              )}
-                            />
-                            {journalFields.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeJournal(index)}
-                                data-testid={`button-journal-remove-${index}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                          <FormField
-                            control={journalForm.control}
-                            name={`entries.${index}.accountName`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs text-muted-foreground">Account</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    {...field}
-                                    placeholder="Type to search account..."
-                                    data-testid={`input-journal-account-${index}`}
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                      setJournalAccountSearchTerm(e.target.value);
-                                      setJournalAccountHighlightedIndex(0);
-                                    }}
-                                    onFocus={() => {
-                                      setActiveJournalRow(index);
-                                      setJournalAccountSearchTerm(journalEntries[index]?.accountName || "");
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={journalForm.control}
-                            name={`entries.${index}.amount`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs text-muted-foreground">Amount</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    {...field}
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    className="font-mono text-right"
-                                    data-testid={`input-journal-amount-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
-                    <div className="flex items-center justify-between pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
-                        data-testid="button-journal-add-row"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Row
-                      </Button>
-                      <div className="text-xs text-muted-foreground">
-                        DR: {formatAmount(totalDebit)} | CR: {formatAmount(totalCredit)}
-                      </div>
-                    </div>
-                    {Math.abs(totalDebit - totalCredit) > 0.01 && (
-                      <div className="text-center text-sm text-destructive">
-                        Debits and Credits must be equal. Difference: {formatAmount(Math.abs(totalDebit - totalCredit))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Desktop journal table (≥ md) */}
-                  <div className="hidden md:block border rounded-md overflow-hidden overflow-x-auto">
+                  <div className="border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/50 sticky top-0 z-10">
                         <tr>
@@ -4102,168 +3955,77 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               })()}
                             </td>
                             <td className="p-2">
-                              <FormField
-                                control={journalForm.control}
-                                name={`entries.${index}.accountId`}
-                                render={({ field }) => {
-                                  const entry = journalEntries[index];
-                                  const currentBalance = entry?.accountId > 0 
-                                    ? getAccountBalance(entry.accountType, entry.accountId) 
-                                    : 0;
-                                  const entryAmount = parseFloat(entry?.amount || "0");
-                                  const isDebit = entry?.type === "DR";
-                                  // In the signed balance system: positive = Dr, negative = Cr
-                                  // DR always adds to balance, CR always subtracts — same for all account types
-                                  const projectedBalance = isDebit 
-                                    ? currentBalance + entryAmount 
-                                    : currentBalance - entryAmount;
-                                  const displayBalance = projectedBalance;
-                                    
-                                  const isActive = activeJournalRow === index;
-                                  const commitAccount = (acc: typeof filteredJournalAccounts[0]) => {
-                                    journalForm.setValue(`entries.${index}.accountType`, acc.type);
-                                    journalForm.setValue(`entries.${index}.accountId`, acc.id);
-                                    journalForm.setValue(`entries.${index}.accountName`, acc.name);
-                                    setJournalAccountSearchTerm("");
-                                    setActiveJournalRow(null);
-                                    setTimeout(() => {
-                                      const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                      if (el) { el.focus(); el.select(); }
-                                    }, 80);
-                                  };
-                                  return (
-                                    <FormItem>
-                                      <FormControl>
-                                        <div className="relative space-y-1">
-                                          <Input
-                                            value={isActive ? journalAccountSearchTerm : (entry?.accountName || "")}
-                                            onChange={(e) => {
-                                              setJournalAccountSearchTerm(e.target.value);
-                                              setJournalAccountHighlightedIndex(0);
-                                            }}
-                                            onFocus={() => {
-                                              setActiveJournalRow(index);
-                                              setJournalAccountSearchTerm("");
-                                            }}
-                                            onBlur={() => {
-                                              setTimeout(() => {
-                                                if (activeJournalRow === index) {
-                                                  setJournalAccountSearchTerm("");
-                                                  setActiveJournalRow(null);
-                                                }
-                                              }, 200);
-                                            }}
-                                            placeholder="Type to search..."
-                                            data-testid={`input-journal-account-${index}`}
-                                            onKeyDown={(e) => {
-                                              const focusAmount = () => setTimeout(() => {
-                                                const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                if (el) { el.focus(); el.select(); }
-                                              }, 50);
-                                              if (e.key === "ArrowUp") {
-                                                e.preventDefault();
-                                                if (filteredJournalAccounts.length > 0) {
-                                                  setJournalAccountHighlightedIndex(prev =>
-                                                    prev > 0 ? prev - 1 : filteredJournalAccounts.length - 1
-                                                  );
-                                                } else if (index > 0) {
-                                                  setTimeout(() => {
-                                                    const el = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
-                                                    if (el) el.focus();
-                                                  }, 50);
-                                                }
-                                              } else if (e.key === "ArrowDown") {
-                                                e.preventDefault();
-                                                if (filteredJournalAccounts.length > 0) {
-                                                  setJournalAccountHighlightedIndex(prev =>
-                                                    prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
-                                                  );
-                                                } else if (index < journalFields.length - 1) {
-                                                  setTimeout(() => {
-                                                    const el = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
-                                                    if (el) el.focus();
-                                                  }, 50);
-                                                }
-                                              } else if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                const sel = filteredJournalAccounts[journalAccountHighlightedIndex];
-                                                if (sel) {
-                                                  commitAccount(sel);
-                                                } else if (isFactoryCompany && journalAccountSearchTerm.trim()) {
-                                                  const name = journalAccountSearchTerm.trim();
-                                                  handleAutoCreateAccount(name).then(created => {
-                                                    if (created) commitAccount({ ...created, balance: String(created.balance ?? 0), code: created.code ?? "" });
-                                                  });
-                                                } else {
-                                                  const committed = journalEntries[index]?.accountId || 0;
-                                                  if (committed > 0) focusAmount();
-                                                }
-                                              } else if (e.key === "Tab" && !e.shiftKey) {
-                                                e.preventDefault();
-                                                focusAmount();
-                                              } else if (e.key === "Escape") {
-                                                e.preventDefault();
-                                                setJournalAccountSearchTerm("");
-                                                setActiveJournalRow(null);
-                                              } else if (e.key === "ArrowRight") {
-                                                e.preventDefault();
-                                                focusAmount();
-                                              } else if (e.key === "ArrowLeft") {
-                                                e.preventDefault();
-                                                setTimeout(() => {
-                                                  const el = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
-                                                  if (el) el.focus();
-                                                }, 50);
-                                              }
-                                            }}
-                                          />
-                                          {/* Inline account dropdown */}
-                                          {isActive && (
-                                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-md max-h-56 overflow-y-auto">
-                                              {filteredJournalAccounts.length === 0 ? (
-                                                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                                                  {isFactoryCompany && journalAccountSearchTerm.trim()
-                                                    ? <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
-                                                    : "No accounts found"}
-                                                </div>
-                                              ) : (
-                                                filteredJournalAccounts.map((acc, idx) => (
-                                                  <button
-                                                    key={`${acc.type}-${acc.id}`}
-                                                    type="button"
-                                                    onMouseDown={(e) => { e.preventDefault(); commitAccount(acc); }}
-                                                    data-testid={`journal-account-option-${idx}`}
-                                                    className={cn(
-                                                      "w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2",
-                                                      idx === journalAccountHighlightedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                                                    )}
-                                                  >
-                                                    <span className="truncate">{acc.name}</span>
-                                                    {acc.balance !== undefined && (
-                                                      <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
-                                                        {parseFloat(acc.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                      </span>
-                                                    )}
-                                                  </button>
-                                                ))
-                                              )}
-                                            </div>
-                                          )}
-                                          {entry?.accountId > 0 && (
-                                            <div className="text-xs text-muted-foreground pl-1">
-                                              New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                                {formatAmount(Math.abs(displayBalance))} {displayBalance >= 0 ? "Dr" : "Cr"}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  );
-                                }}
-                              />
+                              {(() => {
+                                const entry = journalEntries[index];
+                                const currentBalance = entry?.accountId > 0
+                                  ? getAccountBalance(entry.accountType, entry.accountId)
+                                  : 0;
+                                const entryAmount = parseFloat(entry?.amount || "0");
+                                const projectedBalance = entry?.type === "DR"
+                                  ? currentBalance + entryAmount
+                                  : currentBalance - entryAmount;
+                                const focusAmount = () => setTimeout(() => {
+                                  const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                  if (el) { el.focus(); el.select(); }
+                                }, 80);
+                                return (
+                                  <div className="space-y-1">
+                                    <AccountAutocomplete
+                                      value={entry?.accountId > 0 ? { type: entry.accountType, id: entry.accountId, name: entry.accountName } : null}
+                                      onChange={(type, id, name) => {
+                                        journalForm.setValue(`entries.${index}.accountType`, type);
+                                        journalForm.setValue(`entries.${index}.accountId`, id);
+                                        journalForm.setValue(`entries.${index}.accountName`, name);
+                                      }}
+                                      allAccounts={allAccounts}
+                                      placeholder="Type to search..."
+                                      testId={`input-journal-account-${index}`}
+                                      rowIndex={index}
+                                      onSelectionCommitted={() => focusAmount()}
+                                      onTabPressed={() => focusAmount()}
+                                      onEnterWithoutSelection={() => {
+                                        if ((entry?.accountId || 0) > 0) focusAmount();
+                                      }}
+                                      onEnterWithNoResults={isFactoryCompany ? (term) => {
+                                        handleAutoCreateAccount(term).then(created => {
+                                          if (created) {
+                                            journalForm.setValue(`entries.${index}.accountType`, created.type);
+                                            journalForm.setValue(`entries.${index}.accountId`, created.id);
+                                            journalForm.setValue(`entries.${index}.accountName`, created.name);
+                                            focusAmount();
+                                          }
+                                        });
+                                      } : undefined}
+                                      onArrowUp={() => {
+                                        if (index > 0) setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
+                                          if (el) el.focus();
+                                        }, 30);
+                                      }}
+                                      onArrowDown={() => {
+                                        if (index < journalFields.length - 1) setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
+                                          if (el) el.focus();
+                                        }, 30);
+                                      }}
+                                      onArrowLeft={() => {
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
+                                          if (el) el.focus();
+                                        }, 30);
+                                      }}
+                                      onArrowRight={() => focusAmount()}
+                                    />
+                                    {entry?.accountId > 0 && (
+                                      <div className="text-xs text-muted-foreground pl-1">
+                                        New Bal: <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                          {formatAmount(Math.abs(projectedBalance))} {projectedBalance >= 0 ? "Dr" : "Cr"}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="p-2">
                               <FormField

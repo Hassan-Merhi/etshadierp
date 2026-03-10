@@ -21,6 +21,7 @@ export interface AccountAutocompleteProps {
   className?: string;
   onSelectionCommitted?: (account: CombinedAccount) => void;
   onEnterWithoutSelection?: () => void;
+  onEnterWithNoResults?: (term: string) => void;
   onTabPressed?: () => void;
   onArrowUp?: () => void;
   onArrowDown?: () => void;
@@ -47,6 +48,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       className,
       onSelectionCommitted,
       onEnterWithoutSelection,
+      onEnterWithNoResults,
       onTabPressed,
       onArrowUp,
       onArrowDown,
@@ -111,6 +113,8 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         e.preventDefault();
         if (open && filteredAccounts.length > 0 && highlightedIndex >= 0) {
           handleSelectAccount(filteredAccounts[highlightedIndex]);
+        } else if (open && filteredAccounts.length === 0 && searchTerm?.trim()) {
+          onEnterWithNoResults?.(searchTerm.trim());
         } else if (!open) {
           onEnterWithoutSelection?.();
         }
