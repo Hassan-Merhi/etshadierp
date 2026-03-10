@@ -3250,8 +3250,11 @@ if (asOfDate) {
           // NOTE: Production and Consumption are EXCLUDED from the balance calculation
           // Their effects are already reflected in stockOnFloorValue (inventory movements)
           // They are tracked for informational/diagnostic purposes only
+          // T003: directExpenseBalance is intentionally EXCLUDED here (matches the canonical import-cycle-balance formula).
+          // Import charges (duties, transport, etc.) are already capitalized into stockOnFloorValue — including
+          // them again in assets double-counts those costs and causes the profit recalculation to overshoot.
           const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
-            directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
+            indirectExpenseBalance + governmentTaxesBalance +
             cogsBalance + salaryAdvancesBalance;
           
           // Calculate liabilities WITHOUT profit (to avoid circular dependency)
@@ -21061,8 +21064,9 @@ if (asOfDate) {
       const adjustedImportCycleBalance = netImportCycleBalance + storedEquityAdjustment;
 
       // Round to 2 decimal places to eliminate floating-point noise
-      // If the balance is within ±$5, round to 0 to handle accumulated floating-point precision errors
-      const ROUNDING_THRESHOLD = 5;
+      // T006: Threshold reduced from $5 to $0.01 — the $5 threshold was hiding real imbalances.
+      // With T001/T002 preventing bad postings, accumulated errors should stay below $0.01.
+      const ROUNDING_THRESHOLD = 0.01;
       let roundedBalance = Math.round(adjustedImportCycleBalance * 100) / 100;
       if (Math.abs(roundedBalance) <= ROUNDING_THRESHOLD) {
         roundedBalance = 0;
@@ -23531,19 +23535,17 @@ if (asOfDate) {
       // Subtract opening stock value from equity (it's an asset that needs balancing)
       openingBalanceEquity -= openingStockValue;
 
-      // Calculate net balance (EXACT same formula as import-cycle-balance endpoint)
-      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-      
-      // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
-      const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance);
-      
-      // Operating Expenses: Indirect Expenses + Government Taxes + COGS + Payroll Expenses
-      const totalExpenses = round2(indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance);
-      
-      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability + Profit + Income + Payroll Liabilities - Opening Balance Equity
-      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance - openingBalanceEquity);
-      
-      const netImportCycleBalance = round2((totalAssets + totalExpenses) - totalLiabilities);
+      // T005: Calculate net balance using the CANONICAL formula from import-cycle-balance endpoint.
+      // Intermediate round2() calls have been removed — they created different rounding results
+      // compared to the main endpoint, causing the two endpoints to disagree on the same data.
+      // Only the final result is rounded (2 decimal places), matching the main endpoint behavior.
+      const netImportCycleBalance = Math.round((
+        (stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance +
+         indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance) -
+        (supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance +
+         profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance -
+         openingBalanceEquity)
+      ) * 100) / 100;
 
 
       // === RECONCILIATION SECTION ===
@@ -32203,13 +32205,16 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Frontend passes the current displayed import cycle balance
-      const { currentBalance } = req.body;
-      if (typeof currentBalance !== 'number') {
-        return res.status(400).json({ message: "currentBalance is required" });
+      // T004: Frontend passes the RAW (pre-adjustment, pre-rounding) import cycle balance.
+      // Using rawBalance instead of the displayed (adjusted+rounded) balance ensures the
+      // adjustment is always computed against the true DB value, not a stale cached display value.
+      // Formula: newAdjustment = -rawBalance  →  rawBalance + newAdjustment = 0
+      const { rawBalance } = req.body;
+      if (typeof rawBalance !== 'number') {
+        return res.status(400).json({ message: "rawBalance (raw pre-adjustment balance) is required" });
       }
 
-      // Get current equity adjustment (if any)
+      // Get current equity adjustment (if any) — needed to report the previous value
       const settingKey = `equity_adjustment_${companyId}`;
       const existingAdjustment = await db
         .select()
@@ -32220,10 +32225,8 @@ if (asOfDate) {
         ? parseFloat(existingAdjustment[0].value || "0") 
         : 0;
 
-      // The adjustment needed is the additional offset to zero out the current balance
-      // New adjustment = current adjustment - current balance
-      // This way: new balance = current balance + (new adjustment - current adjustment) = current balance - current balance = 0
-      const newAdjustment = currentAdjustment - currentBalance;
+      // newAdjustment = -rawBalance  →  rawBalance + newAdjustment = 0  (always exactly zeros it out)
+      const newAdjustment = -rawBalance;
 
       // Store the adjustment
       if (existingAdjustment.length > 0) {
@@ -32243,7 +32246,7 @@ if (asOfDate) {
         message: `Equity adjustment updated. The import cycle balance should now be $0.`,
         previousAdjustment: currentAdjustment.toFixed(2),
         newAdjustment: newAdjustment.toFixed(2),
-        balanceZeroed: currentBalance.toFixed(2),
+        balanceZeroed: rawBalance.toFixed(2),
       });
     } catch (error: any) {
       console.error("Recalculate equity adjustment error:", error);

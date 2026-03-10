@@ -2482,6 +2482,21 @@ export class DbStorage implements IStorage {
     // NOTE: Uses the user-selected office charges account directly (should be an Asset-type account)
     // This keeps the import cycle balanced: DR Asset (office charges account) = CR Asset (cash)
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
+      // T001: Validate that the office charges debit account is an Asset type.
+      // If an Expense or Liability type is used here, the import cycle becomes permanently imbalanced
+      // because the expense/liability movement is excluded from the formula while the cash deduction is not.
+      const [officeChargesAccount] = await db
+        .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
+        .from(schema.ledgerAccounts)
+        .where(and(eq(schema.ledgerAccounts.id, officeChargesAccountId), isNull(schema.ledgerAccounts.deletedAt)))
+        .limit(1);
+      const officeInvalidTypes = ["Expense", "Direct Expense", "Indirect Expense", "Income", "Liability", "Current Liability", "Profit", "Government Taxes", "COGS"];
+      if (!officeChargesAccount || officeInvalidTypes.includes(officeChargesAccount.accountType)) {
+        throw new Error(
+          `Office charges account "${officeChargesAccount?.name || `ID ${officeChargesAccountId}`}" has type "${officeChargesAccount?.accountType ?? "deleted/not found"}" which is invalid. ` +
+          `It must be an Asset-type account (e.g., a Receivable or Prepaid Expenses account) to keep the import cycle balanced.`
+        );
+      }
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await tx.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -2672,6 +2687,25 @@ export class DbStorage implements IStorage {
     // Additional charges voucher entries
     for (const charge of additionalCharges) {
       if (charge.amount > 0) {
+        // T002: Validate the credit account is not a Direct Expense (import charges family).
+        // Crediting a Direct Expense account cancels part of the capitalized charge in the
+        // excluded IMPORT_CHARGES bucket without reducing any included account, creating a +X imbalance.
+        const [additionalCreditAccount] = await db
+          .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
+          .from(schema.ledgerAccounts)
+          .where(and(eq(schema.ledgerAccounts.id, charge.ledgerAccountId), isNull(schema.ledgerAccounts.deletedAt)))
+          .limit(1);
+        if (!additionalCreditAccount) {
+          throw new Error(
+            `Additional charge "${charge.description}" references a deleted or non-existent ledger account (ID: ${charge.ledgerAccountId}). Please select a valid account.`
+          );
+        }
+        if (additionalCreditAccount.accountType === "Direct Expense" || additionalCreditAccount.accountType === "Indirect Expense") {
+          throw new Error(
+            `Additional charge "${charge.description}" cannot credit the "${additionalCreditAccount.name}" account (type: ${additionalCreditAccount.accountType}). ` +
+            `Use a Liability, Accounts Payable, Cash, or Bank account instead.`
+          );
+        }
         const voucherNumber = `CHG-${container.containerNumber}-${Date.now()}`;
         const [voucher] = await tx.insert(schema.vouchers).values({
           companyId: location.companyId,
