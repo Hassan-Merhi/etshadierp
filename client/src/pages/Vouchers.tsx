@@ -4235,6 +4235,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                     amountInput.select();
                                                   }
                                                 }, 50);
+                                              } else if (e.key === "Enter") {
+                                                const entryAccountId = journalEntries[index]?.accountId || 0;
+                                                if (entryAccountId > 0) {
+                                                  e.preventDefault();
+                                                  setTimeout(() => {
+                                                    const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                    if (amountInput) {
+                                                      amountInput.focus();
+                                                      amountInput.select();
+                                                    }
+                                                  }, 50);
+                                                }
                                               } else if (e.key === "ArrowUp" && index > 0) {
                                                 e.preventDefault();
                                                 setTimeout(() => {

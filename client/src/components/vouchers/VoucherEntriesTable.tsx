@@ -125,9 +125,13 @@ export function VoucherEntriesTable({
       if (filteredSidebarAccounts.length === 0) return;
       const newIndex = Math.max(sidebarHighlightedIndex - 1, 0);
       setSidebarHighlightedIndex(newIndex);
+    } else if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      focusAmountField(index);
     } else if (e.key === "Enter") {
       e.preventDefault();
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
+      const currentAccountId = form.getValues(`entries.${index}.accountId`) || 0;
 
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
         if (filteredSidebarAccounts.length > 0) {
@@ -150,31 +154,34 @@ export function VoucherEntriesTable({
           handleSidebarAccountSelect(highlightedAccount);
           focusAmountField(index);
         }
+      } else if (currentAccountId > 0) {
+        focusAmountField(index);
       }
     }
   };
 
   const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
+      const isLastRow = index === entries.length - 1;
 
-      if (!isNaN(amount) && amount > 0) {
-        if (onAmountCommit) {
-          onAmountCommit(index);
-        }
-
-        handleAddRow();
-
-        requestAnimationFrame(() => {
-          const newRowIndex = entries.length;
-          const newInput = queryVisible(`input-account-${newRowIndex}`);
-          if (newInput) {
-            newInput.focus();
-            newInput.select();
-          }
-        });
+      if (!isNaN(amount) && amount > 0 && onAmountCommit) {
+        onAmountCommit(index);
       }
+
+      if (isLastRow) {
+        handleAddRow();
+      }
+
+      requestAnimationFrame(() => {
+        const newRowIndex = isLastRow ? entries.length : index + 1;
+        const newInput = queryVisible(`input-account-${newRowIndex}`);
+        if (newInput) {
+          newInput.focus();
+          newInput.select();
+        }
+      });
     } else if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
       const prevInput = queryVisible(`input-amount-${index - 1}`);
