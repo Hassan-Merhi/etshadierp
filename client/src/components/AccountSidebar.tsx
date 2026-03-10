@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, Loader2 } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { cn } from "@/lib/utils";
 
 export interface Account {
   id: number;
@@ -40,6 +41,7 @@ interface AccountSidebarProps {
   isFactoryCompany?: boolean;
   onAutoCreateAccount?: (name: string) => Promise<Account | null>;
   isAutoCreating?: boolean;
+  scrollable?: boolean;
 }
 
 export default function AccountSidebar({
@@ -61,6 +63,7 @@ export default function AccountSidebar({
   isFactoryCompany = false,
   onAutoCreateAccount,
   isAutoCreating = false,
+  scrollable = true,
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -177,7 +180,7 @@ export default function AccountSidebar({
   };
 
   return (
-    <Card className="flex flex-col h-full">
+    <Card className={cn("flex flex-col", scrollable ? "h-full" : "h-auto")}>
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-semibold">Select Account</h3>
@@ -214,7 +217,7 @@ export default function AccountSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3" ref={listRef}>
+      <div className={cn(scrollable ? "flex-1 overflow-y-auto" : "", "p-3")} ref={listRef}>
         <div className="space-y-1">
           {filteredAccounts.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">

@@ -71,6 +71,32 @@ export function VoucherEntriesTable({
     return typeof found.balance === "string" ? parseFloat(found.balance) : found.balance;
   };
 
+  const getEntryProjectedBalance = (index: number): { bal: number; projected: number | null } | null => {
+    const bal = getEntryBalance(index);
+    if (bal == null) return null;
+    const entryAmount = parseFloat(entries[index]?.amount || "0") || 0;
+    if (entryAmount <= 0) return { bal, projected: null };
+    const projected = mode === "payment" ? bal + entryAmount : bal - entryAmount;
+    return { bal, projected };
+  };
+
+  const balColorClass = (v: number) =>
+    v < 0
+      ? "text-red-500 dark:text-red-400"
+      : v > 0
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-muted-foreground";
+
+  const focusAmountField = (index: number) => {
+    requestAnimationFrame(() => {
+      const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement | null;
+      if (amountInput) {
+        amountInput.focus();
+        amountInput.select();
+      }
+    });
+  };
+
   const handleAddRow = () => {
     append({
       accountType: "ledger",
@@ -100,22 +126,24 @@ export function VoucherEntriesTable({
 
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
         if (filteredSidebarAccounts.length > 0) {
-          // Results exist — select the highlighted one (or first if none highlighted)
-          const idx = sidebarHighlightedIndex >= 0 && sidebarHighlightedIndex < filteredSidebarAccounts.length
-            ? sidebarHighlightedIndex
-            : 0;
+          const idx =
+            sidebarHighlightedIndex >= 0 && sidebarHighlightedIndex < filteredSidebarAccounts.length
+              ? sidebarHighlightedIndex
+              : 0;
           handleSidebarAccountSelect(filteredSidebarAccounts[idx]);
+          focusAmountField(index);
         } else {
-          // Zero results — create immediately
           const newAccount = await onAutoCreateAccount(currentName);
           if (newAccount) {
             handleSidebarAccountSelect(newAccount);
+            focusAmountField(index);
           }
         }
       } else if (!isFactoryCompany && filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
         const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
         if (highlightedAccount) {
           handleSidebarAccountSelect(highlightedAccount);
+          focusAmountField(index);
         }
       }
     }
@@ -125,17 +153,19 @@ export function VoucherEntriesTable({
     if (e.key === "Enter") {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
-      
+
       if (!isNaN(amount) && amount > 0) {
         if (onAmountCommit) {
           onAmountCommit(index);
         }
-        
+
         handleAddRow();
-        
+
         requestAnimationFrame(() => {
           const newRowIndex = entries.length;
-          const newInput = document.querySelector(`[data-testid="input-account-${newRowIndex}"]`) as HTMLInputElement;
+          const newInput = document.querySelector(
+            `[data-testid="input-account-${newRowIndex}"]`
+          ) as HTMLInputElement;
           if (newInput) {
             newInput.focus();
             newInput.select();
@@ -144,14 +174,18 @@ export function VoucherEntriesTable({
       }
     } else if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
-      const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
+      const prevInput = document.querySelector(
+        `[data-testid="input-amount-${index - 1}"]`
+      ) as HTMLInputElement;
       if (prevInput) {
         prevInput.focus();
         prevInput.select();
       }
     } else if (e.key === "ArrowDown" && index < entries.length - 1) {
       e.preventDefault();
-      const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
+      const nextInput = document.querySelector(
+        `[data-testid="input-amount-${index + 1}"]`
+      ) as HTMLInputElement;
       if (nextInput) {
         nextInput.focus();
         nextInput.select();
@@ -172,90 +206,96 @@ export function VoucherEntriesTable({
     }
   };
 
+  const renderBalanceLine = (index: number) => {
+    const result = getEntryProjectedBalance(index);
+    if (!result) return null;
+    const { bal, projected } = result;
+    const displayVal = projected ?? bal;
+    return (
+      <p className={`text-xs font-mono mt-0.5 ${balColorClass(displayVal)}`}>
+        {projected != null ? "New Bal: " : "Bal: "}
+        {formatAmount(displayVal)}
+      </p>
+    );
+  };
+
   return (
     <div className="space-y-0">
       {/* ── Mobile card layout (< md) ── */}
       <div className="block md:hidden space-y-3">
-        {fields.map((field, index) => {
-          const bal = getEntryBalance(index);
-          return (
-            <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
-              {/* Account row */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">Account</label>
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(index)}
-                      data-testid={`button-remove-${index}`}
-                      className="h-7 w-7 text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-                <FormField
-                  control={form.control}
-                  name={`entries.${index}.accountName`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Type to search..."
-                          className="text-sm"
-                          data-testid={`input-account-${index}`}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setSidebarSearchValue(e.target.value);
-                          }}
-                          onFocus={() => onRowFocus(index, "account")}
-                          onKeyDown={(e) => handleAccountKeyDown(e, index)}
-                          onBlur={() => setTimeout(() => onRowBlur(), 200)}
-                        />
-                      </FormControl>
-                      {bal != null && (
-                        <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                          Balance: {formatAmount(bal)}
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+        {fields.map((field, index) => (
+          <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
+            {/* Account row */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium text-muted-foreground">Account</label>
+                {fields.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove(index)}
+                    data-testid={`button-remove-${index}`}
+                    className="h-7 w-7 text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
-              {/* Amount row */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Amount</label>
-                <FormField
-                  control={form.control}
-                  name={`entries.${index}.amount`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="font-mono text-right"
-                          data-testid={`input-amount-${index}`}
-                          onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                          onBlur={(e) => sharedAmountBlur(e, index)}
-                          onFocus={() => onRowFocus(index, "amount")}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name={`entries.${index}.accountName`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Type to search..."
+                        className="text-sm"
+                        data-testid={`input-account-${index}`}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setSidebarSearchValue(e.target.value);
+                        }}
+                        onFocus={() => onRowFocus(index, "account")}
+                        onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                        onBlur={() => setTimeout(() => onRowBlur(), 200)}
+                      />
+                    </FormControl>
+                    {renderBalanceLine(index)}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-          );
-        })}
+            {/* Amount row */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Amount</label>
+              <FormField
+                control={form.control}
+                name={`entries.${index}.amount`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="font-mono text-right"
+                        data-testid={`input-amount-${index}`}
+                        onKeyDown={(e) => handleAmountKeyDown(e, index)}
+                        onBlur={(e) => sharedAmountBlur(e, index)}
+                        onFocus={() => onRowFocus(index, "amount")}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        ))}
         {/* Mobile footer */}
         <div className="flex items-center justify-between pt-1">
           <Button
@@ -268,9 +308,7 @@ export function VoucherEntriesTable({
             <Plus className="h-4 w-4 mr-2" />
             Add Row
           </Button>
-          <div className="text-sm font-bold font-mono pr-1">
-            {formatAmount(total)}
-          </div>
+          <div className="text-sm font-bold font-mono pr-1">{formatAmount(total)}</div>
         </div>
       </div>
 
@@ -312,15 +350,7 @@ export function VoucherEntriesTable({
                             }}
                           />
                         </FormControl>
-                        {(() => {
-                          const bal = getEntryBalance(index);
-                          if (bal == null) return null;
-                          return (
-                            <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-                              Balance: {formatAmount(bal)}
-                            </p>
-                          );
-                        })()}
+                        {renderBalanceLine(index)}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -381,9 +411,7 @@ export function VoucherEntriesTable({
                 </Button>
               </td>
               <td className="p-3">
-                <div className="text-right font-bold font-mono">
-                  {formatAmount(total)}
-                </div>
+                <div className="text-right font-bold font-mono">{formatAmount(total)}</div>
               </td>
               <td colSpan={1}></td>
             </tr>

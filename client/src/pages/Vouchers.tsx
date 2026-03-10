@@ -3788,7 +3788,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {!isPOS && activeTab === "payment" && (
           <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
-            {selectedCurrency === "CFA" && (
+            {selectedCurrency !== "USD" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput
@@ -3836,7 +3836,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {!isPOS && activeTab === "receipt" && (
           <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
-            {selectedCurrency === "CFA" && (
+            {selectedCurrency !== "USD" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput
@@ -3885,7 +3885,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {!isPOS && activeTab === "journal" && (
           <div className="space-y-4">
             {/* Exchange Rate Input for multi-currency transactions */}
-            {selectedCurrency === "CFA" && (
+            {selectedCurrency !== "USD" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                 <span className="text-sm text-muted-foreground">Transaction Rate:</span>
                 <ExchangeRateInput

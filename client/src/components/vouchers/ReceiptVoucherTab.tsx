@@ -211,20 +211,11 @@ export function ReceiptVoucherTab({
                             </div>
                           </FormControl>
                           {paymentAccountId > 0 && (() => {
-                            const projected = isEditMode
-                              ? accountBalance + originalTotal - total
-                              : accountBalance + total;
+                            const displayBal = total > 0 ? accountBalance + total : accountBalance;
                             return (
-                              <div className="flex items-center gap-1.5 flex-wrap text-xs mt-1.5 font-mono text-muted-foreground">
-                                <span>Bal:</span>
-                                <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
-                                {total > 0 && (
-                                  <>
-                                    <span>→</span>
-                                    <span className={cn("font-semibold", balColor(projected))}>{formatAmount(projected)}</span>
-                                    <span>after</span>
-                                  </>
-                                )}
+                              <div className="flex items-center gap-1 text-xs mt-1.5 font-mono">
+                                <span className="text-muted-foreground">Bal:</span>
+                                <span className={cn("font-semibold", balColor(displayBal))}>{formatAmount(displayBal)}</span>
                               </div>
                             );
                           })()}
@@ -444,9 +435,9 @@ export function ReceiptVoucherTab({
       {/* Desktop sidebar (≥ lg) */}
       <div
         className="hidden lg:block sticky top-4 h-fit"
-        style={{ width: "40%", maxHeight: "calc(100vh - 2rem)" }}
+        style={{ width: "40%" }}
       >
-        <AccountSidebar {...accountSidebarProps} onSelectAccount={handleSidebarAccountSelect} />
+        <AccountSidebar {...accountSidebarProps} onSelectAccount={handleSidebarAccountSelect} scrollable={false} />
       </div>
 
       {/* Mobile sidebar Sheet (< lg) */}
