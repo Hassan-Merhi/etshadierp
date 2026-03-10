@@ -4065,12 +4065,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         data-testid={`input-journal-type-${index}`}
                                         onClick={() => handleJournalTypeChange(index, field.value === "DR" ? "CR" : "DR")}
                                         onKeyDown={(e) => {
-                                          if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter" || e.key === "ArrowRight") {
-                                            e.preventDefault();
+                                          const focusAccount = () => {
                                             setTimeout(() => {
                                               const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
                                               if (accountInput) accountInput.focus();
                                             }, 50);
+                                          };
+                                          if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter" || e.key === "ArrowRight") {
+                                            e.preventDefault();
+                                            focusAccount();
+                                          } else if (e.key === "d" || e.key === "D") {
+                                            e.preventDefault();
+                                            handleJournalTypeChange(index, "DR");
+                                            focusAccount();
+                                          } else if (e.key === "c" || e.key === "C") {
+                                            e.preventDefault();
+                                            handleJournalTypeChange(index, "CR");
+                                            focusAccount();
                                           } else if (e.key === " ") {
                                             e.preventDefault();
                                             handleJournalTypeChange(index, field.value === "DR" ? "CR" : "DR");
@@ -4147,74 +4158,49 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             placeholder="Type to search..."
                                             data-testid={`input-journal-account-${index}`}
                                             onKeyDown={(e) => {
-                                              // If sidebar is open, use arrow keys to navigate accounts
-                                              if (showAccountSidebar) {
-                                                if (e.key === "ArrowUp") {
-                                                  e.preventDefault();
-                                                  setJournalAccountHighlightedIndex(prev => 
-                                                    prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
-                                                  );
-                                                  // Scroll highlighted item into view
-                                                  setTimeout(() => {
-                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.max(0, journalAccountHighlightedIndex - 1)}"]`) as HTMLElement;
-                                                    if (button) button.scrollIntoView({ block: "nearest" });
-                                                  }, 0);
-                                                } else if (e.key === "ArrowDown") {
-                                                  e.preventDefault();
-                                                  setJournalAccountHighlightedIndex(prev => 
-                                                    prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
-                                                  );
-                                                  // Scroll highlighted item into view
-                                                  setTimeout(() => {
-                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1)}"]`) as HTMLElement;
-                                                    if (button) button.scrollIntoView({ block: "nearest" });
-                                                  }, 0);
-                                                } else if (e.key === "Enter") {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
-                                                  if (selectedAccount) {
-                                                    handleJournalAccountSelect(selectedAccount);
-                                                    setShowAccountSidebar(false);
-                                                  }
-                                                }
-                                                return;
-                                              }
-
-                                              // Normal row navigation when sidebar is not open
-                                              if (e.key === "Tab" && !e.shiftKey) {
-                                                e.preventDefault();
+                                              const focusAmount = () => {
                                                 setTimeout(() => {
                                                   const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                  if (amountInput) {
-                                                    amountInput.focus();
-                                                    amountInput.select();
-                                                  }
+                                                  if (amountInput) { amountInput.focus(); amountInput.select(); }
                                                 }, 50);
-                                              } else if (e.key === "Enter") {
-                                                const entryAccountId = journalEntries[index]?.accountId || 0;
-                                                if (entryAccountId > 0) {
-                                                  e.preventDefault();
+                                              };
+                                              if (e.key === "ArrowUp") {
+                                                e.preventDefault();
+                                                if (filteredJournalAccounts.length > 0) {
+                                                  setJournalAccountHighlightedIndex(prev =>
+                                                    prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
+                                                  );
+                                                } else if (index > 0) {
                                                   setTimeout(() => {
-                                                    const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                    if (amountInput) {
-                                                      amountInput.focus();
-                                                      amountInput.select();
-                                                    }
+                                                    const prevInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                                    if (prevInput) prevInput.focus();
                                                   }, 50);
                                                 }
-                                              } else if (e.key === "ArrowUp" && index > 0) {
+                                              } else if (e.key === "ArrowDown") {
                                                 e.preventDefault();
-                                                setTimeout(() => {
-                                                  const prevInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
-                                                  if (prevInput) prevInput.focus();
-                                                }, 50);
-                                              } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                                if (filteredJournalAccounts.length > 0) {
+                                                  setJournalAccountHighlightedIndex(prev =>
+                                                    prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
+                                                  );
+                                                } else if (index < journalFields.length - 1) {
+                                                  setTimeout(() => {
+                                                    const nextInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                                    if (nextInput) nextInput.focus();
+                                                  }, 50);
+                                                }
+                                              } else if (e.key === "Enter") {
                                                 e.preventDefault();
-                                                setTimeout(() => {
-                                                  const nextInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
-                                                  if (nextInput) nextInput.focus();
-                                                }, 50);
+                                                e.stopPropagation();
+                                                const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
+                                                if (selectedAccount) {
+                                                  handleJournalAccountSelect(selectedAccount);
+                                                } else {
+                                                  const entryAccountId = journalEntries[index]?.accountId || 0;
+                                                  if (entryAccountId > 0) focusAmount();
+                                                }
+                                              } else if (e.key === "Tab" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                focusAmount();
                                               } else if (e.key === "ArrowRight") {
                                                 e.preventDefault();
                                                 setTimeout(() => {
