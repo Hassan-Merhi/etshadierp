@@ -74,7 +74,6 @@ export default function FactoryAttendance() {
     queryKey: [`/api/factory/attendance?date=${selectedDate}`],
   });
 
-  // Sync attendance records from server into local state
   useEffect(() => {
     if (!data) return;
     const newMap: Record<number, AttendanceStatus> = {};
@@ -137,9 +136,7 @@ export default function FactoryAttendance() {
     setNotesMap((prev) => ({ ...prev, [workerId]: notes }));
   };
 
-  const handlePrintBlank = () => {
-    const workers = data?.workers ?? [];
-    const html = generateBlankSheetHtml(workers, selectedDate, shift);
+  const openPrintWindow = (html: string) => {
     const w = window.open("", "_blank");
     if (!w) return;
     w.document.write(html);
@@ -148,10 +145,20 @@ export default function FactoryAttendance() {
     setTimeout(() => w.print(), 400);
   };
 
-  const handleExportPdf = () => {
-    const params = new URLSearchParams({ date: selectedDate });
-    if (shift) params.set("shift", shift);
-    window.open(`/api/factory/attendance/pdf?${params.toString()}`, "_blank");
+  const handlePrintBlank = () => {
+    const html = generateBlankSheetHtml(data?.workers ?? [], selectedDate, shift);
+    openPrintWindow(html);
+  };
+
+  const handleExportResults = () => {
+    const html = generateResultsSheetHtml(
+      data?.workers ?? [],
+      attendanceMap,
+      notesMap,
+      selectedDate,
+      shift
+    );
+    openPrintWindow(html);
   };
 
   const workers = data?.workers ?? [];
@@ -196,6 +203,7 @@ export default function FactoryAttendance() {
                 value={shift}
                 onChange={(e) => setShift(e.target.value)}
                 className="w-36"
+                dir="auto"
               />
             </div>
 
@@ -244,7 +252,7 @@ export default function FactoryAttendance() {
                 variant="outline"
                 size="default"
                 data-testid="button-export-pdf"
-                onClick={handleExportPdf}
+                onClick={handleExportResults}
                 disabled={!workers.length}
               >
                 <FileDown className="h-4 w-4 mr-1" />
@@ -306,8 +314,6 @@ export default function FactoryAttendance() {
                     <tr className="border-b bg-muted/40">
                       <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
                       <th className="text-left px-4 py-2 font-medium text-muted-foreground">Worker Name</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Code</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Department</th>
                       <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">Status</th>
                       <th className="text-left px-4 py-2 font-medium text-muted-foreground">Notes</th>
                     </tr>
@@ -322,14 +328,12 @@ export default function FactoryAttendance() {
                           className="border-b last:border-0 hover-elevate"
                         >
                           <td className="px-4 py-2 text-muted-foreground">{idx + 1}</td>
-                          <td className="px-4 py-2 font-medium" data-testid={`text-worker-name-${worker.id}`}>
+                          <td
+                            className="px-4 py-2 font-medium"
+                            dir="auto"
+                            data-testid={`text-worker-name-${worker.id}`}
+                          >
                             {worker.fullName}
-                          </td>
-                          <td className="px-4 py-2 text-muted-foreground">
-                            {worker.employeeCode || "—"}
-                          </td>
-                          <td className="px-4 py-2 text-muted-foreground">
-                            {worker.department || "—"}
                           </td>
                           <td className="px-4 py-2">
                             <Select
@@ -358,6 +362,7 @@ export default function FactoryAttendance() {
                               value={notesMap[worker.id] ?? ""}
                               onChange={(e) => setNotes(worker.id, e.target.value)}
                               className="h-8 text-xs"
+                              dir="auto"
                             />
                           </td>
                         </tr>
@@ -378,15 +383,13 @@ export default function FactoryAttendance() {
                       className="border rounded-md p-3 space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-sm" data-testid={`text-worker-name-mobile-${worker.id}`}>
-                            {worker.fullName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {worker.employeeCode && <span className="mr-2">{worker.employeeCode}</span>}
-                            {worker.department && <span>{worker.department}</span>}
-                          </p>
-                        </div>
+                        <p
+                          className="font-medium text-sm"
+                          dir="auto"
+                          data-testid={`text-worker-name-mobile-${worker.id}`}
+                        >
+                          {worker.fullName}
+                        </p>
                         <span className="text-xs text-muted-foreground shrink-0">{idx + 1}</span>
                       </div>
                       <Select
@@ -413,6 +416,7 @@ export default function FactoryAttendance() {
                         value={notesMap[worker.id] ?? ""}
                         onChange={(e) => setNotes(worker.id, e.target.value)}
                         className="h-8 text-xs"
+                        dir="auto"
                       />
                     </div>
                   );
@@ -471,6 +475,29 @@ function formatDate(dateStr: string) {
   }
 }
 
+const ARABIC_FONT_CSS = `
+  font-family: 'Segoe UI', Tahoma, Arial, 'Noto Sans Arabic', sans-serif;
+`;
+
+const PRINT_BASE_CSS = `
+  @page { size: A4 portrait; margin: 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body { ${ARABIC_FONT_CSS} font-size: 10pt; color: #111; margin: 0; }
+  h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
+  .subtitle { text-align: center; font-size: 10pt; color: #555; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #f0f0f0; border: 1px solid #bbb; padding: 5px 6px; font-size: 9pt; text-align: left; }
+  td { border: 1px solid #ccc; padding: 5px 6px; font-size: 9pt; vertical-align: middle; }
+  td.num { width: 28px; text-align: center; color: #888; }
+  td.name { width: 55%; unicode-bidi: plaintext; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .legend { margin-top: 14px; font-size: 8.5pt; color: #555; }
+  .legend span { margin-right: 16px; }
+  .footer { margin-top: 20px; display: flex; justify-content: space-between; font-size: 9pt; }
+  .footer div { border-top: 1px solid #333; padding-top: 4px; width: 140px; text-align: center; }
+  @media print { button { display: none; } }
+`;
+
 function generateBlankSheetHtml(workers: WorkerRow[], date: string, shift: string) {
   const formattedDate = formatDate(date);
   const rows = workers
@@ -478,43 +505,20 @@ function generateBlankSheetHtml(workers: WorkerRow[], date: string, shift: strin
       (w, i) => `
       <tr>
         <td class="num">${i + 1}</td>
-        <td class="name">${escHtml(w.fullName)}</td>
-        <td class="code">${escHtml(w.employeeCode || "")}</td>
-        <td class="dept">${escHtml(w.department || "")}</td>
-        <td class="status-cell"></td>
-        <td class="status-cell"></td>
-        <td class="notes-cell"></td>
+        <td class="name" dir="auto">${escHtml(w.fullName)}</td>
+        <td style="width:12%;text-align:center"></td>
+        <td style="width:12%;text-align:center"></td>
+        <td style="width:21%"></td>
       </tr>`
     )
     .join("");
 
   return `<!DOCTYPE html>
-<html>
+<html lang="ar" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <title>Attendance Sheet — ${escHtml(date)}</title>
-  <style>
-    @page { size: A4 portrait; margin: 18mm 15mm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 10pt; color: #111; margin: 0; }
-    h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
-    .subtitle { text-align: center; font-size: 10pt; color: #555; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th { background: #f0f0f0; border: 1px solid #bbb; padding: 5px 4px; font-size: 9pt; text-align: left; }
-    td { border: 1px solid #ccc; padding: 5px 4px; font-size: 9pt; vertical-align: middle; }
-    td.num { width: 28px; text-align: center; color: #888; }
-    td.name { width: 30%; }
-    td.code { width: 12%; }
-    td.dept { width: 16%; }
-    td.status-cell { width: 10%; text-align: center; }
-    td.notes-cell { width: 18%; }
-    tr:nth-child(even) td { background: #fafafa; }
-    .legend { margin-top: 14px; font-size: 8.5pt; color: #555; }
-    .legend span { margin-right: 16px; }
-    .footer { margin-top: 20px; display: flex; justify-content: space-between; font-size: 9pt; }
-    .footer div { border-top: 1px solid #333; padding-top: 4px; width: 140px; text-align: center; }
-    @media print { button { display: none; } }
-  </style>
+  <style>${PRINT_BASE_CSS}</style>
 </head>
 <body>
   <h1>Attendance Sheet</h1>
@@ -527,12 +531,10 @@ function generateBlankSheetHtml(workers: WorkerRow[], date: string, shift: strin
     <thead>
       <tr>
         <th style="width:28px">#</th>
-        <th style="width:30%">Worker Name</th>
-        <th style="width:12%">Code</th>
-        <th style="width:16%">Department</th>
-        <th style="width:10%;text-align:center">P</th>
-        <th style="width:10%;text-align:center">A</th>
-        <th style="width:18%">Notes / Signature</th>
+        <th>Worker Name</th>
+        <th style="width:12%;text-align:center">P</th>
+        <th style="width:12%;text-align:center">A</th>
+        <th style="width:21%">Notes / Signature</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -542,6 +544,88 @@ function generateBlankSheetHtml(workers: WorkerRow[], date: string, shift: strin
     <span><strong>A</strong> = Absent</span>
     <span>Mark with ✓ in the appropriate column</span>
   </div>
+  <div class="footer">
+    <div>Prepared By</div>
+    <div>Supervisor</div>
+    <div>Approved By</div>
+  </div>
+</body>
+</html>`;
+}
+
+const STATUS_PRINT_COLORS: Record<string, string> = {
+  Present: "#15803d",
+  Absent: "#b91c1c",
+  Late: "#b45309",
+  "Half Day": "#1d4ed8",
+  Leave: "#7e22ce",
+};
+
+function generateResultsSheetHtml(
+  workers: WorkerRow[],
+  attendanceMap: Record<number, AttendanceStatus>,
+  notesMap: Record<number, string>,
+  date: string,
+  shift: string
+) {
+  const formattedDate = formatDate(date);
+
+  const present = workers.filter((w) => (attendanceMap[w.id] ?? "Present") === "Present").length;
+  const absent = workers.filter((w) => attendanceMap[w.id] === "Absent").length;
+  const other = workers.filter((w) => {
+    const s = attendanceMap[w.id] ?? "Present";
+    return s !== "Present" && s !== "Absent";
+  }).length;
+
+  const rows = workers
+    .map((w, i) => {
+      const status = attendanceMap[w.id] ?? "Present";
+      const color = STATUS_PRINT_COLORS[status] ?? "#374151";
+      const notes = escHtml(notesMap[w.id] ?? "");
+      return `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td class="name" dir="auto">${escHtml(w.fullName)}</td>
+        <td style="width:18%;font-weight:600;color:${color}">${escHtml(status)}</td>
+        <td style="width:22%;color:#555">${notes}</td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>Attendance Report — ${escHtml(date)}</title>
+  <style>
+    ${PRINT_BASE_CSS}
+    .summary { display:flex; gap:32px; margin-bottom:10px; font-size:10pt; }
+    .summary span { font-weight:600; }
+  </style>
+</head>
+<body>
+  <h1>Attendance Report</h1>
+  <div class="subtitle">
+    Date: <strong>${escHtml(formattedDate)}</strong>
+    ${shift ? `&nbsp;&nbsp;|&nbsp;&nbsp; Shift: <strong>${escHtml(shift)}</strong>` : ""}
+  </div>
+  <div class="summary">
+    <div>Total Workers: <span>${workers.length}</span></div>
+    <div>Present: <span style="color:#15803d">${present}</span></div>
+    <div>Absent: <span style="color:#b91c1c">${absent}</span></div>
+    <div>Other: <span style="color:#b45309">${other}</span></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th>Worker Name</th>
+        <th style="width:18%">Status</th>
+        <th style="width:22%">Notes</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
   <div class="footer">
     <div>Prepared By</div>
     <div>Supervisor</div>
