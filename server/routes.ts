@@ -14,6 +14,7 @@ import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
 import { registerFactoryPayrollRoutes } from "./factoryPayrollRoutes";
 import { registerFactoryReportRoutes } from "./factoryReportRoutes";
 import { registerFactoryIntelligenceRoutes } from "./factoryIntelligenceRoutes";
+import { registerFactoryAttendanceRoutes } from "./factoryAttendanceRoutes";
 import { registerSupplierProformaRoutes } from "./supplierProformaRoutes";
 import {
   requireAuth,
@@ -706,6 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFactoryPayrollRoutes(app, requireAuth, db);
   registerFactoryReportRoutes(app, requireAuth, db);
   registerFactoryIntelligenceRoutes(app, requireAuth, db);
+  registerFactoryAttendanceRoutes(app, requireAuth, db);
   registerSupplierProformaRoutes(app, requireAuth);
 
   // Lightweight health check for offline ping detection

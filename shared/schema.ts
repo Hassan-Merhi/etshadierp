@@ -3147,6 +3147,30 @@ export const insertFactoryPayrollSchema = createInsertSchema(factoryPayrolls).om
 export type InsertFactoryPayroll = z.infer<typeof insertFactoryPayrollSchema>;
 export type FactoryPayroll = typeof factoryPayrolls.$inferSelect;
 
+export const factoryAttendance = pgTable("factory_attendance", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  workerId: integer("worker_id").notNull().references(() => factoryWorkers.id),
+  attendanceDate: date("attendance_date").notNull(),
+  shift: varchar("shift", { length: 50 }),
+  status: varchar("status", { length: 20 }).notNull().default("Present"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyDateIdx: index("factory_attendance_company_date_idx").on(t.companyId, t.attendanceDate),
+  uniqueWorkerDate: uniqueIndex("factory_attendance_worker_date_unique").on(t.workerId, t.attendanceDate),
+}));
+
+export const insertFactoryAttendanceSchema = createInsertSchema(factoryAttendance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFactoryAttendance = z.infer<typeof insertFactoryAttendanceSchema>;
+export type FactoryAttendance = typeof factoryAttendance.$inferSelect;
+
 export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

@@ -1,17 +1,25 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, DollarSign } from "lucide-react";
+import { HardHat, DollarSign, CalendarDays } from "lucide-react";
 import FactoryWorkers from "@/pages/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
+import FactoryAttendance from "@/pages/FactoryAttendance";
+
+type TabValue = "workers" | "payroll" | "attendance";
+
+function getInitialTab(): TabValue {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  if (tab === "payroll") return "payroll";
+  if (tab === "attendance") return "attendance";
+  return "workers";
+}
 
 export default function FactoryWorkersHub() {
-  const [tab, setTab] = useState<string>(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("tab") === "payroll" ? "payroll" : "workers";
-  });
+  const [tab, setTab] = useState<TabValue>(getInitialTab);
 
   return (
-    <Tabs value={tab} onValueChange={setTab}>
+    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
       <TabsList className="mb-4">
         <TabsTrigger value="workers" data-testid="tab-workers">
           <HardHat className="h-4 w-4 mr-2" />
@@ -21,6 +29,10 @@ export default function FactoryWorkersHub() {
           <DollarSign className="h-4 w-4 mr-2" />
           Payroll
         </TabsTrigger>
+        <TabsTrigger value="attendance" data-testid="tab-attendance">
+          <CalendarDays className="h-4 w-4 mr-2" />
+          Attendance
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="workers" className="mt-0">
@@ -28,6 +40,9 @@ export default function FactoryWorkersHub() {
       </TabsContent>
       <TabsContent value="payroll" className="mt-0">
         <FactoryPayrollTab />
+      </TabsContent>
+      <TabsContent value="attendance" className="mt-0">
+        <FactoryAttendance />
       </TabsContent>
     </Tabs>
   );
