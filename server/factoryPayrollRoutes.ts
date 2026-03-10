@@ -7,6 +7,7 @@ import {
   factoryPayrolls,
   factoryBales,
   factoryDaybookEntries,
+  factoryAttendance,
   companies,
   insertFactoryPayrollSchema,
 } from "@shared/schema";
@@ -93,6 +94,24 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         }
       }
 
+      // Fetch attendance records for the period
+      const attendanceInRange = await db
+        .select()
+        .from(factoryAttendance)
+        .where(
+          and(
+            eq(factoryAttendance.companyId, companyId),
+            gte(factoryAttendance.attendanceDate, startDate),
+            lte(factoryAttendance.attendanceDate, endDate)
+          )
+        );
+      const attendanceByWorker = new Map<number, any[]>();
+      for (const att of attendanceInRange) {
+        const existing = attendanceByWorker.get(att.workerId) || [];
+        existing.push(att);
+        attendanceByWorker.set(att.workerId, existing);
+      }
+
       const periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
       const monthDays = daysInMonth(startDate);
@@ -111,12 +130,40 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         const workerOvertimeRate = parseFloat(worker.overtimeRate || "0");
         const workerBales = balesByWorker.get(worker.id) || [];
 
+        // Calculate attendance metrics
+        const workerAttendance = attendanceByWorker.get(worker.id) || [];
+        const hasAttendance = workerAttendance.length > 0;
+        let presentDays = 0;
+        let absentDays = 0;
+        const totalWorkingDays = weekdays;
+
+        if (hasAttendance) {
+          for (const att of workerAttendance) {
+            if (att.status === "Present" || att.status === "Late" || att.status === "Leave") {
+              presentDays += 1;
+            } else if (att.status === "Half Day") {
+              presentDays += 0.5;
+              absentDays += 0.5;
+            } else if (att.status === "Absent") {
+              absentDays += 1;
+            }
+          }
+        }
+
         switch (worker.salaryType) {
           case "Monthly":
-            basePay = workerBaseSalary * (periodDays / monthDays);
+            if (hasAttendance) {
+              basePay = (workerBaseSalary / monthDays) * presentDays;
+            } else {
+              basePay = workerBaseSalary * (periodDays / monthDays);
+            }
             break;
           case "Daily":
-            basePay = workerBaseSalary * weekdays;
+            if (hasAttendance) {
+              basePay = workerBaseSalary * presentDays;
+            } else {
+              basePay = workerBaseSalary * weekdays;
+            }
             break;
           case "Per Bale":
             balesCount = workerBales.length;
@@ -151,6 +198,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           balesCount,
           kgProcessed: String(kgProcessed.toFixed(3)),
           overtimeHours: String(overtimeHours.toFixed(2)),
+          totalWorkingDays,
+          presentDays: String(presentDays.toFixed(1)),
+          absentDays: String(absentDays.toFixed(1)),
           status: "DRAFT",
         }).returning();
 
@@ -339,15 +389,16 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
       doc.moveDown(1);
 
-      const headers = ["Code", "Name", "Position", "Base", "Bale", "KG", "OT", "Bonus", "Deduct", "Advance", "Net"];
-      const colWidths = [55, 100, 70, 65, 60, 60, 55, 55, 55, 55, 70];
+      // Columns: Code | Name | Days(P/T) | Absent | Base | Bale | KG | OT | Bonus | Deduct | Net
+      const headers = ["Code", "Name", "Days", "Absent", "Base", "Bale", "KG", "OT", "Bonus", "Deduct", "Net"];
+      const colWidths = [50, 110, 55, 50, 62, 55, 55, 50, 50, 52, 65];
       const startX = 30;
       let y = doc.y;
 
       doc.fontSize(8).font("Helvetica-Bold");
       let x = startX;
       headers.forEach((h, i) => {
-        doc.text(h, x, y, { width: colWidths[i], align: "left" });
+        doc.text(h, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
         x += colWidths[i];
       });
 
@@ -357,7 +408,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       doc.font("Helvetica").fontSize(7);
 
-      let totals = { base: 0, bale: 0, kg: 0, ot: 0, bonus: 0, deduct: 0, advance: 0, net: 0 };
+      let totals = { base: 0, bale: 0, kg: 0, ot: 0, bonus: 0, deduct: 0, net: 0 };
 
       for (const row of payrollData) {
         const p = row.payroll;
@@ -367,8 +418,10 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         const ot = parseFloat(p.overtimePay || "0");
         const bonus = parseFloat(p.bonuses || "0");
         const deduct = parseFloat(p.deductions || "0");
-        const advance = parseFloat(p.advances || "0");
         const net = parseFloat(p.netSalary || "0");
+        const totalDays = p.totalWorkingDays || 0;
+        const present = parseFloat(p.presentDays || "0");
+        const absent = parseFloat(p.absentDays || "0");
 
         totals.base += base;
         totals.bale += bale;
@@ -376,7 +429,6 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         totals.ot += ot;
         totals.bonus += bonus;
         totals.deduct += deduct;
-        totals.advance += advance;
         totals.net += net;
 
         if (y > 550) {
@@ -384,23 +436,26 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           y = 30;
         }
 
+        const daysLabel = totalDays > 0 ? `${present % 1 === 0 ? present.toFixed(0) : present}/${totalDays}` : "—";
+        const absentLabel = totalDays > 0 ? (absent % 1 === 0 ? absent.toFixed(0) : String(absent)) : "—";
+
         const values = [
           row.workerCode || "-",
           row.workerName || "-",
-          row.workerPosition || "-",
+          daysLabel,
+          absentLabel,
           base.toFixed(2),
           bale.toFixed(2),
           kg.toFixed(2),
           ot.toFixed(2),
           bonus.toFixed(2),
           deduct.toFixed(2),
-          advance.toFixed(2),
           net.toFixed(2),
         ];
 
         x = startX;
         values.forEach((v, i) => {
-          doc.text(v, x, y, { width: colWidths[i], align: i >= 3 ? "right" : "left" });
+          doc.text(v, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
           x += colWidths[i];
         });
         y += 12;
@@ -412,14 +467,14 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       doc.font("Helvetica-Bold").fontSize(8);
       const totalValues = [
-        "", "", "TOTALS",
+        "", "TOTALS", "", "",
         totals.base.toFixed(2), totals.bale.toFixed(2), totals.kg.toFixed(2),
         totals.ot.toFixed(2), totals.bonus.toFixed(2), totals.deduct.toFixed(2),
-        totals.advance.toFixed(2), totals.net.toFixed(2),
+        totals.net.toFixed(2),
       ];
       x = startX;
       totalValues.forEach((v, i) => {
-        doc.text(v, x, y, { width: colWidths[i], align: i >= 3 ? "right" : "left" });
+        doc.text(v, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
         x += colWidths[i];
       });
 
@@ -462,6 +517,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         { header: "Name", key: "name", width: 25 },
         { header: "Position", key: "position", width: 18 },
         { header: "Salary Type", key: "salaryType", width: 14 },
+        { header: "Working Days", key: "totalDays", width: 13 },
+        { header: "Present Days", key: "presentDays", width: 13 },
+        { header: "Absent Days", key: "absentDays", width: 13 },
         { header: "Base Salary", key: "base", width: 14 },
         { header: "Bale Earnings", key: "bale", width: 14 },
         { header: "KG Earnings", key: "kg", width: 14 },
@@ -487,6 +545,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           name: w?.fullName || "-",
           position: w?.position || "-",
           salaryType: w?.salaryType || "-",
+          totalDays: p.totalWorkingDays || 0,
+          presentDays: parseFloat(p.presentDays || "0"),
+          absentDays: parseFloat(p.absentDays || "0"),
           base: parseFloat(p.baseSalary || "0"),
           bale: parseFloat(p.baleEarnings || "0"),
           kg: parseFloat(p.kgEarnings || "0"),
@@ -501,9 +562,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         });
       }
 
-      ["base", "bale", "kg", "ot", "bonus", "deduct", "advance", "net", "kgProcessed"].forEach((key) => {
+      ["base", "bale", "kg", "ot", "bonus", "deduct", "advance", "net", "kgProcessed", "presentDays", "absentDays"].forEach((key) => {
         const col = summarySheet.getColumn(key);
-        col.numFmt = "#,##0.00";
+        col.numFmt = "#,##0.0";
       });
 
       const detailsSheet = workbook.addWorksheet("Worker Details");

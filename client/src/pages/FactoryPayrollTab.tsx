@@ -29,6 +29,7 @@ interface PayrollRecord {
   baseSalary: string; bonuses: string; deductions: string; advances: string;
   netSalary: string; status: string; cashAccountId: number | null;
   paidAt: string | null; notes: string | null;
+  totalWorkingDays?: number; presentDays?: string; absentDays?: string;
   worker?: { id: number; fullName: string; employeeCode: string | null; position: string | null };
 }
 interface CashAccount { id: number; name: string; code: string; }
@@ -278,6 +279,7 @@ export default function FactoryPayrollTab() {
                     </TableHead>
                     <TableHead>Worker</TableHead>
                     <TableHead>Period</TableHead>
+                    <TableHead className="text-center">Attendance</TableHead>
                     <TableHead className="text-right">Base</TableHead>
                     <TableHead className="text-right">Bonus</TableHead>
                     <TableHead className="text-right">Deductions</TableHead>
@@ -310,6 +312,16 @@ export default function FactoryPayrollTab() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {fmtDate(p.periodStart, formatDisplayDate)} – {fmtDate(p.periodEnd, formatDisplayDate)}
+                        </TableCell>
+                        <TableCell className="text-center" data-testid={`text-attendance-${p.id}`}>
+                          {p.totalWorkingDays && p.totalWorkingDays > 0 ? (
+                            <div className="text-sm font-mono">
+                              <span>{Number(p.presentDays) % 1 === 0 ? Number(p.presentDays).toFixed(0) : p.presentDays}/{p.totalWorkingDays}</span>
+                              <span className="block text-xs text-muted-foreground">{Number(p.absentDays) > 0 ? `${Number(p.absentDays) % 1 === 0 ? Number(p.absentDays).toFixed(0) : p.absentDays} absent` : "full"}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">${fmt(p.baseSalary)}</TableCell>
                         <TableCell className="text-right font-mono text-sm">${fmt(p.bonuses)}</TableCell>
