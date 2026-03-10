@@ -319,6 +319,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
         if (rawData[f] === "" || rawData[f] === undefined) rawData[f] = null;
       }
+      for (const f of ["baseSalary", "perBaleRate", "perKgRate", "overtimeRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
+        if (rawData[f] === "" || rawData[f] === undefined) rawData[f] = "0";
+      }
+      if (rawData.numberOfChildren === "" || rawData.numberOfChildren === undefined) rawData.numberOfChildren = 0;
       const parsed = insertFactoryWorkerSchema.parse(rawData);
       const [worker] = await db.insert(factoryWorkers).values(parsed).returning();
 
@@ -361,6 +365,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
         if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = null;
       }
+      for (const f of ["baseSalary", "perBaleRate", "perKgRate", "overtimeRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
+        if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = "0";
+      }
+      if (updateData.numberOfChildren === "" || updateData.numberOfChildren === undefined) updateData.numberOfChildren = 0;
       const [updated] = await db
         .update(factoryWorkers)
         .set({ ...updateData, updatedAt: new Date() })
