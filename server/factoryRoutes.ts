@@ -9434,6 +9434,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const userId = (req.session as any).userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
 
+      // Pin the factory company ID to the session so cross-tab ERP company switches
+      // don't corrupt factory API calls made after the ERP tab changes company.
+      (req.session as any).factoryCompanyId = companyId;
+
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner") {
         return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [] });
