@@ -315,7 +315,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const companyId = req.body.companyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const parsed = insertFactoryWorkerSchema.parse({ ...req.body, companyId });
+      const rawData = { ...req.body, companyId };
+      for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
+        if (rawData[f] === "" || rawData[f] === undefined) rawData[f] = null;
+      }
+      const parsed = insertFactoryWorkerSchema.parse(rawData);
       const [worker] = await db.insert(factoryWorkers).values(parsed).returning();
 
       if (!worker.employeeCode) {
