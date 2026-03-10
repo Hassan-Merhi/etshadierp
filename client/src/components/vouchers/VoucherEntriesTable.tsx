@@ -96,23 +96,23 @@ export function VoucherEntriesTable({
       setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
-      
+
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
-        const exactMatch = filteredSidebarAccounts.find(
-          (acc) => acc.name.toLowerCase() === currentName.toLowerCase()
-        );
-        
-        if (exactMatch) {
-          handleSidebarAccountSelect(exactMatch);
+        if (filteredSidebarAccounts.length > 0) {
+          // Results exist — select the highlighted one (or first if none highlighted)
+          const idx = sidebarHighlightedIndex >= 0 && sidebarHighlightedIndex < filteredSidebarAccounts.length
+            ? sidebarHighlightedIndex
+            : 0;
+          handleSidebarAccountSelect(filteredSidebarAccounts[idx]);
         } else {
+          // Zero results — create immediately
           const newAccount = await onAutoCreateAccount(currentName);
           if (newAccount) {
             handleSidebarAccountSelect(newAccount);
           }
         }
-      } else if (filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
+      } else if (!isFactoryCompany && filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
         const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
         if (highlightedAccount) {
           handleSidebarAccountSelect(highlightedAccount);

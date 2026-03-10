@@ -4472,45 +4472,46 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           setJournalAccountHighlightedIndex(0);
                         }}
                         onKeyDown={async (e) => {
-                          if (e.key === "Enter" && isFactoryCompany) {
-                            e.preventDefault();
-                            const trimmedName = journalAccountSearchTerm.trim();
-                            if (!trimmedName) return;
-
-                            // Check for EXACT match (case-insensitive) - only select if name matches exactly
-                            const exactMatch = filteredJournalAccounts.find(
-                              (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
-                            );
-                            
-                            if (exactMatch) {
-                              handleJournalAccountSelect(exactMatch);
-                              return;
-                            }
-
-                            // No exact match - auto-create for factory (even if there are partial matches)
-                            const newAccount = await handleAutoCreateAccount(trimmedName);
-                            if (newAccount) {
-                              // Convert Account to CombinedAccount format
-                              handleJournalAccountSelect({
-                                ...newAccount,
-                                balance: newAccount.balance?.toString(),
-                              });
-                            }
-                          } else if (e.key === "ArrowDown") {
+                          if (e.key === "ArrowDown") {
                             e.preventDefault();
                             if (filteredJournalAccounts.length > 0) {
-                              setJournalAccountHighlightedIndex(Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1));
+                              setJournalAccountHighlightedIndex(Math.min(
+                                journalAccountHighlightedIndex < 0 ? 0 : journalAccountHighlightedIndex + 1,
+                                filteredJournalAccounts.length - 1
+                              ));
                             }
                           } else if (e.key === "ArrowUp") {
                             e.preventDefault();
                             if (filteredJournalAccounts.length > 0) {
                               setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
                             }
-                          } else if (e.key === "Enter" && !isFactoryCompany) {
-                            // For non-factory: select highlighted account on Enter
-                            if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
-                              e.preventDefault();
-                              handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                          } else if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (isFactoryCompany) {
+                              const trimmedName = journalAccountSearchTerm.trim();
+                              if (!trimmedName) return;
+
+                              if (filteredJournalAccounts.length > 0) {
+                                // Results exist — select the highlighted one (or first if none highlighted)
+                                const idx = journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length
+                                  ? journalAccountHighlightedIndex
+                                  : 0;
+                                handleJournalAccountSelect(filteredJournalAccounts[idx]);
+                              } else {
+                                // Zero results — create immediately
+                                const newAccount = await handleAutoCreateAccount(trimmedName);
+                                if (newAccount) {
+                                  handleJournalAccountSelect({
+                                    ...newAccount,
+                                    balance: newAccount.balance?.toString(),
+                                  });
+                                }
+                              }
+                            } else {
+                              // For non-factory: select highlighted account on Enter
+                              if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
+                                handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                              }
                             }
                           }
                         }}
