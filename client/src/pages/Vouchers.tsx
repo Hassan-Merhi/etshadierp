@@ -585,6 +585,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
+  const lastPaymentAccount = useRef<{ type: string; id: number; name: string } | null>(null);
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
@@ -791,7 +792,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
     defaultValues: {
-      paymentAccountType: "bank",
+      paymentAccountType: "ledger",
       paymentAccountId: 0,
       paymentAccountName: "",
       voucherDate: new Date(),
@@ -1244,10 +1245,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       if (isEditMode) {
         setLocation("/daybook");
       } else {
+        const curType = form.getValues("paymentAccountType");
+        const curId = form.getValues("paymentAccountId");
+        const curName = form.getValues("paymentAccountName");
+        if (curId > 0) {
+          lastPaymentAccount.current = { type: curType, id: curId, name: curName };
+        }
         form.reset({
-          paymentAccountType: "ledger",
-          paymentAccountId: 0,
-          paymentAccountName: "",
+          paymentAccountType: lastPaymentAccount.current?.type ?? "ledger",
+          paymentAccountId: lastPaymentAccount.current?.id ?? 0,
+          paymentAccountName: lastPaymentAccount.current?.name ?? "",
           voucherDate: new Date(),
           entries: [
             {
