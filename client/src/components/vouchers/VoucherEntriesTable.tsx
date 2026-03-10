@@ -7,7 +7,7 @@ import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier";
   accountId: number;
   accountName: string;
   amount: string;
