@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -123,13 +123,18 @@ export default function FactorySuppliers() {
     queryKey: ["/api/factory/suppliers/with-balances"],
   });
 
-  const { data: statementData, isLoading: statementLoading } = useQuery<StatementResponse>({
+  const { data: statementData, isLoading: statementLoading, isError: statementError } = useQuery<StatementResponse>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"],
     queryFn: async () => {
       const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/statement`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed to load statement" }));
+        throw new Error(err.message || "Failed to load statement");
+      }
       return res.json();
     },
     enabled: !!statementSupplierId,
+    retry: 1,
   });
 
   // Payment state
@@ -379,6 +384,24 @@ export default function FactorySuppliers() {
     }
   }
 
+  // Auto-expand all parent suppliers when data loads
+  useEffect(() => {
+    if (allSuppliers.length > 0) {
+      const parentIds = new Set<number>();
+      for (const s of allSuppliers) {
+        const pid = (s as any).parentId;
+        if (pid) parentIds.add(pid);
+      }
+      if (parentIds.size > 0) {
+        setExpandedSupplierIds(prev => {
+          const next = new Set(prev);
+          parentIds.forEach(id => next.add(id));
+          return next;
+        });
+      }
+    }
+  }, [suppliers]);
+
   const activeTopLevel = topLevelSuppliers.filter((s) => s.isActive);
   const totalBalance = activeTopLevel.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
   const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
@@ -569,7 +592,7 @@ export default function FactorySuppliers() {
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-statement-supplier-name">
-              {statementData?.supplier?.name || "Loading..."}
+              {statementData?.supplier?.name || allSuppliers.find(s => s.id === statementSupplierId)?.name || "Supplier Statement"}
             </h1>
             <p className="text-muted-foreground text-sm">Full Supplier Statement</p>
           </div>
@@ -577,9 +600,21 @@ export default function FactorySuppliers() {
 
         {statementLoading ? (
           <div className="space-y-4">
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm">Loading statement...</p>
+            </div>
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-64 w-full" />
           </div>
+        ) : statementError ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">Could not load statement</p>
+              <p className="text-sm mt-1">Please go back and try again</p>
+            </CardContent>
+          </Card>
         ) : statementData ? (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
