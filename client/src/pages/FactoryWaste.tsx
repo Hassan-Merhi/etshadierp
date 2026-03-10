@@ -16,6 +16,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 interface WasteEntry {
   id: number;
   date: string;
+  wasteType: string | null;
   kgWaste: number;
   reason: string | null;
   mixBatchId: number | null;
@@ -42,6 +43,7 @@ export default function FactoryWaste() {
 
   const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
   const [formKg, setFormKg] = useState("");
+  const [formWasteType, setFormWasteType] = useState("");
   const [formReason, setFormReason] = useState("");
   const [formMixBatchId, setFormMixBatchId] = useState("");
   const [formSupplierId, setFormSupplierId] = useState("");
@@ -80,6 +82,7 @@ export default function FactoryWaste() {
     mutationFn: async (data: {
       date: string;
       kgWaste: number;
+      wasteType?: string;
       reason?: string;
       mixBatchId?: number;
       supplierId?: number;
@@ -107,6 +110,7 @@ export default function FactoryWaste() {
   function resetForm() {
     setFormDate(new Date().toISOString().split("T")[0]);
     setFormKg("");
+    setFormWasteType("");
     setFormReason("");
     setFormMixBatchId("");
     setFormSupplierId("");
@@ -119,6 +123,7 @@ export default function FactoryWaste() {
       date: formDate,
       kgWaste: parseFloat(formKg),
     };
+    if (formWasteType) payload.wasteType = formWasteType;
     if (formReason.trim()) payload.reason = formReason.trim();
     if (formMixBatchId) payload.mixBatchId = parseInt(formMixBatchId, 10);
     if (formSupplierId) payload.supplierId = parseInt(formSupplierId, 10);
@@ -195,6 +200,21 @@ export default function FactoryWaste() {
                   onChange={(e) => setFormDate(e.target.value)}
                   data-testid="input-waste-date"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="waste-type">Waste Type</Label>
+                <select
+                  id="waste-type"
+                  value={formWasteType}
+                  onChange={(e) => setFormWasteType(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid="select-waste-type"
+                >
+                  <option value="">— None —</option>
+                  <option value="GARBAGE">Garbage</option>
+                  <option value="WIPERS">Wipers</option>
+                  <option value="OTHER">Other</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="waste-kg">KG Waste *</Label>
@@ -276,6 +296,7 @@ export default function FactoryWaste() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>KG</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Mix Batch</TableHead>
@@ -288,6 +309,7 @@ export default function FactoryWaste() {
                   {wasteQuery.data.map((entry, idx) => (
                     <TableRow key={entry.id ?? idx} data-testid={`row-waste-${entry.id}`}>
                       <TableCell className="font-mono text-sm">{entry.date ? formatDisplayDate(entry.date) : "—"}</TableCell>
+                      <TableCell className="text-sm">{entry.wasteType || "—"}</TableCell>
                       <TableCell className="font-mono">{entry.kgWaste}</TableCell>
                       <TableCell>{entry.reason || "—"}</TableCell>
                       <TableCell className="font-mono">{entry.mixBatchId ?? "—"}</TableCell>

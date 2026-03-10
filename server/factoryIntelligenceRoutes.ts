@@ -20,6 +20,7 @@ import {
   factoryWorkers,
   factoryPayrolls,
   factoryDaybookEntries,
+  factoryAttendance,
   containerFreight,
   containerFreightPayments,
   containerDocuments,
@@ -128,17 +129,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       const dateStr = (req.query.date as string) || new Date().toISOString().split("T")[0];
 
-      const balesOnDate = await db
-        .select()
-        .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          sql`DATE(${factoryBales.finalizedAt}) = ${dateStr}`
-        ));
-
-      const kgPressed = balesOnDate.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
-      const balesProduced = balesOnDate.length;
-
+      // Waste entries for the selected date
       const wasteOnDate = await db
         .select()
         .from(factoryWasteEntries)
@@ -146,94 +137,49 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
           eq(factoryWasteEntries.companyId, companyId),
           eq(factoryWasteEntries.date, dateStr)
         ));
-      const wasteKg = wasteOnDate.reduce((s: number, w: any) => s + parseFloat(w.kgWaste || "0"), 0);
 
-      const allContainers = await db
-        .select()
-        .from(factoryContainers)
-        .where(eq(factoryContainers.companyId, companyId));
-      const totalContainers = allContainers.length;
-
-      const requiredDocTypes = await db
-        .select()
-        .from(containerDocumentTypes)
-        .where(and(
-          eq(containerDocumentTypes.isRequired, true),
-          sql`(${containerDocumentTypes.companyId} = ${companyId} OR ${containerDocumentTypes.companyId} IS NULL)`
-        ));
-      const requiredDocTypeCount = requiredDocTypes.length;
-      const requiredDocTypeIds = requiredDocTypes.map((d: any) => d.id);
-
-      let missingDocs = 0;
-      if (requiredDocTypeCount > 0 && allContainers.length > 0) {
-        const docs = await db
-          .select()
-          .from(containerDocuments)
-          .where(eq(containerDocuments.companyId, companyId));
-
-        for (const container of allContainers) {
-          const containerDocs = docs.filter((d: any) => d.containerId === container.id);
-          const uploadedRequiredIds = new Set(
-            containerDocs
-              .filter((d: any) => requiredDocTypeIds.includes(d.docTypeId))
-              .map((d: any) => d.docTypeId)
-          );
-          if (uploadedRequiredIds.size < requiredDocTypeCount) {
-            missingDocs++;
-          }
-        }
+      const wasteBreakdownMap: Record<string, number> = {};
+      let wasteTotalKg = 0;
+      for (const w of wasteOnDate) {
+        const kg = parseFloat(w.kgWaste || "0");
+        wasteTotalKg += kg;
+        const wType = (w as any).wasteType ? (w as any).wasteType.toUpperCase() : "OTHER";
+        wasteBreakdownMap[wType] = (wasteBreakdownMap[wType] || 0) + kg;
       }
+      const wasteBreakdown = Object.entries(wasteBreakdownMap).map(([wasteType, kg]) => ({
+        wasteType,
+        kg: Math.round(kg * 1000) / 1000,
+      }));
 
-      const freightEntries = await db
-        .select()
-        .from(containerFreight)
-        .where(eq(containerFreight.companyId, companyId));
-
-      const freightPayments = await db
-        .select()
-        .from(containerFreightPayments)
-        .where(eq(containerFreightPayments.companyId, companyId));
-
-      let unpaidCount = 0;
-      let partialCount = 0;
-      let totalOwed = 0;
-
-      for (const f of freightEntries) {
-        const amount = parseFloat(f.freightAmount || "0");
-        const paid = freightPayments
-          .filter((p: any) => p.containerFreightId === f.id)
-          .reduce((s: number, p: any) => s + parseFloat(p.amount || "0"), 0);
-        const remaining = amount - paid;
-        if (remaining > 0.01) {
-          totalOwed += remaining;
-          if (paid < 0.01) {
-            unpaidCount++;
-          } else {
-            partialCount++;
-          }
-        }
-      }
-
+      // Active workers count
       const activeWorkers = await db
         .select()
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
 
-      const totalBalesToday = balesOnDate.length;
-
-      const recentActivity = await db
+      // Attendance today (workers marked present on selected date)
+      const attendanceToday = await db
         .select()
-        .from(factoryDaybookEntries)
-        .where(eq(factoryDaybookEntries.companyId, companyId))
-        .orderBy(desc(factoryDaybookEntries.createdAt))
-        .limit(5);
+        .from(factoryAttendance)
+        .where(and(
+          eq(factoryAttendance.companyId, companyId),
+          eq(factoryAttendance.attendanceDate, dateStr),
+          sql`LOWER(${factoryAttendance.status}) != 'absent'`
+        ));
+
+      // Loaded customer containers: finalized orders with containerNumber
+      const loadedOrders = await db
+        .select({ id: customerOrders.id })
+        .from(customerOrders)
+        .where(and(
+          eq(customerOrders.companyId, companyId),
+          sql`(${customerOrders.loadingFinalizedAt} IS NOT NULL OR (${customerOrders.status} = 'FINALIZED' AND ${customerOrders.containerNumber} IS NOT NULL))`
+        ));
 
       res.json({
-        today: { kgPressed, balesProduced, wasteKg },
-        containers: { total: totalContainers, readyToShip: totalContainers, missingDocs },
-        freight: { unpaidCount, partialCount, totalOwed },
-        workers: { active: activeWorkers.length, totalBalesToday },
-        recentActivity,
+        waste: { totalKg: Math.round(wasteTotalKg * 1000) / 1000, breakdown: wasteBreakdown },
+        workers: { active: activeWorkers.length, attendanceToday: attendanceToday.length },
+        containers: { loaded: loadedOrders.length },
       });
     } catch (error: any) {
       console.error("Error fetching factory dashboard:", error);
@@ -275,7 +221,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const companyId = req.body.companyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { date, mixBatchId, supplierId, containerId, kgWaste, reason } = req.body;
+      const { date, mixBatchId, supplierId, containerId, wasteType, kgWaste, reason } = req.body;
 
       const [entry] = await db
         .insert(factoryWasteEntries)
@@ -285,6 +231,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
           mixBatchId: mixBatchId || null,
           supplierId: supplierId || null,
           containerId: containerId || null,
+          wasteType: wasteType || null,
           kgWaste: String(kgWaste),
           reason: reason || null,
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : null,

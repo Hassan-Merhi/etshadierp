@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2, Package, Users, Truck, AlertTriangle, Activity, Scale, Trash2,
-  ChevronDown, ChevronUp, Ship, DollarSign, TrendingUp, TrendingDown, Boxes, Tag
+  Loader2, Package, Users, Trash2,
+  ChevronDown, ChevronUp, Ship, DollarSign, TrendingUp, TrendingDown, Boxes, Tag, CalendarCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +14,9 @@ import {
 } from "@/components/ui/table";
 
 interface DashboardData {
-  today: { kgPressed: number; balesProduced: number; wasteKg: number };
-  workers: { active: number; totalBalesToday: number };
-  containers: { total: number; missingDocs: number };
-  freight: { unpaidCount: number; partialCount: number; totalOwed: number };
-  recentActivity: Array<{ id?: number; date: string; txType: string; description: string }>;
+  waste: { totalKg: number; breakdown: Array<{ wasteType: string; kg: number }> };
+  workers: { active: number; attendanceToday: number };
+  containers: { loaded: number };
 }
 
 interface KpiData {
@@ -29,7 +26,7 @@ interface KpiData {
   kgsUsedToday: string;
   totalBaleWeightToday: string;
   categories: Array<{ name: string; count: number; totalKg: number }>;
-  balesDetail: Array<{ id: number; baleCode: string; productName: string; category: string; weightKg: string; pressedAt: string; status: string }>;
+  balesDetail: Array<{ id: number; baleCode: string; productName: string; category: string; weightKg: string; pressedAt: string; status: string; quantity: number }>;
 }
 
 interface Container {
@@ -62,6 +59,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
+const WASTE_TYPE_LABEL: Record<string, string> = {
+  GARBAGE: "Garbage",
+  WIPERS: "Wipers",
+  OTHER: "Other",
+};
+
 function fmt(n: number | string, decimals = 0) {
   const v = typeof n === "string" ? parseFloat(n) : n;
   return isNaN(v) ? "0" : v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -79,7 +82,6 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 }
 
 export default function FactoryDashboard() {
-  const { formatDisplayDate } = useDateFormat();
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
   const [showNetDetails, setShowNetDetails] = useState(false);
@@ -138,30 +140,9 @@ export default function FactoryDashboard() {
         </div>
       </div>
 
-      {/* ── Row 1: Production KPIs ── */}
+      {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Scale className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">KG Pressed</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-kg-pressed">
-              {fmt(data?.today?.kgPressed ?? 0, 1)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Bales Produced</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-bales-produced">
-              {data?.today?.balesProduced ?? 0}
-            </p>
-          </CardContent>
-        </Card>
+        {/* Waste */}
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-1">
@@ -169,10 +150,35 @@ export default function FactoryDashboard() {
               <p className="text-sm text-muted-foreground">Waste</p>
             </div>
             <p className="text-2xl font-bold font-mono" data-testid="text-waste-kg">
-              {fmt(data?.today?.wasteKg ?? 0, 1)} <span className="text-sm font-normal text-muted-foreground">kg</span>
+              {fmt(data?.waste?.totalKg ?? 0, 1)} <span className="text-sm font-normal text-muted-foreground">kg</span>
             </p>
+            {(data?.waste?.breakdown ?? []).length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {(data?.waste?.breakdown ?? []).map(b => (
+                  <p key={b.wasteType} className="text-xs text-muted-foreground">
+                    {WASTE_TYPE_LABEL[b.wasteType] ?? b.wasteType}: {fmt(b.kg, 1)} kg
+                  </p>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Loaded Containers */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loaded Containers</p>
+            </div>
+            <p className="text-2xl font-bold font-mono" data-testid="text-containers-loaded">
+              {data?.containers?.loaded ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">customer containers finalized</p>
+          </CardContent>
+        </Card>
+
+        {/* Active Workers */}
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-1">
@@ -184,55 +190,18 @@ export default function FactoryDashboard() {
             </p>
           </CardContent>
         </Card>
-      </div>
 
-      {/* ── Row 2: Ops cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Worker Attendance Today */}
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Containers</p>
+              <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Attendance Today</p>
             </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-containers-total">
-              {data?.containers?.total ?? 0} <span className="text-sm font-normal text-muted-foreground">total</span>
+            <p className="text-2xl font-bold font-mono" data-testid="text-attendance-today">
+              {data?.workers?.attendanceToday ?? 0}
             </p>
-            <p className="text-sm mt-1" data-testid="text-containers-missing-docs">
-              {(data?.containers?.missingDocs ?? 0) > 0 ? (
-                <span className="text-destructive flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  {data?.containers?.missingDocs} missing docs
-                </span>
-              ) : (
-                <span className="text-muted-foreground">No missing docs</span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Truck className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Freight</p>
-            </div>
-            <div className="flex items-center gap-2 mt-1" data-testid="text-freight-summary">
-              <Badge variant="outline">{data?.freight?.unpaidCount ?? 0} unpaid</Badge>
-              <Badge variant="outline">{data?.freight?.partialCount ?? 0} partial</Badge>
-            </div>
-            {(data?.freight?.totalOwed ?? 0) > 0 && (
-              <p className="text-sm text-muted-foreground mt-1">${fmt(data!.freight.totalOwed, 2)} owed</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Workers Today</p>
-            </div>
-            <p className="text-2xl font-bold font-mono" data-testid="text-workers-bales-today">
-              {data?.workers?.totalBalesToday ?? 0} <span className="text-sm font-normal text-muted-foreground">bales</span>
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">workers present</p>
           </CardContent>
         </Card>
       </div>
@@ -381,21 +350,19 @@ export default function FactoryDashboard() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Code</TableHead>
+                        <TableHead>Category</TableHead>
                         <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Bales</TableHead>
                         <TableHead className="text-right">KG</TableHead>
-                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {kpis.balesDetail.map((b, i) => (
                         <TableRow key={b.id ?? i} data-testid={`row-bale-${b.id ?? i}`}>
-                          <TableCell className="font-mono text-xs">{b.baleCode}</TableCell>
-                          <TableCell className="text-sm">{b.productName || b.category || "—"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{b.category || "—"}</TableCell>
+                          <TableCell className="text-sm">{b.productName || "—"}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{b.quantity ?? 1}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{fmt(b.weightKg, 2)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">{b.status}</Badge>
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -487,45 +454,6 @@ export default function FactoryDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* ── Recent Activity ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!data?.recentActivity || data.recentActivity.length === 0 ? (
-            <div className="text-center py-8">
-              <Activity className="mx-auto h-10 w-10 text-muted-foreground" />
-              <p className="text-muted-foreground mt-2">No recent activity</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.recentActivity.map((entry, idx) => (
-                    <TableRow key={entry.id ?? idx} data-testid={`row-activity-${entry.id ?? idx}`}>
-                      <TableCell className="font-mono text-sm">{entry.date ? formatDisplayDate(entry.date) : "—"}</TableCell>
-                      <TableCell><Badge variant="outline">{entry.txType}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground">{entry.description}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

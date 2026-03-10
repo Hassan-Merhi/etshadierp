@@ -3248,6 +3248,7 @@ export const factoryWasteEntries = pgTable("factory_waste_entries", {
   mixBatchId: integer("mix_batch_id"),
   supplierId: integer("supplier_id"),
   containerId: integer("container_id"),
+  wasteType: varchar("waste_type", { length: 50 }),
   kgWaste: decimal("kg_waste", { precision: 15, scale: 3 }).notNull(),
   reason: text("reason"),
   createdBy: integer("created_by"),

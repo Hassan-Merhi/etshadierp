@@ -5815,7 +5815,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         kgsUsedToday: kgsUsedToday.toFixed(3),
         totalBaleWeightToday: totalBaleWeightToday.toFixed(3),
         categories,
-        balesDetail: todayBales,
+        balesDetail: todayBales.map((b: any) => ({ ...b, quantity: 1 })),
       });
     } catch (error: any) {
       console.error("Error fetching factory dashboard KPIs:", error);
