@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, Package, Users, Trash2,
-  ChevronDown, ChevronUp, Ship, DollarSign, TrendingUp, TrendingDown, Boxes, Tag, CalendarCheck,
+  ChevronDown, ChevronUp, Ship, TrendingUp, TrendingDown, Boxes, CalendarCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,14 +40,6 @@ interface Container {
   origin: string | null;
 }
 
-interface SupplierBalance {
-  id: number;
-  name: string;
-  totalValue: string;
-  totalContainers: number;
-  isErpOnly?: boolean;
-}
-
 const STATUS_ORDER = ["PENDING", "IN_TRANSIT", "ARRIVED", "OFFLOADED", "PARTIALLY_RECEIVED", "RECEIVED"];
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
@@ -72,10 +64,7 @@ function fmt(n: number | string, decimals = 0) {
 
 function CollapsiblePane({ open, children }: { open: boolean; children: React.ReactNode }) {
   return (
-    <div
-      style={{ display: open ? undefined : "none" }}
-      className="border-t mt-3 pt-3"
-    >
+    <div style={{ display: open ? undefined : "none" }} className="border-t mt-3 pt-3">
       {children}
     </div>
   );
@@ -84,9 +73,7 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 export default function FactoryDashboard() {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
-  const [showNetDetails, setShowNetDetails] = useState(false);
   const [showBalesPane, setShowBalesPane] = useState(false);
-  const [showCatPane, setShowCatPane] = useState(false);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/factory/dashboard", date],
@@ -105,17 +92,9 @@ export default function FactoryDashboard() {
     queryKey: ["/api/factory/containers"],
   });
 
-  const { data: suppliers } = useQuery<SupplierBalance[]>({
-    queryKey: ["/api/factory/suppliers/with-balances"],
-  });
-
-  const importCycleContainers = (containers || [])
+  const containersOtw = (containers || [])
     .filter(c => STATUS_ACTIVE.has(c.status))
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
-
-  const netPosition = (suppliers || []).reduce(
-    (sum, s) => sum + parseFloat(s.totalValue || "0"), 0
-  );
 
   if (isLoading) {
     return (
@@ -206,17 +185,17 @@ export default function FactoryDashboard() {
         </Card>
       </div>
 
-      {/* ── Import Cycle ── */}
+      {/* ── Container OTW ── */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Ship className="h-4 w-4" />
-            Import Cycle
-            <Badge variant="outline" className="ml-1">{importCycleContainers.length} active</Badge>
+            Container OTW
+            <Badge variant="outline" className="ml-1">{containersOtw.length} active</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {importCycleContainers.length === 0 ? (
+          {containersOtw.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No containers currently in transit or pending</p>
           ) : (
             <div className="overflow-x-auto">
@@ -232,8 +211,8 @@ export default function FactoryDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {importCycleContainers.map(c => (
-                    <TableRow key={c.id} data-testid={`row-import-container-${c.id}`}>
+                  {containersOtw.map(c => (
+                    <TableRow key={c.id} data-testid={`row-container-otw-${c.id}`}>
                       <TableCell className="font-mono text-sm font-medium">{c.containerNumber}</TableCell>
                       <TableCell className="text-sm">{c.supplierName || "—"}</TableCell>
                       <TableCell>
@@ -253,181 +232,62 @@ export default function FactoryDashboard() {
         </CardContent>
       </Card>
 
-      {/* ── Net Position ── */}
+      {/* ── Total Bales Pressed ── */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-muted-foreground" />
+              <Boxes className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Net Position</p>
-                <p
-                  className={`text-3xl font-bold font-mono tabular-nums ${netPosition >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
-                  data-testid="text-net-position"
-                >
-                  {netPosition >= 0 ? "+" : ""}${fmt(netPosition, 2)}
+                <p className="text-sm text-muted-foreground">Total Bales Pressed</p>
+                <p className="text-3xl font-bold font-mono" data-testid="text-total-bales-pressed">
+                  {kpis?.balesPressedToday ?? 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {fmt(kpis?.totalBaleWeightToday ?? 0, 1)} kg total
                 </p>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowNetDetails(v => !v)}
-              data-testid="button-toggle-net-details"
+              onClick={() => setShowBalesPane(v => !v)}
+              data-testid="button-toggle-bales-pane"
             >
-              {showNetDetails ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              {showBalesPane ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </Button>
           </div>
 
-          <CollapsiblePane open={showNetDetails}>
-            {(!suppliers || suppliers.length === 0) ? (
-              <p className="text-sm text-muted-foreground">No supplier data available</p>
+          <CollapsiblePane open={showBalesPane}>
+            {(!kpis?.balesDetail || kpis.balesDetail.length === 0) ? (
+              <p className="text-sm text-muted-foreground">No bales pressed today</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-right">Containers</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {suppliers.map(s => {
-                    const bal = parseFloat(s.totalValue || "0");
-                    return (
-                      <TableRow key={s.id} data-testid={`row-net-supplier-${s.id}`}>
-                        <TableCell className="text-sm">
-                          {s.name}
-                          {s.isErpOnly && <Badge variant="outline" className="ml-2 text-xs">ERP</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">{s.totalContainers}</TableCell>
-                        <TableCell className={`text-right font-mono text-sm font-medium ${bal >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                          {bal >= 0 ? "+" : ""}${fmt(bal, 2)}
-                        </TableCell>
+              <div className="max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Bales</TableHead>
+                      <TableHead className="text-right">KG</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {kpis.balesDetail.map((b, i) => (
+                      <TableRow key={b.id ?? i} data-testid={`row-bale-${b.id ?? i}`}>
+                        <TableCell className="text-sm text-muted-foreground">{b.category || "—"}</TableCell>
+                        <TableCell className="text-sm">{b.productName || "—"}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{b.quantity ?? 1}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{fmt(b.weightKg, 2)}</TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CollapsiblePane>
         </CardContent>
       </Card>
-
-      {/* ── Total Bales Pressed + Total Categories ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Bales pressed */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Boxes className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Bales Pressed</p>
-                  <p className="text-3xl font-bold font-mono" data-testid="text-total-bales-pressed">
-                    {kpis?.balesPressedToday ?? 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {fmt(kpis?.totalBaleWeightToday ?? 0, 1)} kg total
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowBalesPane(v => !v)}
-                data-testid="button-toggle-bales-pane"
-              >
-                {showBalesPane ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-              </Button>
-            </div>
-
-            <CollapsiblePane open={showBalesPane}>
-              {(!kpis?.balesDetail || kpis.balesDetail.length === 0) ? (
-                <p className="text-sm text-muted-foreground">No bales pressed today</p>
-              ) : (
-                <div className="max-h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
-                        <TableHead className="text-right">KG</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {kpis.balesDetail.map((b, i) => (
-                        <TableRow key={b.id ?? i} data-testid={`row-bale-${b.id ?? i}`}>
-                          <TableCell className="text-sm text-muted-foreground">{b.category || "—"}</TableCell>
-                          <TableCell className="text-sm">{b.productName || "—"}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{b.quantity ?? 1}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmt(b.weightKg, 2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CollapsiblePane>
-          </CardContent>
-        </Card>
-
-        {/* Categories pressed */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Tag className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Categories Pressed</p>
-                  <p className="text-3xl font-bold font-mono" data-testid="text-total-categories">
-                    {kpis?.categories?.length ?? 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {kpis?.balesPressedToday ?? 0} bales across categories
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowCatPane(v => !v)}
-                data-testid="button-toggle-categories-pane"
-              >
-                {showCatPane ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-              </Button>
-            </div>
-
-            <CollapsiblePane open={showCatPane}>
-              {(!kpis?.categories || kpis.categories.length === 0) ? (
-                <p className="text-sm text-muted-foreground">No categories pressed today</p>
-              ) : (
-                <div className="max-h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
-                        <TableHead className="text-right">KG</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {kpis.categories.map((cat, i) => (
-                        <TableRow key={i} data-testid={`row-category-${i}`}>
-                          <TableCell className="text-sm font-medium">{cat.name}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{cat.count}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmt(cat.totalKg, 2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CollapsiblePane>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* ── Stock Summary ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
