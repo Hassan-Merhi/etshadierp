@@ -111,7 +111,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         e.preventDefault();
         if (open && filteredAccounts.length > 0 && highlightedIndex >= 0) {
           handleSelectAccount(filteredAccounts[highlightedIndex]);
-        } else if (!searchTerm && !value) {
+        } else if (!open) {
           onEnterWithoutSelection?.();
         }
       } else if (e.key === "Tab") {

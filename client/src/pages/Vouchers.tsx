@@ -585,7 +585,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
-  const lastPaymentAccount = useRef<{ type: string; id: number; name: string } | null>(null);
+  const paymentAcctLsKey = `lastPaymentAccount_${selectedCompany?.id ?? 0}`;
+  const loadLastPaymentAccount = () => {
+    try {
+      const raw = localStorage.getItem(paymentAcctLsKey);
+      return raw ? JSON.parse(raw) as { type: string; id: number; name: string } : null;
+    } catch { return null; }
+  };
+  const saveLastPaymentAccount = (type: string, id: number, name: string) => {
+    try {
+      localStorage.setItem(paymentAcctLsKey, JSON.stringify({ type, id, name }));
+    } catch {}
+  };
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
@@ -789,12 +800,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [ledgerAccounts, bankAccounts, suppliers, factorySuppliersData, isFactoryCompany, employees, fixedAssets, customers]);
 
+  const _savedAcct = loadLastPaymentAccount();
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
     defaultValues: {
-      paymentAccountType: "ledger",
-      paymentAccountId: 0,
-      paymentAccountName: "",
+      paymentAccountType: (_savedAcct?.type ?? "ledger") as any,
+      paymentAccountId: _savedAcct?.id ?? 0,
+      paymentAccountName: _savedAcct?.name ?? "",
       voucherDate: new Date(),
       entries: [
         {
@@ -1249,12 +1261,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         const curId = form.getValues("paymentAccountId");
         const curName = form.getValues("paymentAccountName");
         if (curId > 0) {
-          lastPaymentAccount.current = { type: curType, id: curId, name: curName };
+          saveLastPaymentAccount(curType, curId, curName);
         }
+        const remembered = loadLastPaymentAccount();
         form.reset({
-          paymentAccountType: lastPaymentAccount.current?.type ?? "ledger",
-          paymentAccountId: lastPaymentAccount.current?.id ?? 0,
-          paymentAccountName: lastPaymentAccount.current?.name ?? "",
+          paymentAccountType: (remembered?.type ?? "ledger") as any,
+          paymentAccountId: remembered?.id ?? 0,
+          paymentAccountName: remembered?.name ?? "",
           voucherDate: new Date(),
           entries: [
             {

@@ -435,7 +435,7 @@ export function ReceiptVoucherTab({
       {/* Desktop sidebar (≥ lg) */}
       <div
         className="hidden lg:block sticky top-4 h-fit"
-        style={{ width: "40%" }}
+        style={{ width: "40%", overflowX: "hidden" }}
       >
         <AccountSidebar {...accountSidebarProps} onSelectAccount={handleSidebarAccountSelect} scrollable={false} />
       </div>
