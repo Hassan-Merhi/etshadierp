@@ -1420,8 +1420,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${rowIndex}.accountType`, "ledger");
       journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
       journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
-      setShowAccountSidebar(false);
-      
       // Focus the amount input
       requestAnimationFrame(() => {
         const amountInput = document.querySelector(
@@ -1664,10 +1662,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Journal sidebar state for account selection (like Stock Transfer's item sidebar)
   const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
-  const [showAccountSidebar, setShowAccountSidebar] = useState(false);
   const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
   const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
-  const journalSidebarRef = useRef<HTMLDivElement>(null);
 
   // Create account modal state
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
@@ -1695,7 +1691,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
       setJournalAccountSearchTerm("");
       setActiveJournalRow(null);
-      setShowAccountSidebar(false);
       setTimeout(() => {
         const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
         if (amountInput) {
@@ -3876,9 +3871,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {/* Journal Voucher Tab */}
         {!isPOS && activeTab === "journal" && (
           <div className="space-y-4">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Left Panel - Form */}
-              <Card className="flex-1 min-w-0">
+            <div>
+              <Card>
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="text-base sm:text-lg">Journal Voucher</CardTitle>
                 </CardHeader>
@@ -3983,7 +3977,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }}
                                     onFocus={() => {
                                       setActiveJournalRow(index);
-                                      setShowAccountSidebar(true);
                                       setJournalAccountSearchTerm(journalEntries[index]?.accountName || "");
                                     }}
                                   />
@@ -4126,19 +4119,30 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     : currentBalance - entryAmount;
                                   const displayBalance = projectedBalance;
                                     
+                                  const isActive = activeJournalRow === index;
+                                  const commitAccount = (acc: typeof filteredJournalAccounts[0]) => {
+                                    journalForm.setValue(`entries.${index}.accountType`, acc.type);
+                                    journalForm.setValue(`entries.${index}.accountId`, acc.id);
+                                    journalForm.setValue(`entries.${index}.accountName`, acc.name);
+                                    setJournalAccountSearchTerm("");
+                                    setActiveJournalRow(null);
+                                    setTimeout(() => {
+                                      const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                      if (el) { el.focus(); el.select(); }
+                                    }, 80);
+                                  };
                                   return (
                                     <FormItem>
                                       <FormControl>
-                                        <div className="space-y-1">
+                                        <div className="relative space-y-1">
                                           <Input
-                                            value={activeJournalRow === index ? journalAccountSearchTerm : (entry?.accountName || "")}
+                                            value={isActive ? journalAccountSearchTerm : (entry?.accountName || "")}
                                             onChange={(e) => {
                                               setJournalAccountSearchTerm(e.target.value);
                                               setJournalAccountHighlightedIndex(0);
                                             }}
                                             onFocus={() => {
                                               setActiveJournalRow(index);
-                                              setShowAccountSidebar(true);
                                               setJournalAccountSearchTerm("");
                                             }}
                                             onBlur={() => {
@@ -4152,22 +4156,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             placeholder="Type to search..."
                                             data-testid={`input-journal-account-${index}`}
                                             onKeyDown={(e) => {
-                                              const focusAmount = () => {
-                                                setTimeout(() => {
-                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                  if (amountInput) { amountInput.focus(); amountInput.select(); }
-                                                }, 50);
-                                              };
+                                              const focusAmount = () => setTimeout(() => {
+                                                const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                if (el) { el.focus(); el.select(); }
+                                              }, 50);
                                               if (e.key === "ArrowUp") {
                                                 e.preventDefault();
                                                 if (filteredJournalAccounts.length > 0) {
                                                   setJournalAccountHighlightedIndex(prev =>
-                                                    prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
+                                                    prev > 0 ? prev - 1 : filteredJournalAccounts.length - 1
                                                   );
                                                 } else if (index > 0) {
                                                   setTimeout(() => {
-                                                    const prevInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
-                                                    if (prevInput) prevInput.focus();
+                                                    const el = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                                    if (el) el.focus();
                                                   }, 50);
                                                 }
                                               } else if (e.key === "ArrowDown") {
@@ -4178,55 +4180,81 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                   );
                                                 } else if (index < journalFields.length - 1) {
                                                   setTimeout(() => {
-                                                    const nextInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
-                                                    if (nextInput) nextInput.focus();
+                                                    const el = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                                    if (el) el.focus();
                                                   }, 50);
                                                 }
                                               } else if (e.key === "Enter") {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
-                                                if (selectedAccount) {
-                                                  journalForm.setValue(`entries.${index}.accountType`, selectedAccount.type);
-                                                  journalForm.setValue(`entries.${index}.accountId`, selectedAccount.id);
-                                                  journalForm.setValue(`entries.${index}.accountName`, selectedAccount.name);
-                                                  setJournalAccountSearchTerm("");
-                                                  setActiveJournalRow(null);
-                                                  setShowAccountSidebar(false);
-                                                  setTimeout(() => {
-                                                    const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                    if (amountInput) { amountInput.focus(); amountInput.select(); }
-                                                  }, 80);
+                                                const sel = filteredJournalAccounts[journalAccountHighlightedIndex];
+                                                if (sel) {
+                                                  commitAccount(sel);
+                                                } else if (isFactoryCompany && journalAccountSearchTerm.trim()) {
+                                                  const name = journalAccountSearchTerm.trim();
+                                                  handleAutoCreateAccount(name).then(created => {
+                                                    if (created) commitAccount({ ...created, balance: String(created.balance ?? 0), code: created.code ?? "" });
+                                                  });
                                                 } else {
-                                                  const entryAccountId = journalEntries[index]?.accountId || 0;
-                                                  if (entryAccountId > 0) focusAmount();
+                                                  const committed = journalEntries[index]?.accountId || 0;
+                                                  if (committed > 0) focusAmount();
                                                 }
                                               } else if (e.key === "Tab" && !e.shiftKey) {
                                                 e.preventDefault();
                                                 focusAmount();
+                                              } else if (e.key === "Escape") {
+                                                e.preventDefault();
+                                                setJournalAccountSearchTerm("");
+                                                setActiveJournalRow(null);
                                               } else if (e.key === "ArrowRight") {
                                                 e.preventDefault();
-                                                setTimeout(() => {
-                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                  if (amountInput) {
-                                                    amountInput.focus();
-                                                    amountInput.select();
-                                                  }
-                                                }, 50);
+                                                focusAmount();
                                               } else if (e.key === "ArrowLeft") {
                                                 e.preventDefault();
                                                 setTimeout(() => {
-                                                  const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
-                                                  if (typeInput) typeInput.focus();
+                                                  const el = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
+                                                  if (el) el.focus();
                                                 }, 50);
                                               }
                                             }}
                                           />
+                                          {/* Inline account dropdown */}
+                                          {isActive && (
+                                            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-md max-h-56 overflow-y-auto">
+                                              {filteredJournalAccounts.length === 0 ? (
+                                                <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                                                  {isFactoryCompany && journalAccountSearchTerm.trim()
+                                                    ? <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
+                                                    : "No accounts found"}
+                                                </div>
+                                              ) : (
+                                                filteredJournalAccounts.map((acc, idx) => (
+                                                  <button
+                                                    key={`${acc.type}-${acc.id}`}
+                                                    type="button"
+                                                    onMouseDown={(e) => { e.preventDefault(); commitAccount(acc); }}
+                                                    data-testid={`journal-account-option-${idx}`}
+                                                    className={cn(
+                                                      "w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2",
+                                                      idx === journalAccountHighlightedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                                                    )}
+                                                  >
+                                                    <span className="truncate">{acc.name}</span>
+                                                    {acc.balance !== undefined && (
+                                                      <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
+                                                        {parseFloat(acc.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                      </span>
+                                                    )}
+                                                  </button>
+                                                ))
+                                              )}
+                                            </div>
+                                          )}
                                           {entry?.accountId > 0 && (
                                             <div className="text-xs text-muted-foreground pl-1">
-                                              <span>New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                              New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                                                 {formatAmount(Math.abs(displayBalance))} {displayBalance >= 0 ? "Dr" : "Cr"}
-                                              </span></span>
+                                              </span>
                                             </div>
                                           )}
                                         </div>
@@ -4406,148 +4434,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </Form>
                 </CardContent>
               </Card>
-
-              {/* Right Panel - Account Search Sidebar */}
-              {showAccountSidebar && (
-                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
-                  <div className="p-4 border-b">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <h3 className="text-sm font-semibold">Search Accounts</h3>
-                      <div className="flex items-center gap-2">
-                        {!isFactoryCompany && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
-                            data-testid="button-journal-create-account"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            New
-                          </Button>
-                        )}
-                        <button 
-                          onClick={() => setShowAccountSidebar(false)} 
-                          className="text-xs text-muted-foreground hover:text-foreground" 
-                          data-testid="button-close-account-sidebar"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      {isAutoCreating ? (
-                        <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
-                      ) : (
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      )}
-                      <Input
-                        placeholder={isFactoryCompany ? "Type expense name & Enter..." : "Search by name or code..."}
-                        value={journalAccountSearchTerm}
-                        onChange={(e) => {
-                          setJournalAccountSearchTerm(e.target.value);
-                          setJournalAccountHighlightedIndex(0);
-                        }}
-                        onKeyDown={async (e) => {
-                          if (e.key === "ArrowDown") {
-                            e.preventDefault();
-                            if (filteredJournalAccounts.length > 0) {
-                              setJournalAccountHighlightedIndex(Math.min(
-                                journalAccountHighlightedIndex < 0 ? 0 : journalAccountHighlightedIndex + 1,
-                                filteredJournalAccounts.length - 1
-                              ));
-                            }
-                          } else if (e.key === "ArrowUp") {
-                            e.preventDefault();
-                            if (filteredJournalAccounts.length > 0) {
-                              setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
-                            }
-                          } else if (e.key === "Enter") {
-                            e.preventDefault();
-                            if (isFactoryCompany) {
-                              const trimmedName = journalAccountSearchTerm.trim();
-                              if (!trimmedName) return;
-
-                              if (filteredJournalAccounts.length > 0) {
-                                // Results exist — select the highlighted one (or first if none highlighted)
-                                const idx = journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length
-                                  ? journalAccountHighlightedIndex
-                                  : 0;
-                                handleJournalAccountSelect(filteredJournalAccounts[idx]);
-                              } else {
-                                // Zero results — create immediately
-                                const newAccount = await handleAutoCreateAccount(trimmedName);
-                                if (newAccount) {
-                                  handleJournalAccountSelect({
-                                    ...newAccount,
-                                    balance: newAccount.balance?.toString(),
-                                  });
-                                }
-                              }
-                            } else {
-                              // For non-factory: select highlighted account on Enter
-                              if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
-                                handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
-                              }
-                            }
-                          }
-                        }}
-                        className="pl-9"
-                        data-testid="input-journal-sidebar-search"
-                        disabled={isAutoCreating}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-2" ref={journalSidebarRef}>
-                    <div className="space-y-1">
-                      {filteredJournalAccounts.length === 0 ? (
-                        <div className="text-center py-8 text-sm text-muted-foreground">
-                          {isFactoryCompany && journalAccountSearchTerm.trim() ? (
-                            <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
-                          ) : (
-                            "No accounts found"
-                          )}
-                        </div>
-                      ) : (
-                        filteredJournalAccounts.map((account, idx) => {
-                          const isHighlighted = idx === journalAccountHighlightedIndex && activeJournalRow !== null;
-                          const isSelected = journalEntries[activeJournalRow ?? 0]?.accountId === account.id &&
-                                            journalEntries[activeJournalRow ?? 0]?.accountType === account.type;
-                          const balance = getAccountBalance(account.type, account.id);
-                          
-                          return (
-                            <button
-                              key={`${account.type}-${account.id}`}
-                              type="button"
-                              onClick={() => handleJournalAccountSelect(account)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-md text-sm hover-elevate active-elevate-2 flex items-center justify-between gap-2",
-                                isHighlighted && "bg-accent",
-                                isSelected && "bg-primary/10"
-                              )}
-                              data-testid={`journal-account-option-${idx}`}
-                            >
-                              <div className="flex-1 truncate">
-                                <div className="font-medium truncate">{account.name}</div>
-                              </div>
-                              <div className={cn(
-                                "text-xs font-mono",
-                                // For liability accounts (employee/supplier), flip the color logic
-                                // Positive balance = Cr (we owe them) = Red, Negative = Dr (they owe us) = Green
-                                (account.type === "employee" || account.type === "supplier")
-                                  ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
-                                  : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
-                              )}>
-                                {formatAmount(Math.abs(balance))}
-                              </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              )}
             </div>
           </div>
         )}
