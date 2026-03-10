@@ -1448,7 +1448,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factorySupplierPayments)
         .where(eq(factorySupplierPayments.companyId, companyId));
 
-      const suppliersWithBalances = suppliersList.map((s: any) => {
+      // Helper to compute stats for a single supplier record
+      const computeStats = (s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
         const totalContainers = supplierContainers.length;
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
@@ -1469,23 +1470,58 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               return new Date(d) > new Date(latest) ? d : latest;
             }, null)
           : null;
-
-        // Sum payments for this supplier (direct payments to this supplierId)
         const totalPaid = allPayments
           .filter((p: any) => p.supplierId === s.id)
           .reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
-
         const balance = parseFloat(s.openingBalance || "0") + containerValue - totalPaid;
+        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance };
+      };
+
+      // First pass: compute each supplier's own stats
+      const statsById: Record<number, ReturnType<typeof computeStats>> = {};
+      for (const s of suppliersList as any[]) {
+        statsById[s.id] = computeStats(s);
+      }
+
+      // Second pass: for parent suppliers, roll up children's stats
+      const suppliersWithBalances = (suppliersList as any[]).map((s: any) => {
+        const own = statsById[s.id];
+        const children = (suppliersList as any[]).filter((c: any) => c.parentId === s.id);
+
+        if (children.length === 0) {
+          // Leaf supplier — use own stats
+          return {
+            ...s,
+            totalContainers: own.totalContainers,
+            totalKg: own.totalKg.toFixed(3),
+            totalValue: own.balance.toFixed(2),
+            totalPaid: own.totalPaid.toFixed(2),
+            pendingContainers: own.pendingContainers,
+            receivedContainers: own.receivedContainers,
+            lastContainerDate: own.lastContainerDate,
+          };
+        }
+
+        // Parent supplier — aggregate own + children stats
+        const childStats = children.map((c: any) => statsById[c.id]);
+        const aggContainers = own.totalContainers + childStats.reduce((n: number, cs: any) => n + cs.totalContainers, 0);
+        const aggKg = own.totalKg + childStats.reduce((n: number, cs: any) => n + cs.totalKg, 0);
+        const aggBalance = own.balance + childStats.reduce((n: number, cs: any) => n + cs.balance, 0);
+        const aggPaid = own.totalPaid + childStats.reduce((n: number, cs: any) => n + cs.totalPaid, 0);
+        const aggPending = own.pendingContainers + childStats.reduce((n: number, cs: any) => n + cs.pendingContainers, 0);
+        const aggReceived = own.receivedContainers + childStats.reduce((n: number, cs: any) => n + cs.receivedContainers, 0);
+        const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
+        const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
 
         return {
           ...s,
-          totalContainers,
-          totalKg: totalKg.toFixed(3),
-          totalValue: balance.toFixed(2),
-          totalPaid: totalPaid.toFixed(2),
-          pendingContainers,
-          receivedContainers,
-          lastContainerDate,
+          totalContainers: aggContainers,
+          totalKg: aggKg.toFixed(3),
+          totalValue: aggBalance.toFixed(2),
+          totalPaid: aggPaid.toFixed(2),
+          pendingContainers: aggPending,
+          receivedContainers: aggReceived,
+          lastContainerDate: aggLastDate,
         };
       });
 

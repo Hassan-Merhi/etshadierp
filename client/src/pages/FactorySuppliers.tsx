@@ -377,8 +377,9 @@ export default function FactorySuppliers() {
     }
   }
 
-  const totalBalance = activeSuppliers.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
-  const totalContainers = activeSuppliers.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
+  const activeTopLevel = topLevelSuppliers.filter((s) => s.isActive);
+  const totalBalance = activeTopLevel.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
+  const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
 
   if (statementSupplierId) {
     return (
