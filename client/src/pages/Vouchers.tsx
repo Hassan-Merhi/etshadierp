@@ -1660,12 +1660,47 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Journal sidebar state for account selection
+  const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
+  const [showAccountSidebar, setShowAccountSidebar] = useState(false);
+  const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
+  const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
+  const journalSidebarRef = useRef<HTMLDivElement>(null);
+
   // Create account modal state
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [createAccountContext, setCreateAccountContext] = useState<{
     tab: "payment" | "receipt" | "journal";
     rowIndex?: number;
   } | null>(null);
+
+  // Filter accounts for journal sidebar
+  const filteredJournalAccounts = useMemo(() => {
+    if (!journalAccountSearchTerm.trim()) return allAccounts;
+    const term = journalAccountSearchTerm.toLowerCase();
+    return allAccounts.filter((acc) =>
+      (acc.name || '').toLowerCase().includes(term) ||
+      (acc.code || '').toLowerCase().includes(term)
+    );
+  }, [allAccounts, journalAccountSearchTerm]);
+
+  // Handle account selection from sidebar
+  const handleJournalAccountSelect = (account: CombinedAccount) => {
+    if (activeJournalRow !== null) {
+      journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
+      journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
+      journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
+
+      // Focus the amount field after selection
+      setTimeout(() => {
+        const amountInput = document.querySelector(`[data-testid="input-journal-amount-${activeJournalRow}"]`) as HTMLInputElement;
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    }
+  };
 
   // Helper function to get account balance from sidebarAccounts
   const getAccountBalance = (accountType: string, accountId: number): number => {
@@ -3700,31 +3735,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      {/* Mobile horizontal pill nav (hidden on md+) */}
-      {!isPOS && (
-        <div className="flex md:hidden overflow-x-auto gap-2 pb-3 snap-x -mx-1 px-1">
-          {sidebarGroups.flatMap((g) => g.items).map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key as typeof activeTab)}
-                data-testid={`tab-${item.key}`}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap snap-start shrink-0 transition-colors border ${
-                  isActive
-                    ? "bg-primary text-primary-foreground font-medium border-primary"
-                    : "bg-muted text-muted-foreground border-transparent hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <div className="flex gap-6">
         {!isPOS && (
           <nav className="hidden md:flex flex-col w-56 shrink-0 space-y-4">
@@ -3836,9 +3846,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {/* Journal Voucher Tab */}
         {!isPOS && activeTab === "journal" && (
-          <div className="space-y-4">
-            <div>
-              <Card>
+          <div>
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Left Panel - Form */}
+              <Card className="flex-1 min-w-0">
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="text-base sm:text-lg">Journal Voucher</CardTitle>
                 </CardHeader>
@@ -3898,134 +3909,193 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         {journalFields.map((field, index) => (
                           <tr key={field.id} className="border-t">
                             <td className="p-2">
-                              {(() => {
-                                const typeVal = journalForm.watch(`entries.${index}.type`) || "DR";
-                                const focusAccount = () => setTimeout(() => {
-                                  const el = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
-                                  if (el) el.focus();
-                                }, 30);
-                                return (
-                                  <button
-                                    type="button"
-                                    data-testid={`input-journal-type-${index}`}
-                                    className="w-20 h-9 rounded-md border border-input bg-background px-3 font-medium text-sm hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                                    onClick={() => handleJournalTypeChange(index, typeVal === "DR" ? "CR" : "DR")}
-                                    onKeyDown={(e) => {
-                                      if ((e.key === "Tab" && !e.shiftKey) || e.key === "ArrowRight") {
-                                        e.preventDefault();
-                                        focusAccount();
-                                      } else if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        focusAccount();
-                                      } else if (e.key === "d" || e.key === "D") {
-                                        e.preventDefault();
-                                        handleJournalTypeChange(index, "DR");
-                                        focusAccount();
-                                      } else if (e.key === "c" || e.key === "C") {
-                                        e.preventDefault();
-                                        handleJournalTypeChange(index, "CR");
-                                        focusAccount();
-                                      } else if (e.key === " ") {
-                                        e.preventDefault();
-                                        handleJournalTypeChange(index, typeVal === "DR" ? "CR" : "DR");
-                                      } else if (e.key === "ArrowLeft") {
-                                        e.preventDefault();
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-amount-${index - 1 >= 0 ? index - 1 : index}"]`) as HTMLInputElement;
-                                          if (el) { el.focus(); el.select(); }
-                                        }, 30);
-                                      } else if (e.key === "ArrowUp" && index > 0) {
-                                        e.preventDefault();
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
-                                          if (el) el.focus();
-                                        }, 30);
-                                      } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
-                                        e.preventDefault();
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
-                                          if (el) el.focus();
-                                        }, 30);
-                                      }
-                                    }}
-                                  >
-                                    {typeVal}
-                                  </button>
-                                );
-                              })()}
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.type`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <Select
+                                      value={field.value}
+                                      onValueChange={(value: "DR" | "CR") => handleJournalTypeChange(index, value)}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger
+                                          className="w-20 text-center font-medium"
+                                          data-testid={`input-journal-type-${index}`}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Tab" && !e.shiftKey) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+                                                if (accountInput) accountInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowRight") {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+                                                if (accountInput) accountInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowLeft") {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                if (amountInput) {
+                                                  amountInput.focus();
+                                                  amountInput.select();
+                                                }
+                                              }, 50);
+                                            } else if (e.key === "ArrowUp" && index > 0) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const prevTypeInput = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
+                                                if (prevTypeInput) prevTypeInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
+                                                if (nextTypeInput) nextTypeInput.focus();
+                                              }, 50);
+                                            }
+                                          }}
+                                        >
+                                          <SelectValue placeholder="DR" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="DR">DR</SelectItem>
+                                        <SelectItem value="CR">CR</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                             </td>
                             <td className="p-2">
-                              {(() => {
-                                const entry = journalEntries[index];
-                                const currentBalance = entry?.accountId > 0
-                                  ? getAccountBalance(entry.accountType, entry.accountId)
-                                  : 0;
-                                const entryAmount = parseFloat(entry?.amount || "0");
-                                const projectedBalance = entry?.type === "DR"
-                                  ? currentBalance + entryAmount
-                                  : currentBalance - entryAmount;
-                                const focusAmount = () => setTimeout(() => {
-                                  const el = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                  if (el) { el.focus(); el.select(); }
-                                }, 80);
-                                return (
-                                  <div className="space-y-1">
-                                    <AccountAutocomplete
-                                      value={entry?.accountId > 0 ? { type: entry.accountType, id: entry.accountId, name: entry.accountName } : null}
-                                      onChange={(type, id, name) => {
-                                        journalForm.setValue(`entries.${index}.accountType`, type);
-                                        journalForm.setValue(`entries.${index}.accountId`, id);
-                                        journalForm.setValue(`entries.${index}.accountName`, name);
-                                      }}
-                                      allAccounts={allAccounts}
-                                      placeholder="Type to search..."
-                                      testId={`input-journal-account-${index}`}
-                                      rowIndex={index}
-                                      onSelectionCommitted={() => focusAmount()}
-                                      onTabPressed={() => focusAmount()}
-                                      onEnterWithoutSelection={() => {
-                                        if ((entry?.accountId || 0) > 0) focusAmount();
-                                      }}
-                                      onEnterWithNoResults={isFactoryCompany ? (term) => {
-                                        handleAutoCreateAccount(term).then(created => {
-                                          if (created) {
-                                            journalForm.setValue(`entries.${index}.accountType`, created.type);
-                                            journalForm.setValue(`entries.${index}.accountId`, created.id);
-                                            journalForm.setValue(`entries.${index}.accountName`, created.name);
-                                            focusAmount();
-                                          }
-                                        });
-                                      } : undefined}
-                                      onArrowUp={() => {
-                                        if (index > 0) setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
-                                          if (el) el.focus();
-                                        }, 30);
-                                      }}
-                                      onArrowDown={() => {
-                                        if (index < journalFields.length - 1) setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
-                                          if (el) el.focus();
-                                        }, 30);
-                                      }}
-                                      onArrowLeft={() => {
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
-                                          if (el) el.focus();
-                                        }, 30);
-                                      }}
-                                      onArrowRight={() => focusAmount()}
-                                    />
-                                    {entry?.accountId > 0 && (
-                                      <div className="text-xs text-muted-foreground pl-1">
-                                        New Bal: <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                          {formatAmount(Math.abs(projectedBalance))} {projectedBalance >= 0 ? "Dr" : "Cr"}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.accountId`}
+                                render={({ field }) => {
+                                  const entry = journalEntries[index];
+                                  const currentBalance = entry?.accountId > 0
+                                    ? getAccountBalance(entry.accountType, entry.accountId)
+                                    : 0;
+                                  const entryAmount = parseFloat(entry?.amount || "0");
+                                  const isDebit = entry?.type === "DR";
+                                  const projectedBalance = isDebit
+                                    ? currentBalance + entryAmount
+                                    : currentBalance - entryAmount;
+                                  const displayBalance = projectedBalance;
+                                  return (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="space-y-1">
+                                          <Input
+                                            value={activeJournalRow === index ? journalAccountSearchTerm : (entry?.accountName || "")}
+                                            onChange={(e) => {
+                                              setJournalAccountSearchTerm(e.target.value);
+                                              setJournalAccountHighlightedIndex(0);
+                                            }}
+                                            onFocus={() => {
+                                              setActiveJournalRow(index);
+                                              setShowAccountSidebar(true);
+                                              setJournalAccountSearchTerm("");
+                                            }}
+                                            onBlur={() => {
+                                              setTimeout(() => {
+                                                if (activeJournalRow === index) {
+                                                  setJournalAccountSearchTerm("");
+                                                  setActiveJournalRow(null);
+                                                }
+                                              }, 200);
+                                            }}
+                                            placeholder="Type to search..."
+                                            data-testid={`input-journal-account-${index}`}
+                                            onKeyDown={(e) => {
+                                              if (showAccountSidebar) {
+                                                if (e.key === "ArrowUp") {
+                                                  e.preventDefault();
+                                                  setJournalAccountHighlightedIndex(prev =>
+                                                    prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
+                                                  );
+                                                  setTimeout(() => {
+                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.max(0, journalAccountHighlightedIndex - 1)}"]`) as HTMLElement;
+                                                    if (button) button.scrollIntoView({ block: "nearest" });
+                                                  }, 0);
+                                                } else if (e.key === "ArrowDown") {
+                                                  e.preventDefault();
+                                                  setJournalAccountHighlightedIndex(prev =>
+                                                    prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
+                                                  );
+                                                  setTimeout(() => {
+                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1)}"]`) as HTMLElement;
+                                                    if (button) button.scrollIntoView({ block: "nearest" });
+                                                  }, 0);
+                                                } else if (e.key === "Enter") {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
+                                                  if (selectedAccount) {
+                                                    handleJournalAccountSelect(selectedAccount);
+                                                    setShowAccountSidebar(false);
+                                                  }
+                                                }
+                                                return;
+                                              }
+                                              if (e.key === "Tab" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                  if (amountInput) {
+                                                    amountInput.focus();
+                                                    amountInput.select();
+                                                  }
+                                                }, 50);
+                                              } else if (e.key === "ArrowUp" && index > 0) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const prevInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                                  if (prevInput) prevInput.focus();
+                                                }, 50);
+                                              } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const nextInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                                  if (nextInput) nextInput.focus();
+                                                }, 50);
+                                              } else if (e.key === "ArrowRight") {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                  if (amountInput) {
+                                                    amountInput.focus();
+                                                    amountInput.select();
+                                                  }
+                                                }, 50);
+                                              } else if (e.key === "ArrowLeft") {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
+                                                  if (typeInput) typeInput.focus();
+                                                }, 50);
+                                              }
+                                            }}
+                                          />
+                                          {entry?.accountId > 0 && (
+                                            <div className="text-xs text-muted-foreground pl-1">
+                                              <span>New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                                {formatAmount(Math.abs(displayBalance))} {displayBalance >= 0 ? "Dr" : "Cr"}
+                                              </span></span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
+                              />
                             </td>
                             <td className="p-2">
                               <FormField
@@ -4196,6 +4266,137 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </Form>
                 </CardContent>
               </Card>
+
+              {/* Right Panel - Account Search Sidebar */}
+              {showAccountSidebar && (
+                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-semibold">Search Accounts</h3>
+                      <div className="flex items-center gap-2">
+                        {!isFactoryCompany && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
+                            data-testid="button-journal-create-account"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New
+                          </Button>
+                        )}
+                        <button
+                          onClick={() => setShowAccountSidebar(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          data-testid="button-close-account-sidebar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      {isAutoCreating ? (
+                        <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+                      ) : (
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      )}
+                      <Input
+                        placeholder={isFactoryCompany ? "Type expense name & Enter..." : "Search by name or code..."}
+                        value={journalAccountSearchTerm}
+                        onChange={(e) => {
+                          setJournalAccountSearchTerm(e.target.value);
+                          setJournalAccountHighlightedIndex(0);
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter" && isFactoryCompany) {
+                            e.preventDefault();
+                            const trimmedName = journalAccountSearchTerm.trim();
+                            if (!trimmedName) return;
+                            const exactMatch = filteredJournalAccounts.find(
+                              (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
+                            );
+                            if (exactMatch) {
+                              handleJournalAccountSelect(exactMatch);
+                              return;
+                            }
+                            const newAccount = await handleAutoCreateAccount(trimmedName);
+                            if (newAccount) {
+                              handleJournalAccountSelect({
+                                ...newAccount,
+                                balance: newAccount.balance?.toString(),
+                              });
+                            }
+                          } else if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            if (filteredJournalAccounts.length > 0) {
+                              setJournalAccountHighlightedIndex(Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1));
+                            }
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            if (filteredJournalAccounts.length > 0) {
+                              setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
+                            }
+                          } else if (e.key === "Enter" && !isFactoryCompany) {
+                            if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
+                              e.preventDefault();
+                              handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                            }
+                          }
+                        }}
+                        className="pl-9"
+                        data-testid="input-journal-sidebar-search"
+                        disabled={isAutoCreating}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2" ref={journalSidebarRef}>
+                    <div className="space-y-1">
+                      {filteredJournalAccounts.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          {isFactoryCompany && journalAccountSearchTerm.trim() ? (
+                            <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
+                          ) : (
+                            "No accounts found"
+                          )}
+                        </div>
+                      ) : (
+                        filteredJournalAccounts.map((account, idx) => {
+                          const isHighlighted = idx === journalAccountHighlightedIndex && activeJournalRow !== null;
+                          const isSelected = journalEntries[activeJournalRow ?? 0]?.accountId === account.id &&
+                                            journalEntries[activeJournalRow ?? 0]?.accountType === account.type;
+                          const balance = getAccountBalance(account.type, account.id);
+                          return (
+                            <button
+                              key={`${account.type}-${account.id}`}
+                              type="button"
+                              onClick={() => handleJournalAccountSelect(account)}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-md text-sm hover-elevate active-elevate-2 flex items-center justify-between gap-2",
+                                isHighlighted && "bg-accent",
+                                isSelected && "bg-primary/10"
+                              )}
+                              data-testid={`journal-account-option-${idx}`}
+                            >
+                              <div className="flex-1 truncate">
+                                <div className="font-medium truncate">{account.name}</div>
+                              </div>
+                              <div className={cn(
+                                "text-xs font-mono",
+                                (account.type === "employee" || account.type === "supplier")
+                                  ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
+                                  : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
+                              )}>
+                                {formatAmount(Math.abs(balance))}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
             </div>
           </div>
         )}
@@ -4317,135 +4518,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main Spreadsheet Area */}
                 <Card className="flex-1 overflow-hidden min-w-0">
-                  {/* Mobile transfer card layout (< md) */}
-                  <div className="block md:hidden p-3 space-y-3">
-                    {transferFields.map((field, index) => (
-                      <div key={field.id} className="rounded-md border p-3 space-y-2 bg-card">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-muted-foreground">Entry {index + 1}</span>
-                          {transferFields.length > 1 && (
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeTransfer(index)} data-testid={`button-transfer-remove-${index}`}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                        {!isPOS && (
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground">Source Location</label>
-                            <input
-                              type="text"
-                              value={activeTransferRow === index && activeFieldType === 'source' ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
-                              onChange={(e) => {
-                                setTransferSourceSearchTerm(e.target.value);
-                                setTransferSourceHighlightedIndex(0);
-                              }}
-                              onFocus={() => {
-                                setActiveTransferRow(index);
-                                setActiveFieldType('source');
-                                setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
-                                setShowSourceSidebar(true);
-                                setShowItemSidebar(false);
-                              }}
-                              placeholder="Type location..."
-                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              data-testid={`input-source-${index}`}
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-muted-foreground">Item</label>
-                          <input
-                            type="text"
-                            value={activeTransferRow === index && activeFieldType === 'item' ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
-                            onChange={(e) => {
-                              setTransferSearchTerm(e.target.value);
-                              setTransferHighlightedIndex(0);
-                              if (!e.target.value) {
-                                stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
-                                stockTransferForm.setValue(`entries.${index}.stockItemCode`, "");
-                                stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
-                              }
-                            }}
-                            onFocus={() => {
-                              setActiveTransferRow(index);
-                              setActiveFieldType('item');
-                              setTransferHighlightedIndex(0);
-                              setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
-                              setShowItemSidebar(true);
-                              setShowSourceSidebar(false);
-                              if (transferEntries[index]?.sourceLocationId > 0) {
-                                setTransferInventorySource(transferEntries[index].sourceLocationId);
-                              }
-                            }}
-                            placeholder="Type to search item..."
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            data-testid={`input-item-name-${index}`}
-                          />
-                        </div>
-                        <div className={`grid gap-2 ${!isPOS ? "grid-cols-2" : "grid-cols-1"}`}>
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground">Qty</label>
-                            <input
-                              type="number"
-                              step="0.001"
-                              value={transferEntries[index]?.quantity || ""}
-                              onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
-                              placeholder="0"
-                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
-                              data-testid={`input-qty-${index}`}
-                            />
-                          </div>
-                          {!isPOS && (
-                            <div className="space-y-1">
-                              <label className="text-xs font-medium text-muted-foreground">Rate</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={transferEntries[index]?.rate || ""}
-                                onChange={(e) => stockTransferForm.setValue(`entries.${index}.rate`, e.target.value)}
-                                placeholder="0.00"
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
-                                data-testid={`input-rate-${index}`}
-                              />
-                            </div>
-                          )}
-                        </div>
-                        {!isPOS && (
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-xs text-muted-foreground">Amount</span>
-                            <span className="text-sm font-mono font-medium">
-                              {formatAmount((parseFloat(transferEntries[index]?.quantity || "0")) * (parseFloat(transferEntries[index]?.rate || "0")))}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const lastEntry = transferEntries[transferEntries.length - 1];
-                        appendTransfer({
-                          sourceLocationId: lastEntry?.sourceLocationId || 0,
-                          sourceLocationName: lastEntry?.sourceLocationName || "",
-                          stockItemId: 0,
-                          stockItemCode: "",
-                          stockItemName: "",
-                          quantity: "",
-                          rate: lastEntry?.rate || "0",
-                          amount: "0",
-                        });
-                      }}
-                      data-testid="button-add-transfer-row"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Row
-                    </Button>
-                  </div>
-
-                  {/* Desktop transfer table (≥ md) */}
-                  <div className="hidden md:block overflow-x-auto">
+                    <div className="overflow-x-auto">
                     <div className="min-w-[400px]">
                       {/* Header */}
                       <div className="flex bg-muted/50 border-b sticky top-0 z-10">
@@ -5272,109 +5345,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <div className="flex flex-col lg:flex-row gap-4">
                     {/* Main Spreadsheet Area */}
                     <Card className="flex-1 overflow-hidden min-w-0">
-                      {/* Mobile adjustment card layout (< md) */}
-                      <div className="block md:hidden p-3 space-y-3">
-                        {adjustmentFields.map((field, index) => {
-                          const currentEntry = adjustmentEntries[index];
-                          const inventoryItem = adjustmentItemsWithInventory.find(
-                            item => item.stockItemId === currentEntry?.stockItemId
-                          );
-                          const availableQty = inventoryItem?.quantity || "0";
-                          return (
-                            <div key={field.id} className="rounded-md border p-3 space-y-2 bg-card">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={currentEntry?.type === "PRODUCE" ? "default" : "outline"}
-                                    onClick={() => stockAdjustmentForm.setValue(`entries.${index}.type`, "PRODUCE")}
-                                    data-testid={`button-adj-produce-${index}`}
-                                  >Produce</Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={currentEntry?.type === "CONSUME" ? "default" : "outline"}
-                                    onClick={() => stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME")}
-                                    data-testid={`button-adj-consume-${index}`}
-                                  >Consume</Button>
-                                </div>
-                                {adjustmentFields.length > 1 && (
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAdjustment(index)} data-testid={`button-adjustment-remove-${index}`}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Item</label>
-                                <input
-                                  type="text"
-                                  value={activeAdjustmentRow === index ? adjustmentSearchTerm : (currentEntry?.stockItemName || "")}
-                                  onChange={(e) => {
-                                    setAdjustmentSearchTerm(e.target.value);
-                                    setAdjustmentHighlightedIndex(0);
-                                    if (!e.target.value) {
-                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, 0);
-                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, "");
-                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, "");
-                                    }
-                                  }}
-                                  onFocus={() => {
-                                    setActiveAdjustmentRow(index);
-                                    setAdjustmentSearchTerm(currentEntry?.stockItemName || "");
-                                    setShowAdjustmentSidebar(true);
-                                  }}
-                                  placeholder="Type to search item..."
-                                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  data-testid={`input-adjustment-item-${index}`}
-                                />
-                                {currentEntry?.stockItemId > 0 && (
-                                  <p className="text-xs text-muted-foreground">Avail: {formatNumber(parseFloat(availableQty))}</p>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                  <label className="text-xs font-medium text-muted-foreground">Qty</label>
-                                  <input
-                                    type="number"
-                                    step="0.001"
-                                    value={currentEntry?.quantity || ""}
-                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
-                                    placeholder="0"
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
-                                    data-testid={`input-adjustment-qty-${index}`}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs font-medium text-muted-foreground">Rate</label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={currentEntry?.rate || ""}
-                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.rate`, e.target.value)}
-                                    placeholder="0.00"
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-right"
-                                    data-testid={`input-adjustment-rate-${index}`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => appendAdjustment({ type: "CONSUME", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "0" })}
-                          data-testid="button-add-adjustment-row"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Row
-                        </Button>
-                      </div>
-
-                      {/* Desktop adjustment table (≥ md) */}
-                      <div className="hidden md:block overflow-x-auto">
+                      <div className="overflow-x-auto">
                         <div className="min-w-[400px]">
                           {/* Header */}
                           <div className="flex bg-muted/50 border-b sticky top-0 z-10">

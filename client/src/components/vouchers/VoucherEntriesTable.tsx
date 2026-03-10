@@ -2,7 +2,7 @@ import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -227,99 +227,7 @@ export function VoucherEntriesTable({
 
   return (
     <div className="space-y-0">
-      {/* ── Mobile card layout (< md) ── */}
-      <div className="block md:hidden space-y-3">
-        {fields.map((field, index) => (
-          <div key={field.id} className="rounded-md border p-3 space-y-3 bg-card">
-            {/* Account row */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-muted-foreground">Account</label>
-                {fields.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(index)}
-                    data-testid={`button-remove-${index}`}
-                    className="h-7 w-7 text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-              <FormField
-                control={form.control}
-                name={`entries.${index}.accountName`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Type to search..."
-                        className="text-sm"
-                        data-testid={`input-account-${index}`}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          setSidebarSearchValue(e.target.value);
-                        }}
-                        onFocus={() => onRowFocus(index, "account")}
-                        onKeyDown={(e) => handleAccountKeyDown(e, index)}
-                        onBlur={() => setTimeout(() => onRowBlur(), 200)}
-                      />
-                    </FormControl>
-                    {renderBalanceLine(index)}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            {/* Amount row */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Amount</label>
-              <FormField
-                control={form.control}
-                name={`entries.${index}.amount`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        className="font-mono text-right"
-                        data-testid={`input-amount-${index}`}
-                        onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                        onBlur={(e) => sharedAmountBlur(e, index)}
-                        onFocus={() => onRowFocus(index, "amount")}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-        ))}
-        {/* Mobile footer */}
-        <div className="flex items-center justify-between pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddRow}
-            data-testid="button-add-row"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Row
-          </Button>
-          <div className="text-sm font-bold font-mono pr-1">{formatAmount(total)}</div>
-        </div>
-      </div>
-
-      {/* ── Desktop table layout (≥ md) ── */}
-      <div className="hidden md:block border rounded-md overflow-hidden">
+      <div className="border rounded-md overflow-hidden">
         <table className="w-full">
           <thead className="bg-muted/50">
             <tr>

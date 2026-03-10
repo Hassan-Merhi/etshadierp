@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Printer, FileDown, ChevronDown, Search } from "lucide-react";
+import { CalendarIcon, Printer, FileDown, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +27,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -110,7 +103,6 @@ export function ReceiptVoucherTab({
 }: ReceiptVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
-  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
@@ -141,10 +133,7 @@ export function ReceiptVoucherTab({
   const accountSidebarProps = {
     accounts: sidebarAccounts,
     filteredAccounts: filteredSidebarAccounts,
-    onSelectAccount: (account: Account) => {
-      handleSidebarAccountSelect(account);
-      setMobileAccountOpen(false);
-    },
+    onSelectAccount: handleSidebarAccountSelect,
     searchValue: sidebarSearchValue,
     onSearchChange: setSidebarSearchValue,
     selectedAccountId,
@@ -327,20 +316,6 @@ export function ReceiptVoucherTab({
                   </div>
                 </div>
 
-                {/* Mobile: Select Account button (opens Sheet) */}
-                <div className="block lg:hidden">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setMobileAccountOpen(true)}
-                    data-testid="button-mobile-select-account"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Select Account for Entry
-                  </Button>
-                </div>
-
                 {/* Entries section */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -437,25 +412,13 @@ export function ReceiptVoucherTab({
         </Card>
       </div>
 
-      {/* Desktop sidebar (≥ lg) */}
+      {/* Sidebar — always visible */}
       <div
-        className="hidden lg:block sticky top-4 h-fit"
+        className="sticky top-4 h-fit"
         style={{ width: "40%", overflowX: "hidden" }}
       >
         <AccountSidebar {...accountSidebarProps} onSelectAccount={handleSidebarAccountSelect} scrollable={false} />
       </div>
-
-      {/* Mobile sidebar Sheet (< lg) */}
-      <Sheet open={mobileAccountOpen} onOpenChange={setMobileAccountOpen}>
-        <SheetContent side="bottom" className="h-[82vh] p-0 flex flex-col">
-          <SheetHeader className="px-4 pt-4 pb-2 border-b">
-            <SheetTitle>Select Account</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden">
-            <AccountSidebar {...accountSidebarProps} />
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
