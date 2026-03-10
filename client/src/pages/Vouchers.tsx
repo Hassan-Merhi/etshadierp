@@ -4052,67 +4052,61 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         {journalFields.map((field, index) => (
                           <tr key={field.id} className="border-t">
                             <td className="p-2">
-                              <FormField
-                                control={journalForm.control}
-                                name={`entries.${index}.type`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="w-20 font-medium"
-                                        data-testid={`input-journal-type-${index}`}
-                                        onClick={() => handleJournalTypeChange(index, field.value === "DR" ? "CR" : "DR")}
-                                        onKeyDown={(e) => {
-                                          const focusAccount = () => {
-                                            setTimeout(() => {
-                                              const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
-                                              if (accountInput) accountInput.focus();
-                                            }, 50);
-                                          };
-                                          if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter" || e.key === "ArrowRight") {
-                                            e.preventDefault();
-                                            focusAccount();
-                                          } else if (e.key === "d" || e.key === "D") {
-                                            e.preventDefault();
-                                            handleJournalTypeChange(index, "DR");
-                                            focusAccount();
-                                          } else if (e.key === "c" || e.key === "C") {
-                                            e.preventDefault();
-                                            handleJournalTypeChange(index, "CR");
-                                            focusAccount();
-                                          } else if (e.key === " ") {
-                                            e.preventDefault();
-                                            handleJournalTypeChange(index, field.value === "DR" ? "CR" : "DR");
-                                          } else if (e.key === "ArrowLeft") {
-                                            e.preventDefault();
-                                            setTimeout(() => {
-                                              const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                              if (amountInput) { amountInput.focus(); amountInput.select(); }
-                                            }, 50);
-                                          } else if (e.key === "ArrowUp" && index > 0) {
-                                            e.preventDefault();
-                                            setTimeout(() => {
-                                              const prevTypeInput = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
-                                              if (prevTypeInput) prevTypeInput.focus();
-                                            }, 50);
-                                          } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
-                                            e.preventDefault();
-                                            setTimeout(() => {
-                                              const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
-                                              if (nextTypeInput) nextTypeInput.focus();
-                                            }, 50);
-                                          }
-                                        }}
-                                      >
-                                        {field.value || "DR"}
-                                      </Button>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                              {(() => {
+                                const typeVal = journalForm.watch(`entries.${index}.type`) || "DR";
+                                const focusAccount = () => setTimeout(() => {
+                                  const el = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+                                  if (el) el.focus();
+                                }, 30);
+                                return (
+                                  <button
+                                    type="button"
+                                    data-testid={`input-journal-type-${index}`}
+                                    className="w-20 h-9 rounded-md border border-input bg-background px-3 font-medium text-sm hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    onClick={() => handleJournalTypeChange(index, typeVal === "DR" ? "CR" : "DR")}
+                                    onKeyDown={(e) => {
+                                      if ((e.key === "Tab" && !e.shiftKey) || e.key === "ArrowRight") {
+                                        e.preventDefault();
+                                        focusAccount();
+                                      } else if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        focusAccount();
+                                      } else if (e.key === "d" || e.key === "D") {
+                                        e.preventDefault();
+                                        handleJournalTypeChange(index, "DR");
+                                        focusAccount();
+                                      } else if (e.key === "c" || e.key === "C") {
+                                        e.preventDefault();
+                                        handleJournalTypeChange(index, "CR");
+                                        focusAccount();
+                                      } else if (e.key === " ") {
+                                        e.preventDefault();
+                                        handleJournalTypeChange(index, typeVal === "DR" ? "CR" : "DR");
+                                      } else if (e.key === "ArrowLeft") {
+                                        e.preventDefault();
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-amount-${index - 1 >= 0 ? index - 1 : index}"]`) as HTMLInputElement;
+                                          if (el) { el.focus(); el.select(); }
+                                        }, 30);
+                                      } else if (e.key === "ArrowUp" && index > 0) {
+                                        e.preventDefault();
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
+                                          if (el) el.focus();
+                                        }, 30);
+                                      } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                        e.preventDefault();
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
+                                          if (el) el.focus();
+                                        }, 30);
+                                      }
+                                    }}
+                                  >
+                                    {typeVal}
+                                  </button>
+                                );
+                              })()}
                             </td>
                             <td className="p-2">
                               <FormField
@@ -4193,7 +4187,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                 e.stopPropagation();
                                                 const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
                                                 if (selectedAccount) {
-                                                  handleJournalAccountSelect(selectedAccount);
+                                                  journalForm.setValue(`entries.${index}.accountType`, selectedAccount.type);
+                                                  journalForm.setValue(`entries.${index}.accountId`, selectedAccount.id);
+                                                  journalForm.setValue(`entries.${index}.accountName`, selectedAccount.name);
+                                                  setJournalAccountSearchTerm("");
+                                                  setActiveJournalRow(null);
+                                                  setShowAccountSidebar(false);
+                                                  setTimeout(() => {
+                                                    const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                    if (amountInput) { amountInput.focus(); amountInput.select(); }
+                                                  }, 80);
                                                 } else {
                                                   const entryAccountId = journalEntries[index]?.accountId || 0;
                                                   if (entryAccountId > 0) focusAmount();
