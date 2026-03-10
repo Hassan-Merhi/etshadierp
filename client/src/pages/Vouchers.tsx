@@ -79,7 +79,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, Trash2 } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -150,7 +150,7 @@ interface FixedAsset {
 }
 
 interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -158,7 +158,7 @@ interface VoucherEntry {
 
 interface JournalEntry {
   type: "DR" | "CR";
-  accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
   accountId: number;
   accountName: string;
   amount: string;
@@ -196,7 +196,7 @@ interface StockAdjustmentEntry {
 }
 
 const voucherEntrySchema = z.object({
-  accountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -208,7 +208,7 @@ const voucherEntrySchema = z.object({
 
 const journalEntrySchema = z.object({
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -219,7 +219,7 @@ const journalEntrySchema = z.object({
 });
 
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier", "factorySupplier", "employee", "fixedAsset", "customer"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -585,18 +585,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
-  const paymentAcctLsKey = `lastPaymentAccount_${selectedCompany?.id ?? 0}`;
-  const loadLastPaymentAccount = () => {
-    try {
-      const raw = localStorage.getItem(paymentAcctLsKey);
-      return raw ? JSON.parse(raw) as { type: string; id: number; name: string } : null;
-    } catch { return null; }
-  };
-  const saveLastPaymentAccount = (type: string, id: number, name: string) => {
-    try {
-      localStorage.setItem(paymentAcctLsKey, JSON.stringify({ type, id, name }));
-    } catch {}
-  };
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
@@ -675,11 +663,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
-  });
-
-  const { data: factorySuppliersData = [] } = useQuery<{ id: number; name: string; parentId?: number | null }[]>({
-    queryKey: [`/api/factory/suppliers`],
-    enabled: isFactoryCompany,
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({
@@ -761,20 +744,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         name: a.bankName,
         code: a.accountNumber,
       })),
-      // ERP suppliers only for non-factory companies
-      ...(isFactoryCompany ? [] : suppliers.map((s) => ({
+      ...suppliers.map((s) => ({
         type: "supplier" as const,
         id: s.id,
         name: s.legalName,
         code: s.code,
-      }))),
-      // Factory suppliers only for factory companies
-      ...(isFactoryCompany ? factorySuppliersData.map((s) => ({
-        type: "factorySupplier" as const,
-        id: s.id,
-        name: s.name,
-        code: String(s.id),
-      })) : []),
+      })),
       ...employees.map((e) => ({
         type: "employee" as const,
         id: e.id,
@@ -798,15 +773,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       })),
     ];
     return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [ledgerAccounts, bankAccounts, suppliers, factorySuppliersData, isFactoryCompany, employees, fixedAssets, customers]);
+  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets, customers]);
 
-  const _savedAcct = loadLastPaymentAccount();
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
     defaultValues: {
-      paymentAccountType: (_savedAcct?.type ?? "ledger") as any,
-      paymentAccountId: _savedAcct?.id ?? 0,
-      paymentAccountName: _savedAcct?.name ?? "",
+      paymentAccountType: "bank",
+      paymentAccountId: 0,
+      paymentAccountName: "",
       voucherDate: new Date(),
       entries: [
         {
@@ -860,13 +834,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Fallback: liability (supplier/employee) with DR > 0 (paying down a liability).
         paymentEntry = allEntries.find((entry: any) => {
           const cr = parseFloat(entry.creditAmount || "0");
-          const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
+          const isLiability = entry.supplierId || entry.employeeId;
           return !isLiability && cr > 0;
         });
         if (!paymentEntry) {
           paymentEntry = allEntries.find((entry: any) => {
             const dr = parseFloat(entry.debitAmount || "0");
-            const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
+            const isLiability = entry.supplierId || entry.employeeId;
             return isLiability && dr > 0;
           });
         }
@@ -876,13 +850,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Fallback: liability (supplier/employee) with CR > 0.
         paymentEntry = allEntries.find((entry: any) => {
           const dr = parseFloat(entry.debitAmount || "0");
-          const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
+          const isLiability = entry.supplierId || entry.employeeId;
           return !isLiability && dr > 0;
         });
         if (!paymentEntry) {
           paymentEntry = allEntries.find((entry: any) => {
             const cr = parseFloat(entry.creditAmount || "0");
-            const isLiability = entry.supplierId || entry.factorySupplierId || entry.employeeId;
+            const isLiability = entry.supplierId || entry.employeeId;
             return isLiability && cr > 0;
           });
         }
@@ -910,11 +884,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentId = paymentEntry.supplierId;
         const supplier = suppliers.find(s => s.id === paymentId);
         paymentName = supplier?.legalName || "";
-      } else if (paymentEntry.factorySupplierId) {
-        paymentType = "factorySupplier";
-        paymentId = paymentEntry.factorySupplierId;
-        const fs = factorySuppliersData.find(s => s.id === paymentId);
-        paymentName = fs?.name || "";
       } else if (paymentEntry.employeeId) {
         paymentType = "employee";
         paymentId = paymentEntry.employeeId;
@@ -932,7 +901,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const payFromLedgerId = paymentEntry.ledgerAccountId || null;
       const payFromBankId = paymentEntry.bankAccountId || null;
       const payFromSupplierId = paymentEntry.supplierId || null;
-      const payFromFactorySupplierId = paymentEntry.factorySupplierId || null;
       const payFromEmployeeId = paymentEntry.employeeId || null;
 
       // Convert contra entries (all entries except payment entry and duplicate Pay From entries) to form format
@@ -943,13 +911,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           if (payFromLedgerId && entry.ledgerAccountId === payFromLedgerId) return false;
           if (payFromBankId && entry.bankAccountId === payFromBankId) return false;
           if (payFromSupplierId && entry.supplierId === payFromSupplierId) return false;
-          if (payFromFactorySupplierId && entry.factorySupplierId === payFromFactorySupplierId) return false;
           if (payFromEmployeeId && entry.employeeId === payFromEmployeeId) return false;
           if (payFromCustomerId && entry.customerId === payFromCustomerId) return false;
           return true;
         })
         .map((entry: any) => {
-        let accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
         let accountId = 0;
         let accountName = "";
         let amount = "0";
@@ -969,11 +936,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.supplierId;
           const supplier = suppliers.find(s => s.id === accountId);
           accountName = supplier?.legalName || "";
-        } else if (entry.factorySupplierId) {
-          accountType = "factorySupplier";
-          accountId = entry.factorySupplierId;
-          const fs = factorySuppliersData.find(s => s.id === accountId);
-          accountName = fs?.name || "";
         } else if (entry.employeeId) {
           accountType = "employee";
           accountId = entry.employeeId;
@@ -994,7 +956,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         // Extract the amount from the contra entry
         // For asset payment accounts: Payment contra=DR, Receipt contra=CR
         // For liability payment accounts: Payment contra=CR, Receipt contra=DR
-        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.factorySupplierId || paymentEntry.employeeId || paymentEntry.customerId;
+        const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.customerId;
         if (voucherToEdit.voucherType === "Payment") {
           amount = isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0");
         } else if (voucherToEdit.voucherType === "Receipt") {
@@ -1198,10 +1160,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return sum + debit - credit;
         }, openingBalance);
         return balance;
-      } else if (paymentAccountType === "factorySupplier") {
-        // Use sidebar balance for factory suppliers (credit balance = positive = we owe them)
-        const sidebarAcc = sidebarAccounts.find(a => a.type === "factorySupplier" && a.id === paymentAccountId);
-        return sidebarAcc ? Math.abs(sidebarAcc.balance ?? 0) : 0;
       }
       return 0;
     },
@@ -1257,17 +1215,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       if (isEditMode) {
         setLocation("/daybook");
       } else {
-        const curType = form.getValues("paymentAccountType");
-        const curId = form.getValues("paymentAccountId");
-        const curName = form.getValues("paymentAccountName");
-        if (curId > 0) {
-          saveLastPaymentAccount(curType, curId, curName);
-        }
-        const remembered = loadLastPaymentAccount();
         form.reset({
-          paymentAccountType: (remembered?.type ?? "ledger") as any,
-          paymentAccountId: remembered?.id ?? 0,
-          paymentAccountName: remembered?.name ?? "",
+          paymentAccountType: "ledger",
+          paymentAccountId: 0,
+          paymentAccountName: "",
           voucherDate: new Date(),
           entries: [
             {
@@ -1409,7 +1360,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const accountObj: Account = {
         id: account.id,
         name: account.name,
-        type: account.type as "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer",
+        type: account.type as "ledger" | "bank" | "supplier" | "employee" | "fixedAsset",
         code: "",
       };
       handleSidebarAccountSelect(accountObj);
@@ -1420,6 +1371,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${rowIndex}.accountType`, "ledger");
       journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
       journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
+      setShowAccountSidebar(false);
+      
       // Focus the amount input
       requestAnimationFrame(() => {
         const amountInput = document.querySelector(
@@ -1660,7 +1613,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
-  // Journal sidebar state for account selection
+  // Journal sidebar state for account selection (like Stock Transfer's item sidebar)
   const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
   const [showAccountSidebar, setShowAccountSidebar] = useState(false);
   const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
@@ -1690,7 +1643,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
       journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
       journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
-
+      
+      
       // Focus the amount field after selection
       setTimeout(() => {
         const amountInput = document.querySelector(`[data-testid="input-journal-amount-${activeJournalRow}"]`) as HTMLInputElement;
@@ -1762,7 +1716,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
       const formEntries = voucherToEdit.entries.map((entry: any) => {
-        let accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
         let accountId = 0;
         let accountName = "";
         let type: "DR" | "CR" = "DR";
@@ -1784,11 +1738,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.supplierId;
           const supplier = suppliers.find(s => s.id === accountId);
           accountName = supplier?.legalName || "";
-        } else if (entry.factorySupplierId) {
-          accountType = "factorySupplier";
-          accountId = entry.factorySupplierId;
-          const fs = factorySuppliersData.find(s => s.id === accountId);
-          accountName = fs?.name || "";
         } else if (entry.employeeId) {
           accountType = "employee";
           accountId = entry.employeeId;
@@ -3737,7 +3686,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <div className="flex gap-6">
         {!isPOS && (
-          <nav className="hidden md:flex flex-col w-56 shrink-0 space-y-4">
+          <nav className="w-56 shrink-0 space-y-4">
             {sidebarGroups.map((group) => (
               <div key={group.label}>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
@@ -3772,6 +3721,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         <div className="flex-1 min-w-0">
         {!isPOS && activeTab === "payment" && (
           <div className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <PaymentVoucherTab
               form={form}
               fieldArray={fieldArray}
@@ -3809,6 +3769,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {!isPOS && activeTab === "receipt" && (
           <div className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <ReceiptVoucherTab
               form={form}
               fieldArray={fieldArray}
@@ -3846,7 +3817,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {/* Journal Voucher Tab */}
         {!isPOS && activeTab === "journal" && (
-          <div>
+          <div className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Left Panel - Form */}
               <Card className="flex-1 min-w-0">
@@ -3895,6 +3877,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     />
                   </div>
 
+                  {/* Spreadsheet table */}
                   <div className="border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/50 sticky top-0 z-10">
@@ -3919,7 +3902,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       onValueChange={(value: "DR" | "CR") => handleJournalTypeChange(index, value)}
                                     >
                                       <FormControl>
-                                        <SelectTrigger
+                                        <SelectTrigger 
                                           className="w-20 text-center font-medium"
                                           data-testid={`input-journal-type-${index}`}
                                           onKeyDown={(e) => {
@@ -3978,15 +3961,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 name={`entries.${index}.accountId`}
                                 render={({ field }) => {
                                   const entry = journalEntries[index];
-                                  const currentBalance = entry?.accountId > 0
-                                    ? getAccountBalance(entry.accountType, entry.accountId)
+                                  const currentBalance = entry?.accountId > 0 
+                                    ? getAccountBalance(entry.accountType, entry.accountId) 
                                     : 0;
                                   const entryAmount = parseFloat(entry?.amount || "0");
                                   const isDebit = entry?.type === "DR";
-                                  const projectedBalance = isDebit
-                                    ? currentBalance + entryAmount
+                                  // In the signed balance system: positive = Dr, negative = Cr
+                                  // DR always adds to balance, CR always subtracts — same for all account types
+                                  const projectedBalance = isDebit 
+                                    ? currentBalance + entryAmount 
                                     : currentBalance - entryAmount;
                                   const displayBalance = projectedBalance;
+                                    
                                   return (
                                     <FormItem>
                                       <FormControl>
@@ -4013,21 +3999,24 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             placeholder="Type to search..."
                                             data-testid={`input-journal-account-${index}`}
                                             onKeyDown={(e) => {
+                                              // If sidebar is open, use arrow keys to navigate accounts
                                               if (showAccountSidebar) {
                                                 if (e.key === "ArrowUp") {
                                                   e.preventDefault();
-                                                  setJournalAccountHighlightedIndex(prev =>
+                                                  setJournalAccountHighlightedIndex(prev => 
                                                     prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
                                                   );
+                                                  // Scroll highlighted item into view
                                                   setTimeout(() => {
                                                     const button = document.querySelector(`[data-testid="journal-account-option-${Math.max(0, journalAccountHighlightedIndex - 1)}"]`) as HTMLElement;
                                                     if (button) button.scrollIntoView({ block: "nearest" });
                                                   }, 0);
                                                 } else if (e.key === "ArrowDown") {
                                                   e.preventDefault();
-                                                  setJournalAccountHighlightedIndex(prev =>
+                                                  setJournalAccountHighlightedIndex(prev => 
                                                     prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
                                                   );
+                                                  // Scroll highlighted item into view
                                                   setTimeout(() => {
                                                     const button = document.querySelector(`[data-testid="journal-account-option-${Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1)}"]`) as HTMLElement;
                                                     if (button) button.scrollIntoView({ block: "nearest" });
@@ -4043,6 +4032,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                 }
                                                 return;
                                               }
+
+                                              // Normal row navigation when sidebar is not open
                                               if (e.key === "Tab" && !e.shiftKey) {
                                                 e.preventDefault();
                                                 setTimeout(() => {
@@ -4286,9 +4277,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             New
                           </Button>
                         )}
-                        <button
-                          onClick={() => setShowAccountSidebar(false)}
-                          className="text-xs text-muted-foreground hover:text-foreground"
+                        <button 
+                          onClick={() => setShowAccountSidebar(false)} 
+                          className="text-xs text-muted-foreground hover:text-foreground" 
                           data-testid="button-close-account-sidebar"
                         >
                           ✕
@@ -4313,15 +4304,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             e.preventDefault();
                             const trimmedName = journalAccountSearchTerm.trim();
                             if (!trimmedName) return;
+
+                            // Check for EXACT match (case-insensitive) - only select if name matches exactly
                             const exactMatch = filteredJournalAccounts.find(
                               (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
                             );
+                            
                             if (exactMatch) {
                               handleJournalAccountSelect(exactMatch);
                               return;
                             }
+
+                            // No exact match - auto-create for factory (even if there are partial matches)
                             const newAccount = await handleAutoCreateAccount(trimmedName);
                             if (newAccount) {
+                              // Convert Account to CombinedAccount format
                               handleJournalAccountSelect({
                                 ...newAccount,
                                 balance: newAccount.balance?.toString(),
@@ -4338,6 +4335,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
                             }
                           } else if (e.key === "Enter" && !isFactoryCompany) {
+                            // For non-factory: select highlighted account on Enter
                             if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
                               e.preventDefault();
                               handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
@@ -4366,6 +4364,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           const isSelected = journalEntries[activeJournalRow ?? 0]?.accountId === account.id &&
                                             journalEntries[activeJournalRow ?? 0]?.accountType === account.type;
                           const balance = getAccountBalance(account.type, account.id);
+                          
                           return (
                             <button
                               key={`${account.type}-${account.id}`}
@@ -4383,6 +4382,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               </div>
                               <div className={cn(
                                 "text-xs font-mono",
+                                // For liability accounts (employee/supplier), flip the color logic
+                                // Positive balance = Cr (we owe them) = Red, Negative = Dr (they owe us) = Green
                                 (account.type === "employee" || account.type === "supplier")
                                   ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
                                   : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
@@ -4518,7 +4519,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main Spreadsheet Area */}
                 <Card className="flex-1 overflow-hidden min-w-0">
-                    <div className="overflow-x-auto">
+                  <div className="overflow-x-auto">
                     <div className="min-w-[400px]">
                       {/* Header */}
                       <div className="flex bg-muted/50 border-b sticky top-0 z-10">

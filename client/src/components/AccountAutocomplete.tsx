@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CombinedAccount = {
-  type: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer";
+  type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer";
   id: number;
   name: string;
   code: string;
@@ -14,14 +14,13 @@ export type CombinedAccount = {
 
 export interface AccountAutocompleteProps {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer", id: number, name: string) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer", id: number, name: string) => void;
   allAccounts: CombinedAccount[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
   onSelectionCommitted?: (account: CombinedAccount) => void;
   onEnterWithoutSelection?: () => void;
-  onEnterWithNoResults?: (term: string) => void;
   onTabPressed?: () => void;
   onArrowUp?: () => void;
   onArrowDown?: () => void;
@@ -48,7 +47,6 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       className,
       onSelectionCommitted,
       onEnterWithoutSelection,
-      onEnterWithNoResults,
       onTabPressed,
       onArrowUp,
       onArrowDown,
@@ -113,9 +111,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         e.preventDefault();
         if (open && filteredAccounts.length > 0 && highlightedIndex >= 0) {
           handleSelectAccount(filteredAccounts[highlightedIndex]);
-        } else if (open && filteredAccounts.length === 0 && searchTerm?.trim()) {
-          onEnterWithNoResults?.(searchTerm.trim());
-        } else if (!open) {
+        } else if (!searchTerm && !value) {
           onEnterWithoutSelection?.();
         }
       } else if (e.key === "Tab") {
@@ -165,7 +161,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
 
     // Show searchTerm if user has started editing (not null), otherwise show selected value  
     const displayValue = searchTerm !== null ? searchTerm : (value?.name || "");
-    
+
     // Unique IDs for accessibility
     const listboxId = `account-listbox-${rowIndex}`;
     const activeOptionId = `account-option-${rowIndex}-${highlightedIndex}`;
