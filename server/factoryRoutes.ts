@@ -1455,11 +1455,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
+        // Always sum in USD for consistent approximate balance
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
-          if (c.finalPayableAmount) return sum + parseFloat(c.finalPayableAmount);
+          if (c.finalPayableAmountUsd) return sum + parseFloat(c.finalPayableAmountUsd);
+          if (c.finalPayableAmount) {
+            const fx = parseFloat(c.fxRateToUsd || "1");
+            return sum + parseFloat(c.finalPayableAmount) * fx;
+          }
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          return sum + (kg * rate);
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          return sum + (kg * rate * fx);
         }, 0);
         const pendingContainers = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT").length;
         const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED").length;

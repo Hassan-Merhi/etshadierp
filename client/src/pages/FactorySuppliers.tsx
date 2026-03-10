@@ -103,6 +103,8 @@ export default function FactorySuppliers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
+  const [statementReturnToParent, setStatementReturnToParent] = useState(false);
+  const [parentViewSupplierId, setParentViewSupplierId] = useState<number | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
   const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);
@@ -381,6 +383,172 @@ export default function FactorySuppliers() {
   const totalBalance = activeTopLevel.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
   const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
 
+  // ── Parent Supplier Overview ──────────────────────────────────────────────
+  if (parentViewSupplierId && !statementSupplierId) {
+    const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
+    const children = subAccountsByParent[parentViewSupplierId] || [];
+
+    const openChildStatement = (childId: number) => {
+      setStatementReturnToParent(true);
+      setStatementSupplierId(childId);
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setParentViewSupplierId(null)}
+            data-testid="button-back-from-parent-view"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-parent-supplier-name">
+              {parentSup?.name || "Loading..."}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              {children.length} sub-account{children.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          {parentSup && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openChildStatement(parentSup.id)}
+              data-testid="button-parent-own-statement"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
+              Own Statement
+            </Button>
+          )}
+        </div>
+
+        {/* Parent totals card */}
+        {parentSup && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Total Balance (approx. USD)</div>
+                <div className="text-2xl font-bold mt-1 tabular-nums" data-testid="text-parent-total-balance">
+                  ~${formatNum(parentSup.totalValue)}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Total Containers</div>
+                <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
+                  {parentSup.totalContainers}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Sub-accounts</div>
+                <div className="text-2xl font-bold mt-1">
+                  {children.length}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Sub-accounts list */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Sub-accounts &amp; Commission Accounts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {children.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <Users className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                <p>No sub-accounts yet</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {children.map(child => (
+                  <div
+                    key={child.id}
+                    className="flex items-center justify-between gap-3 p-4"
+                    data-testid={`row-child-supplier-${child.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <GitBranch className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <button
+                          onClick={() => openChildStatement(child.id)}
+                          className="font-semibold hover:underline text-left"
+                          data-testid={`link-child-statement-${child.id}`}
+                        >
+                          {child.name}
+                        </button>
+                        {!child.isActive && (
+                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1.5 text-sm text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5" />
+                          {child.totalContainers} container{child.totalContainers !== 1 ? "s" : ""}
+                        </span>
+                        {child.pendingContainers > 0 && (
+                          <span className="flex items-center gap-1 text-amber-500">
+                            <Clock className="h-3.5 w-3.5" />
+                            {child.pendingContainers} OTW
+                          </span>
+                        )}
+                        {child.lastContainerDate && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            Last: {formatDate(child.lastContainerDate)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-xs text-muted-foreground">Balance</div>
+                        <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
+                          ~${formatNum(child.totalValue)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">approx. USD</div>
+                      </div>
+                      {child.isActive && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openPaymentDialog(child)}
+                          title="Record Payment"
+                          data-testid={`button-pay-child-${child.id}`}
+                        >
+                          <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openChildStatement(child.id)}
+                        data-testid={`button-view-child-statement-${child.id}`}
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Statement View ────────────────────────────────────────────────────────
   if (statementSupplierId) {
     return (
       <div className="space-y-6">
@@ -388,7 +556,13 @@ export default function FactorySuppliers() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setStatementSupplierId(null)}
+            onClick={() => {
+              setStatementSupplierId(null);
+              if (statementReturnToParent) {
+                setStatementReturnToParent(false);
+                // parentViewSupplierId is already set — stay in parent view
+              }
+            }}
             data-testid="button-back-suppliers"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -796,7 +970,17 @@ export default function FactorySuppliers() {
                 const hasChildren = childAccounts.length > 0;
                 const isExpanded = expandedSupplierIds.has(s.id);
 
-                const SupplierRow = ({ sup, isChild }: { sup: SupplierWithBalance; isChild?: boolean }) => (
+                const SupplierRow = ({ sup, isChild }: { sup: SupplierWithBalance; isChild?: boolean }) => {
+                  const isParent = !isChild && hasChildren;
+                  const handleOpen = () => {
+                    if (isParent) {
+                      setParentViewSupplierId(sup.id);
+                    } else {
+                      setStatementReturnToParent(false);
+                      setStatementSupplierId(sup.id);
+                    }
+                  };
+                  return (
                   <div
                     className={`p-4 ${!sup.isActive ? "opacity-60" : ""} ${isChild ? "bg-muted/30 pl-8 border-t" : ""}`}
                     data-testid={`row-factory-supplier-${sup.id}`}
@@ -806,7 +990,7 @@ export default function FactorySuppliers() {
                         <div className="flex items-center gap-2 flex-wrap">
                           {isChild && <GitBranch className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
                           <button
-                            onClick={() => setStatementSupplierId(sup.id)}
+                            onClick={handleOpen}
                             className="text-base font-semibold hover:underline text-left"
                             data-testid={`link-supplier-statement-${sup.id}`}
                           >
@@ -880,8 +1064,11 @@ export default function FactorySuppliers() {
                         <div className="text-right">
                           <div className="text-xs text-muted-foreground">Balance</div>
                           <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                            ${formatNum(sup.totalValue)}
+                            {isParent ? "~" : ""}${formatNum(sup.totalValue)}
                           </div>
+                          {isParent && (
+                            <div className="text-xs text-muted-foreground">approx. USD</div>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           {sup.isActive && (
@@ -940,7 +1127,7 @@ export default function FactorySuppliers() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setStatementSupplierId(sup.id)}
+                          onClick={handleOpen}
                           data-testid={`button-view-statement-${sup.id}`}
                         >
                           <ChevronRight className="h-5 w-5" />
@@ -948,7 +1135,8 @@ export default function FactorySuppliers() {
                       </div>
                     </div>
                   </div>
-                );
+                  );
+                };
 
                 return (
                   <div key={s.id}>
