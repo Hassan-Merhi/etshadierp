@@ -4107,22 +4107,9 @@ function LoginHistoryTab() {
                         disabled={isRecalcAllLoading}
                         onClick={async () => {
                           try {
-                            const balanceRes = await fetch("/api/stats/import-cycle-balance", {
-                              credentials: "include",
-                            });
-                            if (!balanceRes.ok) {
-                              throw new Error("Failed to fetch current balance");
-                            }
-                            const balanceData = await balanceRes.json();
-                            // T004: Use rawNetBalance (pre-adjustment, pre-rounding) so the backend
-                            // always computes the adjustment against the true DB value, not a stale cached display.
-                            const rawBalance = balanceData.precisionTrace?.rawNetBalance ?? balanceData.netImportCycleBalance;
-
                             const response = await fetch("/api/admin/recalculate-equity-adjustment", {
                               method: "POST",
-                              headers: { "Content-Type": "application/json" },
                               credentials: "include",
-                              body: JSON.stringify({ rawBalance }),
                             });
                             const result = await response.json();
                             if (response.ok) {

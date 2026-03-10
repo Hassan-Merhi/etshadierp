@@ -238,10 +238,7 @@ export default function ImportCycleDiagnostics() {
 
   const recalculateMutation = useMutation({
     mutationFn: () => {
-      // T004: Pass rawNetBalance (pre-adjustment, pre-rounding) so the endpoint
-      // always uses the true DB value rather than a stale cached display balance.
-      const rawBalance = data?.precisionTrace?.rawNetBalance ?? data?.netImportCycleBalance ?? 0;
-      return modeApiRequest("POST", "/api/admin/recalculate-equity-adjustment", { rawBalance }).then(r => {
+      return modeApiRequest("POST", "/api/admin/recalculate-equity-adjustment").then(r => {
         if (!r.ok) throw new Error("Recalculate failed");
         return r.json();
       });
