@@ -275,6 +275,19 @@ app.use((req, res, next) => {
       notes text,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS factory_supplier_fx_transfers (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      from_supplier_id integer NOT NULL,
+      to_supplier_id integer NOT NULL,
+      date varchar(20) NOT NULL,
+      from_currency_code varchar(10) NOT NULL,
+      from_amount decimal(20,4) NOT NULL,
+      fx_rate_to_usd decimal(20,8) NOT NULL,
+      to_amount_usd decimal(20,4) NOT NULL,
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
     // ── Fix stale factory page access keys (old Settings.tsx had wrong route keys) ──
     // factory/raw-stock → factory/raw-materials
     `UPDATE factory_user_page_access SET page_key = 'factory/raw-materials' WHERE page_key = 'factory/raw-stock' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/raw-materials')`,
