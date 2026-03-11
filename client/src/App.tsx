@@ -396,7 +396,11 @@ function AuthenticatedApp() {
   }
 
   if (error || !user) {
-    return null; // Will redirect to login
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
   }
 
   const style = {

@@ -93,7 +93,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           if (ok) {
             lastSyncedCompanyId.current = companyToSelect!.id;
           }
-          invalidateCompanyQueries();
+          // Do NOT invalidate queries here — this is the initial auto-select on page load.
+          // The server session already persists currentCompanyId, so all data queries
+          // return correct data without needing a full invalidation. Invalidating here
+          // resets in-flight queries to isLoading:true, causing blank white screens.
         });
       }
     }
