@@ -1100,7 +1100,7 @@ export default function Accounts() {
         <Button
           data-testid="button-create-account"
           disabled={!selectedCompany}
-          onClick={() => navigate(appMode === "factory" ? "/factory/create" : "/accounting/create")}
+          onClick={() => navigate(appMode === "factory" ? "/factory/create" : "/create")}
         >
           <Plus className="w-4 h-4 mr-2" />
           Create
