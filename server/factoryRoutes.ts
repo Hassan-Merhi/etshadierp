@@ -86,6 +86,8 @@ import {
   containerSales,
   factorySupplierPayments,
   insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
   baleRecodeSessions,
   baleRecodeItems,
 } from "@shared/schema";
@@ -1378,15 +1380,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [created] = await db.insert(factorySupplierPayments).values(parsed).returning();
       const [spSupplier] = await db.select({ name: factorySuppliers.name })
         .from(factorySuppliers).where(eq(factorySuppliers.id, created.supplierId));
-      const isFxConversion = created.notes?.startsWith("FX Conversion");
       await writeDaybookEntry(db, {
         companyId,
         txDate: created.date,
-        txType: isFxConversion ? "SUPPLIER_FX_CONVERSION" : "SUPPLIER_PAYMENT",
+        txType: "SUPPLIER_PAYMENT",
         referenceId: created.id,
-        description: isFxConversion
-          ? `FX Conversion: ${spSupplier?.name || "Unknown"} – ${created.currencyCode} ${parseFloat(created.amount).toFixed(2)} → USD ${parseFloat(created.amountUsd).toFixed(2)}`
-          : `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
+        description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
         amountCurrency: parseFloat(created.amount),
         amountUsd: parseFloat(created.amountUsd),
         currencyCode: created.currencyCode,
@@ -1427,6 +1426,90 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // 1a-ii. Factory Supplier FX Transfers
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const transfers = await db
+        .select()
+        .from(factorySupplierFxTransfers)
+        .where(eq(factorySupplierFxTransfers.companyId, companyId))
+        .orderBy(desc(factorySupplierFxTransfers.date));
+      res.json(transfers);
+    } catch (error: any) {
+      console.error("Error fetching FX transfers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertFactorySupplierFxTransferSchema.parse({ ...req.body, companyId });
+
+      // Validate both suppliers exist and belong to this company
+      const [fromSupplier] = await db.select({ id: factorySuppliers.id, name: factorySuppliers.name, parentId: factorySuppliers.parentId })
+        .from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, parsed.fromSupplierId), eq(factorySuppliers.companyId, companyId)));
+      if (!fromSupplier) return res.status(404).json({ message: "From-supplier not found" });
+
+      const [toSupplier] = await db.select({ id: factorySuppliers.id, name: factorySuppliers.name })
+        .from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, parsed.toSupplierId), eq(factorySuppliers.companyId, companyId)));
+      if (!toSupplier) return res.status(404).json({ message: "To-supplier not found" });
+
+      const [created] = await db.insert(factorySupplierFxTransfers).values(parsed).returning();
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: created.date,
+        txType: "SUPPLIER_FX_TRANSFER",
+        referenceId: created.id,
+        description: `FX Transfer: ${fromSupplier.name} ${created.fromCurrencyCode} ${parseFloat(created.fromAmount).toFixed(2)} → ${toSupplier.name} USD ${parseFloat(created.toAmountUsd).toFixed(2)}`,
+        amountCurrency: parseFloat(created.fromAmount),
+        amountUsd: parseFloat(created.toAmountUsd),
+        currencyCode: created.fromCurrencyCode,
+      });
+
+      res.json(created);
+    } catch (error: any) {
+      console.error("Error creating FX transfer:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const [transfer] = await db.select().from(factorySupplierFxTransfers)
+        .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
+      await db.delete(factorySupplierFxTransfers)
+        .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "SUPPLIER_FX_TRANSFER_DELETE",
+        description: `FX Transfer deleted: ${transfer.fromCurrencyCode} ${parseFloat(transfer.fromAmount).toFixed(2)} → USD ${parseFloat(transfer.toAmountUsd).toFixed(2)} (dated ${transfer.date})`,
+      });
+
+      res.json({ message: "FX transfer deleted" });
+    } catch (error: any) {
+      console.error("Error deleting FX transfer:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
   // 1b. Factory Suppliers - Balances & Statement
   // ───────────────────────────────────────────────
 
@@ -1450,6 +1533,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .select()
         .from(factorySupplierPayments)
         .where(eq(factorySupplierPayments.companyId, companyId));
+
+      const allFxTransfers = await db
+        .select()
+        .from(factorySupplierFxTransfers)
+        .where(eq(factorySupplierFxTransfers.companyId, companyId));
 
       // Helper to compute stats for a single supplier record
       const computeStats = (s: any) => {
@@ -1496,6 +1584,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         for (const p of supplierPayments) {
           const cc = p.currencyCode || "USD";
           byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(p.amount || "0");
+        }
+        // FX transfers: sub-supplier loses fromCurrency, parent supplier gains USD
+        for (const t of allFxTransfers) {
+          if (t.fromSupplierId === s.id) {
+            const cc = t.fromCurrencyCode || "USD";
+            byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(t.fromAmount || "0");
+          }
+          if (t.toSupplierId === s.id) {
+            byCurrency["USD"] = (byCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
+          }
         }
         const currencyBalances = Object.entries(byCurrency)
           .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
@@ -1675,11 +1773,32 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         byCurrency[cc].totalDirectCommission += parseFloat(s.commissionAmount || "0");
       }
 
+      // Fetch FX transfers involving this supplier (as source or destination)
+      const fxTransfers = await db
+        .select()
+        .from(factorySupplierFxTransfers)
+        .where(and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          sql`(${factorySupplierFxTransfers.fromSupplierId} = ${supplierId} OR ${factorySupplierFxTransfers.toSupplierId} = ${supplierId})`
+        ))
+        .orderBy(desc(factorySupplierFxTransfers.date));
+
       // Build per-currency payment totals (using original currency amounts, not USD)
       const paidByCurrency: Record<string, number> = {};
       for (const p of (payments as any[])) {
         const cc = p.currencyCode || "USD";
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
+      }
+      // FX transfers out of this supplier reduce its original currency balance
+      for (const t of (fxTransfers as any[])) {
+        if (t.fromSupplierId === supplierId) {
+          const cc = t.fromCurrencyCode || "USD";
+          paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
+        }
+        // FX transfers into this supplier (parent) add to its USD bucket
+        if (t.toSupplierId === supplierId) {
+          paidByCurrency["USD"] = (paidByCurrency["USD"] || 0) - parseFloat(t.toAmountUsd || "0");
+        }
       }
 
       const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => {
@@ -1735,6 +1854,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyGroups,
         obCommissions,
         payments,
+        fxTransfers,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),

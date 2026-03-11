@@ -2415,6 +2415,28 @@ export const insertFactorySupplierPaymentSchema = createInsertSchema(factorySupp
 export type InsertFactorySupplierPayment = z.infer<typeof insertFactorySupplierPaymentSchema>;
 export type FactorySupplierPayment = typeof factorySupplierPayments.$inferSelect;
 
+export const factorySupplierFxTransfers = pgTable("factory_supplier_fx_transfers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  fromSupplierId: integer("from_supplier_id").notNull(),
+  toSupplierId: integer("to_supplier_id").notNull(),
+  date: varchar("date", { length: 20 }).notNull(),
+  fromCurrencyCode: varchar("from_currency_code", { length: 10 }).notNull(),
+  fromAmount: decimal("from_amount", { precision: 20, scale: 4 }).notNull(),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull(),
+  toAmountUsd: decimal("to_amount_usd", { precision: 20, scale: 4 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactorySupplierFxTransferSchema = createInsertSchema(factorySupplierFxTransfers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactorySupplierFxTransfer = z.infer<typeof insertFactorySupplierFxTransferSchema>;
+export type FactorySupplierFxTransfer = typeof factorySupplierFxTransfers.$inferSelect;
+
 export const factoryMixBatches = pgTable("factory_mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

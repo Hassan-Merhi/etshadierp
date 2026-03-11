@@ -97,12 +97,25 @@ interface SupplierPayment {
   notes: string | null;
 }
 
+interface FxTransfer {
+  id: number;
+  fromSupplierId: number;
+  toSupplierId: number;
+  date: string;
+  fromCurrencyCode: string;
+  fromAmount: string;
+  fxRateToUsd: string;
+  toAmountUsd: string;
+  notes: string | null;
+}
+
 interface StatementResponse {
   supplier: FactorySupplier;
   statement: StatementEntry[];
   currencyGroups: CurrencyGroup[];
   obCommissions: ObCommission[];
   payments: SupplierPayment[];
+  fxTransfers: FxTransfer[];
   summary: {
     totalContainers: number;
     totalKg: string;
@@ -172,10 +185,11 @@ export default function FactorySuppliers() {
     queryKey: ["/api/ledger-accounts"],
   });
 
-  // FX Conversion state (convert sub-account foreign currency balance to USD)
+  // FX Transfer state (internal transfer: sub-supplier foreign currency → parent USD bucket)
   const [fxConversionOpen, setFxConversionOpen] = useState(false);
   const [fxConversionForm, setFxConversionForm] = useState({
-    supplierId: 0,
+    fromSupplierId: 0,
+    toSupplierId: 0,
     selectedCurrency: "",
     amount: "",
     fxRateToUsd: "",
@@ -183,14 +197,15 @@ export default function FactorySuppliers() {
     notes: "",
   });
 
-  const openFxConversionDialog = (supplierId: number, currencyCode: string, netPayable: string) => {
+  const openFxConversionDialog = (fromSupplierId: number, toSupplierId: number, currencyCode: string, netPayable: string) => {
     setFxConversionForm({
-      supplierId,
+      fromSupplierId,
+      toSupplierId,
       selectedCurrency: currencyCode,
       amount: netPayable,
       fxRateToUsd: "",
       date: today,
-      notes: `FX Conversion: ${currencyCode} ${netPayable} @ `,
+      notes: "",
     });
     setFxConversionOpen(true);
   };
@@ -200,22 +215,22 @@ export default function FactorySuppliers() {
       const fxRate = parseFloat(data.fxRateToUsd) || 0;
       const amt = parseFloat(data.amount) || 0;
       if (amt <= 0 || fxRate <= 0) throw new Error("Amount and rate must be greater than zero");
-      // fxRateToUsd = units of foreign currency per 1 USD (matching existing payment convention)
-      const amountUsd = amt / fxRate;
+      if (!data.toSupplierId) throw new Error("No parent supplier found for this transfer");
+      const toAmountUsd = amt / fxRate;
       const payload = {
-        supplierId: data.supplierId,
-        date: data.date,
-        amount: data.amount,
-        currencyCode: data.selectedCurrency,
+        fromSupplierId: data.fromSupplierId,
+        toSupplierId: data.toSupplierId,
+        fromCurrencyCode: data.selectedCurrency,
+        fromAmount: data.amount,
         fxRateToUsd: data.fxRateToUsd,
-        amountUsd: amountUsd.toFixed(4),
-        paidFromAccountId: null,
-        notes: data.notes || `FX Conversion: ${data.selectedCurrency} ${data.amount} @ ${data.fxRateToUsd}`,
+        toAmountUsd: toAmountUsd.toFixed(4),
+        date: data.date,
+        notes: data.notes || null,
       };
-      const res = await factoryApiRequest("POST", "/api/factory/supplier-payments", payload);
+      const res = await factoryApiRequest("POST", "/api/factory/supplier-fx-transfers", payload);
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || "Failed to record conversion");
+        throw new Error(err.message || "Failed to record FX transfer");
       }
       return res.json();
     },
@@ -224,7 +239,11 @@ export default function FactorySuppliers() {
       if (statementSupplierId) {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
       }
-      toast({ title: "Conversion recorded", description: "Balance moved to USD" });
+      // Also invalidate parent statement if different
+      if (fxConversionForm.toSupplierId && fxConversionForm.toSupplierId !== statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", fxConversionForm.toSupplierId, "statement"] });
+      }
+      toast({ title: "FX Transfer recorded", description: `${fxConversionForm.selectedCurrency} balance transferred to parent USD` });
       setFxConversionOpen(false);
     },
     onError: (err: Error) => {
@@ -801,20 +820,20 @@ export default function FactorySuppliers() {
                       <ArrowRightLeft className="h-4 w-4" />
                       Balance by Currency
                     </span>
-                    {statementData.currencyGroups.some(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0) && (
+                    {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
                           const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0);
-                          if (firstNonUsd && statementSupplierId) {
-                            openFxConversionDialog(statementSupplierId, firstNonUsd.currencyCode, firstNonUsd.netPayable);
+                          if (firstNonUsd && statementSupplierId && statementData.supplier.parentId) {
+                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, firstNonUsd.netPayable);
                           }
                         }}
                         data-testid="button-fx-convert"
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
-                        Convert to USD
+                        Transfer to Parent (USD)
                       </Button>
                     )}
                   </CardTitle>
@@ -850,15 +869,15 @@ export default function FactorySuppliers() {
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
                               {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.netPayable)}
-                              {group.currencyCode !== "USD" && parseFloat(group.netPayable) > 0 && (
+                              {group.currencyCode !== "USD" && parseFloat(group.netPayable) > 0 && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
-                                  onClick={() => statementSupplierId && openFxConversionDialog(statementSupplierId, group.currencyCode, group.netPayable)}
+                                  onClick={() => statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable)}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  Convert
+                                  Transfer
                                 </Button>
                               )}
                             </TableCell>
@@ -1077,6 +1096,65 @@ export default function FactorySuppliers() {
               </Card>
             )}
 
+            {statementData.fxTransfers && statementData.fxTransfers.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    FX Transfers
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Direction</TableHead>
+                          <TableHead className="text-right">From Amount</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">USD Received</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statementData.fxTransfers.map((t) => {
+                          const isOutgoing = t.fromSupplierId === statementSupplierId;
+                          return (
+                            <TableRow key={t.id}>
+                              <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
+                              <TableCell className="text-sm">
+                                {isOutgoing
+                                  ? <Badge variant="outline" className="text-xs">Out → Parent</Badge>
+                                  : <Badge variant="secondary" className="text-xs">In ← Sub</Badge>
+                                }
+                              </TableCell>
+                              <TableCell className="text-right text-sm tabular-nums">
+                                {isOutgoing
+                                  ? <span className="text-destructive">{t.fromCurrencyCode} {formatNum(t.fromAmount)}</span>
+                                  : <span className="text-muted-foreground">—</span>
+                                }
+                              </TableCell>
+                              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                                {formatNum(t.fxRateToUsd)}
+                              </TableCell>
+                              <TableCell className="text-right text-sm tabular-nums font-medium">
+                                {isOutgoing
+                                  ? <span className="text-muted-foreground">—</span>
+                                  : <span className="text-green-600 dark:text-green-400">+${formatNum(t.toAmountUsd)}</span>
+                                }
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{t.notes || "-"}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {parseFloat(statementData.summary.totalPayments || "0") > 0 && (
               <Card className="border-primary/20">
                 <CardContent className="p-4">
@@ -1092,16 +1170,16 @@ export default function FactorySuppliers() {
           </>
         ) : null}
 
-        {/* FX Conversion Dialog (accessible from statement view) */}
+        {/* FX Transfer Dialog — internal transfer: sub-supplier foreign currency → parent USD bucket */}
         <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4" />
-                Convert to USD
+                Transfer to Parent (USD)
               </DialogTitle>
               <DialogDescription>
-                Record this foreign currency balance as paid — reduces the sub-account balance
+                Internal FX transfer: moves this sub-supplier's foreign currency balance into the parent supplier's USD bucket. This is NOT a voucher payment.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1174,7 +1252,7 @@ export default function FactorySuppliers() {
                 }
                 data-testid="button-submit-fx-conversion"
               >
-                {fxConversionMutation.isPending ? "Recording..." : "Record Conversion"}
+                {fxConversionMutation.isPending ? "Recording..." : "Record Transfer"}
               </Button>
             </DialogFooter>
           </DialogContent>
