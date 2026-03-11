@@ -406,6 +406,7 @@ export function FactoryBaleProductMonthDetail() {
   const year = params.year || "0";
   const month = params.month || "0";
   const [_location, navigate] = useLocation();
+  const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
 
   const backPath = `/factory/bale-product-history/${productId}/${locationId}`;
