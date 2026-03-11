@@ -1296,6 +1296,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Overwrite a factory supplier's opening balance
+  app.patch("/api/factory/suppliers/:id/opening-balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid supplier id" });
+
+      const { openingBalance } = req.body;
+      if (openingBalance === undefined || openingBalance === null || openingBalance === "") {
+        return res.status(400).json({ message: "openingBalance is required" });
+      }
+      const val = parseFloat(openingBalance);
+      if (isNaN(val) || val < 0) {
+        return res.status(400).json({ message: "openingBalance must be a non-negative number" });
+      }
+
+      const [supplier] = await db
+        .select()
+        .from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
+        .limit(1);
+
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+      const [updated] = await db
+        .update(factorySuppliers)
+        .set({ openingBalance: String(val) })
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating supplier opening balance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Hard-delete an inactive factory supplier (only if no container records reference it)
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
     try {
@@ -3355,7 +3394,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(eq(factoryRawStock.companyId, companyId));
+        .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
 
       const supplierMap = new Map<string, any>();
       for (const r of results) {
@@ -3432,13 +3471,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           offloadedAt: factoryRawStock.offloadedAt,
           createdAt: factoryRawStock.createdAt,
           containerNumber: factoryContainers.containerNumber,
+          containerStatus: factoryContainers.status,
           supplierName: factorySuppliers.name,
+          supplierId: factoryContainers.supplierId,
           origin: factoryContainers.origin,
         })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(eq(factoryRawStock.companyId, companyId));
+        .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
 
       const enriched = results.map((r: any) => {
         const received = parseFloat(r.receivedKg) || 0;
@@ -4016,6 +4057,213 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error creating opening balance:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // GET a single opening-balance raw stock record
+  app.get("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+      const [row] = await db
+        .select({
+          id: factoryRawStock.id,
+          containerId: factoryRawStock.containerId,
+          receivedKg: factoryRawStock.receivedKg,
+          usedKg: factoryRawStock.usedKg,
+          costPerKg: factoryRawStock.costPerKg,
+          costPerKgUsd: factoryRawStock.costPerKgUsd,
+          containerNumber: factoryContainers.containerNumber,
+          containerStatus: factoryContainers.status,
+          currencyCode: factoryContainers.currencyCode,
+          fxRateToUsd: factoryContainers.fxRateToUsd,
+          notes: factoryContainers.notes,
+          origin: factoryContainers.origin,
+          supplierId: factoryContainers.supplierId,
+          supplierName: factorySuppliers.name,
+        })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+        .where(and(eq(factoryRawStock.id, id), eq(factoryRawStock.companyId, companyId)))
+        .limit(1);
+
+      if (!row) return res.status(404).json({ message: "Raw stock record not found" });
+      if (row.containerStatus !== "OPENING_BALANCE") {
+        return res.status(400).json({ message: "This record is not an opening balance entry" });
+      }
+
+      const received = parseFloat(row.receivedKg as string) || 0;
+      const used = parseFloat(row.usedKg as string) || 0;
+
+      res.json({ ...row, remainingKg: (received - used).toFixed(3) });
+    } catch (error: any) {
+      console.error("Error fetching opening balance record:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH a single opening-balance raw stock record
+  app.patch("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+      const { supplierId: reqSupplierId, supplierName, receivedKg, costPerKg, currencyCode, fxRateToUsd, notes } = req.body;
+
+      if (receivedKg !== undefined && parseFloat(receivedKg) <= 0) {
+        return res.status(400).json({ message: "Received KG must be positive" });
+      }
+      if (costPerKg !== undefined && parseFloat(costPerKg) < 0) {
+        return res.status(400).json({ message: "Cost per KG must be non-negative" });
+      }
+      if (fxRateToUsd !== undefined && parseFloat(fxRateToUsd) <= 0) {
+        return res.status(400).json({ message: "FX rate must be positive" });
+      }
+
+      const [rawStockRow] = await db
+        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .where(and(
+          eq(factoryRawStock.id, id),
+          eq(factoryRawStock.companyId, companyId),
+          eq(factoryContainers.status, "OPENING_BALANCE")
+        ))
+        .limit(1);
+
+      if (!rawStockRow) return res.status(404).json({ message: "Opening balance record not found" });
+
+      await db.transaction(async (tx: any) => {
+        const rawUpdates: Record<string, any> = {};
+        const containerUpdates: Record<string, any> = {};
+
+        if (receivedKg !== undefined) {
+          rawUpdates.receivedKg = String(parseFloat(receivedKg));
+          containerUpdates.totalKg = String(parseFloat(receivedKg));
+          containerUpdates.declaredKg = String(parseFloat(receivedKg));
+          containerUpdates.actualReceivedKg = String(parseFloat(receivedKg));
+        }
+
+        const effectiveCurrency = currencyCode || undefined;
+        const effectiveFx = fxRateToUsd !== undefined ? parseFloat(fxRateToUsd) : undefined;
+        const effectiveCost = costPerKg !== undefined ? parseFloat(costPerKg) : undefined;
+
+        if (effectiveCost !== undefined) {
+          rawUpdates.costPerKg = String(effectiveCost);
+          containerUpdates.ratePerKg = String(effectiveCost);
+        }
+        if (effectiveCurrency !== undefined) containerUpdates.currencyCode = effectiveCurrency;
+        if (effectiveFx !== undefined) containerUpdates.fxRateToUsd = String(effectiveFx);
+
+        if (effectiveCost !== undefined || effectiveFx !== undefined || effectiveCurrency !== undefined) {
+          const [current] = await tx
+            .select({ costPerKg: factoryRawStock.costPerKg, currencyCode: factoryContainers.currencyCode, fxRateToUsd: factoryContainers.fxRateToUsd })
+            .from(factoryRawStock)
+            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+            .where(eq(factoryRawStock.id, id))
+            .limit(1);
+
+          const resolvedCost = effectiveCost ?? parseFloat(current?.costPerKg || "0");
+          const resolvedFx = effectiveFx ?? parseFloat(current?.fxRateToUsd || "1");
+          const resolvedCurrency = effectiveCurrency ?? current?.currencyCode ?? "USD";
+          const costUsd = resolvedCurrency === "USD" ? resolvedCost : resolvedCost * resolvedFx;
+          rawUpdates.costPerKgUsd = String(costUsd);
+          containerUpdates.ratePerKgUsd = String(costUsd);
+        }
+
+        if (notes !== undefined) containerUpdates.notes = notes;
+
+        if (reqSupplierId !== undefined) {
+          const [sup] = await tx
+            .select({ id: factorySuppliers.id })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, parseInt(reqSupplierId)), eq(factorySuppliers.companyId, companyId)))
+            .limit(1);
+          if (!sup) throw new Error("Supplier not found");
+          containerUpdates.supplierId = sup.id;
+        } else if (supplierName !== undefined) {
+          const trimmed = String(supplierName).trim();
+          const [found] = await tx
+            .select({ id: factorySuppliers.id })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.companyId, companyId), sql`lower(${factorySuppliers.name}) = lower(${trimmed})`))
+            .limit(1);
+          if (found) {
+            containerUpdates.supplierId = found.id;
+          } else {
+            const [created] = await tx
+              .insert(factorySuppliers)
+              .values({ companyId, name: trimmed, isActive: true })
+              .returning();
+            containerUpdates.supplierId = created.id;
+          }
+        }
+
+        if (Object.keys(rawUpdates).length > 0) {
+          await tx.update(factoryRawStock).set(rawUpdates).where(eq(factoryRawStock.id, id));
+        }
+        if (Object.keys(containerUpdates).length > 0) {
+          await tx.update(factoryContainers).set(containerUpdates).where(eq(factoryContainers.id, rawStockRow.containerId));
+        }
+      });
+
+      res.json({ message: "Opening balance updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating opening balance:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // DELETE a single opening-balance raw stock record (bale-safe)
+  app.delete("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+      const [rawStockRow] = await db
+        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId, containerStatus: factoryContainers.status })
+        .from(factoryRawStock)
+        .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+        .where(and(eq(factoryRawStock.id, id), eq(factoryRawStock.companyId, companyId)))
+        .limit(1);
+
+      if (!rawStockRow) return res.status(404).json({ message: "Raw stock record not found" });
+      if (rawStockRow.containerStatus !== "OPENING_BALANCE") {
+        return res.status(400).json({ message: "This record is not an opening balance entry and cannot be deleted through this endpoint" });
+      }
+
+      await db.transaction(async (tx: any) => {
+        // Safely detach: null out containerId on mix batch sources referencing this container
+        await tx
+          .update(factoryMixBatchSources)
+          .set({ containerId: null })
+          .where(eq(factoryMixBatchSources.containerId, rawStockRow.containerId));
+
+        // Delete the raw stock row
+        await tx.delete(factoryRawStock).where(eq(factoryRawStock.id, id));
+
+        // Soft-delete the container by changing its status
+        await tx
+          .update(factoryContainers)
+          .set({ status: "DELETED" })
+          .where(eq(factoryContainers.id, rawStockRow.containerId));
+      });
+
+      res.json({ message: "Opening balance deleted. Linked bales remain intact." });
+    } catch (error: any) {
+      console.error("Error deleting opening balance:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

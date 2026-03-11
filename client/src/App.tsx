@@ -86,6 +86,7 @@ import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
 import ProductionRawStock from "@/pages/ProductionRawStock";
+import FactoryOpeningBalanceEdit from "@/pages/FactoryOpeningBalanceEdit";
 import PressingBales from "@/pages/PressingBales";
 import BaleStockEntry from "@/pages/BaleStockEntry";
 import BalesHistory from "@/pages/BalesHistory";
@@ -612,6 +613,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
+                    <Route path="/factory/raw-stock/opening-balance/:id/edit" component={FactoryOpeningBalanceEdit} />
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />
                     <Route path="/factory/mix-batches" component={MixBatches} />
                     <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />

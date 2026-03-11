@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2 } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -178,7 +179,11 @@ export default function ProductionRawStock() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assigningRawStock, setAssigningRawStock] = useState<{ rawStockId: number; supplierName: string; availableKg: number; costPerKg: string } | null>(null);
   const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
+  // OB delete
+  const [deleteObDialogOpen, setDeleteObDialogOpen] = useState(false);
+  const [deletingObRecord, setDeletingObRecord] = useState<{ rawStockId: number; supplierName: string; containerNumber: string } | null>(null);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -202,7 +207,7 @@ export default function ProductionRawStock() {
   });
 
   // Raw stock by individual container (always fetched so it's available when "Assign to Bales" is clicked)
-  const { data: rawStockByContainer } = useQuery<{ id: number; containerId: number; receivedKg: string; usedKg: string; costPerKg: string; supplierName: string; containerStatus: string }[]>({
+  const { data: rawStockByContainer } = useQuery<{ id: number; containerId: number; receivedKg: string; usedKg: string; costPerKg: string; supplierName: string; containerStatus: string; containerNumber: string }[]>({
     queryKey: ["/api/factory/raw-stock/by-container"],
   });
 
@@ -232,6 +237,28 @@ export default function ProductionRawStock() {
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteObMutation = useMutation({
+    mutationFn: async (rawStockId: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/opening-balance/${rawStockId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      setDeleteObDialogOpen(false);
+      setDeletingObRecord(null);
+      toast({ title: "Deleted", description: "Opening balance removed. Bales remain intact." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setDeleteObDialogOpen(false);
     },
   });
 
@@ -609,6 +636,7 @@ export default function ProductionRawStock() {
                         {formatDisplayDate(row.lastOffloaded)}
                       </TableCell>
                       <TableCell>
+                        <div className="flex items-center gap-1 flex-wrap">
                         {isOB && remaining > 0 && (
                           <Button
                             size="sm"
@@ -641,6 +669,62 @@ export default function ProductionRawStock() {
                             Assign to Bales
                           </Button>
                         )}
+                        {isOB && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`button-edit-ob-${row.supplierId || idx}`}
+                            onClick={() => {
+                              const obRows = rawStockByContainer?.filter(
+                                (r: any) => r.containerStatus === "OPENING_BALANCE" && r.supplierName === row.supplierName
+                              ) || [];
+                              const best = obRows.reduce((prev: any, cur: any) => {
+                                const prevAvail = parseFloat(prev?.receivedKg || "0") - parseFloat(prev?.usedKg || "0");
+                                const curAvail = parseFloat(cur.receivedKg) - parseFloat(cur.usedKg);
+                                return curAvail > prevAvail ? cur : prev;
+                              }, obRows[0]);
+                              if (best) {
+                                navigate(`/factory/raw-stock/opening-balance/${best.id}/edit`);
+                              } else {
+                                toast({ title: "Error", description: "Could not find OB record. Try refreshing.", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        {isOB && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`button-delete-ob-${row.supplierId || idx}`}
+                            onClick={() => {
+                              const obRows = rawStockByContainer?.filter(
+                                (r: any) => r.containerStatus === "OPENING_BALANCE" && r.supplierName === row.supplierName
+                              ) || [];
+                              const best = obRows.reduce((prev: any, cur: any) => {
+                                const prevAvail = parseFloat(prev?.receivedKg || "0") - parseFloat(prev?.usedKg || "0");
+                                const curAvail = parseFloat(cur.receivedKg) - parseFloat(cur.usedKg);
+                                return curAvail > prevAvail ? cur : prev;
+                              }, obRows[0]);
+                              if (best) {
+                                setDeletingObRecord({
+                                  rawStockId: best.id,
+                                  supplierName: row.supplierName,
+                                  containerNumber: best.containerNumber || "",
+                                });
+                                setDeleteObDialogOpen(true);
+                              } else {
+                                toast({ title: "Error", description: "Could not find OB record. Try refreshing.", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1 text-destructive" />
+                            Delete
+                          </Button>
+                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -1609,6 +1693,40 @@ export default function ProductionRawStock() {
               })()}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteObDialogOpen} onOpenChange={(open) => { setDeleteObDialogOpen(open); if (!open) setDeletingObRecord(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Opening Balance?
+            </DialogTitle>
+            <DialogDescription>
+              Remove opening balance{deletingObRecord?.containerNumber ? ` ${deletingObRecord.containerNumber}` : ""} for{" "}
+              <span className="font-semibold">{deletingObRecord?.supplierName}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-muted p-3 text-sm space-y-1">
+            <p className="font-medium">What happens:</p>
+            <p>The opening balance entry will be removed from raw stock.</p>
+            <p>Any bales linked through this entry will remain fully intact.</p>
+            <p>Raw stock linkage will be safely detached without data loss.</p>
+          </div>
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setDeleteObDialogOpen(false)} data-testid="button-delete-ob-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deletingObRecord && deleteObMutation.mutate(deletingObRecord.rawStockId)}
+              disabled={deleteObMutation.isPending}
+              data-testid="button-delete-ob-confirm"
+            >
+              {deleteObMutation.isPending ? "Deleting..." : "Yes, Delete"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

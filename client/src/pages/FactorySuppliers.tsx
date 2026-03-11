@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -187,6 +187,8 @@ export default function FactorySuppliers() {
 
   // FX Transfer state (internal transfer: sub-supplier foreign currency → parent USD bucket)
   const [fxConversionOpen, setFxConversionOpen] = useState(false);
+  const [obEditSupplier, setObEditSupplier] = useState<{ id: number; name: string; currentBalance: string } | null>(null);
+  const [obEditValue, setObEditValue] = useState("");
   const [fxConversionForm, setFxConversionForm] = useState({
     fromSupplierId: 0,
     toSupplierId: 0,
@@ -386,6 +388,26 @@ export default function FactorySuppliers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       toast({ title: "Deleted", description: "Supplier permanently removed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const obEditMutation = useMutation({
+    mutationFn: async ({ id, openingBalance }: { id: number; openingBalance: string }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/suppliers/${id}/opening-balance`, { openingBalance });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update opening balance");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      setObEditSupplier(null);
+      setObEditValue("");
+      toast({ title: "Saved", description: "Opening balance updated." });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1476,6 +1498,21 @@ export default function FactorySuppliers() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Edit Opening Balance"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setObEditSupplier({ id: sup.id, name: sup.name, currentBalance: (sup as any).openingBalance || "0" });
+                                setObEditValue((sup as any).openingBalance || "0");
+                              }}
+                              data-testid={`button-ob-edit-supplier-${sup.id}`}
+                            >
+                              <BookOpen className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {sup.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={(e) => { e.stopPropagation(); openEdit(sup); }}
                               data-testid={`button-edit-supplier-${sup.id}`}
                             >
@@ -1788,6 +1825,45 @@ export default function FactorySuppliers() {
               data-testid="button-save-supplier"
             >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSupplier ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!obEditSupplier} onOpenChange={(open) => { if (!open) { setObEditSupplier(null); setObEditValue(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Edit Opening Balance
+            </DialogTitle>
+            <DialogDescription>
+              Overwrite the opening balance for <span className="font-semibold">{obEditSupplier?.name}</span>.
+              Current value: <span className="font-mono">{obEditSupplier?.currentBalance}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Opening Balance (USD)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={obEditValue}
+                onChange={(e) => setObEditValue(e.target.value)}
+                data-testid="input-ob-edit-value"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => { setObEditSupplier(null); setObEditValue(""); }} data-testid="button-ob-edit-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => obEditSupplier && obEditMutation.mutate({ id: obEditSupplier.id, openingBalance: obEditValue })}
+              disabled={obEditMutation.isPending || !obEditValue}
+              data-testid="button-ob-edit-save"
+            >
+              {obEditMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
