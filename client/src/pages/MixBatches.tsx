@@ -60,7 +60,6 @@ export default function MixBatches() {
 
   // Delete state
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const deleteBatch = deleteId ? filteredBatchesForDelete(deleteId) : null;
 
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
   const appMode = useAppMode();
@@ -70,9 +69,7 @@ export default function MixBatches() {
     queryKey: ["/api/factory/mix-batches"],
   });
 
-  function filteredBatchesForDelete(id: number) {
-    return batches?.find((b) => b.id === id) ?? null;
-  }
+  const deleteBatch = deleteId ? (batches?.find((b) => b.id === deleteId) ?? null) : null;
 
   const { data: unlinkedBales } = useQuery<any[]>({
     queryKey: ["/api/factory/bales/unlinked"],
