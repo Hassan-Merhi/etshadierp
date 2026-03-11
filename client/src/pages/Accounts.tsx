@@ -426,22 +426,32 @@ export default function Accounts() {
       const mappedAccount = accountMap.get(account.id);
       if (!mappedAccount) return;
 
-      // Find parent in ledgerAccounts if it has one
-      const ledgerAccount = ledgerAccounts.find(
-        (la) => la.id === account.accountId,
-      );
-      if (ledgerAccount?.parentId) {
-        // Find parent in account map
-        const parentAccount = Array.from(accountMap.values()).find(
-          (a) => a.accountId === ledgerAccount.parentId,
-        );
+      // Factory supplier accounts: use account.parentId directly (they are not in ledgerAccounts)
+      if (account.type === "factorySupplier" && account.parentId) {
+        const parentAccount = accountMap.get(`factorySupplier-${account.parentId}`);
         if (parentAccount) {
           parentAccount.children.push(mappedAccount);
         } else {
           rootAccounts.push(mappedAccount);
         }
       } else {
-        rootAccounts.push(mappedAccount);
+        // Find parent in ledgerAccounts if it has one
+        const ledgerAccount = ledgerAccounts.find(
+          (la) => la.id === account.accountId,
+        );
+        if (ledgerAccount?.parentId) {
+          // Find parent in account map
+          const parentAccount = Array.from(accountMap.values()).find(
+            (a) => a.accountId === ledgerAccount.parentId,
+          );
+          if (parentAccount) {
+            parentAccount.children.push(mappedAccount);
+          } else {
+            rootAccounts.push(mappedAccount);
+          }
+        } else {
+          rootAccounts.push(mappedAccount);
+        }
       }
     });
 
