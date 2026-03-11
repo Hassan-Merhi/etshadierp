@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -174,6 +174,10 @@ export default function ProductionRawStock() {
   const [obCommissionAmount, setObCommissionAmount] = useState("");
   const [obCommissionCurrency, setObCommissionCurrency] = useState("USD");
   const [obCommissionFxRate, setObCommissionFxRate] = useState("1");
+  // Assign OB stock to bales
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assigningRawStock, setAssigningRawStock] = useState<{ rawStockId: number; supplierName: string; availableKg: number; costPerKg: string } | null>(null);
+  const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -195,6 +199,40 @@ export default function ProductionRawStock() {
   const { data: factorySuppliers } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/factory/suppliers"],
     enabled: obDialogOpen,
+  });
+
+  // Raw stock by individual container (always fetched so it's available when "Assign to Bales" is clicked)
+  const { data: rawStockByContainer } = useQuery<{ id: number; containerId: number; receivedKg: string; usedKg: string; costPerKg: string; supplierName: string; containerStatus: string }[]>({
+    queryKey: ["/api/factory/raw-stock/by-container"],
+  });
+
+  // Unlinked bales (no mix batch assigned)
+  const { data: unlinkedBales } = useQuery<{ id: number; baleCode: string; referenceNumber: string; productName: string | null; weightKg: string; status: string; pressedAt: string | null }[]>({
+    queryKey: ["/api/factory/bales/unlinked"],
+    enabled: assignDialogOpen,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ rawStockId, baleIds }: { rawStockId: number; baleIds: number[] }) => {
+      const res = await modeApiRequest("POST", `/api/factory/raw-stock/${rawStockId}/assign-to-bales`, { baleIds });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Assignment failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/unlinked"] });
+      setAssignDialogOpen(false);
+      setAssigningRawStock(null);
+      setSelectedBaleIds(new Set());
+      toast({ title: "Success", description: `Assigned ${data.balesUpdated} bale(s) (${data.totalKg.toFixed(3)} kg) to OB stock` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const selectedContainer = useMemo(() => {
@@ -532,6 +570,7 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Avg Cost/kg</TableHead>
                   <TableHead className="text-right">Value Remaining</TableHead>
                   <TableHead>Last Offloaded</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -568,6 +607,40 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDisplayDate(row.lastOffloaded)}
+                      </TableCell>
+                      <TableCell>
+                        {isOB && remaining > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`button-assign-bales-${row.supplierId || idx}`}
+                            onClick={() => {
+                              const obRows = rawStockByContainer?.filter(
+                                (r: any) => r.containerStatus === "OPENING_BALANCE" && r.supplierName === row.supplierName
+                              ) || [];
+                              const best = obRows.reduce((prev: any, cur: any) => {
+                                const prevAvail = parseFloat(prev?.receivedKg || "0") - parseFloat(prev?.usedKg || "0");
+                                const curAvail = parseFloat(cur.receivedKg) - parseFloat(cur.usedKg);
+                                return curAvail > prevAvail ? cur : prev;
+                              }, obRows[0]);
+                              if (best) {
+                                setAssigningRawStock({
+                                  rawStockId: best.id,
+                                  supplierName: row.supplierName,
+                                  availableKg: parseFloat(best.receivedKg) - parseFloat(best.usedKg),
+                                  costPerKg: best.costPerKg,
+                                });
+                                setSelectedBaleIds(new Set());
+                                setAssignDialogOpen(true);
+                              } else {
+                                toast({ title: "Error", description: "Could not find OB raw stock record. Try refreshing.", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Link2 className="h-3 w-3 mr-1" />
+                            Assign to Bales
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -1399,6 +1472,143 @@ export default function ProductionRawStock() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign OB Stock to Bales dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={(open) => { setAssignDialogOpen(open); if (!open) { setAssigningRawStock(null); setSelectedBaleIds(new Set()); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign OB Stock to Bales</DialogTitle>
+            <DialogDescription>
+              Select bales to source from this opening balance raw stock record.
+            </DialogDescription>
+          </DialogHeader>
+
+          {assigningRawStock && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-muted/50 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Supplier: </span>
+                  <span className="font-medium">{assigningRawStock.supplierName}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Available: </span>
+                  <span className="font-mono font-medium">{formatNumber(assigningRawStock.availableKg)} kg</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Cost/kg: </span>
+                  <span className="font-mono">${parseFloat(assigningRawStock.costPerKg).toFixed(4)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Unlinked bales: </span>
+                  <span className="font-mono">{unlinkedBales?.length ?? "..."}</span>
+                </div>
+              </div>
+
+              {(() => {
+                const selectedKg = unlinkedBales
+                  ?.filter((b) => selectedBaleIds.has(b.id))
+                  .reduce((sum, b) => sum + parseFloat(b.weightKg), 0) ?? 0;
+                const remainingAfter = assigningRawStock.availableKg - selectedKg;
+                const overLimit = selectedKg > assigningRawStock.availableKg + 0.001;
+
+                return (
+                  <>
+                    {unlinkedBales && unlinkedBales.length > 0 && (
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
+                        <span>Select all <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set(unlinkedBales.map((b) => b.id)))}>All</Button> / <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set())}>None</Button></span>
+                        <span className={overLimit ? "text-destructive font-medium" : ""}>
+                          {selectedBaleIds.size} bales / {formatNumber(selectedKg)} kg selected
+                          {selectedBaleIds.size > 0 && ` — Remaining after: ${formatNumber(remainingAfter)} kg`}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="max-h-72 overflow-y-auto border rounded-md">
+                      {!unlinkedBales ? (
+                        <div className="p-4 space-y-2">
+                          <Skeleton className="h-8 w-full" />
+                          <Skeleton className="h-8 w-full" />
+                        </div>
+                      ) : unlinkedBales.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground text-sm">
+                          No unlinked bales found. All pressed bales already have a raw stock source assigned.
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-10"></TableHead>
+                              <TableHead>Bale Code</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-right">Weight (kg)</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {unlinkedBales.map((bale) => (
+                              <TableRow
+                                key={bale.id}
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  setSelectedBaleIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(bale.id)) next.delete(bale.id); else next.add(bale.id);
+                                    return next;
+                                  });
+                                }}
+                                data-testid={`row-unlinked-bale-${bale.id}`}
+                              >
+                                <TableCell>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedBaleIds.has(bale.id)}
+                                    readOnly
+                                    className="cursor-pointer"
+                                    data-testid={`checkbox-bale-${bale.id}`}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">{bale.baleCode}</TableCell>
+                                <TableCell className="text-sm">{bale.productName || "—"}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{formatNumber(parseFloat(bale.weightKg))}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">{bale.status}</Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+
+                    {overLimit && (
+                      <div className="flex items-center gap-2 text-destructive text-sm">
+                        <AlertTriangle className="h-4 w-4" />
+                        Selected bales ({formatNumber(selectedKg)} kg) exceed available stock ({formatNumber(assigningRawStock.availableKg)} kg)
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setAssignDialogOpen(false)} data-testid="button-cancel-assign">
+                        Cancel
+                      </Button>
+                      <Button
+                        disabled={selectedBaleIds.size === 0 || overLimit || assignMutation.isPending}
+                        data-testid="button-confirm-assign"
+                        onClick={() => {
+                          if (!assigningRawStock) return;
+                          assignMutation.mutate({ rawStockId: assigningRawStock.rawStockId, baleIds: Array.from(selectedBaleIds) });
+                        }}
+                      >
+                        {assignMutation.isPending ? "Assigning..." : `Assign ${selectedBaleIds.size} Bale${selectedBaleIds.size !== 1 ? "s" : ""}`}
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
