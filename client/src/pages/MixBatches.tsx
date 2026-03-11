@@ -1,11 +1,14 @@
 import { useState, lazy, Suspense } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle } from "lucide-react";
+import { Plus, Package, CheckCircle, PlayCircle, Link2, AlertTriangle, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -50,6 +53,15 @@ export default function MixBatches() {
   const [sourceBatchId, setSourceBatchId] = useState<string>("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
 
+  // Edit state
+  const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  // Delete state
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const deleteBatch = deleteId ? filteredBatchesForDelete(deleteId) : null;
+
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -57,6 +69,10 @@ export default function MixBatches() {
   const { data: batches, isLoading } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],
   });
+
+  function filteredBatchesForDelete(id: number) {
+    return batches?.find((b) => b.id === id) ?? null;
+  }
 
   const { data: unlinkedBales } = useQuery<any[]>({
     queryKey: ["/api/factory/bales/unlinked"],
@@ -103,6 +119,48 @@ export default function MixBatches() {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("PATCH", `/api/factory/mix-batches/${editBatch!.id}`, {
+        name: editName,
+        notes: editNotes,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      setEditBatch(null);
+      toast({ title: "Saved", description: "Batch updated successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("DELETE", `/api/factory/mix-batches/${deleteId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/unlinked"] });
+      setDeleteId(null);
+      toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const filteredBatches = batches?.filter((batch) => {
     if (statusFilter === "all") return true;
     return batch.status === statusFilter;
@@ -132,7 +190,11 @@ export default function MixBatches() {
   if (selectedBatchId !== null) {
     return (
       <Suspense fallback={<div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>}>
-        <BatchDetail batchId={selectedBatchId} onBack={() => setSelectedBatchId(null)} />
+        <BatchDetail
+          batchId={selectedBatchId}
+          onBack={() => setSelectedBatchId(null)}
+          onDeleted={() => setSelectedBatchId(null)}
+        />
       </Suspense>
     );
   }
@@ -199,6 +261,7 @@ export default function MixBatches() {
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -248,6 +311,30 @@ export default function MixBatches() {
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDisplayDate(batch.createdAt)}
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditBatch(batch);
+                              setEditName(batch.name || "");
+                              setEditNotes((batch as any).notes || "");
+                            }}
+                            data-testid={`button-edit-batch-${batch.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleteId(batch.id)}
+                            data-testid={`button-delete-batch-${batch.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -278,6 +365,84 @@ export default function MixBatches() {
         onOpenChange={setCreateDialogOpen}
       />
 
+      {/* Edit Batch Dialog */}
+      <Dialog open={!!editBatch} onOpenChange={(open) => { if (!open) setEditBatch(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Batch</DialogTitle>
+            <DialogDescription>
+              Update the name or notes for this batch. Sources and weights cannot be changed after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Batch Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder={editBatch?.batchCode || ""}
+                data-testid="input-edit-batch-name"
+              />
+              <p className="text-xs text-muted-foreground">Leave blank to use the auto-generated batch code.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Optional notes..."
+                rows={3}
+                data-testid="input-edit-batch-notes"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditBatch(null)} data-testid="button-cancel-edit">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => editMutation.mutate()}
+                disabled={editMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {editMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Batch</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are not deleted — they will simply become unlinked and available to reassign.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteBatch && (
+            <div className="p-3 rounded-md bg-muted text-sm space-y-1">
+              <p><span className="text-muted-foreground">Batch:</span> <span className="font-medium">{deleteBatch.name || deleteBatch.batchCode}</span></p>
+              <p><span className="text-muted-foreground">Total weight:</span> <span className="font-mono">{formatNumber(parseFloat(deleteBatch.totalWeightKg || "0"))} kg</span></p>
+              <p><span className="text-muted-foreground">Status:</span> <span className="font-medium">{deleteBatch.status}</span></p>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteId(null)} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Batch"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Assign to Bales Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={(open) => {
         setAssignDialogOpen(open);
@@ -292,7 +457,6 @@ export default function MixBatches() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Step 1: pick source batch */}
             <div className="space-y-1">
               <p className="text-sm font-medium">Step 1 — Select raw stock (batch)</p>
               {activeBatchesWithStock.length === 0 ? (
@@ -322,7 +486,6 @@ export default function MixBatches() {
               )}
             </div>
 
-            {/* Step 2: pick bales */}
             {sourceBatchId && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

@@ -1,8 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, Scale, Boxes } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Package, Scale, Boxes, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -12,14 +16,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import type { FactoryMixBatch, FactoryMixBatchSource } from "@shared/schema";
 
 interface BatchDetailProps {
   batchId: number;
   onBack: () => void;
+  onDeleted?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,8 +47,17 @@ const STATUS_COLORS: Record<string, string> = {
   SOLD: "destructive",
 };
 
-export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
+export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailProps) {
   const { formatDisplayDate } = useDateFormat();
+  const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   const { data: batch, isLoading: batchLoading } = useQuery<FactoryMixBatch>({
     queryKey: ["/api/factory/mix-batches", batchId],
   });
@@ -66,6 +91,50 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
   const supplierMap = Object.fromEntries(
     (suppliers || []).map((s: any) => [s.id, s.name])
   );
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("PATCH", `/api/factory/mix-batches/${batchId}`, {
+        name: editName,
+        notes: editNotes,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Update failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches", batchId] });
+      setEditOpen(false);
+      toast({ title: "Saved", description: "Batch updated successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("DELETE", `/api/factory/mix-batches/${batchId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/unlinked"] });
+      toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
+      setDeleteOpen(false);
+      (onDeleted || onBack)();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   const isLoading = batchLoading || balesLoading || sourcesLoading;
 
@@ -125,10 +194,34 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" onClick={onBack} data-testid="button-back">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back
-      </Button>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => {
+              setEditName(batch.name || "");
+              setEditNotes((batch as any).notes || "");
+              setEditOpen(true);
+            }}
+            data-testid="button-edit-batch"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setDeleteOpen(true)}
+            data-testid="button-delete-batch"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </div>
 
       <Card data-testid="card-batch-info">
         <CardHeader>
@@ -329,6 +422,82 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Batch</DialogTitle>
+            <DialogDescription>
+              Update the name or notes for this batch. Sources and weights cannot be changed after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Batch Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder={batch.batchCode}
+                data-testid="input-edit-batch-name"
+              />
+              <p className="text-xs text-muted-foreground">Leave blank to use the auto-generated batch code.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Optional notes..."
+                rows={3}
+                data-testid="input-edit-batch-notes"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditOpen(false)} data-testid="button-cancel-edit">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => editMutation.mutate()}
+                disabled={editMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {editMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Batch</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are not deleted — they will simply become unlinked and available to reassign.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 rounded-md bg-muted text-sm space-y-1">
+            <p><span className="text-muted-foreground">Batch:</span> <span className="font-medium">{batch.name || batch.batchCode}</span></p>
+            <p><span className="text-muted-foreground">Bales linked:</span> <span className="font-mono">{totalBalesCount}</span></p>
+            <p><span className="text-muted-foreground">Total weight:</span> <span className="font-mono">{formatNumber(totalWeight)} kg</span></p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Batch"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4520,6 +4520,112 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.patch("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [batch] = await db
+        .select()
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+
+      if (!batch) return res.status(404).json({ message: "Mix batch not found" });
+
+      const { name, notes } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name?.trim() || null;
+      if (notes !== undefined) updates.notes = notes?.trim() || null;
+
+      const [updated] = await db
+        .update(factoryMixBatches)
+        .set(updates)
+        .where(eq(factoryMixBatches.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating mix batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+
+      await db.transaction(async (tx: any) => {
+        const [batch] = await tx
+          .select()
+          .from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+
+        if (!batch) throw new Error("Mix batch not found");
+
+        // 1. Unlink bales (set mixBatchId = NULL, preserve bales themselves)
+        await tx
+          .update(factoryBales)
+          .set({ mixBatchId: null })
+          .where(and(eq(factoryBales.mixBatchId, id), eq(factoryBales.companyId, companyId)));
+
+        // 2. Reverse used_kg on each source
+        const sources = await tx
+          .select()
+          .from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, id));
+
+        for (const src of sources) {
+          if (src.containerId) {
+            // Reverse used_kg on the raw stock container row
+            const [rsRow] = await tx
+              .select()
+              .from(factoryRawStock)
+              .where(eq(factoryRawStock.containerId, src.containerId));
+            if (rsRow) {
+              const newUsed = Math.max(0, parseFloat(rsRow.usedKg) - parseFloat(src.weightKg));
+              await tx
+                .update(factoryRawStock)
+                .set({ usedKg: newUsed.toFixed(3) })
+                .where(eq(factoryRawStock.id, rsRow.id));
+            }
+          } else if (src.sourceBatchId) {
+            // Reverse used_kg on source batch and restore to ACTIVE
+            const [srcBatch] = await tx
+              .select()
+              .from(factoryMixBatches)
+              .where(eq(factoryMixBatches.id, src.sourceBatchId));
+            if (srcBatch) {
+              const newUsed = Math.max(0, parseFloat(srcBatch.usedKg) - parseFloat(src.weightKg));
+              await tx
+                .update(factoryMixBatches)
+                .set({ usedKg: newUsed.toFixed(3), status: "ACTIVE" })
+                .where(eq(factoryMixBatches.id, src.sourceBatchId));
+            }
+          }
+        }
+
+        // 3. Delete sources
+        await tx
+          .delete(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, id));
+
+        // 4. Delete the batch
+        await tx
+          .delete(factoryMixBatches)
+          .where(eq(factoryMixBatches.id, id));
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting mix batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
