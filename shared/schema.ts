@@ -2441,6 +2441,7 @@ export const factoryMixBatches = pgTable("factory_mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   batchCode: varchar("batch_code", { length: 50 }).notNull(),
+  batchNumber: text("batch_number"),
   name: text("name"),
   totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull(),
   usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
@@ -2476,9 +2477,13 @@ export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
   containerId: integer("container_id"),
   supplierId: integer("supplier_id"),
   sourceBatchId: integer("source_batch_id"),
+  sourceType: text("source_type"),
+  sourceId: integer("source_id"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  quantityKg: decimal("quantity_kg", { precision: 15, scale: 3 }),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -4102,11 +4102,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const result = await db.transaction(async (tx) => {
         // 1. Create a completed mix batch to represent this OB assignment
+        const obBatchCode = `OB-ASSIGN-${rawStockId}-${Date.now()}`;
         const [newBatch] = await tx
           .insert(factoryMixBatches)
           .values({
             companyId,
-            batchCode: `OB-ASSIGN-${rawStockId}-${Date.now()}`,
+            batchCode: obBatchCode,
+            batchNumber: obBatchCode,
             name: "OB Stock Assignment",
             totalWeightKg: totalKg.toFixed(3),
             usedKg: totalKg.toFixed(3),
@@ -4470,6 +4472,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .values({
             companyId,
             batchCode,
+            batchNumber: batchCode,
             name: name || null,
             totalWeightKg: String(totalWeightKg),
             costPerKg: String(blendedCostPerKg),
@@ -4484,7 +4487,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             containerId: sr.containerId || null,
             supplierId: sr.supplierId || null,
             sourceBatchId: sr.sourceBatchId || null,
+            sourceType: sr.sourceBatchId ? "BATCH" : sr.containerId ? "CONTAINER" : "SUPPLIER",
+            sourceId: sr.supplierId || sr.containerId || sr.sourceBatchId || null,
             weightKg: sr.weightKg,
+            quantityKg: sr.weightKg,
             costPerKg: sr.costPerKg,
             totalCost: sr.totalCost,
           });

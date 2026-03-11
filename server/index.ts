@@ -332,6 +332,13 @@ app.use((req, res, next) => {
       status text NOT NULL DEFAULT 'SUCCESS',
       error_message text
     )`,
+    // Sync factory_mix_batches with production schema
+    `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS batch_number text`,
+    // Sync factory_mix_batch_sources with production schema
+    `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS source_type text`,
+    `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS source_id integer`,
+    `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS quantity_kg decimal(15,3)`,
+    `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS notes text`,
   ];
   for (const migration of migrations) {
     try {
