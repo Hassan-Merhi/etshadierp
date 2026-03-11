@@ -1378,12 +1378,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [created] = await db.insert(factorySupplierPayments).values(parsed).returning();
       const [spSupplier] = await db.select({ name: factorySuppliers.name })
         .from(factorySuppliers).where(eq(factorySuppliers.id, created.supplierId));
+      const isFxConversion = created.notes?.startsWith("FX Conversion");
       await writeDaybookEntry(db, {
         companyId,
         txDate: created.date,
-        txType: "SUPPLIER_PAYMENT",
+        txType: isFxConversion ? "SUPPLIER_FX_CONVERSION" : "SUPPLIER_PAYMENT",
         referenceId: created.id,
-        description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
+        description: isFxConversion
+          ? `FX Conversion: ${spSupplier?.name || "Unknown"} – ${created.currencyCode} ${parseFloat(created.amount).toFixed(2)} → USD ${parseFloat(created.amountUsd).toFixed(2)}`
+          : `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
         amountCurrency: parseFloat(created.amount),
         amountUsd: parseFloat(created.amountUsd),
         currencyCode: created.currencyCode,
@@ -1648,6 +1651,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
       const totalDirectCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.commissionAmount || "0"), 0);
 
+      // Fetch payments for this supplier (needed for per-currency net payable calculation)
+      const payments = await db
+        .select()
+        .from(factorySupplierPayments)
+        .where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          eq(factorySupplierPayments.supplierId, supplierId)
+        ))
+        .orderBy(desc(factorySupplierPayments.date));
+
+      const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
       // Group by currency for multi-currency statement
       const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number }> = {};
       for (const s of statement) {
@@ -1659,16 +1674,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         byCurrency[cc].totalCommission += parseFloat(s.totalCommission);
         byCurrency[cc].totalDirectCommission += parseFloat(s.commissionAmount || "0");
       }
-      const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => ({
-        currencyCode: cc,
-        containers: data.containers,
-        totalKg: data.totalKg.toFixed(3),
-        totalValue: data.totalValue.toFixed(2),
-        totalCommission: data.totalCommission.toFixed(2),
-        totalDirectCommission: data.totalDirectCommission.toFixed(2),
-        netPayable: (data.totalValue - data.totalCommission).toFixed(2),
-        totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
-      }));
+
+      // Build per-currency payment totals (using original currency amounts, not USD)
+      const paidByCurrency: Record<string, number> = {};
+      for (const p of (payments as any[])) {
+        const cc = p.currencyCode || "USD";
+        paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
+      }
+
+      const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => {
+        const paid = paidByCurrency[cc] || 0;
+        const netPayable = data.totalValue - data.totalCommission - paid;
+        return {
+          currencyCode: cc,
+          containers: data.containers,
+          totalKg: data.totalKg.toFixed(3),
+          totalValue: data.totalValue.toFixed(2),
+          totalCommission: data.totalCommission.toFixed(2),
+          totalDirectCommission: data.totalDirectCommission.toFixed(2),
+          totalPaid: paid.toFixed(2),
+          netPayable: netPayable.toFixed(2),
+          totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
+        };
+      }).filter(g => parseFloat(g.netPayable) > 0.005);
 
       // Build OB commissions list
       const containerMap: Record<number, any> = {};
@@ -1700,18 +1728,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amountUsd: r.commissionAmountUsd || r.commissionAmount,
         }));
       const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
-
-      // Fetch payments for this supplier
-      const payments = await db
-        .select()
-        .from(factorySupplierPayments)
-        .where(and(
-          eq(factorySupplierPayments.companyId, companyId),
-          eq(factorySupplierPayments.supplierId, supplierId)
-        ))
-        .orderBy(desc(factorySupplierPayments.date));
-
-      const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
 
       res.json({
         supplier,
