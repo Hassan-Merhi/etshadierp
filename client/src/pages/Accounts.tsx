@@ -235,10 +235,26 @@ export default function Accounts() {
   // Filter out inventory accounts - they have their own dedicated page
   // Note: Suppliers are included here so users can view supplier statements
   // Type comparison uses lowercase to match API response
-  const accounts = allAccounts.filter(
+  const baseAccounts = allAccounts.filter(
     (account) =>
       account.code !== "PURCHASES" && account.code !== "IMPORT_CHARGES",
   );
+
+  // In factory mode, append factory suppliers as accounts
+  const factorySupplierAccounts: Account[] = appMode === "factory"
+    ? factorySuppliersData.map((s: any) => ({
+        id: `factorySupplier-${s.id}`,
+        accountId: s.id,
+        type: "factorySupplier" as const,
+        name: s.name,
+        code: `FS-${s.id}`,
+        balance: parseFloat(s.totalValue || "0"),
+        parentId: s.parentId || null,
+        currencyBalances: s.currencyBalances || [],
+      }))
+    : [];
+
+  const accounts = [...baseAccounts, ...factorySupplierAccounts];
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
@@ -256,6 +272,12 @@ export default function Accounts() {
       },
       enabled: !!selectedCompany,
     });
+
+  // Factory suppliers — only loaded in factory mode
+  const { data: factorySuppliersData = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/suppliers/with-balances"],
+    enabled: appMode === "factory" && !!selectedCompany,
+  });
 
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<
     BankAccount[]
@@ -275,17 +297,19 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
+  const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
+
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
     Transaction[]
   >({
-    queryKey: selectedAccount
+    queryKey: selectedAccount && !isFactorySupplierAccount
       ? [
           `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
           { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
         ]
       : [],
     queryFn: async () => {
-      if (!selectedAccount) return [];
+      if (!selectedAccount || isFactorySupplierAccount) return [];
 
       const params = new URLSearchParams();
       // Map periodFilter.fromDate/toDate to backend's startDate/endDate
@@ -307,7 +331,21 @@ export default function Accounts() {
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return await response.json();
     },
-    enabled: !!selectedAccount,
+    enabled: !!selectedAccount && !isFactorySupplierAccount,
+  });
+
+  // Factory supplier statement (only when a factorySupplier account is selected)
+  const { data: factorySupplierStatement, isLoading: factoryStatementLoading } = useQuery<any>({
+    queryKey: selectedAccount && isFactorySupplierAccount
+      ? ["/api/factory/suppliers", selectedAccount.accountId, "statement"]
+      : [],
+    queryFn: async () => {
+      if (!selectedAccount || !isFactorySupplierAccount) return null;
+      const res = await fetch(`/api/factory/suppliers/${selectedAccount.accountId}/statement`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch factory supplier statement");
+      return res.json();
+    },
+    enabled: !!selectedAccount && isFactorySupplierAccount,
   });
 
   // Fetch pre-period balance when a period start date is set (factory mode only)
@@ -1520,6 +1558,79 @@ export default function Accounts() {
                 </CardHeader>
               </Card>
 
+              {isFactorySupplierAccount ? (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      Factory Supplier: {selectedAccount?.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {factoryStatementLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                      </div>
+                    ) : factorySupplierStatement ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <div className="text-xs text-muted-foreground">Containers</div>
+                            <div className="text-lg font-bold">{factorySupplierStatement.summary?.totalContainers || 0}</div>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <div className="text-xs text-muted-foreground">Total Value</div>
+                            <div className="text-lg font-bold tabular-nums">${parseFloat(factorySupplierStatement.summary?.totalValue || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <div className="text-xs text-muted-foreground">Total Paid</div>
+                            <div className="text-lg font-bold tabular-nums">${parseFloat(factorySupplierStatement.summary?.totalPayments || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <div className="text-xs text-muted-foreground">Net Payable</div>
+                            <div className="text-lg font-bold tabular-nums text-primary">${parseFloat(factorySupplierStatement.summary?.netPayable || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          </div>
+                        </div>
+                        {factorySupplierStatement.payments && factorySupplierStatement.payments.length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium mb-2">Recent Payments</div>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead>Notes</TableHead>
+                                  <TableHead className="text-right">Amount</TableHead>
+                                  <TableHead className="text-right">USD</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {factorySupplierStatement.payments.slice(0, 10).map((p: any) => (
+                                  <TableRow key={p.id}>
+                                    <TableCell className="text-sm whitespace-nowrap">{p.date}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{p.notes || "-"}</TableCell>
+                                    <TableCell className="text-right text-sm tabular-nums">
+                                      {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}{parseFloat(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm tabular-nums">
+                                      ${parseFloat(p.amountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                        {(!factorySupplierStatement.payments || factorySupplierStatement.payments.length === 0) && (
+                          <p className="text-sm text-muted-foreground text-center py-4">No payments recorded yet</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Could not load statement</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
               <Card>
                 <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
                   <CardTitle className="text-base">
@@ -1945,6 +2056,7 @@ export default function Accounts() {
                   )}
                 </CardContent>
               </Card>
+              )}
             </>
           )}
         </TabsContent>

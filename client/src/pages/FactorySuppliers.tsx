@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,22 @@ import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactorySupplier } from "@shared/schema";
 
+interface CurrencyBalance {
+  currencyCode: string;
+  balance: number;
+}
+
+interface CurrencyGroup {
+  currencyCode: string;
+  containers: StatementEntry[];
+  totalKg: string;
+  totalValue: string;
+  totalCommission: string;
+  totalDirectCommission: string;
+  netPayable: string;
+  totalOwed: string;
+}
+
 interface SupplierWithBalance extends FactorySupplier {
   totalContainers: number;
   totalKg: string;
@@ -34,6 +50,7 @@ interface SupplierWithBalance extends FactorySupplier {
   pendingContainers: number;
   receivedContainers: number;
   lastContainerDate: string | null;
+  currencyBalances?: CurrencyBalance[];
 }
 
 
@@ -83,6 +100,7 @@ interface SupplierPayment {
 interface StatementResponse {
   supplier: FactorySupplier;
   statement: StatementEntry[];
+  currencyGroups: CurrencyGroup[];
   obCommissions: ObCommission[];
   payments: SupplierPayment[];
   summary: {
@@ -152,6 +170,66 @@ export default function FactorySuppliers() {
 
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
+  });
+
+  // FX Conversion state (convert sub-account foreign currency balance to USD)
+  const [fxConversionOpen, setFxConversionOpen] = useState(false);
+  const [fxConversionForm, setFxConversionForm] = useState({
+    supplierId: 0,
+    selectedCurrency: "",
+    amount: "",
+    fxRateToUsd: "",
+    date: today,
+    notes: "",
+  });
+
+  const openFxConversionDialog = (supplierId: number, currencyCode: string, netPayable: string) => {
+    setFxConversionForm({
+      supplierId,
+      selectedCurrency: currencyCode,
+      amount: netPayable,
+      fxRateToUsd: "",
+      date: today,
+      notes: `FX Conversion: ${currencyCode} ${netPayable} @ `,
+    });
+    setFxConversionOpen(true);
+  };
+
+  const fxConversionMutation = useMutation({
+    mutationFn: async (data: typeof fxConversionForm) => {
+      const fxRate = parseFloat(data.fxRateToUsd) || 0;
+      const amt = parseFloat(data.amount) || 0;
+      if (amt <= 0 || fxRate <= 0) throw new Error("Amount and rate must be greater than zero");
+      // fxRateToUsd = units of foreign currency per 1 USD (matching existing payment convention)
+      const amountUsd = amt / fxRate;
+      const payload = {
+        supplierId: data.supplierId,
+        date: data.date,
+        amount: data.amount,
+        currencyCode: data.selectedCurrency,
+        fxRateToUsd: data.fxRateToUsd,
+        amountUsd: amountUsd.toFixed(4),
+        paidFromAccountId: null,
+        notes: data.notes || `FX Conversion: ${data.selectedCurrency} ${data.amount} @ ${data.fxRateToUsd}`,
+      };
+      const res = await factoryApiRequest("POST", "/api/factory/supplier-payments", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to record conversion");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+      }
+      toast({ title: "Conversion recorded", description: "Balance moved to USD" });
+      setFxConversionOpen(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const paymentMutation = useMutation({
@@ -536,10 +614,21 @@ export default function FactorySuppliers() {
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <div className="text-xs text-muted-foreground">Balance</div>
-                        <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
-                          ~${formatNum(child.totalValue)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">approx. USD</div>
+                        {child.currencyBalances && child.currencyBalances.length > 0 && child.currencyBalances[0].currencyCode !== "USD" ? (
+                          <>
+                            <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
+                              {child.currencyBalances[0].currencyCode} {formatNum(child.currencyBalances[0].balance.toFixed(2))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">~${formatNum(child.totalValue)} USD</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
+                              ${formatNum(child.totalValue)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">USD</div>
+                          </>
+                        )}
                       </div>
                       {child.isActive && (
                         <Button
@@ -699,6 +788,84 @@ export default function FactorySuppliers() {
                         <span className="text-muted-foreground">{statementData.supplier.notes}</span>
                       </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {statementData.currencyGroups && (statementData.currencyGroups.length > 1 || (statementData.currencyGroups.length === 1 && statementData.currencyGroups[0].currencyCode !== "USD")) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
+                    <span className="flex items-center gap-2">
+                      <ArrowRightLeft className="h-4 w-4" />
+                      Balance by Currency
+                    </span>
+                    {statementData.currencyGroups.some(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0);
+                          if (firstNonUsd && statementSupplierId) {
+                            openFxConversionDialog(statementSupplierId, firstNonUsd.currencyCode, firstNonUsd.netPayable);
+                          }
+                        }}
+                        data-testid="button-fx-convert"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                        Convert to USD
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Currency</TableHead>
+                          <TableHead className="text-right">Containers</TableHead>
+                          <TableHead className="text-right">Total Weight</TableHead>
+                          <TableHead className="text-right">Gross Value</TableHead>
+                          <TableHead className="text-right">Commission</TableHead>
+                          <TableHead className="text-right">Net Payable</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statementData.currencyGroups.map((group) => (
+                          <TableRow key={group.currencyCode}>
+                            <TableCell className="font-semibold">
+                              <Badge variant="outline">{group.currencyCode}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{group.containers.length}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{formatKg(group.totalKg)}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-medium">
+                              {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.totalValue)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums text-destructive">
+                              {parseFloat(group.totalCommission) > 0
+                                ? `${group.currencyCode !== "USD" ? group.currencyCode + " " : "$"}${formatNum(group.totalCommission)}`
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-bold">
+                              {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.netPayable)}
+                              {group.currencyCode !== "USD" && parseFloat(group.netPayable) > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="ml-2 h-6 px-2 text-xs"
+                                  onClick={() => statementSupplierId && openFxConversionDialog(statementSupplierId, group.currencyCode, group.netPayable)}
+                                  data-testid={`button-convert-${group.currencyCode}`}
+                                >
+                                  Convert
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
@@ -924,6 +1091,94 @@ export default function FactorySuppliers() {
             )}
           </>
         ) : null}
+
+        {/* FX Conversion Dialog (accessible from statement view) */}
+        <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-4 w-4" />
+                Convert to USD
+              </DialogTitle>
+              <DialogDescription>
+                Record this foreign currency balance as paid — reduces the sub-account balance
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
+                <span className="text-sm font-medium">{fxConversionForm.selectedCurrency} balance being converted</span>
+              </div>
+
+              <div>
+                <Label>Amount ({fxConversionForm.selectedCurrency})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                  value={fxConversionForm.amount}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, amount: e.target.value }))}
+                  data-testid="input-fx-amount"
+                />
+                <p className="text-xs text-muted-foreground mt-1">You can convert a partial amount</p>
+              </div>
+
+              <div>
+                <Label>Exchange Rate (units of {fxConversionForm.selectedCurrency} per 1 USD)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="e.g. 0.91 for EUR (EUR per 1 USD)"
+                  value={fxConversionForm.fxRateToUsd}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
+                  data-testid="input-fx-rate"
+                />
+                {fxConversionForm.amount && fxConversionForm.fxRateToUsd && parseFloat(fxConversionForm.fxRateToUsd) > 0 && parseFloat(fxConversionForm.amount) > 0 && (
+                  <p className="text-sm font-medium mt-1.5 text-primary">
+                    = ${(parseFloat(fxConversionForm.amount) / parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={fxConversionForm.date}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, date: e.target.value }))}
+                  data-testid="input-fx-date"
+                />
+              </div>
+
+              <div>
+                <Label>Notes</Label>
+                <Input
+                  placeholder="Conversion note"
+                  value={fxConversionForm.notes}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, notes: e.target.value }))}
+                  data-testid="input-fx-notes"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => fxConversionMutation.mutate(fxConversionForm)}
+                disabled={
+                  !fxConversionForm.amount ||
+                  !fxConversionForm.fxRateToUsd ||
+                  parseFloat(fxConversionForm.amount) <= 0 ||
+                  parseFloat(fxConversionForm.fxRateToUsd) <= 0 ||
+                  fxConversionMutation.isPending
+                }
+                data-testid="button-submit-fx-conversion"
+              >
+                {fxConversionMutation.isPending ? "Recording..." : "Record Conversion"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -1098,11 +1353,22 @@ export default function FactorySuppliers() {
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <div className="text-xs text-muted-foreground">Balance</div>
-                          <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                            {isParent ? "~" : ""}${formatNum(sup.totalValue)}
-                          </div>
-                          {isParent && (
-                            <div className="text-xs text-muted-foreground">approx. USD</div>
+                          {isChild && sup.currencyBalances && sup.currencyBalances.length > 0 && sup.currencyBalances[0].currencyCode !== "USD" ? (
+                            <>
+                              <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
+                                {sup.currencyBalances[0].currencyCode} {formatNum(sup.currencyBalances[0].balance.toFixed(2))}
+                              </div>
+                              <div className="text-xs text-muted-foreground">~${formatNum(sup.totalValue)} USD</div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
+                                {isParent ? "~" : ""}${formatNum(sup.totalValue)}
+                              </div>
+                              {isParent && (
+                                <div className="text-xs text-muted-foreground">approx. USD</div>
+                              )}
+                            </>
                           )}
                         </div>
                         <div className="flex flex-col gap-1">

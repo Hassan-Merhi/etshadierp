@@ -1476,11 +1476,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               return new Date(d) > new Date(latest) ? d : latest;
             }, null)
           : null;
-        const totalPaid = allPayments
-          .filter((p: any) => p.supplierId === s.id)
-          .reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const supplierPayments = allPayments.filter((p: any) => p.supplierId === s.id);
+        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const balance = parseFloat(s.openingBalance || "0") + containerValue - totalPaid;
-        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance };
+
+        // Per-currency balances (original currency, not converted)
+        const byCurrency: Record<string, number> = {};
+        for (const c of supplierContainers) {
+          const cc = c.currencyCode || "USD";
+          const val = c.finalPayableAmount
+            ? parseFloat(c.finalPayableAmount)
+            : (parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0"));
+          byCurrency[cc] = (byCurrency[cc] || 0) + val;
+        }
+        // Subtract payments by currency
+        for (const p of supplierPayments) {
+          const cc = p.currencyCode || "USD";
+          byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(p.amount || "0");
+        }
+        const currencyBalances = Object.entries(byCurrency)
+          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
+          .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
+          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
+
+        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances };
       };
 
       // First pass: compute each supplier's own stats
@@ -1505,6 +1524,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             pendingContainers: own.pendingContainers,
             receivedContainers: own.receivedContainers,
             lastContainerDate: own.lastContainerDate,
+            currencyBalances: own.currencyBalances,
           };
         }
 
@@ -1519,6 +1539,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
 
+        // Aggregate currency balances across own + children
+        const aggCurrencyMap: Record<string, number> = {};
+        for (const cb of own.currencyBalances) {
+          aggCurrencyMap[cb.currencyCode] = (aggCurrencyMap[cb.currencyCode] || 0) + cb.balance;
+        }
+        for (const cs of childStats) {
+          for (const cb of cs.currencyBalances) {
+            aggCurrencyMap[cb.currencyCode] = (aggCurrencyMap[cb.currencyCode] || 0) + cb.balance;
+          }
+        }
+        const aggCurrencyBalances = Object.entries(aggCurrencyMap)
+          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
+          .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
+          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
+
         return {
           ...s,
           totalContainers: aggContainers,
@@ -1528,6 +1563,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           pendingContainers: aggPending,
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,
+          currencyBalances: aggCurrencyBalances,
         };
       });
 
