@@ -617,8 +617,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />
                     <Route path="/factory/mix-batches" component={MixBatches} />
                     <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
-                    <Route path="/factory/pressing" component={PressingBales} />
-                    <Route path="/factory/finalize" component={ProductionBales} />
+                    <Route path="/factory/pressing"><Redirect to="/factory/stock-entry" /></Route>
+                    <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>
                     <Route path="/factory/stock-entry" component={BaleStockEntry} />
                     <Route path="/factory/bales-history" component={BalesHistory} />
                     <Route path="/factory/bales-hub" component={FactoryBalesHub} />

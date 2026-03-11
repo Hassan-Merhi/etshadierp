@@ -30,7 +30,7 @@
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
   import { Label } from "@/components/ui/label";
   import * as XLSX from "xlsx";
-  import type { FactoryBaleProduct, Location, FactoryMixBatch, FactoryCategory } from "@shared/schema";
+  import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
 
   interface CartItem {
@@ -47,7 +47,6 @@
     const [scanError, setScanError] = useState("");
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-    const [selectedMixBatchId, setSelectedMixBatchId] = useState<string>("");
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const scanRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
@@ -58,7 +57,6 @@
       queryKey: ["/api/factory/bale-products"],
     });
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
-    const { data: mixBatches } = useQuery<FactoryMixBatch[]>({ queryKey: ["/api/factory/mix-batches"] });
     const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
 
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
@@ -102,24 +100,12 @@
 
     const activeProducts = baleProducts?.filter((p) => p.active);
     const activeLocations = locations?.filter((l) => l.active);
-    const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
-
-    const selectedMixBatch = selectedMixBatchId && selectedMixBatchId !== "__none__" ? activeMixBatches?.find((b) => b.id.toString() === selectedMixBatchId) : undefined;
-    const mixBatchRemaining = selectedMixBatch
-      ? parseFloat(selectedMixBatch.totalWeightKg) - parseFloat(selectedMixBatch.usedKg || "0")
-      : 0;
 
     useEffect(() => {
       if (activeLocations && activeLocations.length === 1 && !selectedLocationId) {
         setSelectedLocationId(activeLocations[0].id.toString());
       }
     }, [activeLocations, selectedLocationId]);
-
-    useEffect(() => {
-      if (activeMixBatches && activeMixBatches.length === 1 && !selectedMixBatchId) {
-        setSelectedMixBatchId(activeMixBatches[0].id.toString());
-      }
-    }, [activeMixBatches, selectedMixBatchId]);
 
     useEffect(() => {
       if (scanRef.current) scanRef.current.focus();
@@ -334,9 +320,6 @@
           items,
           erpLocationId: parseInt(selectedLocationId),
         };
-        if (selectedMixBatchId && selectedMixBatchId !== "__none__") {
-          body.mixBatchId = parseInt(selectedMixBatchId);
-        }
         const response = await modeApiRequest("POST", "/api/factory/stock-entry", body);
 
         if (!response.ok) {
@@ -378,49 +361,20 @@
 
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
-            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-              <SelectTrigger data-testid="select-stock-entry-location">
-                <SelectValue placeholder="Select Location..." />
-              </SelectTrigger>
-              <SelectContent>
-                {activeLocations?.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1.5">Mix Batch (optional)</p>
-            <Select value={selectedMixBatchId} onValueChange={setSelectedMixBatchId}>
-              <SelectTrigger data-testid="select-stock-entry-mix-batch">
-                <SelectValue placeholder="No mix batch (cost = 0)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">No mix batch (cost = 0)</SelectItem>
-                {activeMixBatches && activeMixBatches.length > 0 && (
-                  activeMixBatches.map((mb) => {
-                    const remaining = parseFloat(mb.totalWeightKg) - parseFloat(mb.usedKg || "0");
-                    return (
-                      <SelectItem key={mb.id} value={mb.id.toString()}>
-                        {mb.name || mb.batchCode} ({formatNumber(remaining)} kg left)
-                      </SelectItem>
-                    );
-                  })
-                )}
-              </SelectContent>
-            </Select>
-            {selectedMixBatch && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Remaining: {formatNumber(mixBatchRemaining)} kg |
-                Will consume: <span className={totalKg > mixBatchRemaining + 0.001 ? "text-destructive font-medium" : ""}>{formatNumber(totalKg)} kg</span>
-              </div>
-            )}
-          </div>
+        <div className="max-w-sm">
+          <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
+          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+            <SelectTrigger data-testid="select-stock-entry-location">
+              <SelectValue placeholder="Select Location..." />
+            </SelectTrigger>
+            <SelectContent>
+              {activeLocations?.map((loc) => (
+                <SelectItem key={loc.id} value={loc.id.toString()}>
+                  {loc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex gap-6">
