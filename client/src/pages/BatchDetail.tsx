@@ -59,6 +59,14 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
     },
   });
 
+  const { data: suppliers } = useQuery<any[]>({
+    queryKey: ["/api/factory/suppliers"],
+  });
+
+  const supplierMap = Object.fromEntries(
+    (suppliers || []).map((s: any) => [s.id, s.name])
+  );
+
   const isLoading = batchLoading || balesLoading || sourcesLoading;
 
   if (isLoading) {
