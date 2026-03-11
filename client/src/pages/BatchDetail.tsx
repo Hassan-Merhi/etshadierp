@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Package, Scale, Boxes } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Package, Scale, Boxes, Link2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +13,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 import type { FactoryMixBatch, FactoryMixBatchSource } from "@shared/schema";
 
 interface BatchDetailProps {
@@ -33,6 +45,13 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
   const { formatDisplayDate } = useDateFormat();
+  const { toast } = useToast();
+  const appMode = useAppMode();
+  const modeApiRequest = getApiRequest(appMode);
+
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
+
   const { data: batch, isLoading: batchLoading } = useQuery<FactoryMixBatch>({
     queryKey: ["/api/factory/mix-batches", batchId],
   });
@@ -56,6 +75,33 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
       });
       if (!res.ok) throw new Error("Failed to fetch sources");
       return res.json();
+    },
+  });
+
+  const { data: unlinkedBales } = useQuery<{ id: number; baleCode: string; referenceNumber: string; productName: string | null; weightKg: string; status: string; pressedAt: string | null }[]>({
+    queryKey: ["/api/factory/bales/unlinked"],
+    enabled: assignDialogOpen,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (baleIds: number[]) => {
+      const res = await modeApiRequest("POST", `/api/factory/mix-batches/${batchId}/assign-bales`, { baleIds });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Assignment failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches", batchId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales", { mixBatchId: batchId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/unlinked"] });
+      setAssignDialogOpen(false);
+      setSelectedBaleIds(new Set());
+      toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to this batch` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -109,12 +155,9 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "ACTIVE":
-        return "default";
-      case "COMPLETED":
-        return "secondary";
-      default:
-        return "outline";
+      case "ACTIVE": return "default";
+      case "COMPLETED": return "secondary";
+      default: return "outline";
     }
   };
 
@@ -238,12 +281,25 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
 
       <Card data-testid="card-bales">
         <CardHeader>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            <CardTitle>Bales Produced</CardTitle>
-            <Badge variant="secondary" data-testid="badge-bales-count">
-              {totalBalesCount} bales
-            </Badge>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Package className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Bales Produced</CardTitle>
+              <Badge variant="secondary" data-testid="badge-bales-count">
+                {totalBalesCount} bales
+              </Badge>
+            </div>
+            {remainingWeight > 0.001 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSelectedBaleIds(new Set()); setAssignDialogOpen(true); }}
+                data-testid="button-assign-existing-bales"
+              >
+                <Link2 className="h-4 w-4 mr-2" />
+                Assign Existing Bales
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -324,6 +380,114 @@ export default function BatchDetail({ batchId, onBack }: BatchDetailProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Assign existing bales dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={(open) => { setAssignDialogOpen(open); if (!open) setSelectedBaleIds(new Set()); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Existing Bales to This Batch</DialogTitle>
+            <DialogDescription>
+              Select already-pressed bales to link to <strong>{batch.name || batch.batchCode}</strong>.
+              Available: <span className="font-mono">{formatNumber(remainingWeight)} kg</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {(() => {
+            const selectedKg = unlinkedBales
+              ?.filter((b) => selectedBaleIds.has(b.id))
+              .reduce((sum, b) => sum + parseFloat(b.weightKg), 0) ?? 0;
+            const remainingAfter = remainingWeight - selectedKg;
+            const overLimit = selectedKg > remainingWeight + 0.001;
+
+            return (
+              <div className="space-y-3">
+                {unlinkedBales && unlinkedBales.length > 0 && (
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set(unlinkedBales.map((b) => b.id)))}>All</Button>
+                      {" / "}
+                      <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set())}>None</Button>
+                    </span>
+                    <span className={overLimit ? "text-destructive font-medium" : ""}>
+                      {selectedBaleIds.size} bales / {formatNumber(selectedKg)} kg selected
+                      {selectedBaleIds.size > 0 && ` — Remaining after: ${formatNumber(remainingAfter)} kg`}
+                    </span>
+                  </div>
+                )}
+
+                <div className="max-h-72 overflow-y-auto border rounded-md">
+                  {!unlinkedBales ? (
+                    <div className="p-4 space-y-2">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
+                    </div>
+                  ) : unlinkedBales.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground text-sm">
+                      No unlinked bales found. All pressed bales already have a raw stock source assigned.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10"></TableHead>
+                          <TableHead>Bale Code</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Weight (kg)</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unlinkedBales.map((bale) => (
+                          <TableRow
+                            key={bale.id}
+                            className="cursor-pointer"
+                            onClick={() => setSelectedBaleIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(bale.id)) next.delete(bale.id); else next.add(bale.id);
+                              return next;
+                            })}
+                            data-testid={`row-unlinked-bale-${bale.id}`}
+                          >
+                            <TableCell>
+                              <input type="checkbox" checked={selectedBaleIds.has(bale.id)} readOnly className="cursor-pointer" />
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{bale.baleCode}</TableCell>
+                            <TableCell className="text-sm">{bale.productName || "—"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{formatNumber(parseFloat(bale.weightKg))}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">{bale.status}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+
+                {overLimit && (
+                  <div className="flex items-center gap-2 text-destructive text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    Selected bales ({formatNumber(selectedKg)} kg) exceed remaining batch capacity ({formatNumber(remainingWeight)} kg)
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" onClick={() => setAssignDialogOpen(false)} data-testid="button-cancel-assign">
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={selectedBaleIds.size === 0 || overLimit || assignMutation.isPending}
+                    data-testid="button-confirm-assign"
+                    onClick={() => assignMutation.mutate(Array.from(selectedBaleIds))}
+                  >
+                    {assignMutation.isPending ? "Assigning..." : `Assign ${selectedBaleIds.size} Bale${selectedBaleIds.size !== 1 ? "s" : ""}`}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

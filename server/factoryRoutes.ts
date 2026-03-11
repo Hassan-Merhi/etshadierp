@@ -4511,6 +4511,68 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Assign existing (unlinked) bales to a mix batch
+  app.post("/api/factory/mix-batches/:id/assign-bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const mixBatchId = parseInt(req.params.id);
+      const { baleIds } = req.body as { baleIds: number[] };
+
+      if (!Array.isArray(baleIds) || baleIds.length === 0) {
+        return res.status(400).json({ message: "baleIds must be a non-empty array" });
+      }
+
+      const [batch] = await db
+        .select()
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, mixBatchId), eq(factoryMixBatches.companyId, companyId)));
+
+      if (!batch) return res.status(404).json({ message: "Mix batch not found" });
+
+      const bales = await db
+        .select({ id: factoryBales.id, weightKg: factoryBales.weightKg, mixBatchId: factoryBales.mixBatchId })
+        .from(factoryBales)
+        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+
+      if (bales.length !== baleIds.length) {
+        return res.status(400).json({ message: "One or more bale IDs are invalid" });
+      }
+      const alreadyLinked = bales.filter((b) => b.mixBatchId !== null);
+      if (alreadyLinked.length > 0) {
+        return res.status(400).json({ message: `${alreadyLinked.length} bale(s) are already linked to a mix batch` });
+      }
+
+      const totalKg = bales.reduce((sum, b) => sum + parseFloat(b.weightKg as string), 0);
+      const availableKg = parseFloat(batch.totalWeightKg as string) - parseFloat(batch.usedKg as string);
+
+      if (totalKg > availableKg + 0.001) {
+        return res.status(400).json({
+          message: `Not enough remaining kg in this batch (need ${totalKg.toFixed(3)}, have ${availableKg.toFixed(3)})`,
+        });
+      }
+
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        await tx
+          .update(factoryBales)
+          .set({ mixBatchId, updatedAt: now })
+          .where(inArray(factoryBales.id, baleIds));
+
+        await tx
+          .update(factoryMixBatches)
+          .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${totalKg.toFixed(3)}`, updatedAt: now })
+          .where(eq(factoryMixBatches.id, mixBatchId));
+      });
+
+      res.json({ success: true, balesUpdated: baleIds.length, totalKg });
+    } catch (error: any) {
+      console.error("Error assigning bales to mix batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/mix-batches/:id/sources", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
