@@ -225,6 +225,12 @@ export default function Accounts() {
       ? `Statement - ${selectedAccount.name}`
       : "Account Statement",
   });
+  // Factory suppliers — must be declared before factorySupplierAccounts uses it below
+  const { data: factorySuppliersData = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/suppliers/with-balances"],
+    enabled: appMode === "factory" && !!selectedCompany,
+  });
+
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<
     Account[]
   >({
@@ -272,12 +278,6 @@ export default function Accounts() {
       },
       enabled: !!selectedCompany,
     });
-
-  // Factory suppliers — only loaded in factory mode
-  const { data: factorySuppliersData = [] } = useQuery<any[]>({
-    queryKey: ["/api/factory/suppliers/with-balances"],
-    enabled: appMode === "factory" && !!selectedCompany,
-  });
 
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<
     BankAccount[]
