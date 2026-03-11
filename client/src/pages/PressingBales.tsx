@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Minus, Trash2, Printer, Barcode, ScanLine, AlertCircle, Package } from "lucide-react";
+import { Plus, Minus, Trash2, Printer, Barcode, ScanLine, AlertCircle, Package, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -299,6 +299,11 @@ export default function PressingBales() {
           </div>
           <Badge variant="secondary" data-testid="text-pressing-badge">PRESSING</Badge>
         </div>
+      </div>
+
+      <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
+        <span>Raw material usage is recorded at end of day during finalization — no mix batch needed at pressing time.</span>
       </div>
 
       <div className="flex gap-6">

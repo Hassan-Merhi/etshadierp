@@ -59,11 +59,13 @@ interface SourceSelection {
 interface CreateMixBatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (batch: FactoryMixBatch) => void;
 }
 
 export function CreateMixBatchDialog({
   open,
   onOpenChange,
+  onCreated,
 }: CreateMixBatchDialogProps) {
   const { toast } = useToast();
   const [selectedSources, setSelectedSources] = useState<SourceSelection[]>([]);
@@ -135,10 +137,11 @@ export function CreateMixBatchDialog({
 
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result: FactoryMixBatch) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      toast({ title: "Success", description: "Mix batch created successfully" });
+      toast({ title: "Success", description: "Daily usage batch created successfully" });
+      onCreated?.(result);
       handleClose();
     },
     onError: (error: Error) => {

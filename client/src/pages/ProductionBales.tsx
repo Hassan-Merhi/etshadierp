@@ -3,7 +3,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   CheckCircle, Trash2, Package, ScanLine, AlertCircle,
-  XCircle, AlertTriangle, Printer, ArrowLeft, Hash, Scale, Calendar
+  XCircle, AlertTriangle, Printer, ArrowLeft, Hash, Scale, Calendar, PlusCircle, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 
 function formatLabelNum(val: string | number): string {
   const n = typeof val === 'string' ? parseFloat(val) : val;
@@ -96,6 +97,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [createBatchOpen, setCreateBatchOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -419,10 +421,22 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
           <div className="border-t pt-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <p className="text-sm text-muted-foreground mb-1.5">Mix Batch (raw material)</p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-sm text-muted-foreground">Daily Usage Batch (raw material)</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCreateBatchOpen(true)}
+                    data-testid="button-new-daily-batch"
+                    className="h-6 px-2 text-xs"
+                  >
+                    <PlusCircle className="h-3 w-3 mr-1" />
+                    New Batch
+                  </Button>
+                </div>
                 <Select value={selectedMixBatchId} onValueChange={setSelectedMixBatchId}>
                   <SelectTrigger data-testid="select-finalize-mix-batch">
-                    <SelectValue placeholder="Select Mix Batch..." />
+                    <SelectValue placeholder="Select Daily Usage Batch..." />
                   </SelectTrigger>
                   <SelectContent>
                     {activeMixBatches && activeMixBatches.length > 0 ? (
@@ -435,15 +449,19 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
                         );
                       })
                     ) : (
-                      <SelectItem value="none" disabled>No active mix batches</SelectItem>
+                      <SelectItem value="none" disabled>No active batches — create one above</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
-                {selectedMixBatch && (
+                {selectedMixBatch ? (
                   <div className="mt-1 text-xs text-muted-foreground">
                     Remaining: {formatNumber(mixBatchRemaining)} kg |
                     Will consume: <span className={totalScannedWeight > mixBatchRemaining + 0.001 ? "text-destructive font-medium" : ""}>{formatNumber(totalScannedWeight)} kg</span>
                   </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Select an existing batch or create a new one to record today's raw material consumption
+                  </p>
                 )}
               </div>
 
@@ -544,7 +562,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 
           <div className="text-sm space-y-1">
             <p>Location: <span className="font-medium">{selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "-"}</span></p>
-            <p>Mix Batch: <span className="font-medium">{selectedMixBatch?.name || selectedMixBatch?.batchCode || "-"}</span></p>
+            <p>Daily Usage Batch: <span className="font-medium">{selectedMixBatch?.name || selectedMixBatch?.batchCode || "-"}</span></p>
             <p>Weight to consume: <span className="font-medium">{formatNumber(totalScannedWeight)} kg</span></p>
           </div>
 
@@ -567,6 +585,15 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateMixBatchDialog
+        open={createBatchOpen}
+        onOpenChange={setCreateBatchOpen}
+        onCreated={(batch) => {
+          setSelectedMixBatchId(batch.id.toString());
+          setCreateBatchOpen(false);
+        }}
+      />
     </div>
   );
 }

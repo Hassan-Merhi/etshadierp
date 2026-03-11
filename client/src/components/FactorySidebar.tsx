@@ -89,6 +89,8 @@ const allMenuGroups: MenuGroup[] = [
     title: "Operations",
     icon: Factory,
     items: [
+      { title: "Pressing", url: "/factory/pressing", icon: Boxes },
+      { title: "Finalize", url: "/factory/finalize", icon: CheckCircle },
       { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
       { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
