@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Trash2, RotateCcw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -84,6 +84,24 @@ export default function FactoryInvoices() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const unfinalizeMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/unfinalize`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to revert invoice");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Reverted to Draft", description: "Invoice has been reverted. You can now edit and re-finalize it." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Cannot Revert", description: error.message, variant: "destructive" });
     },
   });
 
@@ -171,7 +189,7 @@ export default function FactoryInvoices() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total Bales</TableHead>
                 <TableHead className="text-right">Grand Total</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -217,6 +235,41 @@ export default function FactoryInvoices() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {order.status === "FINALIZED" && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={unfinalizeMutation.isPending}
+                                data-testid={`button-revert-order-${order.id}`}
+                              >
+                                <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Revert to Draft</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will revert invoice {order.invoiceNumber} for {order.customerName} back to Draft status.
+                                  The invoice number will be voided, all bales will return to stock, and the customer balance entry will be removed.
+                                  This cannot be done if any payment has been recorded against this invoice.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid={`button-cancel-revert-${order.id}`}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => unfinalizeMutation.mutate(order.id)}
+                                  data-testid={`button-confirm-revert-${order.id}`}
+                                >
+                                  Revert to Draft
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+
                         {order.status !== "FINALIZED" && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

@@ -9056,6 +9056,90 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+
+      await db.transaction(async (tx: any) => {
+        const [order] = await tx.select().from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) throw new Error("Order not found");
+        if (order.status !== "FINALIZED") throw new Error("Only FINALIZED orders can be reverted to Draft");
+
+        // Block if any payment has been recorded against this invoice
+        const payments = await tx.select({ id: customerBalances.id })
+          .from(customerBalances)
+          .where(and(
+            eq(customerBalances.companyId, companyId),
+            eq(customerBalances.referenceId, orderId),
+            eq(customerBalances.referenceType, "INVOICE"),
+            eq(customerBalances.transactionType, "PAYMENT"),
+          ));
+        if (payments.length > 0) {
+          throw new Error("Cannot revert: this invoice has payments recorded against it. Reverse the payments first.");
+        }
+
+        // Delete the SALE balance entry for this invoice
+        await tx.delete(customerBalances).where(and(
+          eq(customerBalances.companyId, companyId),
+          eq(customerBalances.referenceId, orderId),
+          eq(customerBalances.referenceType, "INVOICE"),
+          eq(customerBalances.transactionType, "SALE"),
+        ));
+
+        // Delete charge journal vouchers created during finalization (sourceModule FACTORY, description contains invoice number)
+        if (order.invoiceNumber) {
+          const chargeVouchers = await tx.select({ id: vouchers.id })
+            .from(vouchers)
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              sql`${vouchers.description} LIKE ${"CHARGE-" + order.invoiceNumber + "-%"}`,
+            ));
+          for (const cv of chargeVouchers) {
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, cv.id));
+            await tx.delete(vouchers).where(eq(vouchers.id, cv.id));
+          }
+        }
+
+        // Revert bales from SOLD → FINALIZED
+        const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        for (const b of bales) {
+          await tx.update(factoryBales)
+            .set({ status: "FINALIZED", updatedAt: new Date() })
+            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "SOLD")));
+        }
+
+        // Reset order to DRAFT, clear invoice number
+        await tx.update(customerOrders).set({
+          status: "DRAFT",
+          invoiceNumber: null,
+          updatedAt: new Date(),
+        }).where(eq(customerOrders.id, orderId));
+
+        // Daybook entry
+        const [unfCustomer] = await tx.select({ legalName: customers.legalName })
+          .from(customers).where(eq(customers.id, order.customerId));
+        const unfToday = new Date().toISOString().split("T")[0];
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: unfToday,
+          txType: "INVOICE_REVERTED",
+          referenceId: orderId,
+          description: `Invoice ${order.invoiceNumber} reverted to Draft – ${unfCustomer?.legalName || "Customer"}`,
+        });
+      });
+
+      res.json({ message: "Invoice reverted to Draft successfully" });
+    } catch (error: any) {
+      console.error("Error unfinalizing order:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders/:id/cancel", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
