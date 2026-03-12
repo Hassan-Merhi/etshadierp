@@ -70,6 +70,7 @@ interface VoucherWithItems extends Voucher {
   salesItems?: SalesItem[];
   exchangeRate?: string | null;
   isCreditSale?: boolean;
+  customerName?: string | null;
 }
 
 interface InventoryItem {
@@ -856,7 +857,7 @@ export default function POSDaybook() {
                     {/* Date + User row */}
                     <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                       <span>Date: {voucherDetails?.voucherDate}</span>
-                      <span>User: {currentUser?.username}</span>
+                      <span>User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}</span>
                     </div>
                     {/* Daily Rate — Mali company only */}
                     {isMaliCompany && voucherDetails?.exchangeRate && (
@@ -868,6 +869,9 @@ export default function POSDaybook() {
                     {voucherDetails?.isCreditSale && (
                       <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
                         <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+                        {voucherDetails.customerName && (
+                          <div>Customer: {voucherDetails.customerName}</div>
+                        )}
                       </div>
                     )}
                     {/* Items table */}

@@ -71,6 +71,9 @@ export default function POSImport() {
     return prefix + parts.join(".");
   };
 
+  // Currency prefix for the print template: reflects what the user selected at import time
+  const printCurrPrefix = saleCurrency === "CFA" ? "CFA " : "$";
+
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
@@ -823,8 +826,8 @@ export default function POSImport() {
                       <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
                         <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName || item.itemCode}</td>
                         <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, "$")}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, "$")}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, printCurrPrefix)}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, printCurrPrefix)}</td>
                       </tr>
                     );
                   })}
@@ -835,7 +838,7 @@ export default function POSImport() {
                     <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
                     <td style={{ padding: '5px 3px' }}></td>
                     <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
-                      {fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), "$")}
+                      {fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), printCurrPrefix)}
                     </td>
                   </tr>
                 </tfoot>
@@ -844,7 +847,7 @@ export default function POSImport() {
               {/* Total Paid */}
               <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
                 <span>TOTAL PAID:</span>
-                <span>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), "$")}</span>
+                <span>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), printCurrPrefix)}</span>
               </div>
 
               {/* Notes */}

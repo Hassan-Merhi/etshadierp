@@ -14777,6 +14777,20 @@ if (asOfDate) {
         }
       }
 
+      // For credit sales, resolve customer name from the voucher entries
+      let customerName: string | null = null;
+      if (voucher.isCreditSale) {
+        const creditEntry = entries.find((e: any) => e.customerId != null);
+        if (creditEntry?.customerId) {
+          const [cust] = await db
+            .select({ legalName: customers.legalName })
+            .from(customers)
+            .where(eq(customers.id, creditEntry.customerId))
+            .limit(1);
+          customerName = cust?.legalName ?? null;
+        }
+      }
+
       res.json({
         ...voucher,
         entries,
@@ -14784,6 +14798,7 @@ if (asOfDate) {
         salesItems: salesItemsList,
         adjustmentData,
         transferData,
+        customerName,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
