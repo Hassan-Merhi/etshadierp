@@ -555,6 +555,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     return prefix + parts.join(".");
   };
 
+  // Currency-aware formatter for the print template.
+  // Reads the currency locked on the saved sale (not the live toggle),
+  // converts USD stored values → CFA using the voucher's locked exchange rate.
+  const fmtPrintCurrency = (usdAmount: number): string => {
+    const printCurrency = savedSale?.currency || activeCurrency;
+    const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || dailyExchangeRate || 1;
+    if (printCurrency === "CFA") {
+      const cfaAmount = Math.round(usdAmount * lockedRate);
+      return `CFA ${cfaAmount.toLocaleString()}`;
+    }
+    return fmtPrint(usdAmount, "$");
+  };
+
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -2158,7 +2171,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 </div>
               )}
 
-              {/* Items Table - Always print in USD */}
+              {/* Items Table - currency follows the sale's locked currency */}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid black' }}>
@@ -2176,8 +2189,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                       <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
                         <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName}</td>
                         <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(parseFloat(item.quantity))}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(itemRateUSD, "$")}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(itemAmountUSD, "$")}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrintCurrency(itemRateUSD)}</td>
+                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrintCurrency(itemAmountUSD)}</td>
                       </tr>
                     );
                   })}
@@ -2189,10 +2202,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
                     <td style={{ padding: '5px 3px' }}></td>
                     <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
-                      {fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => {
+                      {fmtPrintCurrency((savedSale?.items ?? []).reduce((sum: number, item: any) => {
                         const rateUSD = parseFloat(item.rateUSD || item.rate);
                         return sum + (parseFloat(item.quantity) * rateUSD);
-                      }, 0), "$")}
+                      }, 0))}
                     </td>
                   </tr>
                 </tfoot>
@@ -2202,10 +2215,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
                 <span>TOTAL PAID:</span>
                 <span>
-                  {fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => {
+                  {fmtPrintCurrency((savedSale?.items ?? []).reduce((sum: number, item: any) => {
                     const rateUSD = parseFloat(item.rateUSD || item.rate);
                     return sum + (parseFloat(item.quantity) * rateUSD);
-                  }, 0), "$")}
+                  }, 0))}
                 </span>
               </div>
 
