@@ -213,7 +213,7 @@ export default function FactoryInvoiceDetail() {
           {order.status === "DRAFT" && (
             <Button
               variant="outline"
-              onClick={() => navigate(`/factory/sales/new?orderId=${order.id}`)}
+              onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
               data-testid="button-continue-editing"
             >
               Continue Editing
