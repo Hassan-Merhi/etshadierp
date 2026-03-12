@@ -89,6 +89,7 @@ export default function VoucherDetail() {
   const modeApiRequest = getApiRequest(appMode);
   
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
+  const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";
 
   const { data, isLoading } = useQuery<VoucherDetailData>({
     queryKey: ["/api/voucher-detail", voucherId],
@@ -123,12 +124,14 @@ export default function VoucherDetail() {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              size="icon"
               onClick={() => window.history.back()}
-              className="text-white hover:bg-white/20"
+              className="text-white hover:bg-white/20 gap-1"
               data-testid="button-back"
             >
               <ArrowLeft className="h-5 w-5" />
+              {fromDaybook && (
+                <span className="text-sm font-normal hidden sm:inline">Back to Daybook</span>
+              )}
             </Button>
             <div>
               <p className="text-sm opacity-80">

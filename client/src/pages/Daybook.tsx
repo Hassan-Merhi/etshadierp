@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,6 +86,7 @@ import {
   Filter,
   X,
   Eye,
+  EyeOff,
   Edit,
   Trash2,
   Plus,
@@ -387,6 +388,38 @@ function AccountCombobox({
   );
 }
 
+// ─── ERP Daybook sessionStorage persistence ──────────────────────────────────
+const DAYBOOK_STATE_KEY = "erp-daybook-ui-state";
+
+interface DaybookUIState {
+  periodFilter: PeriodFilterValue;
+  filters: { voucherType: string; searchQuery: string; sortOrder: "asc" | "desc" };
+  selectedRowId: string | null;
+  hiddenRowIds: string[];
+  showHidden: boolean;
+  scrollY: number;
+}
+
+function loadDaybookState(): DaybookUIState | null {
+  try {
+    const raw = sessionStorage.getItem(DAYBOOK_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DaybookUIState;
+  } catch {
+    return null;
+  }
+}
+
+function saveDaybookState(state: DaybookUIState): void {
+  try {
+    sessionStorage.setItem(DAYBOOK_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // sessionStorage may be unavailable in some contexts
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -409,6 +442,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [editFormInitialized, setEditFormInitialized] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
+
+  // ERP Daybook UX: selected row, hidden rows, scroll
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  const scrollYRef = useRef(0);
 
   // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -843,6 +882,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
     });
   }, [filteredVouchers, filteredOffloads, filters.sortOrder]);
 
+  // Row ID helper
+  const rowId = useCallback((row: DaybookRow): string => {
+    return row._type === "voucher"
+      ? `voucher-${(row.data as Voucher).id}`
+      : `offload-${row.data.id}`;
+  }, []);
+
+  // Visible rows: filter out hidden rows (unless showHidden is true)
+  const visibleRows = useMemo((): DaybookRow[] => {
+    if (showHidden) return allRows;
+    return allRows.filter((row) => !hiddenRowIds.has(rowId(row)));
+  }, [allRows, hiddenRowIds, showHidden, rowId]);
+
   // Check if user can edit a voucher based on role and date
   const canEdit = (voucher: Voucher): boolean => {
     if (!user) return false;
@@ -999,14 +1051,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Handler functions
   const handleView = (voucher: Voucher) => {
-    setSelectedVoucher(voucher);
-    setViewDialogOpen(true);
+    // Navigate to route-based detail page; state is preserved in sessionStorage
+    navigate(`/voucher-detail/${voucher.id}?from=daybook`);
   };
 
   const handleEdit = (voucher: Voucher) => {
     // Sales vouchers use the dedicated edit page
     if (voucher.voucherType === "Sales") {
-      navigate(`/vouchers/${voucher.id}/edit`);
+      navigate(`/vouchers/${voucher.id}/edit?from=daybook`);
       return;
     }
 
@@ -1038,7 +1090,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
     const tabName = voucherTypeMap[voucher.voucherType];
     if (tabName) {
-      navigate(`/vouchers?edit=${voucher.id}&tab=${tabName}`);
+      navigate(`/vouchers?edit=${voucher.id}&tab=${tabName}&from=daybook`);
     } else {
       // Fallback for unsupported types
       toast({
@@ -1308,6 +1360,159 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   };
 
+  // ── ERP Daybook persistence: restore from sessionStorage on mount ────────────
+  useEffect(() => {
+    const saved = loadDaybookState();
+    if (!saved) return;
+    setPeriodFilter(saved.periodFilter);
+    setFilters(saved.filters);
+    setSelectedRowId(saved.selectedRowId);
+    setHiddenRowIds(new Set(saved.hiddenRowIds));
+    setShowHidden(saved.showHidden);
+    // Restore scroll after React has painted
+    const scrollY = saved.scrollY || 0;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── ERP Daybook persistence: save to sessionStorage on every state change ────
+  useEffect(() => {
+    saveDaybookState({
+      periodFilter,
+      filters,
+      selectedRowId,
+      hiddenRowIds: Array.from(hiddenRowIds),
+      showHidden,
+      scrollY: scrollYRef.current,
+    });
+  }, [periodFilter, filters, selectedRowId, hiddenRowIds, showHidden]);
+
+  // ── ERP Daybook persistence: clear on unmount if leaving voucher flow ─────────
+  useEffect(() => {
+    return () => {
+      const path = window.location.pathname;
+      const isVoucherFlow =
+        path.includes("/voucher-detail") ||
+        path.includes("/vouchers") ||
+        path.includes("/offloads/");
+      if (!isVoucherFlow) {
+        sessionStorage.removeItem(DAYBOOK_STATE_KEY);
+      }
+      // When staying in the voucher flow, state is already up-to-date in
+      // sessionStorage via the save-on-change effect and the scroll handler.
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Track window scroll into ref + patch sessionStorage directly ─────────────
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollYRef.current = window.scrollY;
+      // Patch scroll in sessionStorage without triggering a React re-render
+      try {
+        const raw = sessionStorage.getItem(DAYBOOK_STATE_KEY);
+        if (raw) {
+          const state = JSON.parse(raw);
+          state.scrollY = window.scrollY;
+          sessionStorage.setItem(DAYBOOK_STATE_KEY, JSON.stringify(state));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // ── Scroll selected row into view when selection changes ─────────────────────
+  useEffect(() => {
+    if (!selectedRowId) return;
+    const el = document.querySelector(`[data-row-id="${selectedRowId}"]`);
+    if (el) {
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedRowId]);
+
+  // ── Keyboard navigation (Arrow Up/Down, Ctrl+H, Ctrl+U) ─────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || "").toLowerCase();
+      const isEditable = document.activeElement?.getAttribute("contenteditable");
+      if (["input", "textarea", "select"].includes(tag) || isEditable) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (visibleRows.length === 0) return;
+        const currentIndex = selectedRowId
+          ? visibleRows.findIndex((r) => rowId(r) === selectedRowId)
+          : -1;
+        if (e.key === "ArrowDown") {
+          const nextIndex =
+            currentIndex < visibleRows.length - 1 ? currentIndex + 1 : 0;
+          setSelectedRowId(rowId(visibleRows[nextIndex]));
+        } else {
+          const prevIndex =
+            currentIndex > 0 ? currentIndex - 1 : visibleRows.length - 1;
+          setSelectedRowId(rowId(visibleRows[prevIndex]));
+        }
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "h") {
+        e.preventDefault();
+        if (
+          selectedRowId &&
+          selectedRowId.startsWith("voucher-") &&
+          !hiddenRowIds.has(selectedRowId)
+        ) {
+          const ridToHide = selectedRowId;
+          const nextVisible = visibleRows.filter(
+            (r) => rowId(r) !== ridToHide,
+          );
+          const idx = visibleRows.findIndex((r) => rowId(r) === ridToHide);
+          const nextSel =
+            nextVisible[idx] ?? nextVisible[idx - 1] ?? null;
+          setHiddenRowIds((prev) => {
+            const next = new Set(prev);
+            next.add(ridToHide);
+            return next;
+          });
+          setSelectedRowId(nextSel ? rowId(nextSel) : null);
+        }
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "u") {
+        e.preventDefault();
+        if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
+          const rid = selectedRowId;
+          setHiddenRowIds((prev) => {
+            const next = new Set(prev);
+            next.delete(rid);
+            return next;
+          });
+        } else {
+          // Unhide the most recently hidden row
+          const arr = Array.from(hiddenRowIds);
+          if (arr.length > 0) {
+            const last = arr[arr.length - 1];
+            setHiddenRowIds((prev) => {
+              const next = new Set(prev);
+              next.delete(last);
+              return next;
+            });
+          }
+        }
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId]);
+
   const clearFilters = () => {
     setPeriodFilter(getDefaultPeriodValue("today"));
     setFilters({
@@ -1464,15 +1669,31 @@ export default function Daybook({ user }: { user?: any } = {}) {
       {/* Vouchers Table */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            Transactions
-            {allRows.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({allRows.length}{" "}
-                {allRows.length === 1 ? "entry" : "entries"})
-              </span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle>
+              Transactions
+              {allRows.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({visibleRows.length}
+                  {hiddenRowIds.size > 0 && !showHidden ? ` of ${allRows.length}` : ""}{" "}
+                  {visibleRows.length === 1 ? "entry" : "entries"})
+                </span>
+              )}
+            </CardTitle>
+            {hiddenRowIds.size > 0 && (
+              <Button
+                variant={showHidden ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowHidden((v) => !v)}
+                className="gap-1"
+                data-testid="button-toggle-show-hidden"
+              >
+                <EyeOff className="w-4 h-4" />
+                {showHidden ? "Hide hidden rows" : "Show hidden"}
+                <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+              </Button>
             )}
-          </CardTitle>
+          </div>
           <CardDescription>
             All accounting vouchers and transactions
           </CardDescription>
@@ -1510,13 +1731,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {allRows.map((row) => {
+              {visibleRows.map((row) => {
                 if (row._type === "offload") {
                   const o = row.data;
+                  const rid = `offload-${o.id}`;
                   return (
                     <div
-                      key={`offload-${o.id}`}
-                      className="border rounded-md p-3 space-y-2"
+                      key={rid}
+                      data-row-id={rid}
+                      className={cn(
+                        "border rounded-md p-3 space-y-2 cursor-pointer transition-colors",
+                        selectedRowId === rid && "bg-accent/30 border-accent",
+                        hiddenRowIds.has(rid) && showHidden && "opacity-50",
+                      )}
+                      onClick={() => setSelectedRowId(rid)}
                       data-testid={`card-offload-${o.id}`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1555,10 +1783,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   );
                 }
                 const voucher = row.data as Voucher;
+                const vid = `voucher-${voucher.id}`;
+                const isVoucherHidden = hiddenRowIds.has(vid);
                 return (
                   <div
-                    key={`voucher-${voucher.id}`}
-                    className="border rounded-md p-3 space-y-2"
+                    key={vid}
+                    data-row-id={vid}
+                    className={cn(
+                      "border rounded-md p-3 space-y-2 cursor-pointer transition-colors",
+                      selectedRowId === vid && "bg-accent/30 border-accent",
+                      isVoucherHidden && showHidden && "opacity-50",
+                    )}
+                    onClick={() => setSelectedRowId(vid)}
                     data-testid={`card-voucher-${voucher.id}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -1576,6 +1812,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             className="text-xs"
                           >
                             Optional
+                          </Badge>
+                        )}
+                        {isVoucherHidden && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Hidden
                           </Badge>
                         )}
                       </div>
@@ -1599,7 +1840,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleView(voucher)}
+                        onClick={(e) => { e.stopPropagation(); handleView(voucher); }}
                         data-testid={`button-view-${voucher.id}`}
                       >
                         <Eye className="w-4 h-4" />
@@ -1608,17 +1849,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleEdit(voucher)}
+                          onClick={(e) => { e.stopPropagation(); handleEdit(voucher); }}
                           data-testid={`button-edit-${voucher.id}`}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isVoucherHidden) {
+                            setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(vid); return next; });
+                          } else {
+                            setHiddenRowIds((prev) => { const next = new Set(prev); next.add(vid); return next; });
+                            if (selectedRowId === vid) setSelectedRowId(null);
+                          }
+                        }}
+                        data-testid={isVoucherHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
+                        title={isVoucherHidden ? "Unhide row" : "Hide row"}
+                      >
+                        {isVoucherHidden ? <Eye className="w-4 h-4 text-muted-foreground" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                      </Button>
                       {canDelete() && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(voucher)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(voucher); }}
                           data-testid={`button-delete-${voucher.id}`}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
@@ -1645,11 +1903,21 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allRows.map((row) => {
+                  {visibleRows.map((row) => {
                     if (row._type === "offload") {
                       const o = row.data;
+                      const rid = `offload-${o.id}`;
                       return (
-                        <TableRow key={`offload-${o.id}`} data-testid={`row-offload-${o.id}`}>
+                        <TableRow
+                          key={rid}
+                          data-row-id={rid}
+                          data-testid={`row-offload-${o.id}`}
+                          className={cn(
+                            "cursor-pointer",
+                            selectedRowId === rid && "bg-accent/30",
+                          )}
+                          onClick={() => setSelectedRowId(rid)}
+                        >
                           <TableCell className="font-medium sticky left-0 bg-background z-10">
                             {formatDisplayDate(parseISO(o.offloadedAt.slice(0, 10)))}
                           </TableCell>
@@ -1689,10 +1957,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       );
                     }
                     const voucher = row.data as Voucher;
+                    const dvid = `voucher-${voucher.id}`;
+                    const isDvHidden = hiddenRowIds.has(dvid);
                     return (
                       <TableRow
-                        key={`voucher-${voucher.id}`}
+                        key={dvid}
+                        data-row-id={dvid}
                         data-testid={`row-voucher-${voucher.id}`}
+                        className={cn(
+                          "cursor-pointer",
+                          selectedRowId === dvid && "bg-accent/30",
+                          isDvHidden && showHidden && "opacity-50",
+                        )}
+                        onClick={() => setSelectedRowId(dvid)}
                       >
                         <TableCell className="font-medium sticky left-0 bg-background z-10">
                           <div className="flex flex-col">
@@ -1717,6 +1994,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 Optional
                               </Badge>
                             )}
+                            {isDvHidden && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">
+                                Hidden
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="max-w-md truncate">
@@ -1735,8 +2017,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleView(voucher)}
+                              onClick={(e) => { e.stopPropagation(); handleView(voucher); }}
                               data-testid={`button-view-${voucher.id}`}
+                              title="View detail"
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -1744,17 +2027,36 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleEdit(voucher)}
+                                onClick={(e) => { e.stopPropagation(); handleEdit(voucher); }}
                                 data-testid={`button-edit-${voucher.id}`}
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isDvHidden) {
+                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(dvid); return next; });
+                                } else {
+                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.add(dvid); return next; });
+                                  if (selectedRowId === dvid) setSelectedRowId(null);
+                                }
+                              }}
+                              data-testid={isDvHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
+                              title={isDvHidden ? "Unhide row" : "Hide row"}
+                            >
+                              {isDvHidden
+                                ? <Eye className="w-4 h-4 text-muted-foreground" />
+                                : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                            </Button>
                             {canDelete() && (
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDelete(voucher)}
+                                onClick={(e) => { e.stopPropagation(); handleDelete(voucher); }}
                                 data-testid={`button-delete-${voucher.id}`}
                               >
                                 <Trash2 className="w-4 h-4 text-destructive" />
