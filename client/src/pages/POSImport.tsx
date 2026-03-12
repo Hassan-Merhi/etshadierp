@@ -71,8 +71,8 @@ export default function POSImport() {
     return prefix + parts.join(".");
   };
 
-  // Currency prefix for the print template: reflects what the user selected at import time
-  const printCurrPrefix = saleCurrency === "CFA" ? "CFA " : "$";
+  // Print always shows USD amounts
+  const printCurrPrefix = "$";
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -184,9 +184,15 @@ export default function POSImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       
       const location = locations.find(l => l.id === parseInt(selectedLocation));
+      const itemsForPrint = saleCurrency === "CFA" && exchangeRate
+        ? (validationResult?.validatedItems || []).map((item: any) => ({
+            ...item,
+            rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
+          }))
+        : (validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
-        items: validationResult?.validatedItems || [],
+        items: itemsForPrint,
         grandTotal: data.totalSales,
         saleDate,
         location,
@@ -220,9 +226,15 @@ export default function POSImport() {
       
       const location = locations.find(l => l.id === parseInt(selectedLocation));
       const customer = customers.find(c => c.id === parseInt(selectedCustomer));
+      const itemsForPrint = saleCurrency === "CFA" && exchangeRate
+        ? (validationResult?.validatedItems || []).map((item: any) => ({
+            ...item,
+            rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
+          }))
+        : (validationResult?.validatedItems || []);
       setImportedSale({
         voucher: data.voucher,
-        items: validationResult?.validatedItems || [],
+        items: itemsForPrint,
         grandTotal: data.totalSales,
         saleDate,
         location,
