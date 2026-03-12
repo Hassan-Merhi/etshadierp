@@ -29503,7 +29503,7 @@ if (asOfDate) {
   app.get("/api/stock-items/:id/monthly-summary", requireAuth, async (req, res) => {
     try {
       const stockItemId = parseInt(req.params.id);
-      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const year = parseInt(req.query.year as string) || (req.query.startDate ? new Date(req.query.startDate as string).getFullYear() : new Date().getFullYear());
       const companyId = req.session.currentCompanyId;
       
       if (!companyId) {
@@ -29548,28 +29548,24 @@ if (asOfDate) {
           sql`EXTRACT(YEAR FROM ${purchaseOrders.createdAt}) = ${year}`
         ));
       
-      // 2. Stock Transfers (both In and Out based on source/destination)
-      const stockTransfers = await db
+      // 2. Credit / Debit Note Items (company-wide, all locations)
+      // Credit Notes restore stock (INWARD), Debit Notes reduce stock (OUTWARD)
+      const creditDebitNotes = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
-          quantity: stockTransferItems.quantity,
-          rate: stockTransferItems.rate,
-          totalAmount: stockTransferItems.totalAmount,
-          sourceLocationId: stockTransferItems.sourceLocationId,
-          destinationLocationId: stockTransferVouchers.destinationLocationId,
-          optional: vouchers.optional,
+          quantity: creditNoteItems.quantity,
+          inventoryCost: creditNoteItems.inventoryCost,
+          noteType: vouchers.voucherType,
         })
-        .from(stockTransferItems)
-        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
-        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .from(creditNoteItems)
+        .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
         .where(and(
-          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(creditNoteItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
           isNull(vouchers.deletedAt),
-          eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
         ));
-      
+
       // 3. Stock Adjustments (Production = In, Consumption = Out)
       const stockAdjustments = await db
         .select({
@@ -29623,19 +29619,21 @@ if (asOfDate) {
         monthBuckets[month].inVal += parseFloat(row.lineTotal);
       }
       
-      // Process Stock Transfers (all count as movement - inward if receiving, outward if sending)
-      for (const row of stockTransfers) {
+      // Process Credit / Debit Notes
+      // Credit Notes = customer returned goods = INWARD; Debit Notes = stock reduced = OUTWARD
+      for (const row of creditDebitNotes) {
         const month = Number(row.month);
         const qty = parseFloat(row.quantity);
-        const val = parseFloat(row.totalAmount);
-        // Transfer OUT from source (outward)
-        monthBuckets[month].outQty += qty;
-        monthBuckets[month].outVal += val;
-        // Transfer IN to destination (inward)
-        monthBuckets[month].inQty += qty;
-        monthBuckets[month].inVal += val;
+        const val = parseFloat(row.inventoryCost || "0") * qty;
+        if (row.noteType === "Credit Note") {
+          monthBuckets[month].inQty += qty;
+          monthBuckets[month].inVal += val;
+        } else {
+          monthBuckets[month].outQty += qty;
+          monthBuckets[month].outVal += val;
+        }
       }
-      
+
       // Process Stock Adjustments
       for (const row of stockAdjustments) {
         const month = Number(row.month);
@@ -30190,7 +30188,7 @@ if (asOfDate) {
     try {
       const locationId = parseInt(req.params.locationId);
       const stockItemId = parseInt(req.params.stockItemId);
-      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const year = parseInt(req.query.year as string) || (req.query.startDate ? new Date(req.query.startDate as string).getFullYear() : new Date().getFullYear());
       const companyId = req.session.currentCompanyId;
       
       if (!companyId) {
@@ -30312,10 +30310,42 @@ if (asOfDate) {
       for (const row of salesData) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
-        monthBuckets[month].outVal += parseFloat(row.totalCost);
+        monthBuckets[month].outVal += parseFloat(row.totalCost || "0");
       }
-      
-      // 4. Container Offloads at this location (Inwards - from PO imports)
+
+      // 4. Credit / Debit Note Items at this location
+      // Credit Notes restore stock (INWARD), Debit Notes reduce stock (OUTWARD)
+      const creditDebitNotes = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
+          quantity: creditNoteItems.quantity,
+          inventoryCost: creditNoteItems.inventoryCost,
+          noteType: vouchers.voucherType,
+        })
+        .from(creditNoteItems)
+        .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+        .where(and(
+          eq(creditNoteItems.stockItemId, stockItemId),
+          eq(creditNoteItems.locationId, locationId),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
+        ));
+
+      for (const row of creditDebitNotes) {
+        const month = Number(row.month);
+        const qty = parseFloat(row.quantity);
+        const val = parseFloat(row.inventoryCost || "0") * qty;
+        if (row.noteType === "Credit Note") {
+          monthBuckets[month].inQty += qty;
+          monthBuckets[month].inVal += val;
+        } else {
+          monthBuckets[month].outQty += qty;
+          monthBuckets[month].outVal += val;
+        }
+      }
+
+      // 5. Container Offloads at this location (Inwards - from PO imports)
       const containerOffloadData = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
@@ -30338,7 +30368,7 @@ if (asOfDate) {
         const month = Number(row.month);
         const qty = parseFloat(row.quantity);
         const baseValue = parseFloat(row.lineTotal);
-        const additionalCost = parseFloat(row.additionalCostPerBale) * qty;
+        const additionalCost = parseFloat(row.additionalCostPerBale || "0") * qty;
         const landedValue = baseValue + additionalCost;
         
         monthBuckets[month].inQty += qty;
