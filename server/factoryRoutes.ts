@@ -9902,8 +9902,9 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.put("/api/factory/daybook/:entryId", requireAuth, async (req: any, res: any) => {
     try {
-      const entryId = Number(req.params.entryId);
+      const rawEntryId = Number(req.params.entryId);
       const session = req.session as any;
+      const companyId = session.currentCompanyId;
       const userId = session.userId ? Number(session.userId) : null;
       const { reason, description, amountCurrency, amountUsd, currencyCode, fxRateToUsd, txDate } = req.body;
 
@@ -9914,8 +9915,46 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const canEdit = session.role === "admin" || session.daybookEditDays > 0;
       if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
 
-      const [existing] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, entryId));
-      if (!existing) return res.status(404).json({ message: "Daybook entry not found" });
+      let existing: any;
+      let realEntryId: number;
+
+      if (rawEntryId < 0) {
+        // ── Synthetic row: backed by a voucher not yet in factory_daybook_entries ──
+        // Negative ID means Math.abs(rawEntryId) is the voucher ID.
+        const realVoucherId = Math.abs(rawEntryId);
+        const [sourceVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, realVoucherId));
+        if (!sourceVoucher) return res.status(404).json({ message: "Source voucher not found" });
+
+        const voucherTxTypeMap: Record<string, string> = { Payment: "PAYMENT", Receipt: "RECEIPT", Journal: "JOURNAL" };
+        const txTypeVal = voucherTxTypeMap[sourceVoucher.voucherType] || "JOURNAL";
+        const currency = sourceVoucher.currency || "USD";
+        const fxRate = parseFloat(sourceVoucher.exchangeRate || "1") || 1;
+        const amtCurrency = parseFloat(sourceVoucher.totalAmount || "0");
+        const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+
+        // Insert a real daybook entry from this voucher so it can be edited going forward
+        const [inserted] = await db.insert(factoryDaybookEntries).values({
+          companyId,
+          txDate: sourceVoucher.voucherDate,
+          txType: txTypeVal,
+          referenceId: realVoucherId,
+          referenceTable: "vouchers",
+          description: description !== undefined ? description : (sourceVoucher.description || `${sourceVoucher.voucherType} voucher #${sourceVoucher.voucherNumber}`),
+          currencyCode: currency,
+          amountCurrency: String(amtCurrency),
+          fxRateToUsd: String(fxRate),
+          amountUsd: String(amtUsd),
+          createdBy: userId,
+        }).returning();
+        existing = inserted;
+        realEntryId = inserted.id;
+      } else {
+        // ── Real daybook entry ────────────────────────────────────────────────
+        const [found] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, rawEntryId));
+        if (!found) return res.status(404).json({ message: "Daybook entry not found" });
+        existing = found;
+        realEntryId = rawEntryId;
+      }
 
       if (session.role !== "admin" && session.daybookEditDays) {
         const entryDate = new Date(existing.txDate);
@@ -9936,16 +9975,23 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       if (fxRateToUsd !== undefined) updates.fxRateToUsd = String(fxRateToUsd);
       if (txDate !== undefined) updates.txDate = txDate;
 
-      const [updated] = await db.update(factoryDaybookEntries).set(updates).where(eq(factoryDaybookEntries.id, entryId)).returning();
+      const [updated] = await db.update(factoryDaybookEntries).set(updates).where(eq(factoryDaybookEntries.id, realEntryId)).returning();
       const afterJson = JSON.stringify(updated);
 
       await db.insert(factoryDaybookEntryEdits).values({
-        daybookEntryId: entryId,
+        daybookEntryId: realEntryId,
         editedBy: userId,
         beforeJson,
         afterJson,
         reason: reason.trim(),
       });
+
+      // ── Sync description back to the source voucher so Accounts statements stay in sync ──
+      if (description !== undefined && updated.referenceTable === "vouchers" && updated.referenceId) {
+        await db.update(vouchers)
+          .set({ description })
+          .where(and(eq(vouchers.id, updated.referenceId), eq(vouchers.companyId, companyId)));
+      }
 
       res.json(updated);
     } catch (error: any) {
