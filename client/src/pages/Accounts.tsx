@@ -1708,6 +1708,11 @@ export default function Accounts() {
                               <TableHead className="py-2">
                                 Particulars
                               </TableHead>
+                              {appMode === "factory" && (
+                                <TableHead className="py-2">
+                                  Notes
+                                </TableHead>
+                              )}
                               {!hideBalances && <TableHead className="text-right w-[120px] py-2">
                                 Debit
                               </TableHead>}
@@ -1728,7 +1733,7 @@ export default function Accounts() {
                               <TableCell className="py-2 print:hidden"></TableCell>
                               <TableCell
                                 className="font-mono text-sm py-2"
-                                colSpan={3}
+                                colSpan={appMode === "factory" ? 4 : 3}
                               >
                                 <span className="font-semibold">
                                   Opening Balance
@@ -1768,7 +1773,7 @@ export default function Accounts() {
                             {vouchersWithBalance.length === 0 ? (
                               <TableRow>
                                 <TableCell
-                                  colSpan={7}
+                                  colSpan={appMode === "factory" ? 8 : 7}
                                   className="text-center py-8 text-muted-foreground"
                                 >
                                   <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -1816,21 +1821,41 @@ export default function Accounts() {
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="py-2">
-                                    <button
-                                      onClick={() =>
-                                        handleVoucherClick(voucher)
-                                      }
-                                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
-                                      data-testid={`link-voucher-${voucher.voucherId}`}
-                                    >
-                                      <span className="truncate max-w-[280px]">
-                                        {voucher.narration ||
-                                          voucher.voucherDescription ||
-                                          voucher.voucherNumber}
+                                    {appMode === "factory" ? (
+                                      <span className="text-sm">
+                                        {selectedAccount?.name ?? "-"}
                                       </span>
-                                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                    </button>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          handleVoucherClick(voucher)
+                                        }
+                                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
+                                        data-testid={`link-voucher-${voucher.voucherId}`}
+                                      >
+                                        <span className="truncate max-w-[280px]">
+                                          {voucher.narration ||
+                                            voucher.voucherDescription ||
+                                            voucher.voucherNumber}
+                                        </span>
+                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      </button>
+                                    )}
                                   </TableCell>
+                                  {appMode === "factory" && (
+                                    <TableCell className="py-2">
+                                      <button
+                                        onClick={() => handleVoucherClick(voucher)}
+                                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
+                                        data-testid={`link-voucher-${voucher.voucherId}`}
+                                      >
+                                        <span className="truncate max-w-[280px]">
+                                          {voucher.narration || voucher.voucherDescription || "-"}
+                                        </span>
+                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                      </button>
+                                    </TableCell>
+                                  )}
                                   {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalDebit > 0
                                       ? formatAmount(voucher.totalDebit)
@@ -1896,16 +1921,34 @@ export default function Accounts() {
                                       data-testid={`checkbox-voucher-${voucher.voucherId}`}
                                     />
                                     <div className="min-w-0">
-                                      <button
-                                        onClick={() => handleVoucherClick(voucher)}
-                                        className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
-                                        data-testid={`link-voucher-${voucher.voucherId}`}
-                                      >
-                                        <span className="truncate">
-                                          {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
-                                        </span>
-                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                      </button>
+                                      {appMode === "factory" ? (
+                                        <div className="space-y-0.5">
+                                          <span className="text-sm font-medium block truncate">
+                                            {selectedAccount?.name ?? "-"}
+                                          </span>
+                                          <button
+                                            onClick={() => handleVoucherClick(voucher)}
+                                            className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-xs text-left"
+                                            data-testid={`link-voucher-${voucher.voucherId}`}
+                                          >
+                                            <span className="truncate text-muted-foreground">
+                                              {voucher.narration || voucher.voucherDescription || "-"}
+                                            </span>
+                                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleVoucherClick(voucher)}
+                                          className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
+                                          data-testid={`link-voucher-${voucher.voucherId}`}
+                                        >
+                                          <span className="truncate">
+                                            {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
+                                          </span>
+                                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                   <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -1952,7 +1995,7 @@ export default function Accounts() {
                           <TableBody>
                             <TableRow className="bg-muted/30">
                               <TableCell
-                                colSpan={3}
+                                colSpan={appMode === "factory" ? 4 : 3}
                                 className="text-right font-medium py-2"
                               >
                                 Opening Balance:
@@ -1979,7 +2022,7 @@ export default function Accounts() {
                             </TableRow>
                             <TableRow>
                               <TableCell
-                                colSpan={3}
+                                colSpan={appMode === "factory" ? 4 : 3}
                                 className="text-right font-medium py-2"
                               >
                                 Current Total:
@@ -1994,7 +2037,7 @@ export default function Accounts() {
                             </TableRow>
                             <TableRow className="bg-accent/50 border-t-2">
                               <TableCell
-                                colSpan={3}
+                                colSpan={appMode === "factory" ? 4 : 3}
                                 className="text-right font-bold py-2"
                               >
                                 Current Balance:
