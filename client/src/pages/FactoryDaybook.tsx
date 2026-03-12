@@ -226,10 +226,15 @@ export default function FactoryDaybook() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate daybook and all accounts/transaction queries so Accounts statements
+      // immediately reflect the synced description
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       setEditEntry(null);
       setEditReason("");
-      toast({ title: "Entry updated" });
+      toast({ title: "Entry updated", description: "Description synced to source record." });
     },
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
@@ -301,12 +306,16 @@ export default function FactoryDaybook() {
 
   const handleEditSubmit = () => {
     if (!editEntry || !editReason.trim()) return;
+    const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
     editMutation.mutate({
       entryId: editEntry.id,
       data: {
         description: editDescription,
-        amountCurrency: editAmountCurrency,
-        amountUsd: editAmountUsd,
+        // For voucher-backed entries, amounts must be edited through the source record
+        ...(!isVoucherBacked && {
+          amountCurrency: editAmountCurrency,
+          amountUsd: editAmountUsd,
+        }),
         reason: editReason.trim(),
       },
     });
@@ -588,34 +597,44 @@ export default function FactoryDaybook() {
             <DialogTitle>Edit Daybook Entry</DialogTitle>
             <DialogDescription>Modify the entry details. A reason is required for the audit trail.</DialogDescription>
           </DialogHeader>
-          {editEntry && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Description</Label>
-                <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} data-testid="input-edit-description" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+          {editEntry && (() => {
+            const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
+            return (
+              <div className="space-y-4">
+                {isVoucherBacked && (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="note-voucher-sync">
+                    Saving will update the description on the linked voucher, so Accounts statements stay in sync. To change amounts, use the source record edit button.
+                  </div>
+                )}
                 <div>
-                  <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
-                  <Input type="number" step="0.01" value={editAmountCurrency} onChange={(e) => setEditAmountCurrency(e.target.value)} data-testid="input-edit-amount-currency" />
+                  <Label className="text-sm font-medium">Description</Label>
+                  <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} data-testid="input-edit-description" />
                 </div>
+                {!isVoucherBacked && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
+                      <Input type="number" step="0.01" value={editAmountCurrency} onChange={(e) => setEditAmountCurrency(e.target.value)} data-testid="input-edit-amount-currency" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Amount (USD)</Label>
+                      <Input type="number" step="0.01" value={editAmountUsd} onChange={(e) => setEditAmountUsd(e.target.value)} data-testid="input-edit-amount-usd" />
+                    </div>
+                  </div>
+                )}
                 <div>
-                  <Label className="text-sm font-medium">Amount (USD)</Label>
-                  <Input type="number" step="0.01" value={editAmountUsd} onChange={(e) => setEditAmountUsd(e.target.value)} data-testid="input-edit-amount-usd" />
+                  <Label className="text-sm font-medium">Reason for edit *</Label>
+                  <Textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} placeholder="Why is this change needed?" data-testid="input-edit-reason" />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">Cancel</Button>
+                  <Button disabled={!editReason.trim() || editMutation.isPending} onClick={handleEditSubmit} data-testid="button-submit-edit">
+                    {editMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
                 </div>
               </div>
-              <div>
-                <Label className="text-sm font-medium">Reason for edit *</Label>
-                <Textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} placeholder="Why is this change needed?" data-testid="input-edit-reason" />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">Cancel</Button>
-                <Button disabled={!editReason.trim() || editMutation.isPending} onClick={handleEditSubmit} data-testid="button-submit-edit">
-                  {editMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
