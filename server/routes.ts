@@ -17505,6 +17505,9 @@ if (asOfDate) {
 
             // Soft delete: Set deletedAt instead of hard delete
             await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, id));
+
+            // Cascade: remove factory daybook entries linked to this voucher
+            await tx.execute(sql`DELETE FROM factory_daybook_entries WHERE reference_table = 'vouchers' AND reference_id = ${id}`);
           });
 
         // Log the deletion to audit log

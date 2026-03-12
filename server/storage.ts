@@ -3552,7 +3552,10 @@ export class DbStorage implements IStorage {
 
       // STEP 3: Delete voucher entries (this automatically restores account balances)
       await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
-      
+
+      // STEP 3.5: Cascade — remove factory daybook entries linked to this voucher
+      await tx.execute(sql`DELETE FROM factory_daybook_entries WHERE reference_table = 'vouchers' AND reference_id = ${id}`);
+
       // STEP 4: Delete the voucher itself
       await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
     });

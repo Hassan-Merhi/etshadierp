@@ -7201,6 +7201,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(...conditions))
         .orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
 
+      // ── 1b. Safety-net: drop real daybook entries whose source voucher was deleted ─
+      // This handles any deletion path (soft or hard) that didn't cascade at write time.
+      const voucherRefIds = daybookRows
+        .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
+        .map((r: any) => r.referenceId as number);
+
+      const validVoucherIds = new Set<number>();
+      if (voucherRefIds.length > 0) {
+        const liveVouchers = await db
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(
+            inArray(vouchers.id, voucherRefIds),
+            sql`${vouchers.deletedAt} IS NULL`
+          ));
+        liveVouchers.forEach((v: any) => validVoucherIds.add(v.id));
+      }
+
+      const filteredDaybookRows = daybookRows.filter((r: any) => {
+        if (r.referenceTable !== "vouchers" || r.referenceId == null) return true;
+        return validVoucherIds.has(r.referenceId);
+      });
+
       // ── 2. Query vouchers directly (to catch pre-fix historical entries) ───
       // Only include Payment / Receipt / Journal vouchers in the daybook view
       const voucherTxTypeMap: Record<string, string> = {
@@ -7219,8 +7242,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       let syntheticRows: any[] = [];
       if (shouldFetchVouchers) {
         // Build the set of voucher IDs already captured in factory_daybook_entries
+        // Use filteredDaybookRows so deleted-voucher entries don't block synthetic rows
         const capturedVoucherIds = new Set<number>(
-          daybookRows
+          filteredDaybookRows
             .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
             .map((r: any) => r.referenceId as number)
         );
@@ -7268,7 +7292,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // ── 3. Merge + sort ────────────────────────────────────────────────────
-      const merged = [...daybookRows, ...syntheticRows].sort((a: any, b: any) => {
+      const merged = [...filteredDaybookRows, ...syntheticRows].sort((a: any, b: any) => {
         if (b.txDate > a.txDate) return 1;
         if (b.txDate < a.txDate) return -1;
         return Math.abs(b.id) - Math.abs(a.id);
