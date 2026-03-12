@@ -81,19 +81,26 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     enabled: !!selectedLocationId,
   });
 
-  // Collect all unique stock groups for the filter
+  // For POS users: only keep items that have a price set specifically for their location.
+  // Items that only have a base/fallback price (no location-specific entry) are hidden.
+  const locationPricedList = useMemo(() => {
+    if (!posUser) return priceList;
+    return priceList.filter((item) => item.hasCustomPrice && item.sellingPrice !== null);
+  }, [priceList, posUser]);
+
+  // Collect all unique stock groups for the filter (from location-priced list only)
   const stockGroups = useMemo(() => {
     const groups = new Set<string>();
-    priceList.forEach((item) => {
+    locationPricedList.forEach((item) => {
       if (item.stockGroupName) groups.add(item.stockGroupName);
     });
     return Array.from(groups).sort();
-  }, [priceList]);
+  }, [locationPricedList]);
 
   // Apply search + group filter
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return priceList.filter((item) => {
+    return locationPricedList.filter((item) => {
       const matchesSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -103,7 +110,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         groupFilter === "all" || item.stockGroupName === groupFilter;
       return matchesSearch && matchesGroup;
     });
-  }, [priceList, search, groupFilter]);
+  }, [locationPricedList, search, groupFilter]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -311,7 +318,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 className="text-xs text-muted-foreground text-right"
                 data-testid="text-item-count"
               >
-                Showing {filteredItems.length} of {priceList.length} items
+                Showing {filteredItems.length} of {locationPricedList.length} items
                 {!posUser && (
                   <span className="ml-1 text-muted-foreground">
                     · Prices marked "base" use the item default price (no custom location price set)
