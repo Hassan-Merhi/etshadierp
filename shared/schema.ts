@@ -3637,3 +3637,31 @@ export const insertBaleRecodeItemSchema = createInsertSchema(baleRecodeItems).om
 
 export type InsertBaleRecodeItem = z.infer<typeof insertBaleRecodeItemSchema>;
 export type BaleRecodeItem = typeof baleRecodeItems.$inferSelect;
+
+// ─── Live Spreadsheet Links ───
+
+export const liveSpreadsheets = pgTable("live_spreadsheets", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLiveSpreadsheetSchema = createInsertSchema(liveSpreadsheets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  name: z.string().min(1, "Name is required"),
+  url: z.string().url("Must be a valid URL"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+
+export type InsertLiveSpreadsheet = z.infer<typeof insertLiveSpreadsheetSchema>;
+export type LiveSpreadsheet = typeof liveSpreadsheets.$inferSelect;

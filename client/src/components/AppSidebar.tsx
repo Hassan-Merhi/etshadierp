@@ -28,6 +28,7 @@ import {
   Upload,
   MessageCircle,
   TableProperties,
+  ExternalLink,
 } from "lucide-react";
 import {
   Sidebar,
@@ -125,6 +126,7 @@ const navEntries: NavEntry[] = [
   },
   { kind: "item", title: "Create", url: "/create", icon: FolderPlus },
   { kind: "item", title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
+  { kind: "item", title: "Live Sheets", url: "/live-sheets", icon: ExternalLink },
   { kind: "item", title: "Chat", url: "/chat", icon: MessageCircle },
   { kind: "item", title: "Settings", url: "/settings", icon: Settings },
 ];

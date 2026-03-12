@@ -102,6 +102,8 @@ import {
   factorySuppliers,
   loginHistory,
   storedFiles,
+  liveSpreadsheets,
+  insertLiveSpreadsheetSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -35257,6 +35259,66 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       await storage.deleteSpreadsheet(id, companyId);
       res.json({ message: "Spreadsheet deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Live Spreadsheet Links ───
+
+  app.get("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const companyId = req.session?.currentCompanyId;
+      const isAdmin = req.session?.currentRole === "Admin" || req.session?.currentRole === "Owner";
+      const sheets = await storage.getLiveSpreadsheets(companyId, !isAdmin);
+      res.json(sheets);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Admin or Owner role required" });
+      }
+      const companyId = req.session?.currentCompanyId;
+      const parsed = insertLiveSpreadsheetSchema.parse({ ...req.body, companyId });
+      const sheet = await storage.createLiveSpreadsheet(parsed);
+      res.json(sheet);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Admin or Owner role required" });
+      }
+      const companyId = req.session?.currentCompanyId;
+      const id = parseInt(req.params.id);
+      const fields = insertLiveSpreadsheetSchema.partial().parse(req.body);
+      const sheet = await storage.updateLiveSpreadsheet(id, companyId, fields);
+      if (!sheet) return res.status(404).json({ message: "Not found" });
+      res.json(sheet);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Admin or Owner role required" });
+      }
+      const companyId = req.session?.currentCompanyId;
+      const id = parseInt(req.params.id);
+      await storage.deleteLiveSpreadsheet(id, companyId);
+      res.json({ message: "Deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

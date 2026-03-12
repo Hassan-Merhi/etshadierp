@@ -406,6 +406,13 @@ export interface IStorage {
   createSpreadsheet(companyId: number, name: string, data: any, createdBy?: string): Promise<schema.Spreadsheet>;
   updateSpreadsheet(id: number, companyId: number, fields: { name?: string; data?: any }): Promise<schema.Spreadsheet | undefined>;
   deleteSpreadsheet(id: number, companyId: number): Promise<void>;
+
+  // Live Spreadsheets
+  getLiveSpreadsheets(companyId: number, activeOnly?: boolean): Promise<schema.LiveSpreadsheet[]>;
+  getLiveSpreadsheetById(id: number, companyId: number): Promise<schema.LiveSpreadsheet | undefined>;
+  createLiveSpreadsheet(data: schema.InsertLiveSpreadsheet): Promise<schema.LiveSpreadsheet>;
+  updateLiveSpreadsheet(id: number, companyId: number, fields: Partial<schema.InsertLiveSpreadsheet>): Promise<schema.LiveSpreadsheet | undefined>;
+  deleteLiveSpreadsheet(id: number, companyId: number): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -6762,6 +6769,38 @@ export class DbStorage implements IStorage {
     await db
       .delete(schema.spreadsheets)
       .where(and(eq(schema.spreadsheets.id, id), eq(schema.spreadsheets.companyId, companyId)));
+  }
+
+  // Live Spreadsheets
+  async getLiveSpreadsheets(companyId: number, activeOnly = true): Promise<schema.LiveSpreadsheet[]> {
+    const conditions = [eq(schema.liveSpreadsheets.companyId, companyId)];
+    if (activeOnly) conditions.push(eq(schema.liveSpreadsheets.isActive, true));
+    return db.select().from(schema.liveSpreadsheets).where(and(...conditions)).orderBy(schema.liveSpreadsheets.name);
+  }
+
+  async getLiveSpreadsheetById(id: number, companyId: number): Promise<schema.LiveSpreadsheet | undefined> {
+    const [row] = await db.select().from(schema.liveSpreadsheets).where(
+      and(eq(schema.liveSpreadsheets.id, id), eq(schema.liveSpreadsheets.companyId, companyId))
+    );
+    return row;
+  }
+
+  async createLiveSpreadsheet(data: schema.InsertLiveSpreadsheet): Promise<schema.LiveSpreadsheet> {
+    const [row] = await db.insert(schema.liveSpreadsheets).values(data).returning();
+    return row;
+  }
+
+  async updateLiveSpreadsheet(id: number, companyId: number, fields: Partial<schema.InsertLiveSpreadsheet>): Promise<schema.LiveSpreadsheet | undefined> {
+    const [row] = await db.update(schema.liveSpreadsheets)
+      .set({ ...fields, updatedAt: sql`now()` })
+      .where(and(eq(schema.liveSpreadsheets.id, id), eq(schema.liveSpreadsheets.companyId, companyId)))
+      .returning();
+    return row;
+  }
+
+  async deleteLiveSpreadsheet(id: number, companyId: number): Promise<void> {
+    await db.delete(schema.liveSpreadsheets)
+      .where(and(eq(schema.liveSpreadsheets.id, id), eq(schema.liveSpreadsheets.companyId, companyId)));
   }
 }
 
