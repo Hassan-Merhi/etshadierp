@@ -555,16 +555,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     return prefix + parts.join(".");
   };
 
-  // Currency-aware formatter for the print template.
-  // Reads the currency locked on the saved sale (not the live toggle),
-  // converts USD stored values → CFA using the voucher's locked exchange rate.
+  // Always format amounts in USD for printing.
   const fmtPrintCurrency = (usdAmount: number): string => {
-    const printCurrency = savedSale?.currency || activeCurrency;
-    const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || dailyExchangeRate || 1;
-    if (printCurrency === "CFA") {
-      const cfaAmount = Math.round(usdAmount * lockedRate);
-      return `CFA ${cfaAmount.toLocaleString()}`;
-    }
     return fmtPrint(usdAmount, "$");
   };
 
@@ -1386,12 +1378,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       currency: activeCurrency === "CFA" ? "CFA" : "USD",
       exchangeRate: exchangeRate ? exchangeRate.toString() : undefined, // Rate-lock: store the rate used for this transaction
       items: validItems.map(row => {
-        // Use canonical USD rate directly (no conversion needed)
+        // Always send rate in USD.
+        // When in CFA mode, derive USD from the display rate (row.rate ÷ exchangeRate)
+        // so even if rateUSD was set before the exchange rate loaded, the math is correct.
+        const rateInUSD = activeCurrency === "CFA" && dailyExchangeRate
+          ? parseFloat(row.rate.toString()) / dailyExchangeRate
+          : row.rateUSD;
         return {
           stockItemId: row.stockItemId,
           salesItemId: row.salesItemId, // Preserve for edit mode
           quantity: row.quantity.toString(),
-          rate: row.rateUSD.toFixed(6),
+          rate: rateInUSD.toFixed(6),
         };
       }),
     };
