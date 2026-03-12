@@ -715,14 +715,22 @@ export class DbStorage implements IStorage {
 
   async getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined> {
     const [account] = await db.select().from(schema.ledgerAccounts).where(
-      and(eq(schema.ledgerAccounts.code, code), eq(schema.ledgerAccounts.companyId, companyId))
+      and(
+        eq(schema.ledgerAccounts.code, code),
+        eq(schema.ledgerAccounts.companyId, companyId),
+        isNull(schema.ledgerAccounts.deletedAt)
+      )
     );
     return account;
   }
 
   async getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined> {
     const [account] = await db.select().from(schema.ledgerAccounts).where(
-      and(eq(schema.ledgerAccounts.name, name), eq(schema.ledgerAccounts.companyId, companyId))
+      and(
+        eq(schema.ledgerAccounts.name, name),
+        eq(schema.ledgerAccounts.companyId, companyId),
+        isNull(schema.ledgerAccounts.deletedAt)
+      )
     );
     return account;
   }
