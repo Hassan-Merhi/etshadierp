@@ -174,7 +174,24 @@ export default function SalesReportDetail() {
                       const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
                       return (
                         <TableRow key={item.id} data-testid={`row-detail-${item.id}`}>
-                          <TableCell className="font-medium">{item.stockItemName}</TableCell>
+                          <TableCell className="font-medium">
+                            {(item.locationId || item.stockItemId) ? (
+                              <a
+                                href={item.locationId
+                                  ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
+                                  : `/stock-items/${item.stockItemId}/history`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline text-foreground"
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`link-bale-${item.stockItemId}`}
+                              >
+                                {item.stockItemName}
+                              </a>
+                            ) : (
+                              item.stockItemName
+                            )}
+                          </TableCell>
                           <TableCell>{item.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumericValue(item.quantity)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(item.actualSellingPrice)}</TableCell>
@@ -229,7 +246,22 @@ export default function SalesReportDetail() {
                     <Card key={item.id}>
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-sm">{item.stockItemName}</span>
+                          {(item.locationId || item.stockItemId) ? (
+                            <a
+                              href={item.locationId
+                                ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
+                                : `/stock-items/${item.stockItemId}/history`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-sm hover:underline text-foreground"
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid={`link-bale-mobile-${item.stockItemId}`}
+                            >
+                              {item.stockItemName}
+                            </a>
+                          ) : (
+                            <span className="font-medium text-sm">{item.stockItemName}</span>
+                          )}
                           <span className="text-xs text-muted-foreground">{item.locationName || "-"}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1 text-xs">
