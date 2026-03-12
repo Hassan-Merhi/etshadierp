@@ -20,7 +20,7 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { usePresence } from "@/hooks/use-presence";
@@ -58,6 +58,7 @@ import POSDaybook from "@/pages/POSDaybook";
 import POSDashboard from "@/pages/POSDashboard";
 import POSCustomers from "@/pages/POSCustomers";
 import POSSettings from "@/pages/POSSettings";
+import POSPriceList from "@/pages/POSPriceList";
 import EditSupplier from "@/pages/EditSupplier";
 import SupplierProformas from "@/pages/SupplierProformas";
 import ContainerVerification from "@/pages/ContainerVerification";
@@ -183,6 +184,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route path="/pos-chat" component={Chat} />
         <Route path="/pos-settings" component={POSSettings} />
+        <Route path="/pos-price-list">{() => <POSPriceList posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -228,6 +230,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sales-report/detail" component={SalesReportDetail} />
       <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/pos-daybook" component={POSDaybook} />
+      <Route path="/pos-price-list">{() => <POSPriceList />}</Route>
       <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
       <Route path="/containers/:containerId/verification" component={ContainerVerification} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
@@ -438,11 +441,13 @@ function AuthenticatedApp() {
     const isOnTransfer = currentLocation.startsWith("/vouchers");
     const isOnChat = currentLocation === "/pos-chat";
     const isOnSettings = currentLocation === "/pos-settings";
+    const isOnPriceList = currentLocation === "/pos-price-list";
 
     const posNavItems = [
       { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
       { label: "Daybook", icon: BookOpen, active: isOnDaybook, testId: "button-daybook-tab", onClick: () => setLocation("/pos-daybook") },
       { label: "Inventory", icon: MapPin, active: isOnInventory, testId: "button-inventory-tab", onClick: () => setLocation("/location-inventory") },
+      { label: "Price List", icon: Tag, active: isOnPriceList, testId: "button-price-list-tab", onClick: () => setLocation("/pos-price-list") },
       { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
       ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),

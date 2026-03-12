@@ -6685,6 +6685,85 @@ if (asOfDate) {
     }
   });
 
+  // POS Price List: get all stock items with location-specific selling prices
+  // Fallback rule: if no custom location price, falls back to stock item base selling price
+  app.get("/api/pos/price-list", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const locationId = parseInt(req.query.locationId as string);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "locationId query parameter is required" });
+      }
+
+      const isPOS = req.user?.role?.startsWith("POS");
+
+      if (isPOS) {
+        // POS security: validate the requested location is assigned to this user
+        const assigned = await db
+          .select({ locationId: userLocations.locationId })
+          .from(userLocations)
+          .where(
+            and(
+              eq(userLocations.userId, req.user!.id),
+              eq(userLocations.companyId, companyId)
+            )
+          );
+        const assignedIds = assigned.map((r) => r.locationId);
+        if (!assignedIds.includes(locationId)) {
+          return res.status(403).json({ message: "Forbidden: location not assigned to this user" });
+        }
+      } else {
+        // Non-POS: verify the location belongs to the company
+        const [loc] = await db
+          .select({ id: locations.id })
+          .from(locations)
+          .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)));
+        if (!loc) {
+          return res.status(403).json({ message: "Forbidden: location not found" });
+        }
+      }
+
+      // Query all active stock items for company with location-specific price (COALESCE to base price)
+      const rows = await db
+        .select({
+          stockItemId: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          baseSellingPrice: stockItems.sellingPrice,
+          hasCustomPrice: sql<boolean>`(${stockItemLocationPrices.sellingPrice} IS NOT NULL)`,
+          sellingPrice: sql<string>`COALESCE(${stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`,
+          quantity: sql<string>`COALESCE(${inventory.quantity}::text, '0')`,
+        })
+        .from(stockItems)
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .leftJoin(
+          stockItemLocationPrices,
+          and(
+            eq(stockItemLocationPrices.stockItemId, stockItems.id),
+            eq(stockItemLocationPrices.locationId, locationId)
+          )
+        )
+        .leftJoin(
+          inventory,
+          and(
+            eq(inventory.stockItemId, stockItems.id),
+            eq(inventory.locationId, locationId)
+          )
+        )
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+        .orderBy(stockItems.name);
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk import stock items
   app.post(
     "/api/stock-items/import",
