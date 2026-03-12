@@ -9113,9 +9113,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "SOLD")));
         }
 
-        // Reset order to DRAFT, clear invoice number
+        // Reset order to PENDING_VERIFICATION, clear invoice number
         await tx.update(customerOrders).set({
-          status: "DRAFT",
+          status: "PENDING_VERIFICATION",
           invoiceNumber: null,
           updatedAt: new Date(),
         }).where(eq(customerOrders.id, orderId));

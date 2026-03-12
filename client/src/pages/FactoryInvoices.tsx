@@ -97,7 +97,7 @@ export default function FactoryInvoices() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Reverted to Draft", description: "Invoice has been reverted. You can now edit and re-finalize it." });
+      toast({ title: "Reverted to Pending", description: "Invoice has been reverted. You can now edit and re-finalize it." });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
     },
     onError: (error: any) => {
@@ -250,9 +250,9 @@ export default function FactoryInvoices() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Revert to Draft</AlertDialogTitle>
+                                <AlertDialogTitle>Revert to Pending</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will revert invoice {order.invoiceNumber} for {order.customerName} back to Draft status.
+                                  This will revert invoice {order.invoiceNumber} for {order.customerName} back to Pending Verification status.
                                   The invoice number will be voided, all bales will return to stock, and the customer balance entry will be removed.
                                   This cannot be done if any payment has been recorded against this invoice.
                                 </AlertDialogDescription>
@@ -263,7 +263,7 @@ export default function FactoryInvoices() {
                                   onClick={() => unfinalizeMutation.mutate(order.id)}
                                   data-testid={`button-confirm-revert-${order.id}`}
                                 >
-                                  Revert to Draft
+                                  Revert to Pending
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
