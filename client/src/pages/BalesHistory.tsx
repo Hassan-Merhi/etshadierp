@@ -305,10 +305,28 @@ export default function BalesHistory() {
     const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
     return baleDate === todayStr;
   });
-  const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
-  const todayGarbage = todayInStock.filter((row: any) => getCategory(row) === "garbage");
-  const todayWipers = todayInStock.filter((row: any) => getCategory(row) === "wipers");
-  const todayRegular = todayInStock.filter((row: any) => !["garbage", "wipers"].includes(getCategory(row)));
+
+  // Robust classification: check category → productName → product.name with includes() matching
+  // so "Garbage Bales", "GARBAGE", " garbage " and "wiper"/"WIPERS" all classify correctly
+  const getBaleClassification = (row: any): "garbage" | "wipers" | "regular" => {
+    const candidates = [
+      row.bale?.category,
+      row.bale?.productName,
+      row.product?.name,
+    ]
+      .filter((v: any) => v && typeof v === "string")
+      .map((v: string) => v.toLowerCase().trim());
+
+    for (const c of candidates) {
+      if (c.includes("garbage")) return "garbage";
+      if (c.includes("wiper")) return "wipers";
+    }
+    return "regular";
+  };
+
+  const todayGarbage = todayInStock.filter((row: any) => getBaleClassification(row) === "garbage");
+  const todayWipers = todayInStock.filter((row: any) => getBaleClassification(row) === "wipers");
+  const todayRegular = todayInStock.filter((row: any) => getBaleClassification(row) === "regular");
   const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
   const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
