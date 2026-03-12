@@ -339,6 +339,17 @@ app.use((req, res, next) => {
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS source_id integer`,
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS quantity_kg decimal(15,3)`,
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS notes text`,
+    // Live spreadsheet links (shared Google Sheet / external links)
+    `CREATE TABLE IF NOT EXISTS live_spreadsheets (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name text NOT NULL,
+      url text NOT NULL,
+      description text,
+      is_active boolean NOT NULL DEFAULT true,
+      created_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now()
+    )`,
   ];
   for (const migration of migrations) {
     try {
