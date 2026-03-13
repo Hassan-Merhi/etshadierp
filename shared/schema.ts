@@ -3699,37 +3699,3 @@ export const insertLiveSpreadsheetSchema = createInsertSchema(liveSpreadsheets).
 
 export type InsertLiveSpreadsheet = z.infer<typeof insertLiveSpreadsheetSchema>;
 export type LiveSpreadsheet = typeof liveSpreadsheets.$inferSelect;
-
-export const factoryWorkerAdvances = pgTable("factory_worker_advances", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  workerId: integer("worker_id").notNull(),
-  advanceDate: date("advance_date").notNull(),
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  remainingBalance: decimal("remaining_balance", { precision: 15, scale: 2 }).notNull(),
-  cashAccountId: integer("cash_account_id"),
-  voucherId: integer("voucher_id"),
-  notes: text("notes"),
-  fullyPaid: boolean("fully_paid").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("factory_worker_advances_company_idx").on(t.companyId),
-  workerIdx: index("factory_worker_advances_worker_idx").on(t.workerId),
-}));
-
-export const insertFactoryWorkerAdvanceSchema = createInsertSchema(factoryWorkerAdvances).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  workerId: z.number().min(1, "Worker is required"),
-  advanceDate: z.string().min(1, "Date is required"),
-  amount: z.string().min(1, "Amount is required"),
-  remainingBalance: z.string().optional(),
-  cashAccountId: z.number().optional().nullable(),
-  voucherId: z.number().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-export type InsertFactoryWorkerAdvance = z.infer<typeof insertFactoryWorkerAdvanceSchema>;
-export type FactoryWorkerAdvance = typeof factoryWorkerAdvances.$inferSelect;
