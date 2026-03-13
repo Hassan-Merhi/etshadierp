@@ -114,6 +114,9 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+      max: 3,
+      connectionTimeoutMillis: 4000,
+      idleTimeoutMillis: 30000,
     },
     createTableIfMissing: true,
   });
