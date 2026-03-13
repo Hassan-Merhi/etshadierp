@@ -12,6 +12,7 @@ import {
   factoryBales,
   factoryPayrolls,
   factoryWorkerDocuments,
+  factoryWorkerAdvances,
   ledgerAccounts,
 } from "@shared/schema";
 
@@ -791,6 +792,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
 
       const daysInMonth = (d: string) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); };
+
+      const allOutstandingAdvances = await db.select().from(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
+      const advanceByWorker: Record<number, number> = {};
+      for (const adv of allOutstandingAdvances) {
+        advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
+      }
+
       let created = 0;
       for (const worker of targetWorkers) {
         const baseSal = parseFloat(worker.baseSalary || "0");
@@ -800,11 +809,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
         else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
         else base = baseSal * (days / daysInMonth(periodStart));
-        const net = base + bonus;
+        const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
+        const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
+        const net = base + bonus - advanceDeduction;
         await db.insert(factoryPayrolls).values({
           companyId, workerId: worker.id, periodStart, periodEnd,
           baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
-          baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0", advances: "0",
+          baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0",
+          advances: advanceDeduction.toFixed(2),
           netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
           status: "DRAFT", notes: notes || null,
           cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
@@ -831,26 +843,57 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
-      const [updated] = await db.update(factoryPayrolls)
-        .set({ status: "PAID", paidAt: new Date(), cashAccountId } as any)
-        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
-        .returning();
-      if (!updated) return res.status(404).json({ message: "Payroll record not found" });
-      const [prWorker] = await db.select({ fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(eq(factoryWorkers.id, updated.workerId));
-      const workerName = prWorker?.fullName?.trim() || `Worker #${updated.workerId}`;
-      const prToday = new Date().toISOString().split("T")[0];
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: prToday,
-        txType: "PAYROLL_PAYMENT",
-        referenceId: updated.id,
-        description: `Payroll paid: ${workerName} – ${parseFloat(updated.netSalary || "0").toFixed(2)} (${updated.periodStart} – ${updated.periodEnd})`,
-        amountCurrency: parseFloat(updated.netSalary || "0"),
-        amountUsd: parseFloat(updated.netSalary || "0"),
+
+      const updated = await db.transaction(async (tx: any) => {
+        const [payroll] = await tx.update(factoryPayrolls)
+          .set({ status: "PAID", paidAt: new Date(), cashAccountId } as any)
+          .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
+          .returning();
+        if (!payroll) throw new Error("Payroll record not found");
+
+        const advanceDeducted = parseFloat(payroll.advances || "0");
+        if (advanceDeducted > 0) {
+          const outstanding = await tx.select().from(factoryWorkerAdvances)
+            .where(and(
+              eq(factoryWorkerAdvances.companyId, companyId),
+              eq(factoryWorkerAdvances.workerId, payroll.workerId),
+              eq(factoryWorkerAdvances.fullyPaid, false),
+            ))
+            .orderBy(factoryWorkerAdvances.advanceDate);
+          let remaining = advanceDeducted;
+          for (const adv of outstanding) {
+            if (remaining <= 0) break;
+            const bal = parseFloat(adv.remainingBalance || "0");
+            const reduce = Math.min(bal, remaining);
+            const newBal = bal - reduce;
+            await tx.update(factoryWorkerAdvances).set({
+              remainingBalance: newBal.toFixed(2),
+              fullyPaid: newBal <= 0,
+            }).where(eq(factoryWorkerAdvances.id, adv.id));
+            remaining -= reduce;
+          }
+        }
+
+        const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
+          .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
+        const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
+        const prToday = new Date().toISOString().split("T")[0];
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: prToday,
+          txType: "PAYROLL_PAYMENT",
+          referenceId: payroll.id,
+          description: `Payroll paid: ${workerName} – ${parseFloat(payroll.netSalary || "0").toFixed(2)} (${payroll.periodStart} – ${payroll.periodEnd})`,
+          amountCurrency: parseFloat(payroll.netSalary || "0"),
+          amountUsd: parseFloat(payroll.netSalary || "0"),
+        });
+
+        return payroll;
       });
+
       res.json(updated);
     } catch (error: any) {
+      if (error.message === "Payroll record not found") return res.status(404).json({ message: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -934,6 +977,181 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
     } catch (error: any) {
       console.error("Error fetching worker stats:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── FACTORY WORKER ADVANCES ─────────────────────────────────────────
+
+  // GET /api/factory/advances - List all advances for company
+  app.get("/api/factory/advances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
+      if (req.query.workerId) conditions.push(eq(factoryWorkerAdvances.workerId, parseInt(req.query.workerId)));
+      if (req.query.status === "outstanding") conditions.push(eq(factoryWorkerAdvances.fullyPaid, false));
+      if (req.query.status === "paid") conditions.push(eq(factoryWorkerAdvances.fullyPaid, true));
+
+      const advances = await db.select().from(factoryWorkerAdvances)
+        .where(and(...conditions))
+        .orderBy(desc(factoryWorkerAdvances.advanceDate));
+
+      const workerIds = [...new Set(advances.map((a: any) => a.workerId))];
+      let workerMap: Record<number, string> = {};
+      if (workerIds.length > 0) {
+        const workers = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+          .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIds));
+        workerMap = Object.fromEntries(workers.map((w: any) => [w.id, w.fullName]));
+      }
+
+      const enriched = advances.map((a: any) => ({ ...a, workerName: workerMap[a.workerId] || `Worker #${a.workerId}` }));
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("Error fetching advances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/workers/:id/advances - List advances for a specific worker
+  app.get("/api/factory/workers/:id/advances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+
+      const advances = await db.select().from(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.workerId, workerId)))
+        .orderBy(desc(factoryWorkerAdvances.advanceDate));
+
+      res.json(advances);
+    } catch (error: any) {
+      console.error("Error fetching worker advances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/workers/:id/advances - Record a new advance
+  app.post("/api/factory/workers/:id/advances", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+
+      const amount = parseFloat(req.body.amount);
+      if (!amount || amount <= 0) return res.status(400).json({ message: "Amount must be positive" });
+
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(and(eq(factoryWorkers.id, workerId), eq(factoryWorkers.companyId, companyId)));
+      if (!worker) return res.status(404).json({ message: "Worker not found" });
+
+      const advanceDate = req.body.advanceDate || new Date().toISOString().split("T")[0];
+      const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+
+      const [advance] = await db.insert(factoryWorkerAdvances).values({
+        companyId, workerId, advanceDate,
+        amount: amount.toFixed(2),
+        remainingBalance: amount.toFixed(2),
+        cashAccountId,
+        notes: req.body.notes || null,
+      }).returning();
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: advanceDate,
+        txType: "ADVANCE_GIVEN",
+        referenceId: advance.id,
+        referenceTable: "factory_worker_advances",
+        description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
+        amountCurrency: amount,
+        amountUsd: amount,
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json({ ...advance, workerName: worker.fullName });
+    } catch (error: any) {
+      console.error("Error creating advance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/factory/advances/:id - Edit advance (notes/date only)
+  app.patch("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+
+      const updates: any = {};
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.advanceDate) updates.advanceDate = req.body.advanceDate;
+
+      const [updated] = await db.update(factoryWorkerAdvances).set(updates)
+        .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Advance not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating advance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/advances/:id - Delete advance
+  app.delete("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+
+      const [advance] = await db.select().from(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
+      if (!advance) return res.status(404).json({ message: "Advance not found" });
+
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
+
+      await db.delete(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
+
+      const today = new Date().toISOString().split("T")[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "ADVANCE_DELETED",
+        referenceId: id,
+        referenceTable: "factory_worker_advances",
+        description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}`,
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json({ message: "Advance deleted" });
+    } catch (error: any) {
+      console.error("Error deleting advance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/workers/:id/advance-balance - Get total outstanding advance balance
+  app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseInt(req.params.id);
+
+      const outstanding = await db.select().from(factoryWorkerAdvances)
+        .where(and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.workerId, workerId),
+          eq(factoryWorkerAdvances.fullyPaid, false),
+        ));
+
+      const totalBalance = outstanding.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
+      res.json({ totalBalance: totalBalance.toFixed(2), count: outstanding.length });
+    } catch (error: any) {
+      console.error("Error fetching advance balance:", error);
       res.status(500).json({ message: error.message });
     }
   });

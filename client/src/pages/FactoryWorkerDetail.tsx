@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import type { FactoryWorker, FactoryBale, FactoryWorkerDocument } from "@shared/schema";
+import type { FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAdvance } from "@shared/schema";
 
 interface WorkerWithStats extends FactoryWorker {
   stats?: {
@@ -162,6 +162,16 @@ export default function FactoryWorkerDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/factory/workers/${workerId}/documents`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json();
+    },
+    enabled: !!workerId,
+  });
+
+  const { data: workerAdvances } = useQuery<FactoryWorkerAdvance[]>({
+    queryKey: ["/api/factory/workers", workerId, "advances"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/workers/${workerId}/advances`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch advances");
       return res.json();
     },
     enabled: !!workerId,
@@ -440,6 +450,7 @@ export default function FactoryWorkerDetail() {
               <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
               <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
               <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>
+              <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
               <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
             </TabsList>
 
@@ -603,6 +614,63 @@ export default function FactoryWorkerDetail() {
                       </Table>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="advances" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-sm">Advance History</CardTitle>
+                  {(() => {
+                    const outstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
+                    const totalBal = outstanding.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                    return totalBal > 0 ? (
+                      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400" data-testid="badge-advance-total-balance">
+                        Outstanding: {fmt(totalBal)}
+                      </Badge>
+                    ) : null;
+                  })()}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Remaining</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(!workerAdvances || workerAdvances.length === 0) ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No advances recorded
+                          </TableCell>
+                        </TableRow>
+                      ) : workerAdvances.map((adv) => (
+                        <TableRow key={adv.id} data-testid={`row-worker-advance-${adv.id}`}>
+                          <TableCell>{formatDate(adv.advanceDate)}</TableCell>
+                          <TableCell className="text-right font-mono">{fmt(adv.amount)}</TableCell>
+                          <TableCell className="text-right font-mono">{fmt(adv.remainingBalance)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={adv.fullyPaid
+                                ? "border-green-500 text-green-700 dark:text-green-400"
+                                : "border-amber-400 text-amber-700 dark:text-amber-400"
+                              }
+                            >
+                              {adv.fullyPaid ? "Paid" : "Outstanding"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{adv.notes || "\u2014"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>

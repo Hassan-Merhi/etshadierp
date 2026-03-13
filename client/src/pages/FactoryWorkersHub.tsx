@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, DollarSign, CalendarDays } from "lucide-react";
+import { HardHat, DollarSign, CalendarDays, Banknote } from "lucide-react";
 import FactoryWorkers from "@/pages/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
 import FactoryAttendance from "@/pages/FactoryAttendance";
+import FactoryAdvancesTab from "@/pages/FactoryAdvancesTab";
 
-type TabValue = "workers" | "payroll" | "attendance";
+type TabValue = "workers" | "payroll" | "attendance" | "advances";
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
   if (tab === "payroll") return "payroll";
   if (tab === "attendance") return "attendance";
+  if (tab === "advances") return "advances";
   return "workers";
 }
 
@@ -33,6 +35,10 @@ export default function FactoryWorkersHub() {
           <CalendarDays className="h-4 w-4 mr-2" />
           Attendance
         </TabsTrigger>
+        <TabsTrigger value="advances" data-testid="tab-advances">
+          <Banknote className="h-4 w-4 mr-2" />
+          Advances
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="workers" className="mt-0">
@@ -43,6 +49,9 @@ export default function FactoryWorkersHub() {
       </TabsContent>
       <TabsContent value="attendance" className="mt-0">
         <FactoryAttendance />
+      </TabsContent>
+      <TabsContent value="advances" className="mt-0">
+        <FactoryAdvancesTab />
       </TabsContent>
     </Tabs>
   );
