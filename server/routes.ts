@@ -16202,6 +16202,7 @@ if (asOfDate) {
               quantity: item.quantity,
               rate: item.rate,
               totalAmount: itemTotal.toFixed(2),
+              sourceLocationId: parseInt(sourceLocationId),
             };
           });
 

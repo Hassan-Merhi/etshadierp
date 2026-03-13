@@ -1087,7 +1087,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Sales voucher updated successfully",
       });
-      navigate("/daybook");
+      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
     },
     onError: (error: any) => {
       toast({
@@ -1123,7 +1123,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Purchase voucher updated successfully",
       });
-      navigate("/daybook");
+      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
     },
     onError: (error: any) => {
       toast({
@@ -1159,7 +1159,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Adjustment voucher updated successfully",
       });
-      navigate("/daybook");
+      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
     },
     onError: (error: any) => {
       toast({
@@ -1195,7 +1195,7 @@ export default function VoucherEdit() {
         title: "Success",
         description: "Stock transfer voucher updated successfully",
       });
-      navigate("/daybook");
+      navigate(appMode === "factory" ? "/factory/daybook" : "/daybook");
     },
     onError: (error: any) => {
       toast({
