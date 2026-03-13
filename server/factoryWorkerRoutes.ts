@@ -1552,6 +1552,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         let skipped = 0;
         for (const adv of eligible) {
           if (alreadyPostedIds.has(adv.id)) {
+            if (adv.cashAccountId === null) {
+              await tx.update(factoryWorkerAdvances)
+                .set({ cashAccountId: cashAccountId })
+                .where(eq(factoryWorkerAdvances.id, adv.id));
+            }
             skipped++;
             continue;
           }

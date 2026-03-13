@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Plus, Trash2, Banknote, RotateCcw, BookOpen, Loader2 } from "lucide-react";
@@ -552,8 +552,8 @@ function AdvancesView() {
                           grouped[key].push(adv);
                         }
                         return Object.entries(grouped).map(([workerName, advs]) => (
-                          <>
-                            <TableRow key={`header-${workerName}`}>
+                          <Fragment key={workerName}>
+                            <TableRow>
                               <TableCell colSpan={3} className="bg-muted/50 font-medium text-sm py-1.5">
                                 {workerName}
                                 <span className="text-xs text-muted-foreground ml-2">
@@ -572,7 +572,7 @@ function AdvancesView() {
                                 </TableCell>
                               </TableRow>
                             ))}
-                          </>
+                          </Fragment>
                         ));
                       })()}
                     </TableBody>
