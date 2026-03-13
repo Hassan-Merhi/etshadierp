@@ -177,6 +177,7 @@ function AdvancesView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
       setForm({ workerId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", cashAccountId: "", notes: "", repaymentType: "salary_deduction" });
@@ -192,6 +193,7 @@ function AdvancesView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       toast({ title: "Advance deleted" });
       setDeleteTarget(null);
     },

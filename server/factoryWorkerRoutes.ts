@@ -849,35 +849,37 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
       }
 
-      let created = 0;
-      for (const worker of targetWorkers) {
-        const baseSal = parseFloat(worker.baseSalary || "0");
-        const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
-        let base = 0;
-        if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
-        else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
-        else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
-        else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
-        const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
-        const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
-        const net = base + bonus - advanceDeduction;
-        await db.insert(factoryPayrolls).values({
-          companyId, workerId: worker.id, periodStart, periodEnd,
-          baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
-          baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0",
-          advances: advanceDeduction.toFixed(2),
-          netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
-          status: "DRAFT", notes: notes || null,
-          cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-        } as any);
-        created++;
-      }
-      const payrollToday = new Date().toISOString().split("T")[0];
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: periodStart,
-        txType: "PAYROLL_GENERATED",
-        description: `Payroll generated: ${created} worker${created !== 1 ? "s" : ""} for period ${periodStart} – ${periodEnd}`,
+      const created = await db.transaction(async (tx: any) => {
+        let count = 0;
+        for (const worker of targetWorkers) {
+          const baseSal = parseFloat(worker.baseSalary || "0");
+          const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
+          let base = 0;
+          if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
+          else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
+          else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
+          else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+          const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
+          const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
+          const net = base + bonus - advanceDeduction;
+          await tx.insert(factoryPayrolls).values({
+            companyId, workerId: worker.id, periodStart, periodEnd,
+            baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
+            baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0",
+            advances: advanceDeduction.toFixed(2),
+            netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
+            status: "DRAFT", notes: notes || null,
+            cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+          } as any);
+          count++;
+        }
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: periodStart,
+          txType: "PAYROLL_GENERATED",
+          description: `Payroll generated: ${count} worker${count !== 1 ? "s" : ""} for period ${periodStart} – ${periodEnd}`,
+        });
+        return count;
       });
       res.json({ created });
     } catch (error: any) {

@@ -416,6 +416,7 @@ export default function FactoryWorkerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "payrolls"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
       toast({ title: "Marked as paid" });
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
