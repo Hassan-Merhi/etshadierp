@@ -395,6 +395,39 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     }
   });
 
+  app.delete("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [existing] = await db
+        .select()
+        .from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
+
+      if (!existing) return res.status(404).json({ message: "Payroll record not found" });
+      if (existing.status === "PAID") return res.status(400).json({ message: "Cannot delete a paid payroll record" });
+
+      await db.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: new Date().toISOString().split("T")[0],
+        txType: "PAYROLL_DELETED",
+        referenceId: id,
+        referenceTable: "factory_payrolls",
+        description: `Draft payroll #${id} deleted (Worker #${existing.workerId}, period ${existing.periodStart}–${existing.periodEnd}, net $${parseFloat(existing.netSalary || "0").toFixed(2)})`,
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json({ message: "Payroll record deleted" });
+    } catch (error: any) {
+      console.error("Error deleting payroll:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
       const { companyId, startDate, endDate } = req.body;

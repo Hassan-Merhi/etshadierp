@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,6 +80,7 @@ export default function FactoryPayrollTab() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const [runForm, setRunForm] = useState({
     periodStart: new Date().toISOString().slice(0, 7) + "-01",
@@ -173,6 +174,20 @@ export default function FactoryPayrollTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       toast({ title: "Marked as paid", description: `${selectedIds.size} records updated` });
       setSelectedIds(new Set()); setBulkPayOpen(false); setBulkCashAccountId("");
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/factory/payroll/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      toast({ title: "Draft payroll deleted" });
+      setDeleteTargetId(null);
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -351,16 +366,28 @@ export default function FactoryPayrollTab() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
                         <TableCell>
-                          {canPay && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }}
-                              data-testid={`button-pay-${p.id}`}
-                            >
-                              Pay
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {canPay && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }}
+                                data-testid={`button-pay-${p.id}`}
+                              >
+                                Pay
+                              </Button>
+                            )}
+                            {p.status === "DRAFT" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setDeleteTargetId(p.id)}
+                                data-testid={`button-delete-payroll-${p.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -562,6 +589,28 @@ export default function FactoryPayrollTab() {
               data-testid="button-confirm-bulk-pay"
             >
               {bulkMarkPaidMutation.isPending ? "Processing..." : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Draft Payroll</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this draft payroll record? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTargetId(null)} data-testid="button-cancel-delete-payroll">Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTargetId && deleteMutation.mutate(deleteTargetId)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-payroll"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
