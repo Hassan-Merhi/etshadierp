@@ -688,8 +688,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
-        // Monthly (default)
-        earned = baseSal * (days / daysInMonth(startDate));
+        // Monthly (default) — fixed amount, not prorated by calendar days
+        earned = baseSal;
       }
 
       // Compute already paid in period (APPROVED or PAID payrolls)
@@ -838,7 +838,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
         else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
         else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
-        else base = baseSal * (days / daysInMonth(periodStart));
+        else base = baseSal;
         const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
         const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
         const net = base + bonus - advanceDeduction;
