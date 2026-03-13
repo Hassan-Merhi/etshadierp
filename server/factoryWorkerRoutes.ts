@@ -38,6 +38,25 @@ const workerUpload = multer({
   }),
 });
 
+function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
+  const start = new Date(startStr + "T00:00:00");
+  const end   = new Date(endStr   + "T00:00:00");
+  let total = 0;
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cur <= end) {
+    const year  = cur.getFullYear();
+    const month = cur.getMonth();
+    const monthLastDay    = new Date(year, month + 1, 0);
+    const daysInThisMonth = monthLastDay.getDate();
+    const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
+    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    total += salary * (daysInSeg / daysInThisMonth);
+    cur = new Date(year, month + 1, 1);
+  }
+  return total;
+}
+
 export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: any) {
 
   async function writeDaybookEntry(dbOrTx: any, opts: {
@@ -688,8 +707,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
-        // Monthly (default) — fixed amount, not prorated by calendar days
-        earned = baseSal;
+        earned = computeMonthlyPay(baseSal, startDate, endDate);
       }
 
       // Compute already paid in period (APPROVED or PAID payrolls)
@@ -838,7 +856,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
         else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
         else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
-        else base = baseSal;
+        else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
         const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
         const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
         const net = base + bonus - advanceDeduction;

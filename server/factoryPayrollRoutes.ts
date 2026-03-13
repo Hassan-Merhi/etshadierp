@@ -58,6 +58,25 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   }
 
+  function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
+    const start = new Date(startStr + "T00:00:00");
+    const end   = new Date(endStr   + "T00:00:00");
+    let total = 0;
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= end) {
+      const year  = cur.getFullYear();
+      const month = cur.getMonth();
+      const monthLastDay    = new Date(year, month + 1, 0);
+      const daysInThisMonth = monthLastDay.getDate();
+      const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
+      const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+      const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      total += salary * (daysInSeg / daysInThisMonth);
+      cur = new Date(year, month + 1, 1);
+    }
+    return total;
+  }
+
   app.post("/api/factory/payroll/generate", requireAuth, async (req: any, res: any) => {
     try {
       const { companyId, startDate, endDate } = req.body;
@@ -171,7 +190,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
         switch (worker.salaryType) {
           case "Monthly":
-            basePay = workerBaseSalary;
+            basePay = computeMonthlyPay(workerBaseSalary, startDate, endDate);
             break;
           case "Daily":
             if (hasAttendance) {

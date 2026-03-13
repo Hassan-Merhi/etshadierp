@@ -40,6 +40,25 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   PAID: { label: "Paid", variant: "outline", className: "border-green-500 text-green-700 dark:text-green-400" },
 };
 
+function computeMonthlyPayPreview(salary: number, startStr: string, endStr: string): number {
+  const start = new Date(startStr + "T00:00:00");
+  const end   = new Date(endStr   + "T00:00:00");
+  let total = 0;
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cur <= end) {
+    const year  = cur.getFullYear();
+    const month = cur.getMonth();
+    const monthLastDay    = new Date(year, month + 1, 0);
+    const daysInThisMonth = monthLastDay.getDate();
+    const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
+    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    total += salary * (daysInSeg / daysInThisMonth);
+    cur = new Date(year, month + 1, 1);
+  }
+  return total;
+}
+
 function fmt(val: string | number | null | undefined) {
   const n = parseFloat(String(val || 0));
   return isNaN(n) ? "0.00" : n.toFixed(2);
@@ -173,8 +192,6 @@ export default function FactoryPayrollTab() {
     const end = new Date(runForm.periodEnd);
     const days = runForm.daysCount ? parseInt(runForm.daysCount) : Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
     const bonus = parseFloat(runForm.bonusPerWorker || "0");
-    const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-
     return target.map((w) => {
       const base = parseFloat(w.baseSalary || "0");
       const freq = (w as any).payFrequency || w.salaryType || "Monthly";
@@ -182,7 +199,7 @@ export default function FactoryPayrollTab() {
       if (freq === "Weekly") calc = (days / 7) * parseFloat((w as any).weeklySalary || base.toString());
       else if (freq === "Bi-Weekly") calc = (days / 14) * parseFloat((w as any).biWeeklySalary || base.toString());
       else if (freq === "Daily" || w.salaryType === "Daily") calc = days * base;
-      else calc = base;
+      else calc = computeMonthlyPayPreview(base, runForm.periodStart, runForm.periodEnd);
       const net = calc + bonus;
       return { id: w.id, name: w.fullName, position: w.position, base: calc, bonus, net };
     });
