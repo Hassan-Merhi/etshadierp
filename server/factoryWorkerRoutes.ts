@@ -1534,4 +1534,104 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.get("/api/factory/workers/:id/statement", requireAuth, async (req: any, res: any) => {
+    try {
+      const workerId = parseInt(req.params.id);
+      if (isNaN(workerId)) return res.status(400).json({ message: "Invalid worker ID" });
+
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { startDate, endDate } = req.query;
+
+      const advanceConditions: any[] = [
+        eq(factoryWorkerAdvances.workerId, workerId),
+        eq(factoryWorkerAdvances.companyId, companyId),
+      ];
+      if (startDate) advanceConditions.push(sql`${factoryWorkerAdvances.advanceDate} >= ${startDate}`);
+      if (endDate) advanceConditions.push(sql`${factoryWorkerAdvances.advanceDate} <= ${endDate}`);
+
+      const advances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(and(...advanceConditions))
+        .orderBy(factoryWorkerAdvances.advanceDate);
+
+      const payrollConditions: any[] = [
+        eq(factoryPayrolls.workerId, workerId),
+        eq(factoryPayrolls.companyId, companyId),
+        eq(factoryPayrolls.status, "PAID"),
+      ];
+      if (startDate) payrollConditions.push(sql`${factoryPayrolls.paidAt}::date >= ${startDate}`);
+      if (endDate) payrollConditions.push(sql`${factoryPayrolls.paidAt}::date <= ${endDate}`);
+
+      const payrolls = await db
+        .select()
+        .from(factoryPayrolls)
+        .where(and(...payrollConditions))
+        .orderBy(factoryPayrolls.paidAt);
+
+      const entries: any[] = [];
+
+      for (const adv of advances) {
+        entries.push({
+          entryId: adv.id,
+          voucherId: adv.id,
+          date: adv.advanceDate,
+          type: "Advance",
+          debitAmount: adv.amount,
+          creditAmount: "0",
+          narration: adv.notes || "Advance payment",
+          voucherNumber: `ADV-${adv.id}`,
+          voucherType: "Advance",
+          voucherDate: adv.advanceDate,
+          voucherDescription: adv.notes || "Advance payment",
+          currency: "USD",
+        });
+      }
+
+      for (const pr of payrolls) {
+        const paidDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : pr.periodEnd;
+        entries.push({
+          entryId: 100000 + pr.id,
+          voucherId: 100000 + pr.id,
+          date: paidDate,
+          type: "Payroll",
+          debitAmount: "0",
+          creditAmount: pr.netSalary || "0",
+          narration: `Payroll ${pr.periodStart} to ${pr.periodEnd}`,
+          voucherNumber: `PAY-${pr.id}`,
+          voucherType: "Payroll",
+          voucherDate: paidDate,
+          voucherDescription: `Payroll ${pr.periodStart} to ${pr.periodEnd}`,
+          currency: "USD",
+        });
+
+        if (parseFloat(pr.advances || "0") > 0) {
+          entries.push({
+            entryId: 200000 + pr.id,
+            voucherId: 200000 + pr.id,
+            date: paidDate,
+            type: "Advance Deduction",
+            debitAmount: "0",
+            creditAmount: pr.advances || "0",
+            narration: `Advance deducted from payroll ${pr.periodStart} to ${pr.periodEnd}`,
+            voucherNumber: `ADV-DED-${pr.id}`,
+            voucherType: "Advance Deduction",
+            voucherDate: paidDate,
+            voucherDescription: `Advance deducted: $${pr.advances}`,
+            currency: "USD",
+          });
+        }
+      }
+
+      entries.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Error fetching factory worker statement:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

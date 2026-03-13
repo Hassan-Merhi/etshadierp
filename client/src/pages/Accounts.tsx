@@ -104,6 +104,7 @@ interface Transaction {
   voucherType: string;
   voucherDate: string;
   voucherDescription: string;
+  currency?: string;
 }
 
 interface GroupedVoucher {
@@ -116,6 +117,7 @@ interface GroupedVoucher {
   totalDebit: number;
   totalCredit: number;
   runningBalance?: number;
+  currency?: string;
 }
 
 export default function Accounts() {
@@ -260,7 +262,29 @@ export default function Accounts() {
       }))
     : [];
 
-  const accounts = [...baseAccounts, ...factorySupplierAccounts];
+  const { data: factoryWorkersData = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/workers", selectedCompany?.id],
+    enabled: appMode === "factory" && !!selectedCompany,
+  });
+
+  const factoryWorkerAccounts: Account[] = appMode === "factory"
+    ? (Array.isArray(factoryWorkersData) ? factoryWorkersData : [])
+        .filter((w: any) => w.active !== false)
+        .map((w: any) => ({
+          id: `factoryWorker-${w.id}`,
+          accountId: w.id,
+          type: "factoryWorker" as const,
+          name: w.fullName,
+          code: w.employeeCode || `FW-${w.id}`,
+          balance: 0,
+          balanceSide: null,
+          openingBalance: 0,
+          openingBalanceSide: null,
+          active: w.active ?? true,
+        }))
+    : [];
+
+  const accounts = [...baseAccounts, ...factorySupplierAccounts, ...factoryWorkerAccounts];
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
@@ -298,13 +322,16 @@ export default function Accounts() {
   });
 
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
+  const isFactoryWorkerAccount = selectedAccount?.type === "factoryWorker";
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
     Transaction[]
   >({
     queryKey: selectedAccount && !isFactorySupplierAccount
       ? [
-          `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
+          selectedAccount.type === "factoryWorker"
+            ? `/api/factory/workers/${selectedAccount.accountId}/statement`
+            : `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
           { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
         ]
       : [],
@@ -312,20 +339,23 @@ export default function Accounts() {
       if (!selectedAccount || isFactorySupplierAccount) return [];
 
       const params = new URLSearchParams();
-      // Map periodFilter.fromDate/toDate to backend's startDate/endDate
       if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
       if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
 
-      let accountType = (selectedAccount.type || "").toLowerCase();
-      if (accountType === "fixed asset") {
-        accountType = "fixed-asset";
-      } else if (accountType === "supplier") {
-        accountType = "supplier";
+      let url: string;
+      if (selectedAccount.type === "factoryWorker") {
+        url = `/api/factory/workers/${selectedAccount.accountId}/statement${
+          params.toString() ? `?${params.toString()}` : ""
+        }`;
+      } else {
+        let accountType = (selectedAccount.type || "").toLowerCase();
+        if (accountType === "fixed asset") {
+          accountType = "fixed-asset";
+        }
+        url = `/api/accounts/${accountType}/${selectedAccount.accountId}/transactions${
+          params.toString() ? `?${params.toString()}` : ""
+        }`;
       }
-
-      const url = `/api/accounts/${accountType}/${selectedAccount.accountId}/transactions${
-        params.toString() ? `?${params.toString()}` : ""
-      }`;
 
       const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch transactions");
@@ -365,7 +395,7 @@ export default function Accounts() {
       if (!res.ok) return { balance: 0 };
       return res.json();
     },
-    enabled: !!selectedAccount && !!periodFilter.fromDate && appMode === "factory",
+    enabled: !!selectedAccount && !!periodFilter.fromDate && appMode === "factory" && !isFactoryWorkerAccount,
   });
 
   // Restore account from URL params when accounts load
@@ -543,6 +573,7 @@ export default function Accounts() {
           narration: txn.narration || txn.voucherDescription || "",
           totalDebit: debit,
           totalCredit: credit,
+          currency: txn.currency,
         });
       }
     });
@@ -1858,12 +1889,12 @@ export default function Accounts() {
                                   )}
                                   {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalDebit > 0
-                                      ? formatAmount(voucher.totalDebit)
+                                      ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalDebit)}`
                                       : "-"}
                                   </TableCell>}
                                   {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalCredit > 0
-                                      ? formatAmount(voucher.totalCredit)
+                                      ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalCredit)}`
                                       : "-"}
                                   </TableCell>}
                                   {!hideBalances && <TableCell className="text-right font-mono font-medium py-2">
@@ -1964,13 +1995,13 @@ export default function Accounts() {
                                   <div>
                                     <span className="text-muted-foreground block">Debit</span>
                                     <span className="font-mono">
-                                      {voucher.totalDebit > 0 ? formatAmount(voucher.totalDebit) : "-"}
+                                      {voucher.totalDebit > 0 ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalDebit)}` : "-"}
                                     </span>
                                   </div>
                                   <div>
                                     <span className="text-muted-foreground block">Credit</span>
                                     <span className="font-mono">
-                                      {voucher.totalCredit > 0 ? formatAmount(voucher.totalCredit) : "-"}
+                                      {voucher.totalCredit > 0 ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalCredit)}` : "-"}
                                     </span>
                                   </div>
                                   <div className="text-right">
