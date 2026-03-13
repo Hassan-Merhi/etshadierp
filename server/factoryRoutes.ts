@@ -10139,8 +10139,8 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
-      const role = session.currentRole || session.role;
-      if (role !== "Admin" && role !== "Owner") {
+      const role = (session.currentRole || session.role || "").toLowerCase();
+      if (role !== "admin" && role !== "owner") {
         return res.status(403).json({ message: "Only Admin or Owner can void vouchers" });
       }
 
