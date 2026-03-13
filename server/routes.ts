@@ -14970,32 +14970,17 @@ if (asOfDate) {
                 .from(stockTransferItems)
                 .where(eq(stockTransferItems.transferId, transfer.id));
 
-              // Validate legacy transfers
-              const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
-              if (itemsWithoutSource.length > 0) {
-                throw new Error(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data.`);
-              }
-
               for (const item of items) {
+                const sourceLocId = item.sourceLocationId ?? transfer.sourceLocationId;
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
                 const totalAmount = quantity * rate;
 
                 if (willBeOptional) {
-                  // Reversing: was active (false), now making optional (true)
-                  // Add back to source, subtract from destination
-                  
-                  // Add back to source
-                  await adjustInventory(tx, item.sourceLocationId!, item.stockItemId, quantity, existingVoucher.companyId, rate);
-
-                  // Subtract from destination
+                  await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, -quantity, existingVoucher.companyId);
                 } else {
-                  // Applying: was optional (true), now making active (false)
-                  // Subtract from source, add to destination
-
-                  // Subtract from source
-                  await adjustInventory(tx, item.sourceLocationId!, item.stockItemId, -quantity, existingVoucher.companyId);
+                  await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
 
                   // Add to destination
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
@@ -15201,24 +15186,16 @@ if (asOfDate) {
               .from(stockTransferItems)
               .where(eq(stockTransferItems.transferId, transfer.id));
 
-            // Validate legacy transfers
-            const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
-            if (itemsWithoutSource.length > 0) {
-              throw new ValidationError(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data. It was created before per-item source locations were tracked.`);
-            }
               for (const item of items) {
+                const sourceLocId = item.sourceLocationId ?? transfer.sourceLocationId;
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
 
                 if (willBeOptional) {
-                  // Reversing: was active (false), now making optional (true)
-                  // Add back to source, subtract from destination
-                  await adjustInventory(tx, item.sourceLocationId!, item.stockItemId, quantity, existingVoucher.companyId, rate);
+                  await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, -quantity, existingVoucher.companyId);
                 } else {
-                  // Applying: was optional (true), now making active (false)
-                  // Subtract from source, add to destination
-                  await adjustInventory(tx, item.sourceLocationId!, item.stockItemId, -quantity, existingVoucher.companyId);
+                  await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 }
               }

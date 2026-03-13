@@ -155,6 +155,9 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Marked as paid" });
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
@@ -172,6 +175,9 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Marked as paid", description: `${selectedIds.size} records updated` });
       setSelectedIds(new Set()); setBulkPayOpen(false); setBulkCashAccountId("");
     },
