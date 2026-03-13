@@ -42,6 +42,17 @@ if (!requiresSSL && !isLocalReplitDB) {
 const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+  // Connection pool limits — critical for Render's basic PostgreSQL plan (~25 max connections total).
+  // The session store uses its own separate pool, so keep this at 7 to leave headroom.
+  max: 7,
+  // Fail fast if no connection available within 4 seconds, rather than queuing indefinitely.
+  connectionTimeoutMillis: 4000,
+  // Release idle connections after 30 seconds to avoid holding unused slots.
+  idleTimeoutMillis: 30000,
+});
+
+pool.on('error', (err) => {
+  console.error('[DB Pool] Unexpected error on idle client:', err.message);
 });
 
 export const db = drizzle(pool, { schema });

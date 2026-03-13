@@ -899,31 +899,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const companyName = (req.session as any).currentCompanyName || null;
         const role = req.session.currentRole || null;
 
-        // Upsert presence record
-        const existing = await db.select().from(userPresence).where(eq(userPresence.sessionId, sessionId)).limit(1);
-        
-        if (existing.length > 0) {
-          await db.update(userPresence)
-            .set({
-              currentRoute: route,
-              companyId,
-              companyName,
-              role,
-              lastSeen: sql`now()`,
-            })
-            .where(eq(userPresence.sessionId, sessionId));
-        } else {
-          await db.insert(userPresence).values({
-            sessionId,
-            userId,
-            username,
+        // Single-query upsert — avoids the SELECT + conditional INSERT/UPDATE race condition
+        // and halves the number of DB round-trips per heartbeat.
+        await db.insert(userPresence).values({
+          sessionId,
+          userId,
+          username,
+          currentRoute: route,
+          companyId,
+          companyName,
+          role,
+          lastSeen: sql`now()`,
+        }).onConflictDoUpdate({
+          target: userPresence.sessionId,
+          set: {
             currentRoute: route,
             companyId,
             companyName,
             role,
             lastSeen: sql`now()`,
-          });
-        }
+          },
+        });
 
         res.json({ success: true });
       } catch (error: any) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 
-const HEARTBEAT_INTERVAL = 30000;
+const HEARTBEAT_INTERVAL = 60000;
 
 export function usePresence() {
   const [location] = useLocation();
