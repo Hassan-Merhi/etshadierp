@@ -88,10 +88,10 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
         effectiveDate: format(new Date(), "yyyy-MM-dd"),
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Today's exchange rate has been set" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
-      queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/check-today", companyId] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });

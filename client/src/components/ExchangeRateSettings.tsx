@@ -86,10 +86,10 @@ export function ExchangeRateSettings() {
         effectiveDate: data.effectiveDate,
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Exchange rate saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
-      queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
