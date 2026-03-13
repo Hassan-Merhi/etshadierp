@@ -3205,6 +3205,36 @@ export const insertFactoryAttendanceSchema = createInsertSchema(factoryAttendanc
 export type InsertFactoryAttendance = z.infer<typeof insertFactoryAttendanceSchema>;
 export type FactoryAttendance = typeof factoryAttendance.$inferSelect;
 
+export const factoryWorkerAdvances = pgTable("factory_worker_advances", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  workerId: integer("worker_id").notNull().references(() => factoryWorkers.id),
+  advanceDate: date("advance_date").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  notes: text("notes"),
+  payrollId: integer("payroll_id").references(() => factoryPayrolls.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_worker_advances_company_idx").on(t.companyId),
+  workerIdx: index("factory_worker_advances_worker_idx").on(t.workerId),
+  payrollIdx: index("factory_worker_advances_payroll_idx").on(t.payrollId),
+}));
+
+export const insertFactoryWorkerAdvanceSchema = createInsertSchema(factoryWorkerAdvances).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  workerId: z.number().min(1, "Worker is required"),
+  advanceDate: z.string().min(1, "Advance date is required"),
+  amount: z.string().min(1, "Amount is required"),
+  notes: z.string().optional().nullable(),
+  payrollId: z.number().optional().nullable(),
+});
+
+export type InsertFactoryWorkerAdvance = z.infer<typeof insertFactoryWorkerAdvanceSchema>;
+export type FactoryWorkerAdvance = typeof factoryWorkerAdvances.$inferSelect;
+
 export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

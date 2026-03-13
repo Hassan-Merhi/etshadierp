@@ -5,7 +5,7 @@ import { useRoute, useLocation } from "wouter";
 import {
   ArrowLeft, Upload, Pencil, UserX, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
-  FileText, FileImage, File, Trash2,
+  FileText, FileImage, File, Trash2, Banknote, Plus, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,6 +115,11 @@ export default function FactoryWorkerDetail() {
 
   const [editOpen, setEditOpen] = useState(false);
 
+  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [advanceNotes, setAdvanceNotes] = useState("");
+  const [showAdvanceForm, setShowAdvanceForm] = useState(false);
+
   const { data: worker, isLoading: workerLoading, error: workerError } = useQuery<WorkerWithStats>({
     queryKey: ["/api/factory/workers", workerId],
     queryFn: async () => {
@@ -183,6 +188,45 @@ export default function FactoryWorkerDetail() {
       const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
+  });
+
+  const { data: advances, isLoading: advancesLoading } = useQuery<FactoryWorkerAdvance[]>({
+    queryKey: ["/api/factory/workers", workerId, "advances"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/workers/${workerId}/advances`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch advances");
+      return res.json();
+    },
+    enabled: !!workerId,
+  });
+
+  const createAdvanceMutation = useMutation({
+    mutationFn: async (data: { advanceDate: string; amount: string; notes: string }) => {
+      const res = await apiRequest("POST", `/api/factory/workers/${workerId}/advances`, data);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
+      toast({ title: "Advance recorded" });
+      setAdvanceAmount("");
+      setAdvanceNotes("");
+      setShowAdvanceForm(false);
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteAdvanceMutation = useMutation({
+    mutationFn: async (advanceId: number) => {
+      const res = await fetch(`/api/factory/workers/${workerId}/advances/${advanceId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
+      toast({ title: "Advance deleted" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteDocMutation = useMutation({
@@ -449,6 +493,7 @@ export default function FactoryWorkerDetail() {
             <TabsList className="mb-4">
               <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
               <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
+              <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
               <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>
               <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
               <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
@@ -571,6 +616,7 @@ export default function FactoryWorkerDetail() {
                             <TableHead className="text-right">Base</TableHead>
                             <TableHead className="text-right">Bonus</TableHead>
                             <TableHead className="text-right">Deductions</TableHead>
+                            <TableHead className="text-right">Advances</TableHead>
                             <TableHead className="text-right">Net</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Paid On</TableHead>
@@ -588,6 +634,7 @@ export default function FactoryWorkerDetail() {
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.baseSalary)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.bonuses)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">${fmtNum(p.deductions)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">${fmtNum(p.advances)}</TableCell>
                                 <TableCell className="text-right font-mono text-sm font-semibold">${fmtNum(p.netSalary)}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>

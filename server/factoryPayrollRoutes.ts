@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { eq, and, sql, gte, lte, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, gte, lte, desc, inArray, isNull } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
 import {
@@ -8,6 +8,7 @@ import {
   factoryBales,
   factoryDaybookEntries,
   factoryAttendance,
+  factoryWorkerAdvances,
   companies,
   insertFactoryPayrollSchema,
 } from "@shared/schema";
@@ -112,6 +113,24 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         attendanceByWorker.set(att.workerId, existing);
       }
 
+      const undeductedAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            isNull(factoryWorkerAdvances.payrollId),
+            gte(factoryWorkerAdvances.advanceDate, startDate),
+            lte(factoryWorkerAdvances.advanceDate, endDate)
+          )
+        );
+      const advancesByWorker = new Map<number, any[]>();
+      for (const adv of undeductedAdvances) {
+        const existing = advancesByWorker.get(adv.workerId) || [];
+        existing.push(adv);
+        advancesByWorker.set(adv.workerId, existing);
+      }
+
       const periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
       const monthDays = daysInMonth(startDate);
@@ -179,7 +198,8 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         const overtimePay = overtimeHours * workerOvertimeRate;
         const bonuses = 0;
         const deductions = 0;
-        const advances = 0;
+        const workerAdvances = advancesByWorker.get(worker.id) || [];
+        const advances = workerAdvances.reduce((sum: number, a: any) => sum + parseFloat(a.amount || "0"), 0);
         const netSalary = basePay + baleEarnings + kgEarnings + overtimePay + bonuses - deductions - advances;
 
         const [record] = await db.insert(factoryPayrolls).values({
@@ -203,6 +223,13 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           absentDays: String(absentDays.toFixed(1)),
           status: "DRAFT",
         }).returning();
+
+        if (workerAdvances.length > 0) {
+          const advanceIds = workerAdvances.map((a: any) => a.id);
+          await db.update(factoryWorkerAdvances)
+            .set({ payrollId: record.id })
+            .where(inArray(factoryWorkerAdvances.id, advanceIds));
+        }
 
         payrollRecords.push(record);
       }

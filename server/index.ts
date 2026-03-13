@@ -339,6 +339,19 @@ app.use((req, res, next) => {
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS source_id integer`,
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS quantity_kg decimal(15,3)`,
     `ALTER TABLE factory_mix_batch_sources ADD COLUMN IF NOT EXISTS notes text`,
+    `CREATE TABLE IF NOT EXISTS factory_worker_advances (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      worker_id integer NOT NULL REFERENCES factory_workers(id),
+      advance_date date NOT NULL,
+      amount decimal(20, 2) NOT NULL,
+      notes text,
+      payroll_id integer REFERENCES factory_payrolls(id),
+      created_at timestamp DEFAULT now() NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_worker_advances_company_idx ON factory_worker_advances (company_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_worker_advances_worker_idx ON factory_worker_advances (worker_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_worker_advances_payroll_idx ON factory_worker_advances (payroll_id)`,
     // Live spreadsheet links (shared Google Sheet / external links)
     `CREATE TABLE IF NOT EXISTS live_spreadsheets (
       id serial PRIMARY KEY,

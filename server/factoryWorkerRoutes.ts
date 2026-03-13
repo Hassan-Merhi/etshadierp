@@ -13,6 +13,7 @@ import {
   factoryPayrolls,
   factoryWorkerDocuments,
   factoryWorkerAdvances,
+  factoryAttendance,
   ledgerAccounts,
 } from "@shared/schema";
 
@@ -352,6 +353,33 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         description: `New worker created: ${worker.fullName} (${worker.employeeCode})`,
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
+
+      const now = new Date();
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+      const joinDate = worker.dateJoined ? new Date(worker.dateJoined) : now;
+      const absentEnd = new Date(joinDate);
+      absentEnd.setDate(absentEnd.getDate() - 1);
+
+      if (absentEnd >= yearStart) {
+        const absentRecords: any[] = [];
+        const cursor = new Date(yearStart);
+        while (cursor <= absentEnd) {
+          absentRecords.push({
+            companyId,
+            workerId: worker.id,
+            attendanceDate: cursor.toISOString().split("T")[0],
+            status: "Absent",
+            notes: "Auto-absent (pre-join)",
+          });
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        if (absentRecords.length > 0) {
+          const BATCH = 500;
+          for (let i = 0; i < absentRecords.length; i += BATCH) {
+            await db.insert(factoryAttendance).values(absentRecords.slice(i, i + BATCH)).onConflictDoNothing();
+          }
+        }
+      }
 
       res.json(worker);
     } catch (error: any) {
