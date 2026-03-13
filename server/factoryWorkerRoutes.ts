@@ -15,6 +15,8 @@ import {
   factoryWorkerAdvances,
   factoryAttendance,
   ledgerAccounts,
+  vouchers,
+  voucherEntries,
 } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
@@ -1099,27 +1101,95 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
       }
 
-      const [advance] = await db.insert(factoryWorkerAdvances).values({
-        companyId, workerId, advanceDate,
-        amount: amount.toFixed(2),
-        remainingBalance: amount.toFixed(2),
-        cashAccountId,
-        notes: req.body.notes || null,
-      }).returning();
+      const result = await db.transaction(async (tx: any) => {
+        const [advance] = await tx.insert(factoryWorkerAdvances).values({
+          companyId, workerId, advanceDate,
+          amount: amount.toFixed(2),
+          remainingBalance: amount.toFixed(2),
+          cashAccountId,
+          notes: req.body.notes || null,
+        }).returning();
 
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: advanceDate,
-        txType: "ADVANCE_GIVEN",
-        referenceId: advance.id,
-        referenceTable: "factory_worker_advances",
-        description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
-        amountCurrency: amount,
-        amountUsd: amount,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        let voucherId: number | null = null;
+
+        if (cashAccountId) {
+          let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.name, "Factory Worker Advances"),
+            ));
+
+          if (!advancesAccount) {
+            const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .from(ledgerAccounts)
+              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+            const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+
+            [advancesAccount] = await tx.insert(ledgerAccounts).values({
+              companyId,
+              code: nextCode,
+              name: "Factory Worker Advances",
+              accountType: "Asset",
+              active: true,
+              isHidden: false,
+            }).returning();
+          }
+
+          const voucherNumber = `PAYMENT-ADV-${advance.id}-${Date.now()}`;
+          const narration = `Advance to ${worker.fullName}: $${amount.toFixed(2)}`;
+
+          const [createdVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber,
+            voucherType: "Payment",
+            voucherDate: advanceDate,
+            description: narration,
+            totalAmount: amount.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          }).returning();
+
+          voucherId = createdVoucher.id;
+
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: createdVoucher.id,
+              ledgerAccountId: advancesAccount.id,
+              debitAmount: amount.toFixed(2),
+              creditAmount: "0",
+              narration,
+            },
+            {
+              voucherId: createdVoucher.id,
+              ledgerAccountId: cashAccountId,
+              debitAmount: "0",
+              creditAmount: amount.toFixed(2),
+              narration,
+            },
+          ]);
+
+          await tx.update(factoryWorkerAdvances)
+            .set({ voucherId })
+            .where(eq(factoryWorkerAdvances.id, advance.id));
+        }
+
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: advanceDate,
+          txType: "ADVANCE_GIVEN",
+          referenceId: advance.id,
+          referenceTable: "factory_worker_advances",
+          description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
+          amountCurrency: amount,
+          amountUsd: amount,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
+
+        return { ...advance, voucherId, workerName: worker.fullName };
       });
 
-      res.json({ ...advance, workerName: worker.fullName });
+      res.json(result);
     } catch (error: any) {
       console.error("Error creating advance:", error);
       res.status(500).json({ message: error.message });

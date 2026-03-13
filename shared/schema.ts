@@ -3708,6 +3708,7 @@ export const factoryWorkerAdvances = pgTable("factory_worker_advances", {
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   remainingBalance: decimal("remaining_balance", { precision: 15, scale: 2 }).notNull(),
   cashAccountId: integer("cash_account_id"),
+  voucherId: integer("voucher_id"),
   notes: text("notes"),
   fullyPaid: boolean("fully_paid").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -3726,6 +3727,7 @@ export const insertFactoryWorkerAdvanceSchema = createInsertSchema(factoryWorker
   amount: z.string().min(1, "Amount is required"),
   remainingBalance: z.string().optional(),
   cashAccountId: z.number().optional().nullable(),
+  voucherId: z.number().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
