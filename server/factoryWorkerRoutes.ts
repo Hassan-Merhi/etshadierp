@@ -851,28 +851,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           .returning();
         if (!payroll) throw new Error("Payroll record not found");
 
-        const advanceDeducted = parseFloat(payroll.advances || "0");
-        if (advanceDeducted > 0) {
-          const outstanding = await tx.select().from(factoryWorkerAdvances)
-            .where(and(
-              eq(factoryWorkerAdvances.companyId, companyId),
-              eq(factoryWorkerAdvances.workerId, payroll.workerId),
-              eq(factoryWorkerAdvances.fullyPaid, false),
-            ))
-            .orderBy(factoryWorkerAdvances.advanceDate);
-          let remaining = advanceDeducted;
-          for (const adv of outstanding) {
-            if (remaining <= 0) break;
-            const bal = parseFloat(adv.remainingBalance || "0");
-            const reduce = Math.min(bal, remaining);
-            const newBal = bal - reduce;
-            await tx.update(factoryWorkerAdvances).set({
-              remainingBalance: newBal.toFixed(2),
-              fullyPaid: newBal <= 0,
-            }).where(eq(factoryWorkerAdvances.id, adv.id));
-            remaining -= reduce;
-          }
-        }
+        await settleAdvancesForPayroll(tx, companyId, payroll.workerId, parseFloat(payroll.advances || "0"));
 
         const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
           .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
@@ -898,6 +877,29 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  async function settleAdvancesForPayroll(tx: any, companyId: number, workerId: number, advanceAmount: number) {
+    if (advanceAmount <= 0) return;
+    const outstanding = await tx.select().from(factoryWorkerAdvances)
+      .where(and(
+        eq(factoryWorkerAdvances.companyId, companyId),
+        eq(factoryWorkerAdvances.workerId, workerId),
+        eq(factoryWorkerAdvances.fullyPaid, false),
+      ))
+      .orderBy(factoryWorkerAdvances.advanceDate);
+    let remaining = advanceAmount;
+    for (const adv of outstanding) {
+      if (remaining <= 0) break;
+      const bal = parseFloat(adv.remainingBalance || "0");
+      const reduce = Math.min(bal, remaining);
+      const newBal = bal - reduce;
+      await tx.update(factoryWorkerAdvances).set({
+        remainingBalance: newBal.toFixed(2),
+        fullyPaid: newBal <= 0,
+      }).where(eq(factoryWorkerAdvances.id, adv.id));
+      remaining -= reduce;
+    }
+  }
+
   // POST /api/factory/payrolls/mark-paid-bulk - Mark multiple payrolls as paid
   app.post("/api/factory/payrolls/mark-paid-bulk", requireAuth, async (req: any, res: any) => {
     try {
@@ -906,16 +908,29 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const { payrollIds, cashAccountId } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;
-      await db.update(factoryPayrolls)
-        .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
-        .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
-      const bulkPrToday = new Date().toISOString().split("T")[0];
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: bulkPrToday,
-        txType: "PAYROLL_PAYMENT",
-        description: `Payroll bulk paid: ${payrollIds.length} worker${payrollIds.length !== 1 ? "s" : ""}`,
+
+      await db.transaction(async (tx: any) => {
+        const payrollsToMark = await tx.select().from(factoryPayrolls)
+          .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
+
+        await tx.update(factoryPayrolls)
+          .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
+          .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
+
+        for (const pr of payrollsToMark) {
+          const advAmt = parseFloat(pr.advances || "0");
+          await settleAdvancesForPayroll(tx, companyId, pr.workerId, advAmt);
+        }
+
+        const bulkPrToday = new Date().toISOString().split("T")[0];
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: bulkPrToday,
+          txType: "PAYROLL_PAYMENT",
+          description: `Payroll bulk paid: ${payrollIds.length} worker${payrollIds.length !== 1 ? "s" : ""}`,
+        });
       });
+
       res.json({ updated: payrollIds.length });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1049,6 +1064,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const advanceDate = req.body.advanceDate || new Date().toISOString().split("T")[0];
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
 
+      if (cashAccountId) {
+        const [acct] = await db.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+        if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
+      }
+
       const [advance] = await db.insert(factoryWorkerAdvances).values({
         companyId, workerId, advanceDate,
         amount: amount.toFixed(2),
@@ -1076,9 +1098,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
-  // PATCH /api/factory/advances/:id - Edit advance (notes/date only)
+  // PATCH /api/factory/advances/:id - Edit advance (admin/owner only)
   app.patch("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
     try {
+      const currentRole = (req.session as any).currentRole;
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can edit advances" });
+      }
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
@@ -1099,9 +1125,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
-  // DELETE /api/factory/advances/:id - Delete advance
+  // DELETE /api/factory/advances/:id - Delete advance (admin/owner only)
   app.delete("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
     try {
+      const currentRole = (req.session as any).currentRole;
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can delete advances" });
+      }
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
