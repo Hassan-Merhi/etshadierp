@@ -172,7 +172,7 @@ export default function FactoryWorkerDetail() {
     enabled: !!workerId,
   });
 
-  const { data: workerAdvances } = useQuery<FactoryWorkerAdvance[]>({
+  const { data: workerAdvances, isLoading: advancesLoading } = useQuery<FactoryWorkerAdvance[]>({
     queryKey: ["/api/factory/workers", workerId, "advances"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/workers/${workerId}/advances`, { credentials: "include" });
@@ -188,16 +188,6 @@ export default function FactoryWorkerDetail() {
       const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
-  });
-
-  const { data: advances, isLoading: advancesLoading } = useQuery<FactoryWorkerAdvance[]>({
-    queryKey: ["/api/factory/workers", workerId, "advances"],
-    queryFn: async () => {
-      const res = await fetch(`/api/factory/workers/${workerId}/advances`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch advances");
-      return res.json();
-    },
-    enabled: !!workerId,
   });
 
   const createAdvanceMutation = useMutation({
@@ -218,7 +208,7 @@ export default function FactoryWorkerDetail() {
 
   const deleteAdvanceMutation = useMutation({
     mutationFn: async (advanceId: number) => {
-      const res = await fetch(`/api/factory/workers/${workerId}/advances/${advanceId}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`/api/factory/advances/${advanceId}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
       return res.json();
     },

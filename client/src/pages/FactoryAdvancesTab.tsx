@@ -67,6 +67,7 @@ export default function FactoryAdvancesTab() {
       if (filterStatus !== "all") params.set("status", filterStatus);
       const url = `/api/factory/advances${params.toString() ? `?${params}` : ""}`;
       const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to load advances"); }
       return res.json();
     },
   });
@@ -123,13 +124,13 @@ export default function FactoryAdvancesTab() {
   });
 
   const filtered = useMemo(() => {
-    let list = advances || [];
+    let list = Array.isArray(advances) ? advances : [];
     if (filterWorker !== "all") list = list.filter((a) => a.workerId === parseInt(filterWorker));
     return list;
   }, [advances, filterWorker]);
 
   const stats = useMemo(() => {
-    const all = advances || [];
+    const all = Array.isArray(advances) ? advances : [];
     const totalGiven = all.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
     const totalOutstanding = all.filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
     const outstandingCount = all.filter((a) => !a.fullyPaid).length;
