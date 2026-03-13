@@ -837,9 +837,9 @@ export default function FactoryDaybook() {
       <AlertDialog open={voidEntry !== null} onOpenChange={(open) => { if (!open) setVoidEntry(null); }}>
         <AlertDialogContent data-testid="dialog-void-voucher">
           <AlertDialogHeader>
-            <AlertDialogTitle>Void this voucher?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will reverse all accounting entries for this voucher and remove it from the daybook. This action cannot be undone.
+              This will reverse all accounting entries. This action cannot be undone.
               {voidEntry && (
                 <span className="block mt-2 font-medium text-foreground">
                   {voidEntry.description}

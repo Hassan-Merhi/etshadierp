@@ -10167,6 +10167,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} IS NULL`));
       if (!voucher) return res.status(404).json({ message: "Voucher not found or already voided" });
 
+      if (!["Payment", "Receipt", "Journal"].includes(voucher.voucherType)) {
+        return res.status(400).json({ message: `Cannot void ${voucher.voucherType} vouchers from the daybook` });
+      }
+
       const vNum = voucher.voucherNumber || "";
       const voucherTxTypeMap: Record<string, string> = { Payment: "PAYMENT", Receipt: "RECEIPT", Journal: "JOURNAL" };
       const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
