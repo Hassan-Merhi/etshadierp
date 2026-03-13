@@ -182,7 +182,7 @@ export default function FactoryPayrollTab() {
       if (freq === "Weekly") calc = (days / 7) * parseFloat((w as any).weeklySalary || base.toString());
       else if (freq === "Bi-Weekly") calc = (days / 14) * parseFloat((w as any).biWeeklySalary || base.toString());
       else if (freq === "Daily" || w.salaryType === "Daily") calc = days * base;
-      else calc = base * (days / daysInMonth);
+      else calc = base;
       const net = calc + bonus;
       return { id: w.id, name: w.fullName, position: w.position, base: calc, bonus, net };
     });

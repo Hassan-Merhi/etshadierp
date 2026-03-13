@@ -171,11 +171,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
         switch (worker.salaryType) {
           case "Monthly":
-            if (hasAttendance) {
-              basePay = (workerBaseSalary / monthDays) * presentDays;
-            } else {
-              basePay = workerBaseSalary * (periodDays / monthDays);
-            }
+            basePay = workerBaseSalary;
             break;
           case "Daily":
             if (hasAttendance) {
