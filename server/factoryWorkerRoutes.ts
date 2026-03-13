@@ -887,6 +887,57 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
         const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
         const prToday = new Date().toISOString().split("T")[0];
+
+        if (cashAccountId) {
+          let [payrollAccount] = await tx.select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Payroll")));
+
+          if (!payrollAccount) {
+            const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .from(ledgerAccounts)
+              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+            const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
+            [payrollAccount] = await tx.insert(ledgerAccounts).values({
+              companyId, code: nextCode,
+              name: "Factory Worker Payroll",
+              accountType: "Expense",
+              active: true, isHidden: false,
+            }).returning();
+          }
+
+          const netAmt = parseFloat(payroll.netSalary || "0");
+          const narration = `Payroll: ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
+
+          const [pVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
+            voucherType: "Payment",
+            voucherDate: prToday,
+            description: narration,
+            totalAmount: netAmt.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          }).returning();
+
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: pVoucher.id,
+              ledgerAccountId: payrollAccount.id,
+              debitAmount: netAmt.toFixed(2),
+              creditAmount: "0",
+              narration,
+            },
+            {
+              voucherId: pVoucher.id,
+              ledgerAccountId: cashAccountId,
+              debitAmount: "0",
+              creditAmount: netAmt.toFixed(2),
+              narration,
+            },
+          ]);
+        }
+
         await writeDaybookEntry(tx, {
           companyId,
           txDate: prToday,
@@ -947,12 +998,74 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           .set({ status: "PAID", paidAt: new Date(), cashAccountId: cashId } as any)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
 
+        const bulkPrToday = new Date().toISOString().split("T")[0];
+
+        let payrollAccount: { id: number } | undefined;
+        if (cashId) {
+          let [found] = await tx.select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Payroll")));
+
+          if (!found) {
+            const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+              .from(ledgerAccounts)
+              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+            const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
+            [found] = await tx.insert(ledgerAccounts).values({
+              companyId, code: nextCode,
+              name: "Factory Worker Payroll",
+              accountType: "Expense",
+              active: true, isHidden: false,
+            }).returning();
+          }
+          payrollAccount = found;
+        }
+
+        const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];
+        const workerRows = await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+          .from(factoryWorkers)
+          .where(inArray(factoryWorkers.id, workerIds));
+        const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
+
         for (const pr of payrollsToMark) {
           const advAmt = parseFloat(pr.advances || "0");
           await settleAdvancesForPayroll(tx, companyId, pr.workerId, advAmt);
+
+          if (cashId && payrollAccount) {
+            const netAmt = parseFloat(pr.netSalary || "0");
+            const workerName = (workerMap.get(pr.workerId) as string)?.trim() || `Worker #${pr.workerId}`;
+            const narration = `Payroll: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
+
+            const [pVoucher] = await tx.insert(vouchers).values({
+              companyId,
+              voucherNumber: `PAYMENT-PAY-${pr.id}-${Date.now()}`,
+              voucherType: "Payment",
+              voucherDate: bulkPrToday,
+              description: narration,
+              totalAmount: netAmt.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            }).returning();
+
+            await tx.insert(voucherEntries).values([
+              {
+                voucherId: pVoucher.id,
+                ledgerAccountId: payrollAccount.id,
+                debitAmount: netAmt.toFixed(2),
+                creditAmount: "0",
+                narration,
+              },
+              {
+                voucherId: pVoucher.id,
+                ledgerAccountId: cashId,
+                debitAmount: "0",
+                creditAmount: netAmt.toFixed(2),
+                narration,
+              },
+            ]);
+          }
         }
 
-        const bulkPrToday = new Date().toISOString().split("T")[0];
         await writeDaybookEntry(tx, {
           companyId,
           txDate: bulkPrToday,
