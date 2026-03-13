@@ -1860,6 +1860,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get(
+    "/api/locations/:locationId/inventory-rates",
+    requireAuth,
+    checkPOSLocation,
+    async (req, res) => {
+      try {
+        const locationId = parseInt(req.params.locationId);
+        if (isNaN(locationId)) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
+
+        const location = await storage.getLocationById(locationId);
+        if (!location) {
+          return res.status(404).json({ message: "Location not found" });
+        }
+        if (location.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+        }
+
+        const stockItemIdsParam = req.query.stockItemIds as string;
+        if (!stockItemIdsParam) {
+          return res.status(400).json({ message: "stockItemIds query parameter is required" });
+        }
+        const stockItemIds = stockItemIdsParam.split(",").map(Number).filter(n => !isNaN(n) && n > 0);
+        if (stockItemIds.length === 0) {
+          return res.json([]);
+        }
+
+        const rows = await db
+          .select({
+            stockItemId: inventory.stockItemId,
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+            totalValue: inventory.totalValue,
+            stockItemName: stockItems.name,
+          })
+          .from(inventory)
+          .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+          .where(
+            and(
+              eq(inventory.locationId, locationId),
+              inArray(inventory.stockItemId, stockItemIds)
+            )
+          );
+
+        res.json(rows);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Location Inventory - Get inventory for a specific location
   app.get(
     "/api/locations/:locationId/inventory",
@@ -11027,6 +11079,7 @@ if (asOfDate) {
           transportFees,
           transportAccountId,
           additionalCharges = [],
+          inventoryCostCorrections = [],
         } = validation.data;
 
         // Validate container exists
@@ -11150,6 +11203,7 @@ if (asOfDate) {
           transportAccountId,
           additionalCharges,
           offloadDate,
+          inventoryCostCorrections,
         );
 
         res.json(offload);

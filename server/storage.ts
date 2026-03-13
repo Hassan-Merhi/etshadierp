@@ -208,7 +208,8 @@ export interface IStorage {
     transportFees: string,
     transportAccountId: number | null | undefined,
     additionalCharges?: Array<{ description: string; amount: number; ledgerAccountId: number }>,
-    offloadDate?: string
+    offloadDate?: string,
+    inventoryCostCorrections?: Array<{ stockItemId: number; correctRate: number }>
   ): Promise<ContainerOffload>;
 
   // Vouchers and Journal Entries
@@ -2154,7 +2155,8 @@ export class DbStorage implements IStorage {
     transportFees: string,
     transportAccountId: number | null | undefined,
     additionalCharges: Array<{ description: string; amount: number; ledgerAccountId: number }> = [],
-    offloadDate?: string
+    offloadDate?: string,
+    inventoryCostCorrections: Array<{ stockItemId: number; correctRate: number }> = []
   ): Promise<ContainerOffload> {
     // Get container to access PO charges (freight + otherCharges from purchase orders)
     const container = await this.getContainerById(containerId);
@@ -2248,6 +2250,37 @@ export class DbStorage implements IStorage {
     // Add inventory to destination location with weighted average cost
     // Wrapped in a DB transaction for atomicity
     const offload = await db.transaction(async (tx) => {
+    // Apply inventory cost corrections BEFORE adding new container stock
+    const validCorrectionItemIds = new Set(itemsMap.keys());
+    if (inventoryCostCorrections.length > 0) {
+      for (const correction of inventoryCostCorrections) {
+        if (correction.correctRate <= 0) continue;
+        if (!validCorrectionItemIds.has(correction.stockItemId)) {
+          console.warn(`[Offload] Skipping cost correction for stockItem=${correction.stockItemId}: not in container's line items`);
+          continue;
+        }
+        const correctionRows = await (tx as any).execute(
+          sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${correction.stockItemId} FOR UPDATE`
+        );
+        const corrRow = correctionRows.rows?.[0] || correctionRows[0];
+        if (corrRow) {
+          const existingQty = parseFloat(corrRow.quantity);
+          if (existingQty > 0) {
+            const newTotalValue = existingQty * correction.correctRate;
+            await tx
+              .update(schema.inventory)
+              .set({
+                averageRate: correction.correctRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, corrRow.id));
+            console.log(`[Offload] Cost correction: stockItem=${correction.stockItemId}, qty=${existingQty}, oldRate=${corrRow.average_rate}, newRate=${correction.correctRate}, newTotal=${newTotalValue.toFixed(2)}`);
+          }
+        }
+      }
+    }
+
     for (let i = 0; i < itemsArray.length; i++) {
       const [stockItemId, data] = itemsArray[i];
       const isLastItem = i === lastItemIndex;

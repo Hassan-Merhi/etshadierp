@@ -689,6 +689,10 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
     amount: z.number().min(0, "Amount must be non-negative"),
     ledgerAccountId: z.number().min(1, "Ledger account is required"),
   })).optional(),
+  inventoryCostCorrections: z.array(z.object({
+    stockItemId: z.number().min(1),
+    correctRate: z.number().min(0),
+  })).optional(),
 });
 
 export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema>;

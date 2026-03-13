@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -35,9 +35,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, X, Check, ChevronsUpDown, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { Location } from "@shared/schema";
 
 interface OffloadDialogProps {
@@ -195,6 +200,13 @@ export function OffloadDialog({
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
+  const [costCorrections, setCostCorrections] = useState<Record<number, string>>({});
+  const [correctionSectionOpen, setCorrectionSectionOpen] = useState(false);
+
+  useEffect(() => {
+    setCostCorrections({});
+    setCorrectionSectionOpen(false);
+  }, [open, containerId, locationId]);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -210,6 +222,31 @@ export function OffloadDialog({
     queryKey: [`/api/containers/${containerId}`],
     enabled: open && !!containerId,
   });
+
+  const containerStockItemIds = (() => {
+    if (!containerData?.pos) return [];
+    const ids = new Set<number>();
+    for (const po of containerData.pos) {
+      if (po.items) {
+        for (const item of po.items) {
+          if (item.stockItemId && item.stockItemId > 0) ids.add(item.stockItemId);
+        }
+      }
+    }
+    return Array.from(ids);
+  })();
+
+  const { data: inventoryRates = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations", locationId, "inventory-rates", containerStockItemIds.join(",")],
+    queryFn: async () => {
+      if (!locationId || containerStockItemIds.length === 0) return [];
+      const res = await factoryApiRequest("GET", `/api/locations/${locationId}/inventory-rates?stockItemIds=${containerStockItemIds.join(",")}`);
+      return res.json();
+    },
+    enabled: open && !!locationId && containerStockItemIds.length > 0,
+  });
+
+  const hasExistingInventory = inventoryRates.some((r: any) => parseFloat(r.quantity) > 0);
 
   // Calculate PO charges (freight, document charges, etc.) from charges array
   let poChargesTotal = 0;
@@ -314,6 +351,12 @@ export function OffloadDialog({
               description: charge.description,
               amount: parseFloat(charge.amount),
               ledgerAccountId: parseInt(charge.ledgerAccountId),
+            })),
+          inventoryCostCorrections: Object.entries(costCorrections)
+            .filter(([, rate]) => parseFloat(rate) > 0)
+            .map(([stockItemId, rate]) => ({
+              stockItemId: parseInt(stockItemId),
+              correctRate: parseFloat(rate),
             })),
         }
       );
@@ -543,6 +586,70 @@ export function OffloadDialog({
               testId="select-location"
             />
           </div>
+
+          {/* Inventory Cost Correction (Advanced) */}
+          {hasExistingInventory && locationId && (
+            <Collapsible
+              open={correctionSectionOpen}
+              onOpenChange={setCorrectionSectionOpen}
+              className="space-y-2 pt-2 border-t"
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-between gap-2"
+                  data-testid="button-toggle-cost-correction"
+                >
+                  <span className="text-sm font-medium">Inventory Cost Correction (Advanced)</span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", correctionSectionOpen && "rotate-180")} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Use the closing rate from your monthly location summary to correct existing inventory costs before offloading.
+                </p>
+                {inventoryRates
+                  .filter((r: any) => parseFloat(r.quantity) > 0)
+                  .map((r: any) => (
+                    <div key={r.stockItemId} className="rounded-md border p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-sm font-medium" data-testid={`text-correction-item-${r.stockItemId}`}>{r.stockItemName}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                        <div>
+                          <span>Qty: </span>
+                          <span className="font-medium" data-testid={`text-correction-qty-${r.stockItemId}`}>{formatNumber(parseFloat(r.quantity))}</span>
+                        </div>
+                        <div>
+                          <span>Avg Rate: </span>
+                          <span className="font-medium" data-testid={`text-correction-rate-${r.stockItemId}`}>${formatNumber(parseFloat(r.averageRate))}</span>
+                        </div>
+                        <div>
+                          <span>Total: </span>
+                          <span className="font-medium">${formatNumber(parseFloat(r.totalValue))}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Correct rate to ($ per unit)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Leave empty to keep current rate"
+                          value={costCorrections[r.stockItemId] || ""}
+                          onChange={(e) => setCostCorrections(prev => ({
+                            ...prev,
+                            [r.stockItemId]: e.target.value,
+                          }))}
+                          data-testid={`input-correct-rate-${r.stockItemId}`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Calculation Summary */}
           <div className="rounded-md border p-4 space-y-2 bg-muted/50">
