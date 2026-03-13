@@ -1412,18 +1412,30 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const [worker] = await db.select({ fullName: factoryWorkers.fullName })
         .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
 
-      await db.delete(factoryWorkerAdvances)
-        .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
-
       const today = new Date().toISOString().split("T")[0];
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: today,
-        txType: "ADVANCE_DELETED",
-        referenceId: id,
-        referenceTable: "factory_worker_advances",
-        description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}`,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+
+      await db.transaction(async (tx: any) => {
+        const repayments = await tx.select().from(factoryAdvanceRepayments)
+          .where(eq(factoryAdvanceRepayments.advanceId, id));
+
+        if (repayments.length > 0) {
+          await tx.delete(factoryAdvanceRepayments)
+            .where(eq(factoryAdvanceRepayments.advanceId, id));
+        }
+
+        await tx.delete(factoryWorkerAdvances)
+          .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
+
+        const repayNote = repayments.length > 0 ? ` (${repayments.length} repayment(s) also removed)` : "";
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: today,
+          txType: "ADVANCE_DELETED",
+          referenceId: id,
+          referenceTable: "factory_worker_advances",
+          description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}${repayNote}`,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
       });
 
       res.json({ message: "Advance deleted" });

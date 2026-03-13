@@ -10199,8 +10199,40 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
         } else if (payPayMatch) {
           const payrollId = parseInt(payPayMatch[1]);
+          const [payroll] = await tx.select().from(factoryPayrolls)
+            .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
+
           await tx.update(factoryPayrolls).set({ status: "DRAFT", cashAccountId: null, paidAt: null })
             .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
+
+          if (payroll) {
+            const advAmt = parseFloat(payroll.advances || "0");
+            if (advAmt > 0) {
+              const workerAdvances = await tx.select().from(factoryWorkerAdvances)
+                .where(and(
+                  eq(factoryWorkerAdvances.companyId, companyId),
+                  eq(factoryWorkerAdvances.workerId, payroll.workerId),
+                  eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
+                ))
+                .orderBy(desc(factoryWorkerAdvances.advanceDate));
+
+              let toRestore = advAmt;
+              for (const adv of workerAdvances) {
+                if (toRestore <= 0) break;
+                const bal = parseFloat(adv.remainingBalance || "0");
+                const originalAmt = parseFloat(adv.amount || "0");
+                const room = originalAmt - bal;
+                if (room <= 0) continue;
+                const restoreAmt = Math.min(room, toRestore);
+                const newBal = bal + restoreAmt;
+                await tx.update(factoryWorkerAdvances).set({
+                  remainingBalance: newBal.toFixed(2),
+                  fullyPaid: false,
+                }).where(eq(factoryWorkerAdvances.id, adv.id));
+                toRestore -= restoreAmt;
+              }
+            }
+          }
         } else if (repayMatch) {
           const repaymentId = parseInt(repayMatch[1]);
           const [repayment] = await tx.select().from(factoryAdvanceRepayments)
