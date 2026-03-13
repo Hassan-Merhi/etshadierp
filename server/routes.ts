@@ -16454,6 +16454,16 @@ if (asOfDate) {
           .where(eq(vouchers.id, id))
           .returning();
 
+        if (voucher.voucherDate) {
+          const { factoryDaybookEntries: fde } = await import("@shared/schema");
+          await db.update(fde)
+            .set({ txDate: voucher.voucherDate })
+            .where(and(
+              eq(fde.referenceTable, "vouchers"),
+              eq(fde.referenceId, id)
+            ));
+        }
+
         // Delete all existing entries
         await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
