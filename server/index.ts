@@ -116,9 +116,9 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
       // Keep session pool small to stay within Render's connection limit.
-      // No connectionTimeoutMillis here — session connections need to be reliable;
-      // the main pool timeout handles cascade failure prevention.
+      // Main pool: 7, session pool: 4 — total 11, well within Render's 25 limit.
       max: 4,
+      connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
     },
     createTableIfMissing: true,

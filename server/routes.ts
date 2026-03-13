@@ -855,105 +855,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User Presence tracking endpoints
   // GET: Fetch all active users (Admin/Owner/Manager only)
+  // Uses TTL-based filtering (WHERE lastSeen > 2 min ago) in a single SELECT —
+  // no blocking DELETE before fetch. Stale-row cleanup runs fire-and-forget separately.
   app.get(
     "/api/user-presence",
     requireAuth,
     async (req, res) => {
+      const userRole = req.session.currentRole;
+      if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
+        return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
+      }
+
       try {
-        // Check if user has admin/owner/manager role
-        const userRole = req.session.currentRole;
-        if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
-          return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
-        }
-
-        // Clean up stale records (older than 2 minutes)
         const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-        await db.delete(userPresence).where(lt(userPresence.lastSeen, twoMinutesAgo));
 
-        // Fetch active users
-        const activeUsers = await db.select().from(userPresence).orderBy(desc(userPresence.lastSeen));
+        // Single SELECT with WHERE — no blocking cleanup step.
+        const activeUsers = await db
+          .select()
+          .from(userPresence)
+          .where(gt(userPresence.lastSeen, twoMinutesAgo))
+          .orderBy(desc(userPresence.lastSeen));
+
         res.json(activeUsers);
+
+        // Fire-and-forget stale row cleanup; never blocks the response.
+        db.delete(userPresence)
+          .where(lt(userPresence.lastSeen, twoMinutesAgo))
+          .catch((err: any) => console.error("[Presence] Stale cleanup error:", err.message));
       } catch (error: any) {
-        console.error("Error fetching active users:", error);
+        console.error("[Presence] Error fetching active users:", error.message);
         res.status(500).json({ message: error.message });
       }
     }
   );
 
-  // PATCH: Update user presence (heartbeat)
+  // PATCH: Update user presence (heartbeat / route change)
+  // Returns 204 silently on DB failure — presence is non-critical.
   app.patch(
     "/api/user-presence",
     requireAuth,
     async (req, res) => {
-      try {
-        const parseResult = updatePresenceSchema.safeParse(req.body);
-        if (!parseResult.success) {
-          return res.status(400).json({ message: "Invalid request body" });
-        }
+      const parseResult = updatePresenceSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid request body" });
+      }
 
-        const { route } = parseResult.data;
-        const sessionId = req.sessionID;
-        const userId = req.user!.id;
-        const username = req.user!.username;
-        const companyId = req.session.currentCompanyId || null;
-        const companyName = (req.session as any).currentCompanyName || null;
-        const role = req.session.currentRole || null;
+      const { route } = parseResult.data;
+      const sessionId = req.sessionID;
+      const userId = req.user!.id;
+      const username = req.user!.username;
+      const companyId = req.session.currentCompanyId || null;
+      const companyName = (req.session as any).currentCompanyName || null;
+      const role = req.session.currentRole || null;
 
-        // Single-query upsert — avoids the SELECT + conditional INSERT/UPDATE race condition
-        // and halves the number of DB round-trips per heartbeat.
-        await db.insert(userPresence).values({
-          sessionId,
-          userId,
-          username,
+      // Respond immediately — presence writes are best-effort.
+      res.status(204).end();
+
+      // Single-query upsert in the background.
+      db.insert(userPresence).values({
+        sessionId,
+        userId,
+        username,
+        currentRoute: route,
+        companyId,
+        companyName,
+        role,
+        lastSeen: sql`now()`,
+      }).onConflictDoUpdate({
+        target: userPresence.sessionId,
+        set: {
           currentRoute: route,
           companyId,
           companyName,
           role,
           lastSeen: sql`now()`,
-        }).onConflictDoUpdate({
-          target: userPresence.sessionId,
-          set: {
-            currentRoute: route,
-            companyId,
-            companyName,
-            role,
-            lastSeen: sql`now()`,
-          },
-        });
-
-        res.json({ success: true });
-      } catch (error: any) {
-        console.error("Error updating presence:", error);
-        res.status(500).json({ message: error.message });
-      }
+        },
+      }).catch((err: any) => {
+        console.error("[Presence] Heartbeat upsert error:", err.message);
+      });
     }
   );
 
-  // DELETE: Clear user presence on logout
+  // DELETE: Clear user presence on logout — fire-and-forget, never 500.
   app.delete(
     "/api/user-presence",
     requireAuth,
     async (req, res) => {
-      try {
-        const sessionId = req.sessionID;
-        await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
-        res.json({ success: true });
-      } catch (error: any) {
-        console.error("Error clearing presence:", error);
-        res.status(500).json({ message: error.message });
+      const sessionId = req.sessionID;
+      res.status(204).end();
+      if (sessionId) {
+        db.delete(userPresence)
+          .where(eq(userPresence.sessionId, sessionId))
+          .catch((err: any) => console.error("[Presence] Delete error:", err.message));
       }
-    });
+    }
+  );
 
-  // POST: Handle sendBeacon leave request (no auth required as session may be ending)
+  // POST: Handle sendBeacon leave (no auth — session may already be ending).
+  // Responds instantly; DB delete runs in the background.
   app.post(
     "/api/user-presence/leave",
     async (req, res) => {
       const sessionId = req.sessionID;
-      res.json({ success: true });
+      res.status(204).end();
       if (sessionId) {
-        db.delete(userPresence).where(eq(userPresence.sessionId, sessionId)).catch((err: any) => {
-          console.error("Error clearing presence on leave:", err.message);
-        });
+        db.delete(userPresence)
+          .where(eq(userPresence.sessionId, sessionId))
+          .catch((err: any) => console.error("[Presence] Leave delete error:", err.message));
       }
     }
   );

@@ -7,11 +7,9 @@ import * as schema from "@shared/schema";
 let connectionString: string;
 
 if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL directly (Render, external databases)
   connectionString = process.env.DATABASE_URL;
   console.log('✓ Using DATABASE_URL for PostgreSQL connection');
 } else if (process.env.PGHOST && process.env.PGPORT && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
-  // Use Replit's database via individual connection variables
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
   connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
   console.log('✓ Using Replit PostgreSQL database');
@@ -21,38 +19,63 @@ if (process.env.DATABASE_URL) {
 
 console.log('Database connection endpoint:', connectionString.replace(/:[^:@]*@/, ':***@'));
 
-// Create PostgreSQL connection pool
-// SSL Configuration Logic:
-// - DISABLE SSL only for: Replit's local database (host: "helium") OR when PGSSLMODE="disable"
-// - ENABLE SSL for: All other databases (production, Neon, Render, etc.) unless explicitly disabled
-// This ensures external managed databases always use SSL while allowing local dev without SSL
+// SSL: disabled for Replit local DB or when PGSSLMODE=disable, enabled for everything else.
 const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
 const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
 const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
 
-// Log SSL configuration for debugging
-if (!requiresSSL && !isLocalReplitDB) {
-  console.warn('⚠️  SSL disabled via PGSSLMODE=disable - ensure this is intentional for your environment');
-} else if (isLocalReplitDB) {
+if (isLocalReplitDB) {
   console.log('ℹ️  SSL disabled for Replit local database (helium)');
+} else if (sslExplicitlyDisabled) {
+  console.warn('⚠️  SSL disabled via PGSSLMODE=disable');
 } else {
   console.log('✓ SSL enabled for external database connection');
 }
 
-const pool = new Pool({
+// Single shared Pool for the entire application.
+// Session store uses its own separate pool (server/index.ts, max 4).
+// Total = 11 connections, well within Render's 25-connection basic plan limit.
+export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  // Connection pool limits — critical for Render's basic PostgreSQL plan (~25 max connections total).
-  // The session store uses its own separate pool, so keep this at 7 to leave headroom.
   max: 7,
-  // Fail fast if no connection available within 10 seconds, rather than queuing indefinitely.
+  // Give connections 10 seconds to become available before throwing.
+  // Routes that are non-critical (presence heartbeat, leave) handle this gracefully.
   connectionTimeoutMillis: 10000,
-  // Release idle connections after 30 seconds to avoid holding unused slots.
+  // Release idle connections after 30 seconds.
   idleTimeoutMillis: 30000,
+  // Keep the pool alive across idle periods instead of draining to zero.
+  allowExitOnIdle: false,
 });
 
+// Log unexpected errors on idle clients.
 pool.on('error', (err) => {
-  console.error('[DB Pool] Unexpected error on idle client:', err.message);
+  console.error('[DB Pool] Idle client error:', err.message);
+  logPoolStats('on-error');
 });
+
+// Log every new physical connection — useful for spotting connection churn.
+pool.on('connect', () => {
+  logPoolStats('new-connection');
+});
+
+// Log when a client is acquired from the pool.
+pool.on('acquire', () => {
+  // Only log when the pool is under pressure to avoid noise.
+  if (pool.waitingCount > 0) {
+    logPoolStats('acquire-under-pressure');
+  }
+});
+
+// Log when a client is removed (pool shrinking).
+pool.on('remove', () => {
+  logPoolStats('client-removed');
+});
+
+export function logPoolStats(trigger: string) {
+  console.log(
+    `[DB Pool] trigger=${trigger} total=${pool.totalCount} idle=${pool.idleCount} waiting=${pool.waitingCount}`
+  );
+}
 
 export const db = drizzle(pool, { schema });
