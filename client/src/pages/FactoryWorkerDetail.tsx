@@ -952,10 +952,10 @@ export default function FactoryWorkerDetail() {
                           </Select>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">Cash Account</Label>
+                          <Label className="text-xs">Cash Account (optional)</Label>
                           <Select value={advanceCashAccountId} onValueChange={setAdvanceCashAccountId}>
                             <SelectTrigger className="w-48" data-testid="select-advance-cash-account">
-                              <SelectValue placeholder="Select account" />
+                              <SelectValue placeholder="None (no cash deduction)" />
                             </SelectTrigger>
                             <SelectContent>
                               {(cashAccounts || []).map((a) => (
