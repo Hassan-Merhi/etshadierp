@@ -101,6 +101,7 @@ interface VoucherEntry {
   ledgerAccountId: number | null;
   bankAccountId: number | null;
   supplierId: number | null;
+  employeeId?: number | null;
   debitAmount: string;
   creditAmount: string;
   narration: string | null;
@@ -833,11 +834,11 @@ export default function VoucherEdit() {
         id: entry.supplierId,
         name: `Supplier #${entry.supplierId}`,
       };
-    } else if ((entry as any).employeeId) {
+    } else if (entry.employeeId) {
       return {
         type: "employee" as const,
-        id: (entry as any).employeeId,
-        name: `Employee #${(entry as any).employeeId}`,
+        id: entry.employeeId,
+        name: `Employee #${entry.employeeId}`,
       };
     }
     return null;
