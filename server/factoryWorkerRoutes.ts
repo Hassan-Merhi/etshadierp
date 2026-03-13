@@ -1161,6 +1161,45 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
   // ─── FACTORY WORKER ADVANCES ─────────────────────────────────────────
 
+  // GET /api/factory/advance-repayments - List all repayments company-wide
+  app.get("/api/factory/advance-repayments", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
+      if (req.query.workerId) conditions.push(eq(factoryAdvanceRepayments.workerId, parseInt(req.query.workerId as string)));
+
+      const repayments = await db
+        .select({
+          id: factoryAdvanceRepayments.id,
+          advanceId: factoryAdvanceRepayments.advanceId,
+          workerId: factoryAdvanceRepayments.workerId,
+          repaymentDate: factoryAdvanceRepayments.repaymentDate,
+          amount: factoryAdvanceRepayments.amount,
+          cashAccountId: factoryAdvanceRepayments.cashAccountId,
+          notes: factoryAdvanceRepayments.notes,
+          createdAt: factoryAdvanceRepayments.createdAt,
+          advanceDate: factoryWorkerAdvances.advanceDate,
+          advanceAmount: factoryWorkerAdvances.amount,
+          advanceRemainingBalance: factoryWorkerAdvances.remainingBalance,
+          workerName: factoryWorkers.fullName,
+          cashAccountName: ledgerAccounts.name,
+        })
+        .from(factoryAdvanceRepayments)
+        .innerJoin(factoryWorkerAdvances, eq(factoryAdvanceRepayments.advanceId, factoryWorkerAdvances.id))
+        .innerJoin(factoryWorkers, eq(factoryAdvanceRepayments.workerId, factoryWorkers.id))
+        .leftJoin(ledgerAccounts, eq(factoryAdvanceRepayments.cashAccountId, ledgerAccounts.id))
+        .where(and(...conditions))
+        .orderBy(desc(factoryAdvanceRepayments.repaymentDate));
+
+      res.json(repayments);
+    } catch (error: any) {
+      console.error("Error fetching advance repayments:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/advances - List all advances for company
   app.get("/api/factory/advances", requireAuth, async (req: any, res: any) => {
     try {
