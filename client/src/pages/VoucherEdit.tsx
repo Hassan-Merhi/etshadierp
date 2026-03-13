@@ -209,7 +209,7 @@ interface VoucherData {
 // Form entry schemas
 const voucherEntrySchema = z.object({
   id: z.number().optional(),
-  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -222,7 +222,7 @@ const voucherEntrySchema = z.object({
 const journalEntrySchema = z.object({
   id: z.number().optional(),
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -298,7 +298,7 @@ const transferLineItemSchema = z.object({
 
 // Form schemas
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -806,21 +806,39 @@ export default function VoucherEdit() {
         type: "ledger" as const,
         id: account.id,
         name: account.name,
-      } : null;
+      } : {
+        type: "ledger" as const,
+        id: entry.ledgerAccountId,
+        name: `Ledger #${entry.ledgerAccountId}`,
+      };
     } else if (entry.bankAccountId) {
       const account = bankAccounts.find(a => a.id === entry.bankAccountId);
       return account ? {
         type: "bank" as const,
         id: account.id,
         name: account.bankName,
-      } : null;
+      } : {
+        type: "bank" as const,
+        id: entry.bankAccountId,
+        name: `Bank #${entry.bankAccountId}`,
+      };
     } else if (entry.supplierId) {
       const supplier = suppliers.find(s => s.id === entry.supplierId);
       return supplier ? {
         type: "supplier" as const,
         id: supplier.id,
         name: supplier.legalName,
-      } : null;
+      } : {
+        type: "supplier" as const,
+        id: entry.supplierId,
+        name: `Supplier #${entry.supplierId}`,
+      };
+    } else if ((entry as any).employeeId) {
+      return {
+        type: "employee" as const,
+        id: (entry as any).employeeId,
+        name: `Employee #${(entry as any).employeeId}`,
+      };
     }
     return null;
   };
@@ -869,37 +887,35 @@ export default function VoucherEdit() {
         return amount > 0;
       });
 
-      if (paymentAccount) {
-        paymentForm.reset({
-          paymentAccountType: paymentAccount.type,
-          paymentAccountId: paymentAccount.id,
-          paymentAccountName: paymentAccount.name,
-          voucherDate: parseISO(voucher.voucherDate),
-          currency: (voucher.currency as "USD" | "CFA") || "USD",
-          entries: voucherEntries.map(entry => {
-            const account = findAccountDetails(entry);
-            const amount = voucherType === "Payment"
-              ? (isLiabilityPayment ? entry.creditAmount : entry.debitAmount)
-              : (isLiabilityPayment ? entry.debitAmount : entry.creditAmount);
-            
-            return account ? {
-              id: entry.id,
-              accountType: account.type,
-              accountId: account.id,
-              accountName: account.name,
-              amount: amount || "0",
-            } : {
-              id: entry.id,
-              accountType: "ledger" as const,
-              accountId: 0,
-              accountName: "",
-              amount: amount || "0",
-            };
-          }),
-          notes: voucher.description || "",
-        });
-        setFormInitialized(true);
-      }
+      paymentForm.reset({
+        paymentAccountType: paymentAccount?.type || "ledger",
+        paymentAccountId: paymentAccount?.id || 0,
+        paymentAccountName: paymentAccount?.name || "",
+        voucherDate: parseISO(voucher.voucherDate),
+        currency: (voucher.currency as "USD" | "CFA") || "USD",
+        entries: voucherEntries.map(entry => {
+          const account = findAccountDetails(entry);
+          const amount = voucherType === "Payment"
+            ? (isLiabilityPayment ? entry.creditAmount : entry.debitAmount)
+            : (isLiabilityPayment ? entry.debitAmount : entry.creditAmount);
+          
+          return account ? {
+            id: entry.id,
+            accountType: account.type,
+            accountId: account.id,
+            accountName: account.name,
+            amount: amount || "0",
+          } : {
+            id: entry.id,
+            accountType: "ledger" as const,
+            accountId: 0,
+            accountName: "",
+            amount: amount || "0",
+          };
+        }),
+        notes: voucher.description || "",
+      });
+      setFormInitialized(true);
     } else if (isJournal) {
       journalForm.reset({
         voucherDate: parseISO(voucher.voucherDate),

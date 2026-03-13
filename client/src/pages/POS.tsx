@@ -493,8 +493,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setShowPrintDialog(true);
       
       // Invalidate inventory query to refresh stock levels
-      queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
+      const locationId = activeLocation?.id || editVoucher?.locationId;
+      if (locationId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      if (editVoucherId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
@@ -1305,7 +1311,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const handleSaveSale = () => {
     // Validate
-    if (!activeLocation) {
+    if (!activeLocation && !editVoucherId) {
       toast({
         title: "Error",
         description: "Please select a location",
@@ -1369,7 +1375,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
     // Prepare sale data - convert CFA amounts to USD if entering in CFA
     const saleData = {
-      locationId: activeLocation.id,
+      locationId: activeLocation?.id || editVoucher?.locationId,
       paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
       paymentAccountId: isCreditSale ? parseInt(selectedCustomerId) : parseInt(paymentAccountId),
       isCreditSale,
