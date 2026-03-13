@@ -243,6 +243,7 @@ export default function FactoryWorkerDetail() {
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceNotes, setAdvanceNotes] = useState("");
   const [advanceRepaymentType, setAdvanceRepaymentType] = useState("salary_deduction");
+  const [advanceCashAccountId, setAdvanceCashAccountId] = useState("");
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
 
   const [repayAdvanceId, setRepayAdvanceId] = useState<number | null>(null);
@@ -323,7 +324,7 @@ export default function FactoryWorkerDetail() {
   });
 
   const createAdvanceMutation = useMutation({
-    mutationFn: async (data: { advanceDate: string; amount: string; notes: string; repaymentType: string }) => {
+    mutationFn: async (data: { advanceDate: string; amount: string; notes: string; repaymentType: string; cashAccountId?: number }) => {
       const res = await apiRequest("POST", `/api/factory/workers/${workerId}/advances`, data);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
@@ -334,6 +335,7 @@ export default function FactoryWorkerDetail() {
       setAdvanceAmount("");
       setAdvanceNotes("");
       setAdvanceRepaymentType("salary_deduction");
+      setAdvanceCashAccountId("");
       setShowAdvanceForm(false);
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -636,7 +638,6 @@ export default function FactoryWorkerDetail() {
               <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
               <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
               <TabsTrigger value="bales" data-testid="tab-bales">Bales</TabsTrigger>
-              <TabsTrigger value="advances" data-testid="tab-advances">Advances</TabsTrigger>
               <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
             </TabsList>
 
@@ -804,6 +805,63 @@ export default function FactoryWorkerDetail() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Banknote className="h-4 w-4" />
+                    Advances Given
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {advancesLoading ? (
+                    <div className="p-4 space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  ) : !workerAdvances?.length ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">No advances given</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Remaining</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Notes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workerAdvances.map((adv) => (
+                            <TableRow key={adv.id} data-testid={`row-statement-advance-${adv.id}`}>
+                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                {formatDate(adv.advanceDate)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">${fmtNum(adv.amount)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">${fmtNum(adv.remainingBalance)}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Deduction"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={adv.fullyPaid ? "outline" : "default"} className="text-xs">
+                                  {adv.fullyPaid ? "Repaid" : "Outstanding"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                                {adv.notes || "—"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="advances" className="space-y-4">
@@ -893,6 +951,19 @@ export default function FactoryWorkerDetail() {
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Cash Account</Label>
+                          <Select value={advanceCashAccountId} onValueChange={setAdvanceCashAccountId}>
+                            <SelectTrigger className="w-48" data-testid="select-advance-cash-account">
+                              <SelectValue placeholder="Select account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(cashAccounts || []).map((a) => (
+                                <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex items-end gap-2 mt-auto pt-4">
                           <Button
                             size="sm"
@@ -901,6 +972,7 @@ export default function FactoryWorkerDetail() {
                               amount: advanceAmount,
                               notes: advanceNotes,
                               repaymentType: advanceRepaymentType,
+                              ...(advanceCashAccountId ? { cashAccountId: parseInt(advanceCashAccountId) } : {}),
                             })}
                             disabled={!advanceAmount || parseFloat(advanceAmount) <= 0 || createAdvanceMutation.isPending}
                             data-testid="button-save-advance"
