@@ -407,7 +407,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
 
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
-      if (existing.status === "PAID") return res.status(400).json({ message: "Cannot delete a paid payroll record" });
+      if (existing.status !== "DRAFT") return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
       await db.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
 
