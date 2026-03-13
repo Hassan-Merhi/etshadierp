@@ -366,6 +366,20 @@ let migrationsDone = false;
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS remaining_balance decimal(20,2) NOT NULL DEFAULT 0`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS cash_account_id integer`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS fully_paid boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS repayment_type VARCHAR(30) NOT NULL DEFAULT 'salary_deduction'`,
+    `CREATE TABLE IF NOT EXISTS factory_advance_repayments (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      advance_id integer NOT NULL REFERENCES factory_worker_advances(id),
+      worker_id integer NOT NULL,
+      repayment_date date NOT NULL,
+      amount decimal(20, 2) NOT NULL,
+      cash_account_id integer,
+      notes text,
+      created_at timestamp DEFAULT now() NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_advance_repayments_advance_idx ON factory_advance_repayments (advance_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_advance_repayments_company_idx ON factory_advance_repayments (company_id)`,
     // Live spreadsheet links (shared Google Sheet / external links)
     `CREATE TABLE IF NOT EXISTS live_spreadsheets (
       id serial PRIMARY KEY,

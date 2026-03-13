@@ -32,6 +32,7 @@ interface AdvanceRecord {
   cashAccountId: number | null;
   notes: string | null;
   fullyPaid: boolean;
+  repaymentType: string;
   createdAt: string;
   workerName: string;
 }
@@ -58,6 +59,7 @@ export default function FactoryAdvancesTab() {
     amount: "",
     cashAccountId: "",
     notes: "",
+    repaymentType: "salary_deduction" as string,
   });
 
   const { data: advances, isLoading } = useQuery<AdvanceRecord[]>({
@@ -95,6 +97,7 @@ export default function FactoryAdvancesTab() {
         amount: form.amount,
         cashAccountId: form.cashAccountId ? parseInt(form.cashAccountId) : undefined,
         notes: form.notes || undefined,
+        repaymentType: form.repaymentType,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create advance");
@@ -104,7 +107,7 @@ export default function FactoryAdvancesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
-      setForm({ workerId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", cashAccountId: "", notes: "" });
+      setForm({ workerId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", cashAccountId: "", notes: "", repaymentType: "salary_deduction" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -231,6 +234,7 @@ export default function FactoryAdvancesTab() {
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Remaining</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead className="w-12"></TableHead>
@@ -239,7 +243,7 @@ export default function FactoryAdvancesTab() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No advances found
                   </TableCell>
                 </TableRow>
@@ -256,6 +260,18 @@ export default function FactoryAdvancesTab() {
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-advance-remaining-${adv.id}`}>
                     {fmt(adv.remainingBalance)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={adv.repaymentType === "manual_repayment"
+                        ? "border-blue-400 text-blue-700 dark:text-blue-400"
+                        : "border-slate-400 text-slate-700 dark:text-slate-400"
+                      }
+                      data-testid={`badge-advance-type-${adv.id}`}
+                    >
+                      {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -344,6 +360,18 @@ export default function FactoryAdvancesTab() {
                   {(cashAccounts || []).map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Repayment Type</Label>
+              <Select value={form.repaymentType} onValueChange={(v) => setForm({ ...form, repaymentType: v })}>
+                <SelectTrigger data-testid="select-advance-repayment-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="salary_deduction">Deduct from Salary</SelectItem>
+                  <SelectItem value="manual_repayment">Manual Repayment (Loan)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

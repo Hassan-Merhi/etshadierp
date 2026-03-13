@@ -3215,6 +3215,7 @@ export const factoryWorkerAdvances = pgTable("factory_worker_advances", {
   cashAccountId: integer("cash_account_id"),
   notes: text("notes"),
   fullyPaid: boolean("fully_paid").notNull().default(false),
+  repaymentType: varchar("repayment_type", { length: 30 }).notNull().default("salary_deduction"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("factory_worker_advances_company_idx").on(t.companyId),
@@ -3231,10 +3232,42 @@ export const insertFactoryWorkerAdvanceSchema = createInsertSchema(factoryWorker
   amount: z.string().min(1, "Amount is required"),
   notes: z.string().optional().nullable(),
   cashAccountId: z.number().optional().nullable(),
+  repaymentType: z.enum(["salary_deduction", "manual_repayment"]).optional().default("salary_deduction"),
 });
 
 export type InsertFactoryWorkerAdvance = z.infer<typeof insertFactoryWorkerAdvanceSchema>;
 export type FactoryWorkerAdvance = typeof factoryWorkerAdvances.$inferSelect;
+
+export const factoryAdvanceRepayments = pgTable("factory_advance_repayments", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  advanceId: integer("advance_id").notNull().references(() => factoryWorkerAdvances.id),
+  workerId: integer("worker_id").notNull(),
+  repaymentDate: date("repayment_date").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  cashAccountId: integer("cash_account_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  advanceIdx: index("factory_advance_repayments_advance_idx").on(t.advanceId),
+  companyIdx: index("factory_advance_repayments_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryAdvanceRepaymentSchema = createInsertSchema(factoryAdvanceRepayments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  advanceId: z.number().min(1, "Advance is required"),
+  workerId: z.number().min(1, "Worker is required"),
+  repaymentDate: z.string().min(1, "Repayment date is required"),
+  amount: z.string().min(1, "Amount is required"),
+  cashAccountId: z.number().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export type InsertFactoryAdvanceRepayment = z.infer<typeof insertFactoryAdvanceRepaymentSchema>;
+export type FactoryAdvanceRepayment = typeof factoryAdvanceRepayments.$inferSelect;
 
 export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   id: serial("id").primaryKey(),

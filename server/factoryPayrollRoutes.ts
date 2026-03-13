@@ -139,6 +139,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           and(
             eq(factoryWorkerAdvances.companyId, companyId),
             isNull(factoryWorkerAdvances.payrollId),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
             gte(factoryWorkerAdvances.advanceDate, startDate),
             lte(factoryWorkerAdvances.advanceDate, endDate)
           )

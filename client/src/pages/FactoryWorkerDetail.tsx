@@ -6,6 +6,7 @@ import {
   ArrowLeft, Upload, Pencil, UserX, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
   FileText, FileImage, File, Trash2, Banknote, Plus, Loader2,
+  ChevronDown, ChevronRight, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +83,105 @@ function fmtNum(val: string | number | null | undefined) {
   return isNaN(n) ? "0.00" : n.toFixed(2);
 }
 
+interface AdvanceRowProps {
+  adv: FactoryWorkerAdvance;
+  isLoan: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onRepay: () => void;
+  formatDate: (d: string | null | undefined) => string;
+  fmt: (v: string | number | null | undefined) => string;
+}
+
+function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDate, fmt }: AdvanceRowProps) {
+  const { data: repayments } = useQuery<any[]>({
+    queryKey: ["/api/factory/advances", adv.id, "repayments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/advances/${adv.id}/repayments`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isLoan && isExpanded,
+  });
+
+  return (
+    <>
+      <TableRow data-testid={`row-worker-advance-${adv.id}`}>
+        <TableCell className="px-2">
+          {isLoan && !adv.fullyPaid && (
+            <Button size="icon" variant="ghost" onClick={onToggleExpand} data-testid={`button-expand-advance-${adv.id}`}>
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </Button>
+          )}
+        </TableCell>
+        <TableCell>{formatDate(adv.advanceDate)}</TableCell>
+        <TableCell className="text-right font-mono">{fmt(adv.amount)}</TableCell>
+        <TableCell className="text-right font-mono">{fmt(adv.remainingBalance)}</TableCell>
+        <TableCell>
+          <Badge
+            variant="outline"
+            className={isLoan
+              ? "border-blue-400 text-blue-700 dark:text-blue-400"
+              : "border-slate-400 text-slate-700 dark:text-slate-400"
+            }
+            data-testid={`badge-advance-type-${adv.id}`}
+          >
+            {isLoan ? "Loan" : "Salary Ded."}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <Badge
+            variant="outline"
+            className={adv.fullyPaid
+              ? "border-green-500 text-green-700 dark:text-green-400"
+              : "border-amber-400 text-amber-700 dark:text-amber-400"
+            }
+          >
+            {adv.fullyPaid ? "Paid" : "Outstanding"}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">{adv.notes || "\u2014"}</TableCell>
+        <TableCell>
+          {isLoan && !adv.fullyPaid && (
+            <Button size="sm" variant="outline" onClick={onRepay} data-testid={`button-repay-advance-${adv.id}`}>
+              <RotateCcw className="h-3 w-3 mr-1" /> Repay
+            </Button>
+          )}
+        </TableCell>
+      </TableRow>
+      {isLoan && isExpanded && (
+        <TableRow>
+          <TableCell colSpan={8} className="bg-muted/30 p-3">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Repayment History</div>
+            {!repayments || repayments.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No repayments recorded yet</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs text-right">Amount</TableHead>
+                    <TableHead className="text-xs">Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {repayments.map((r: any) => (
+                    <TableRow key={r.id} data-testid={`row-repayment-${r.id}`}>
+                      <TableCell className="text-xs">{formatDate(r.repaymentDate)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{fmt(r.amount)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.notes || "\u2014"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
 export default function FactoryWorkerDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/factory/workers/:id");
@@ -118,7 +218,15 @@ export default function FactoryWorkerDetail() {
   const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceNotes, setAdvanceNotes] = useState("");
+  const [advanceRepaymentType, setAdvanceRepaymentType] = useState<"salary_deduction" | "manual_repayment">("salary_deduction");
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
+
+  const [repayAdvanceId, setRepayAdvanceId] = useState<number | null>(null);
+  const [repayDate, setRepayDate] = useState(new Date().toISOString().split("T")[0]);
+  const [repayAmount, setRepayAmount] = useState("");
+  const [repayCashAccountId, setRepayCashAccountId] = useState("");
+  const [repayNotes, setRepayNotes] = useState("");
+  const [expandedAdvanceId, setExpandedAdvanceId] = useState<number | null>(null);
 
   const { data: worker, isLoading: workerLoading, error: workerError } = useQuery<WorkerWithStats>({
     queryKey: ["/api/factory/workers", workerId],
@@ -191,7 +299,7 @@ export default function FactoryWorkerDetail() {
   });
 
   const createAdvanceMutation = useMutation({
-    mutationFn: async (data: { advanceDate: string; amount: string; notes: string }) => {
+    mutationFn: async (data: { advanceDate: string; amount: string; notes: string; repaymentType: string }) => {
       const res = await apiRequest("POST", `/api/factory/workers/${workerId}/advances`, data);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
       return res.json();
@@ -201,7 +309,26 @@ export default function FactoryWorkerDetail() {
       toast({ title: "Advance recorded" });
       setAdvanceAmount("");
       setAdvanceNotes("");
+      setAdvanceRepaymentType("salary_deduction");
       setShowAdvanceForm(false);
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const repaymentMutation = useMutation({
+    mutationFn: async (data: { advanceId: number; repaymentDate: string; amount: string; cashAccountId?: number; notes?: string }) => {
+      const res = await apiRequest("POST", `/api/factory/advances/${data.advanceId}/repayments`, data);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances", vars.advanceId, "repayments"] });
+      toast({ title: "Repayment recorded" });
+      setRepayAdvanceId(null);
+      setRepayAmount("");
+      setRepayNotes("");
+      setRepayCashAccountId("");
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -657,59 +784,242 @@ export default function FactoryWorkerDetail() {
 
             <TabsContent value="advances" className="space-y-4">
               <Card>
-                <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="text-sm">Advance History</CardTitle>
-                  {(() => {
-                    const outstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
-                    const totalBal = outstanding.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
-                    return totalBal > 0 ? (
-                      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400" data-testid="badge-advance-total-balance">
-                        Outstanding: {fmt(totalBal)}
-                      </Badge>
-                    ) : null;
-                  })()}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(() => {
+                      const allOutstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
+                      const salaryDeduction = allOutstanding.filter((a) => (a as any).repaymentType !== "manual_repayment");
+                      const manualRepayment = allOutstanding.filter((a) => (a as any).repaymentType === "manual_repayment");
+                      const salaryBal = salaryDeduction.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                      const loanBal = manualRepayment.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                      return (
+                        <>
+                          {salaryBal > 0 && (
+                            <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400" data-testid="badge-advance-salary-balance">
+                              Salary Ded: {fmt(salaryBal)}
+                            </Badge>
+                          )}
+                          {loanBal > 0 && (
+                            <Badge variant="outline" className="border-blue-400 text-blue-700 dark:text-blue-400" data-testid="badge-advance-loan-balance">
+                              Loan: {fmt(loanBal)}
+                            </Badge>
+                          )}
+                        </>
+                      );
+                    })()}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowAdvanceForm(true)}
+                      data-testid="button-new-advance"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> New Advance
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {showAdvanceForm && (
+                    <div className="p-4 border-b space-y-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Date</Label>
+                          <Input
+                            type="date"
+                            value={advanceDate}
+                            onChange={(e) => setAdvanceDate(e.target.value)}
+                            className="w-40"
+                            data-testid="input-new-advance-date"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Amount ($)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={advanceAmount}
+                            onChange={(e) => setAdvanceAmount(e.target.value)}
+                            className="w-32"
+                            data-testid="input-new-advance-amount"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Notes</Label>
+                          <Input
+                            placeholder="Optional"
+                            value={advanceNotes}
+                            onChange={(e) => setAdvanceNotes(e.target.value)}
+                            className="w-40"
+                            data-testid="input-new-advance-notes"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Repayment Type</Label>
+                          <Select value={advanceRepaymentType} onValueChange={(v) => setAdvanceRepaymentType(v as any)}>
+                            <SelectTrigger className="w-48" data-testid="select-advance-repayment-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="salary_deduction">Deduct from Salary</SelectItem>
+                              <SelectItem value="manual_repayment">Manual Repayment (Loan)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end gap-2 mt-auto pt-4">
+                          <Button
+                            size="sm"
+                            onClick={() => createAdvanceMutation.mutate({
+                              advanceDate,
+                              amount: advanceAmount,
+                              notes: advanceNotes,
+                              repaymentType: advanceRepaymentType,
+                            })}
+                            disabled={!advanceAmount || parseFloat(advanceAmount) <= 0 || createAdvanceMutation.isPending}
+                            data-testid="button-save-advance"
+                          >
+                            {createAdvanceMutation.isPending ? "Saving..." : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setShowAdvanceForm(false)} data-testid="button-cancel-advance">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-8"></TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead className="text-right">Remaining</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Notes</TableHead>
+                        <TableHead className="w-24"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(!workerAdvances || workerAdvances.length === 0) ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                             No advances recorded
                           </TableCell>
                         </TableRow>
-                      ) : workerAdvances.map((adv) => (
-                        <TableRow key={adv.id} data-testid={`row-worker-advance-${adv.id}`}>
-                          <TableCell>{formatDate(adv.advanceDate)}</TableCell>
-                          <TableCell className="text-right font-mono">{fmt(adv.amount)}</TableCell>
-                          <TableCell className="text-right font-mono">{fmt(adv.remainingBalance)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={adv.fullyPaid
-                                ? "border-green-500 text-green-700 dark:text-green-400"
-                                : "border-amber-400 text-amber-700 dark:text-amber-400"
-                              }
-                            >
-                              {adv.fullyPaid ? "Paid" : "Outstanding"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{adv.notes || "\u2014"}</TableCell>
-                        </TableRow>
-                      ))}
+                      ) : workerAdvances.map((adv) => {
+                        const isLoan = (adv as any).repaymentType === "manual_repayment";
+                        const isExpanded = expandedAdvanceId === adv.id;
+                        return (
+                          <AdvanceRow
+                            key={adv.id}
+                            adv={adv}
+                            isLoan={isLoan}
+                            isExpanded={isExpanded}
+                            onToggleExpand={() => setExpandedAdvanceId(isExpanded ? null : adv.id)}
+                            onRepay={() => {
+                              setRepayAdvanceId(adv.id);
+                              setRepayDate(new Date().toISOString().split("T")[0]);
+                              setRepayAmount("");
+                              setRepayCashAccountId("");
+                              setRepayNotes("");
+                            }}
+                            formatDate={formatDate}
+                            fmt={fmt}
+                          />
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
+
+              {repayAdvanceId && (() => {
+                const adv = (workerAdvances || []).find((a) => a.id === repayAdvanceId);
+                if (!adv) return null;
+                const maxRepay = parseFloat(adv.remainingBalance || "0");
+                return (
+                  <Dialog open={true} onOpenChange={(open) => { if (!open) setRepayAdvanceId(null); }}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Record Repayment</DialogTitle>
+                        <DialogDescription>
+                          Advance of {fmt(adv.amount)} | Remaining: {fmt(adv.remainingBalance)}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Date</Label>
+                            <Input
+                              type="date"
+                              value={repayDate}
+                              onChange={(e) => setRepayDate(e.target.value)}
+                              data-testid="input-repay-date"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Amount ($)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={maxRepay}
+                              step="0.01"
+                              placeholder={`Max ${maxRepay.toFixed(2)}`}
+                              value={repayAmount}
+                              onChange={(e) => setRepayAmount(e.target.value)}
+                              data-testid="input-repay-amount"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cash Account (receives repayment)</Label>
+                          <Select value={repayCashAccountId} onValueChange={setRepayCashAccountId}>
+                            <SelectTrigger data-testid="select-repay-cash-account">
+                              <SelectValue placeholder="Select cash account (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(cashAccounts || []).map((a) => (
+                                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Input
+                            placeholder="Optional notes"
+                            value={repayNotes}
+                            onChange={(e) => setRepayNotes(e.target.value)}
+                            data-testid="input-repay-notes"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setRepayAdvanceId(null)} data-testid="button-cancel-repay">
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => repaymentMutation.mutate({
+                            advanceId: repayAdvanceId,
+                            repaymentDate: repayDate,
+                            amount: repayAmount,
+                            cashAccountId: repayCashAccountId ? parseInt(repayCashAccountId) : undefined,
+                            notes: repayNotes || undefined,
+                          })}
+                          disabled={!repayAmount || parseFloat(repayAmount) <= 0 || repaymentMutation.isPending}
+                          data-testid="button-submit-repay"
+                        >
+                          {repaymentMutation.isPending ? "Saving..." : "Record Repayment"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="documents" className="space-y-4">
