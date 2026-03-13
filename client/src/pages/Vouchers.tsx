@@ -2561,6 +2561,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {

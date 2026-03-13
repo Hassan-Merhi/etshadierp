@@ -1083,6 +1083,11 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       toast({
         title: "Success",
         description: "Sales voucher updated successfully",
@@ -1119,6 +1124,11 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       toast({
         title: "Success",
         description: "Purchase voucher updated successfully",
@@ -1155,6 +1165,11 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       toast({
         title: "Success",
         description: "Adjustment voucher updated successfully",
@@ -1191,6 +1206,11 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       toast({
         title: "Success",
         description: "Stock transfer voucher updated successfully",
