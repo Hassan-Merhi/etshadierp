@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db } from "./db";
+import { Client } from "pg";
 
 // Global error handlers — prevent unhandled rejections from crashing the process in production
 process.on("unhandledRejection", (reason: any) => {
@@ -114,8 +115,10 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-      max: 3,
-      connectionTimeoutMillis: 4000,
+      // Keep session pool small to stay within Render's connection limit.
+      // No connectionTimeoutMillis here — session connections need to be reliable;
+      // the main pool timeout handles cascade failure prevention.
+      max: 4,
       idleTimeoutMillis: 30000,
     },
     createTableIfMissing: true,
@@ -453,15 +456,35 @@ let migrationsDone = false;
   const port = parseInt(process.env.PORT || '5000', 10);
 
   const runMigrations = async () => {
-    for (const migration of migrations) {
-      try {
-        await db.execute(migration);
-      } catch (err: any) {
-        console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
+    // Use a dedicated single Client for migrations — completely separate from the
+    // shared connection pool so migrations never starve user requests of connections.
+    const connectionString = process.env.DATABASE_URL ||
+      `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
+    const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
+    const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
+    const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
+
+    const migrationClient = new Client({
+      connectionString,
+      ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+    });
+
+    try {
+      await migrationClient.connect();
+      for (const migration of migrations) {
+        try {
+          await migrationClient.query(migration);
+        } catch (err: any) {
+          console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
+        }
       }
+      console.log("✓ Database tables and columns verified/migrated");
+    } catch (err: any) {
+      console.error("Migration connection error:", err.message);
+    } finally {
+      await migrationClient.end();
+      migrationsDone = true;
     }
-    console.log("✓ Database tables and columns verified/migrated");
-    migrationsDone = true;
   };
 
   const doListen = () => {
