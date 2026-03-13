@@ -10215,7 +10215,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           }
         }
 
-        // 5. Write a VOIDED audit daybook entry
+        // 5. Write a VOIDED audit daybook entry (no voucher reference so it won't be filtered by soft-delete logic)
         const voidTxType = `${txTypeVal}_VOIDED`;
         const amt = parseFloat(voucher.totalAmount || "0");
         const currency = voucher.currency || "USD";
@@ -10225,9 +10225,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           companyId,
           txDate: today,
           txType: voidTxType,
-          referenceId: voucherId,
-          referenceTable: "vouchers",
-          description: `VOIDED: ${voucher.description || voucher.voucherNumber}`,
+          description: `VOIDED: ${voucher.description || voucher.voucherNumber} (voucher #${voucherId})`,
           currencyCode: currency,
           amountCurrency: amt,
           fxRateToUsd: fxRate,
