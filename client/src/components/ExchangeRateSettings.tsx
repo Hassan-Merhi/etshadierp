@@ -89,7 +89,11 @@ export function ExchangeRateSettings() {
     onSuccess: () => {
       toast({ title: "Exchange rate saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/latest"] });
+      queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });
       form.reset({ rate: "", effectiveDate: format(new Date(), "yyyy-MM-dd") });
       setShowForm(false);
     },
