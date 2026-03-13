@@ -3052,7 +3052,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/containers", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -6506,7 +6506,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/dashboard-kpis", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const todayStart = new Date();
