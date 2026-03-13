@@ -7187,7 +7187,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/daybook", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { startDate, endDate, txType, currencyCode } = req.query;
 
@@ -7202,27 +7202,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
 
       // ── 1b. Safety-net: drop real daybook entries whose source voucher was deleted ─
-      // This handles any deletion path (soft or hard) that didn't cascade at write time.
+      // Also fetch `optional` flag for voucher-backed rows
       const voucherRefIds = daybookRows
         .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
         .map((r: any) => r.referenceId as number);
 
       const validVoucherIds = new Set<number>();
+      const voucherOptionalMap = new Map<number, boolean>();
       if (voucherRefIds.length > 0) {
         const liveVouchers = await db
-          .select({ id: vouchers.id })
+          .select({ id: vouchers.id, optional: vouchers.optional })
           .from(vouchers)
           .where(and(
             inArray(vouchers.id, voucherRefIds),
             sql`${vouchers.deletedAt} IS NULL`
           ));
-        liveVouchers.forEach((v: any) => validVoucherIds.add(v.id));
+        liveVouchers.forEach((v: any) => {
+          validVoucherIds.add(v.id);
+          voucherOptionalMap.set(v.id, !!v.optional);
+        });
       }
 
-      const filteredDaybookRows = daybookRows.filter((r: any) => {
-        if (r.referenceTable !== "vouchers" || r.referenceId == null) return true;
-        return validVoucherIds.has(r.referenceId);
-      });
+      const filteredDaybookRows = daybookRows
+        .filter((r: any) => {
+          if (r.referenceTable !== "vouchers" || r.referenceId == null) return true;
+          return validVoucherIds.has(r.referenceId);
+        })
+        .map((r: any) => ({
+          ...r,
+          optional: r.referenceTable === "vouchers" && r.referenceId != null
+            ? voucherOptionalMap.get(r.referenceId) ?? false
+            : false,
+        }));
 
       // ── 2. Query vouchers directly (to catch pre-fix historical entries) ───
       // Only include Payment / Receipt / Journal vouchers in the daybook view
@@ -7285,6 +7296,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               amountCurrency: String(amtCurrency),
               fxRateToUsd: String(fxRate),
               amountUsd: String(amtUsd),
+              optional: !!v.optional,
               createdAt: v.createdAt,
               createdBy: null,
             };

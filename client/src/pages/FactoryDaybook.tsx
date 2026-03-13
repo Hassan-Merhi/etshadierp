@@ -45,6 +45,7 @@ interface DaybookEntry {
   amountCurrency: string;
   fxRateToUsd: string;
   amountUsd: string;
+  optional?: boolean;
   createdAt: string;
   createdBy: number | null;
 }
@@ -194,7 +195,7 @@ export default function FactoryDaybook() {
       fxRateToUsd: string | null;
       totalAmountUsd: number;
     }> = {};
-    entries.forEach((e) => {
+    entries.filter((e) => !e.optional).forEach((e) => {
       const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
       if (!grouped[key]) {
         grouped[key] = {
@@ -509,16 +510,23 @@ export default function FactoryDaybook() {
                     <TableRow
                       key={entry.id}
                       data-testid={`row-daybook-${entry.id}`}
-                      className={isRowClickable ? "cursor-pointer hover-elevate" : ""}
+                      className={`${isRowClickable ? "cursor-pointer hover-elevate" : ""} ${entry.optional ? "opacity-50" : ""}`}
                       onClick={isRowClickable ? (e) => handleEntryClick(entry, e) : undefined}
                     >
                       <TableCell className="font-mono text-sm whitespace-nowrap">
                         {formatDisplayDate(entry.txDate + "T00:00:00")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="default">
-                          {formatTxType(entry.txType)}
-                        </Badge>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="default">
+                            {formatTxType(entry.txType)}
+                          </Badge>
+                          {entry.optional && (
+                            <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-optional-${entry.id}`}>
+                              Optional
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={entry.description}>
                         {entry.description}
