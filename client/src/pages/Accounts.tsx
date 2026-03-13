@@ -643,6 +643,7 @@ export default function Accounts() {
       : openingBalance;
 
   const handleVoucherClick = (voucher: GroupedVoucher) => {
+    if (isFactoryWorkerAccount) return;
     const voucherTypeMap: Record<string, string> = {
       Payment: "payment",
       Receipt: "receipt",
