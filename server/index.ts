@@ -345,13 +345,17 @@ app.use((req, res, next) => {
       worker_id integer NOT NULL REFERENCES factory_workers(id),
       advance_date date NOT NULL,
       amount decimal(20, 2) NOT NULL,
+      remaining_balance decimal(20, 2) NOT NULL DEFAULT 0,
+      cash_account_id integer,
       notes text,
-      payroll_id integer REFERENCES factory_payrolls(id),
+      fully_paid boolean NOT NULL DEFAULT false,
       created_at timestamp DEFAULT now() NOT NULL
     )`,
     `CREATE INDEX IF NOT EXISTS factory_worker_advances_company_idx ON factory_worker_advances (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_worker_advances_worker_idx ON factory_worker_advances (worker_id)`,
-    `CREATE INDEX IF NOT EXISTS factory_worker_advances_payroll_idx ON factory_worker_advances (payroll_id)`,
+    `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS remaining_balance decimal(20,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS cash_account_id integer`,
+    `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS fully_paid boolean NOT NULL DEFAULT false`,
     // Live spreadsheet links (shared Google Sheet / external links)
     `CREATE TABLE IF NOT EXISTS live_spreadsheets (
       id serial PRIMARY KEY,
