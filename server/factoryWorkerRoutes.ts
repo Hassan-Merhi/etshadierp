@@ -1404,6 +1404,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         return res.status(403).json({ message: "Only Admin or Owner can run backfill" });
       }
 
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
       const paidPayrolls = await db.select({
         id: factoryPayrolls.id,
         companyId: factoryPayrolls.companyId,
@@ -1415,6 +1418,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         paidAt: factoryPayrolls.paidAt,
       }).from(factoryPayrolls)
         .where(and(
+          eq(factoryPayrolls.companyId, companyId),
           eq(factoryPayrolls.status, "PAID"),
           isNotNull(factoryPayrolls.cashAccountId),
         ));
