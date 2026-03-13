@@ -1550,6 +1550,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           referenceId: repayment.id,
           referenceTable: "factory_advance_repayments",
           description: `Advance repayment from ${worker?.fullName || "Worker"}: $${effectiveAmount.toFixed(2)} (advance #${advanceId})`,
+          amountCurrency: effectiveAmount,
+          currencyCode: "USD",
+          amountUsd: effectiveAmount,
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
         });
 
@@ -1608,6 +1611,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         referenceId: repaymentId,
         referenceTable: "factory_advance_repayments",
         description: `Repayment deleted for ${worker?.fullName || "Worker"}: $${repayAmt.toFixed(2)} (advance #${repayment.advanceId})`,
+        amountCurrency: repayAmt,
+        currencyCode: "USD",
+        amountUsd: repayAmt,
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
 
