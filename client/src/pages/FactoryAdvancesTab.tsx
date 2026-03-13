@@ -146,7 +146,7 @@ function AdvancesView() {
   });
 
   const postAccountingMutation = useMutation({
-    mutationFn: async (data: { cashAccountId: number; advanceIds: number[] }) => {
+    mutationFn: async (data: { cashAccountId: number }) => {
       const res = await apiRequest("POST", "/api/factory/advances/post-accounting", data);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed");
@@ -538,25 +538,43 @@ function AdvancesView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Worker</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Type</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {unvouchered.map((adv) => (
-                        <TableRow key={adv.id} data-testid={`row-unvouchered-${adv.id}`}>
-                          <TableCell className="text-sm font-medium">{adv.workerName}</TableCell>
-                          <TableCell className="text-sm">{formatDate(adv.advanceDate)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmt(adv.amount)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {(() => {
+                        const grouped: Record<string, typeof unvouchered> = {};
+                        for (const adv of unvouchered) {
+                          const key = adv.workerName || `Worker #${adv.workerId}`;
+                          if (!grouped[key]) grouped[key] = [];
+                          grouped[key].push(adv);
+                        }
+                        return Object.entries(grouped).map(([workerName, advs]) => (
+                          <>
+                            <TableRow key={`header-${workerName}`}>
+                              <TableCell colSpan={3} className="bg-muted/50 font-medium text-sm py-1.5">
+                                {workerName}
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  ({advs.length} advance{advs.length !== 1 ? "s" : ""} — {fmt(advs.reduce((s, a) => s + parseFloat(a.amount || "0"), 0))})
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                            {advs.map((adv) => (
+                              <TableRow key={adv.id} data-testid={`row-unvouchered-${adv.id}`}>
+                                <TableCell className="text-sm pl-6">{formatDate(adv.advanceDate)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{fmt(adv.amount)}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </>
+                        ));
+                      })()}
                     </TableBody>
                   </Table>
                 </div>
@@ -577,7 +595,6 @@ function AdvancesView() {
                 if (!postCashAccountId || !unvouchered?.length) return;
                 postAccountingMutation.mutate({
                   cashAccountId: parseInt(postCashAccountId),
-                  advanceIds: unvouchered.map((a) => a.id),
                 });
               }}
               disabled={!postCashAccountId || !unvouchered?.length || postAccountingMutation.isPending}

@@ -1467,7 +1467,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (match) voucheredIds.add(parseInt(match[1]));
       }
 
-      const unvouchered = allAdvances.filter((a) => !voucheredIds.has(a.id));
+      const unvouchered = allAdvances.filter((a) => !voucheredIds.has(a.id) || a.cashAccountId === null);
 
       res.json(unvouchered);
     } catch (error: any) {
@@ -1488,17 +1488,24 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
 
-      const advanceIds: number[] = req.body.advanceIds;
-      if (!advanceIds || !Array.isArray(advanceIds) || advanceIds.length === 0) {
-        return res.status(400).json({ message: "No advance IDs provided" });
-      }
-
       const [acct] = await db.select({ id: ledgerAccounts.id })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
       const result = await db.transaction(async (tx: any) => {
+        const allAdvances = await tx.select({
+          id: factoryWorkerAdvances.id,
+          amount: factoryWorkerAdvances.amount,
+          advanceDate: factoryWorkerAdvances.advanceDate,
+          workerId: factoryWorkerAdvances.workerId,
+          cashAccountId: factoryWorkerAdvances.cashAccountId,
+          workerName: factoryWorkers.fullName,
+        })
+          .from(factoryWorkerAdvances)
+          .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
+          .where(eq(factoryWorkerAdvances.companyId, companyId));
+
         const existingVouchers = await tx.select({ voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
           .where(and(
@@ -1509,6 +1516,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         for (const v of existingVouchers) {
           const match = v.voucherNumber.match(/^PAYMENT-ADV-(\d+)-/);
           if (match) alreadyPostedIds.add(parseInt(match[1]));
+        }
+
+        const eligible = allAdvances.filter((a: any) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
+        const eligibleIds = new Set(eligible.map((a: any) => a.id));
+
+        if (eligibleIds.size === 0) {
+          return { posted: 0, skipped: 0 };
         }
 
         let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
@@ -1534,23 +1548,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           }).returning();
         }
 
-        const advances = await tx.select({
-          id: factoryWorkerAdvances.id,
-          amount: factoryWorkerAdvances.amount,
-          advanceDate: factoryWorkerAdvances.advanceDate,
-          workerId: factoryWorkerAdvances.workerId,
-          workerName: factoryWorkers.fullName,
-        })
-          .from(factoryWorkerAdvances)
-          .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
-          .where(and(
-            eq(factoryWorkerAdvances.companyId, companyId),
-            inArray(factoryWorkerAdvances.id, advanceIds),
-          ));
-
         let posted = 0;
         let skipped = 0;
-        for (const adv of advances) {
+        for (const adv of eligible) {
           if (alreadyPostedIds.has(adv.id)) {
             skipped++;
             continue;
@@ -1589,7 +1589,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           ]);
 
           await tx.update(factoryWorkerAdvances)
-            .set({ cashAccountId } as any)
+            .set({ cashAccountId: cashAccountId })
             .where(eq(factoryWorkerAdvances.id, adv.id));
 
           posted++;
