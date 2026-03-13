@@ -90,6 +90,8 @@ import {
   insertFactorySupplierFxTransferSchema,
   baleRecodeSessions,
   baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -10128,6 +10130,115 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .orderBy(desc(factoryDaybookEntryEdits.editedAt));
       res.json(edits);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/daybook/entry/:id/void — Void a voucher-backed daybook entry
+  app.delete("/api/factory/daybook/entry/:id/void", requireAuth, async (req: any, res: any) => {
+    try {
+      const session = req.session as any;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      const role = session.currentRole || session.role;
+      if (role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can void vouchers" });
+      }
+
+      const rawId = Number(req.params.id);
+      if (isNaN(rawId)) return res.status(400).json({ message: "Invalid entry ID" });
+
+      let voucherId: number;
+      let daybookEntryId: number | null = null;
+
+      if (rawId < 0) {
+        voucherId = Math.abs(rawId);
+      } else {
+        const [entry] = await db.select().from(factoryDaybookEntries)
+          .where(and(eq(factoryDaybookEntries.id, rawId), eq(factoryDaybookEntries.companyId, companyId)));
+        if (!entry) return res.status(404).json({ message: "Daybook entry not found" });
+        if (entry.referenceTable !== "vouchers" || !entry.referenceId) {
+          return res.status(400).json({ message: "This entry is not voucher-backed and cannot be voided" });
+        }
+        voucherId = entry.referenceId;
+        daybookEntryId = entry.id;
+      }
+
+      const [voucher] = await db.select().from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} IS NULL`));
+      if (!voucher) return res.status(404).json({ message: "Voucher not found or already voided" });
+
+      const vNum = voucher.voucherNumber || "";
+      const voucherTxTypeMap: Record<string, string> = { Payment: "PAYMENT", Receipt: "RECEIPT", Journal: "JOURNAL" };
+      const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
+      const today = new Date().toISOString().split("T")[0];
+
+      await db.transaction(async (tx: any) => {
+        // 1. Delete voucher entries (double-entry lines)
+        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+
+        // 2. Soft-delete the voucher
+        await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, voucherId));
+
+        // 3. Delete the real daybook entry if it exists
+        if (daybookEntryId) {
+          await tx.delete(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, daybookEntryId));
+        }
+
+        // 4. Cascade effects based on voucher number pattern
+        const advPayMatch = vNum.match(/^PAYMENT-ADV-(\d+)-/);
+        const payPayMatch = vNum.match(/^PAYMENT-PAY-(\d+)-/);
+        const repayMatch = vNum.match(/^RECEIPT-REPAY-(\d+)-/);
+
+        if (advPayMatch) {
+          const advanceId = parseInt(advPayMatch[1]);
+          await tx.update(factoryWorkerAdvances).set({ cashAccountId: null })
+            .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
+        } else if (payPayMatch) {
+          const payrollId = parseInt(payPayMatch[1]);
+          await tx.update(factoryPayrolls).set({ status: "DRAFT", cashAccountId: null, paidAt: null })
+            .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
+        } else if (repayMatch) {
+          const repaymentId = parseInt(repayMatch[1]);
+          const [repayment] = await tx.select().from(factoryAdvanceRepayments)
+            .where(and(eq(factoryAdvanceRepayments.id, repaymentId), eq(factoryAdvanceRepayments.companyId, companyId)));
+          if (repayment) {
+            const [advance] = await tx.select().from(factoryWorkerAdvances)
+              .where(and(eq(factoryWorkerAdvances.id, repayment.advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
+            if (advance) {
+              const newBalance = parseFloat(advance.remainingBalance || "0") + parseFloat(repayment.amount || "0");
+              await tx.update(factoryWorkerAdvances).set({
+                remainingBalance: newBalance.toFixed(2),
+                fullyPaid: false,
+              }).where(eq(factoryWorkerAdvances.id, advance.id));
+            }
+            await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
+          }
+        }
+
+        // 5. Write a VOIDED audit daybook entry
+        const voidTxType = `${txTypeVal}_VOIDED`;
+        const amt = parseFloat(voucher.totalAmount || "0");
+        const currency = voucher.currency || "USD";
+        const fxRate = parseFloat(voucher.exchangeRate || "1") || 1;
+        const amtUsd = currency === "USD" ? amt : amt * fxRate;
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: today,
+          txType: voidTxType,
+          referenceId: voucherId,
+          referenceTable: "vouchers",
+          description: `VOIDED: ${voucher.description || voucher.voucherNumber}`,
+          currencyCode: currency,
+          amountCurrency: amt,
+          fxRateToUsd: fxRate,
+          amountUsd: amtUsd,
+          createdBy: session.userId ? Number(session.userId) : undefined,
+        });
+      });
+
+      res.json({ message: "Voucher voided successfully", voucherId });
+    } catch (error: any) {
+      console.error("Error voiding voucher:", error);
       res.status(500).json({ message: error.message });
     }
   });

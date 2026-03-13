@@ -3,7 +3,17 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal, Package } from "lucide-react";
+import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal, Package, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -108,6 +118,9 @@ const TX_TYPE_LABELS: Record<string, string> = {
   SUPPLIER_PAYMENT_DELETE: "Supplier Pmt. Deleted",
   ORDER_CANCELLED: "Order Cancelled",
   REPORT_GENERATED: "Report Generated",
+  PAYMENT_VOIDED: "Payment Voided",
+  RECEIPT_VOIDED: "Receipt Voided",
+  JOURNAL_VOIDED: "Journal Voided",
 };
 
 function formatTxType(type: string): string {
@@ -149,6 +162,8 @@ export default function FactoryDaybook() {
   const [showHistory, setShowHistory] = useState<number | null>(null);
   const [baleViewerEntry, setBaleViewerEntry] = useState<DaybookEntry | null>(null);
   const [baleChooserEntry, setBaleChooserEntry] = useState<DaybookEntry | null>(null);
+  const [optionalFilter, setOptionalFilter] = useState<"all" | "exclude" | "only">("all");
+  const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
 
   // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
   useEffect(() => {
@@ -185,6 +200,12 @@ export default function FactoryDaybook() {
     },
   });
 
+  const filteredEntries = useMemo(() => {
+    if (optionalFilter === "exclude") return entries.filter((e) => !e.optional);
+    if (optionalFilter === "only") return entries.filter((e) => e.optional);
+    return entries;
+  }, [entries, optionalFilter]);
+
   const condensedRows = useMemo(() => {
     const grouped: Record<string, {
       date: string;
@@ -195,7 +216,7 @@ export default function FactoryDaybook() {
       fxRateToUsd: string | null;
       totalAmountUsd: number;
     }> = {};
-    entries.filter((e) => !e.optional).forEach((e) => {
+    filteredEntries.forEach((e) => {
       const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
       if (!grouped[key]) {
         grouped[key] = {
@@ -219,7 +240,7 @@ export default function FactoryDaybook() {
       if (b.date !== a.date) return b.date.localeCompare(a.date);
       return a.txType.localeCompare(b.txType);
     });
-  }, [entries]);
+  }, [filteredEntries]);
 
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
@@ -248,6 +269,24 @@ export default function FactoryDaybook() {
       return res.json();
     },
     enabled: showHistory !== null,
+  });
+
+  const voidMutation = useMutation({
+    mutationFn: async (entryId: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/daybook/entry/${entryId}/void`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      setVoidEntry(null);
+      toast({ title: "Voucher voided", description: "All accounting entries have been reversed." });
+    },
+    onError: (e: any) => toast({ title: "Void failed", description: e.message, variant: "destructive" }),
   });
 
   const openEditDialog = (entry: DaybookEntry) => {
@@ -397,6 +436,19 @@ export default function FactoryDaybook() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Optional</Label>
+              <Select value={optionalFilter} onValueChange={(v) => setOptionalFilter(v as "all" | "exclude" | "only")}>
+                <SelectTrigger className="w-40" data-testid="select-optional-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Entries</SelectItem>
+                  <SelectItem value="exclude">Exclude Optional</SelectItem>
+                  <SelectItem value="only">Only Optional</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -484,7 +536,7 @@ export default function FactoryDaybook() {
                 <p className="text-muted-foreground mt-2">Factory transactions will appear here as you perform operations</p>
               </div>
             )
-          ) : entries.length > 0 ? (
+          ) : filteredEntries.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
@@ -500,12 +552,13 @@ export default function FactoryDaybook() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry) => {
+                  {filteredEntries.map((entry) => {
                     const balesMeta = parseBalesMeta(entry);
                     const hasSource = (!!VOUCHER_TX_TYPES[entry.txType] || entry.txType === "INVOICE") && !!entry.referenceId
                       || (entry.txType === "BALE_STOCK_ENTRY" && balesMeta.length > 0);
                     const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                     const isRowClickable = isBaleTransfer;
+                    const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
                     return (
                     <TableRow
                       key={entry.id}
@@ -581,6 +634,17 @@ export default function FactoryDaybook() {
                           <Button size="icon" variant="ghost" title="Edit history" onClick={(e) => { e.stopPropagation(); setShowHistory(entry.id); }} data-testid={`button-history-daybook-${entry.id}`}>
                             <History className="h-3 w-3" />
                           </Button>
+                          {isAdminOrOwner && isVoucherBacked && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Void voucher"
+                              onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+                              data-testid={`button-void-voucher-${entry.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -769,6 +833,33 @@ export default function FactoryDaybook() {
           })()}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={voidEntry !== null} onOpenChange={(open) => { if (!open) setVoidEntry(null); }}>
+        <AlertDialogContent data-testid="dialog-void-voucher">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Void this voucher?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse all accounting entries for this voucher and remove it from the daybook. This action cannot be undone.
+              {voidEntry && (
+                <span className="block mt-2 font-medium text-foreground">
+                  {voidEntry.description}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-void">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => voidEntry && voidMutation.mutate(voidEntry.id)}
+              disabled={voidMutation.isPending}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-void"
+            >
+              {voidMutation.isPending ? "Voiding..." : "Void Voucher"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
