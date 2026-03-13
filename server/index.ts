@@ -162,8 +162,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Flag used by /api/health/db to signal readiness to Render's health check.
+// Port opens immediately; migrations run in background. Render holds traffic
+// on the old instance (via health check 503) until this flips to true.
+let migrationsDone = false;
+
 (async () => {
-  // Run database migrations to ensure all tables and columns exist in production
   const migrations = [
     // ── Create missing tables ──────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS user_presence (
@@ -371,14 +375,15 @@ app.use((req, res, next) => {
       updated_at timestamp DEFAULT now()
     )`,
   ];
-  for (const migration of migrations) {
-    try {
-      await db.execute(migration);
-    } catch (err: any) {
-      console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
+  // Health check registered BEFORE registerRoutes so it takes precedence over the
+  // one in routes.ts. Returns 503 while migrations are running — this tells Render's
+  // health check to keep traffic on the old instance until the new one is fully ready.
+  app.get("/api/health/db", (_req, res) => {
+    if (!migrationsDone) {
+      return res.status(503).json({ status: "starting", message: "Running startup migrations, please wait..." });
     }
-  }
-  console.log("✓ Database tables and columns verified/migrated");
+    res.json({ status: "ok", message: "Database connection successful" });
+  });
 
   // Build info endpoint for frontend version checking (must be before registerRoutes)
   app.get("/api/build-info", (_req, res) => {
@@ -421,7 +426,7 @@ app.use((req, res, next) => {
     app.use(express.static(distPath, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('index.html')) {
-          // Never cache index.html to prevent serving stale bundles
+          // Never cache index.html to prevent suppress stale bundles
           res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
@@ -447,9 +452,28 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
 
+  const runMigrations = async () => {
+    for (const migration of migrations) {
+      try {
+        await db.execute(migration);
+      } catch (err: any) {
+        console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
+      }
+    }
+    console.log("✓ Database tables and columns verified/migrated");
+    migrationsDone = true;
+  };
+
   const doListen = () => {
     server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
+      // Run migrations in background AFTER port is open.
+      // Render's health check (/api/health/db) returns 503 until done,
+      // so the old instance continues serving traffic during this window.
+      runMigrations().catch((err) => {
+        console.error("Migration error:", err);
+        migrationsDone = true; // unblock health check even on error
+      });
     });
   };
 
