@@ -1051,8 +1051,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Handler functions
   const handleView = (voucher: Voucher) => {
-    // Navigate to route-based detail page; state is preserved in sessionStorage
-    navigate(`/voucher-detail/${voucher.id}?from=daybook`);
+    setSelectedVoucher(voucher);
+    setViewDialogOpen(true);
   };
 
   const handleEdit = (voucher: Voucher) => {
