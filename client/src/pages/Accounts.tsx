@@ -1889,12 +1889,16 @@ export default function Accounts() {
                                   )}
                                   {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalDebit > 0
-                                      ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalDebit)}`
+                                      ? voucher.currency && voucher.currency !== "USD"
+                                        ? `${voucher.currency} ${voucher.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : formatAmount(voucher.totalDebit)
                                       : "-"}
                                   </TableCell>}
                                   {!hideBalances && <TableCell className="text-right font-mono py-2">
                                     {voucher.totalCredit > 0
-                                      ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalCredit)}`
+                                      ? voucher.currency && voucher.currency !== "USD"
+                                        ? `${voucher.currency} ${voucher.totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                        : formatAmount(voucher.totalCredit)
                                       : "-"}
                                   </TableCell>}
                                   {!hideBalances && <TableCell className="text-right font-mono font-medium py-2">
@@ -1995,13 +1999,21 @@ export default function Accounts() {
                                   <div>
                                     <span className="text-muted-foreground block">Debit</span>
                                     <span className="font-mono">
-                                      {voucher.totalDebit > 0 ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalDebit)}` : "-"}
+                                      {voucher.totalDebit > 0
+                                        ? voucher.currency && voucher.currency !== "USD"
+                                          ? `${voucher.currency} ${voucher.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                          : formatAmount(voucher.totalDebit)
+                                        : "-"}
                                     </span>
                                   </div>
                                   <div>
                                     <span className="text-muted-foreground block">Credit</span>
                                     <span className="font-mono">
-                                      {voucher.totalCredit > 0 ? `${voucher.currency && voucher.currency !== "USD" ? voucher.currency + " " : ""}${formatAmount(voucher.totalCredit)}` : "-"}
+                                      {voucher.totalCredit > 0
+                                        ? voucher.currency && voucher.currency !== "USD"
+                                          ? `${voucher.currency} ${voucher.totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                          : formatAmount(voucher.totalCredit)
+                                        : "-"}
                                     </span>
                                   </div>
                                   <div className="text-right">

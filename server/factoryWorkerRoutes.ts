@@ -1579,7 +1579,6 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           entryId: adv.id,
           voucherId: adv.id,
           date: adv.advanceDate,
-          type: "Advance",
           debitAmount: adv.amount,
           creditAmount: "0",
           narration: adv.notes || "Advance payment",
@@ -1597,7 +1596,6 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           entryId: 100000 + pr.id,
           voucherId: 100000 + pr.id,
           date: paidDate,
-          type: "Payroll",
           debitAmount: "0",
           creditAmount: pr.netSalary || "0",
           narration: `Payroll ${pr.periodStart} to ${pr.periodEnd}`,
@@ -1607,26 +1605,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           voucherDescription: `Payroll ${pr.periodStart} to ${pr.periodEnd}`,
           currency: "USD",
         });
-
-        if (parseFloat(pr.advances || "0") > 0) {
-          entries.push({
-            entryId: 200000 + pr.id,
-            voucherId: 200000 + pr.id,
-            date: paidDate,
-            type: "Advance Deduction",
-            debitAmount: "0",
-            creditAmount: pr.advances || "0",
-            narration: `Advance deducted from payroll ${pr.periodStart} to ${pr.periodEnd}`,
-            voucherNumber: `ADV-DED-${pr.id}`,
-            voucherType: "Advance Deduction",
-            voucherDate: paidDate,
-            voucherDescription: `Advance deducted: $${pr.advances}`,
-            currency: "USD",
-          });
-        }
       }
 
       entries.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      let runningBalance = 0;
+      for (const entry of entries) {
+        runningBalance += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+        entry.runningBalance = runningBalance;
+      }
 
       res.json(entries);
     } catch (error: any) {
