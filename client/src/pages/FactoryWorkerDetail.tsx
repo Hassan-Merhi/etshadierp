@@ -94,6 +94,15 @@ interface AdvanceRowProps {
 }
 
 function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDate, fmt }: AdvanceRowProps) {
+  const { data: cashAccounts } = useQuery<CashAccount[]>({
+    queryKey: ["/api/factory/cash-accounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
+      return res.json();
+    },
+    enabled: isLoan && isExpanded,
+  });
+
   const { data: repayments } = useQuery<any[]>({
     queryKey: ["/api/factory/advances", adv.id, "repayments"],
     queryFn: async () => {
@@ -104,11 +113,22 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
     enabled: isLoan && isExpanded,
   });
 
+  const cashAccountMap = new Map((cashAccounts || []).map((a) => [a.id, a.name]));
+
+  const repaymentsWithRunningBalance = (repayments || []).slice().sort(
+    (a: any, b: any) => new Date(a.repaymentDate).getTime() - new Date(b.repaymentDate).getTime()
+  ).reduce((acc: any[], r: any) => {
+    const prevBal = acc.length > 0 ? acc[acc.length - 1].balanceAfter : parseFloat(adv.amount || "0");
+    const balAfter = prevBal - parseFloat(r.amount || "0");
+    acc.push({ ...r, balanceAfter: Math.max(0, balAfter) });
+    return acc;
+  }, []).reverse();
+
   return (
     <>
       <TableRow data-testid={`row-worker-advance-${adv.id}`}>
         <TableCell className="px-2">
-          {isLoan && !adv.fullyPaid && (
+          {isLoan && (
             <Button size="icon" variant="ghost" onClick={onToggleExpand} data-testid={`button-expand-advance-${adv.id}`}>
               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
@@ -153,7 +173,7 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/30 p-3">
             <div className="text-xs font-medium text-muted-foreground mb-2">Repayment History</div>
-            {!repayments || repayments.length === 0 ? (
+            {repaymentsWithRunningBalance.length === 0 ? (
               <p className="text-xs text-muted-foreground">No repayments recorded yet</p>
             ) : (
               <Table>
@@ -161,14 +181,18 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
                   <TableRow>
                     <TableHead className="text-xs">Date</TableHead>
                     <TableHead className="text-xs text-right">Amount</TableHead>
+                    <TableHead className="text-xs">Cash Account</TableHead>
+                    <TableHead className="text-xs text-right">Balance After</TableHead>
                     <TableHead className="text-xs">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {repayments.map((r: any) => (
+                  {repaymentsWithRunningBalance.map((r: any) => (
                     <TableRow key={r.id} data-testid={`row-repayment-${r.id}`}>
                       <TableCell className="text-xs">{formatDate(r.repaymentDate)}</TableCell>
                       <TableCell className="text-xs text-right font-mono">{fmt(r.amount)}</TableCell>
+                      <TableCell className="text-xs">{r.cashAccountId ? (cashAccountMap.get(r.cashAccountId) || `#${r.cashAccountId}`) : "\u2014"}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{fmt(r.balanceAfter)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{r.notes || "\u2014"}</TableCell>
                     </TableRow>
                   ))}
@@ -218,7 +242,7 @@ export default function FactoryWorkerDetail() {
   const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceNotes, setAdvanceNotes] = useState("");
-  const [advanceRepaymentType, setAdvanceRepaymentType] = useState<"salary_deduction" | "manual_repayment">("salary_deduction");
+  const [advanceRepaymentType, setAdvanceRepaymentType] = useState("salary_deduction");
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
 
   const [repayAdvanceId, setRepayAdvanceId] = useState<number | null>(null);
@@ -789,8 +813,8 @@ export default function FactoryWorkerDetail() {
                   <div className="flex items-center gap-2 flex-wrap">
                     {(() => {
                       const allOutstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
-                      const salaryDeduction = allOutstanding.filter((a) => (a as any).repaymentType !== "manual_repayment");
-                      const manualRepayment = allOutstanding.filter((a) => (a as any).repaymentType === "manual_repayment");
+                      const salaryDeduction = allOutstanding.filter((a) => a.repaymentType !== "manual_repayment");
+                      const manualRepayment = allOutstanding.filter((a) => a.repaymentType === "manual_repayment");
                       const salaryBal = salaryDeduction.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
                       const loanBal = manualRepayment.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
                       return (
@@ -859,7 +883,7 @@ export default function FactoryWorkerDetail() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <div className="space-y-1">
                           <Label className="text-xs">Repayment Type</Label>
-                          <Select value={advanceRepaymentType} onValueChange={(v) => setAdvanceRepaymentType(v as any)}>
+                          <Select value={advanceRepaymentType} onValueChange={(v) => setAdvanceRepaymentType(v)}>
                             <SelectTrigger className="w-48" data-testid="select-advance-repayment-type">
                               <SelectValue />
                             </SelectTrigger>
@@ -910,28 +934,56 @@ export default function FactoryWorkerDetail() {
                             No advances recorded
                           </TableCell>
                         </TableRow>
-                      ) : workerAdvances.map((adv) => {
-                        const isLoan = (adv as any).repaymentType === "manual_repayment";
-                        const isExpanded = expandedAdvanceId === adv.id;
+                      ) : (() => {
+                        const salaryAdvances = workerAdvances.filter((a) => a.repaymentType !== "manual_repayment");
+                        const loanAdvances = workerAdvances.filter((a) => a.repaymentType === "manual_repayment");
+                        const renderRows = (list: typeof workerAdvances, isLoan: boolean) =>
+                          list.map((adv) => {
+                            const isExpanded = expandedAdvanceId === adv.id;
+                            return (
+                              <AdvanceRow
+                                key={adv.id}
+                                adv={adv}
+                                isLoan={isLoan}
+                                isExpanded={isExpanded}
+                                onToggleExpand={() => setExpandedAdvanceId(isExpanded ? null : adv.id)}
+                                onRepay={() => {
+                                  setRepayAdvanceId(adv.id);
+                                  setRepayDate(new Date().toISOString().split("T")[0]);
+                                  setRepayAmount("");
+                                  setRepayCashAccountId("");
+                                  setRepayNotes("");
+                                }}
+                                formatDate={formatDate}
+                                fmt={fmt}
+                              />
+                            );
+                          });
                         return (
-                          <AdvanceRow
-                            key={adv.id}
-                            adv={adv}
-                            isLoan={isLoan}
-                            isExpanded={isExpanded}
-                            onToggleExpand={() => setExpandedAdvanceId(isExpanded ? null : adv.id)}
-                            onRepay={() => {
-                              setRepayAdvanceId(adv.id);
-                              setRepayDate(new Date().toISOString().split("T")[0]);
-                              setRepayAmount("");
-                              setRepayCashAccountId("");
-                              setRepayNotes("");
-                            }}
-                            formatDate={formatDate}
-                            fmt={fmt}
-                          />
+                          <>
+                            {salaryAdvances.length > 0 && (
+                              <>
+                                <TableRow>
+                                  <TableCell colSpan={8} className="bg-muted/50 py-1.5 px-3 text-xs font-semibold text-muted-foreground">
+                                    Salary Deduction Advances ({salaryAdvances.length})
+                                  </TableCell>
+                                </TableRow>
+                                {renderRows(salaryAdvances, false)}
+                              </>
+                            )}
+                            {loanAdvances.length > 0 && (
+                              <>
+                                <TableRow>
+                                  <TableCell colSpan={8} className="bg-muted/50 py-1.5 px-3 text-xs font-semibold text-muted-foreground">
+                                    Loan / Manual Repayment Advances ({loanAdvances.length})
+                                  </TableCell>
+                                </TableRow>
+                                {renderRows(loanAdvances, true)}
+                              </>
+                            )}
+                          </>
                         );
-                      })}
+                      })()}
                     </TableBody>
                   </Table>
                 </CardContent>

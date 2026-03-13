@@ -1553,7 +1553,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
         });
 
-        return { repayment, newBalance: Math.max(0, newBalance).toFixed(2), fullyPaid: isFullyPaid };
+        const [updatedAdvance] = await tx.select().from(factoryWorkerAdvances)
+          .where(eq(factoryWorkerAdvances.id, advanceId));
+
+        return { repayment, advance: updatedAdvance };
       });
 
       res.json(result);
