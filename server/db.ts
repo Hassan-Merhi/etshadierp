@@ -45,8 +45,8 @@ const pool = new Pool({
   // Connection pool limits — critical for Render's basic PostgreSQL plan (~25 max connections total).
   // The session store uses its own separate pool, so keep this at 7 to leave headroom.
   max: 7,
-  // Fail fast if no connection available within 4 seconds, rather than queuing indefinitely.
-  connectionTimeoutMillis: 4000,
+  // Fail fast if no connection available within 10 seconds, rather than queuing indefinitely.
+  connectionTimeoutMillis: 10000,
   // Release idle connections after 30 seconds to avoid holding unused slots.
   idleTimeoutMillis: 30000,
 });

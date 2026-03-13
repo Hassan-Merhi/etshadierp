@@ -948,15 +948,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/user-presence/leave",
     async (req, res) => {
-      try {
-        const sessionId = req.sessionID;
-        if (sessionId) {
-          await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
-        }
-        res.json({ success: true });
-      } catch (error: any) {
-        console.error("Error clearing presence on leave:", error);
-        res.status(500).json({ message: error.message });
+      const sessionId = req.sessionID;
+      res.json({ success: true });
+      if (sessionId) {
+        db.delete(userPresence).where(eq(userPresence.sessionId, sessionId)).catch((err: any) => {
+          console.error("Error clearing presence on leave:", err.message);
+        });
       }
     }
   );
