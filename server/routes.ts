@@ -8,7 +8,7 @@ import CryptoJS from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
 import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
-import { adjustInventory } from "./inventoryHelper";
+import { adjustInventory, reverseInventoryByExactValue } from "./inventoryHelper";
 import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
 import { registerFactoryPayrollRoutes } from "./factoryPayrollRoutes";
@@ -11055,35 +11055,49 @@ if (asOfDate) {
               .from(containerOffloadItems)
               .where(eq(containerOffloadItems.offloadId, existingOffload.id));
 
-            // Fall back to PO line items only when no stored offload items exist (legacy containers)
-            let itemsToReverse: Array<{ stockItemId: number; quantity: string }>;
-            if (storedOffloadItems.length > 0) {
-              itemsToReverse = storedOffloadItems.map(i => ({
-                stockItemId: i.stockItemId,
-                quantity: i.quantity,
-              }));
-            } else {
-              const pos = await storage.getPurchaseOrdersByContainer(containerId);
-              const allLineItems: any[] = [];
-              for (const po of pos) {
-                const lineItems = await storage.getLineItemsByPO(po.id);
-                allLineItems.push(...lineItems);
-              }
-              itemsToReverse = allLineItems.map(i => ({
-                stockItemId: i.stockItemId,
-                quantity: i.quantity,
-              }));
-            }
-
             await db.transaction(async (tx) => {
-              for (const item of itemsToReverse) {
-                await adjustInventory(
-                  tx,
-                  existingOffload.locationId,
-                  item.stockItemId,
-                  -parseFloat(item.quantity),
-                  container.companyId,
-                );
+              if (storedOffloadItems.length > 0) {
+                for (const offloadItem of storedOffloadItems) {
+                  await reverseInventoryByExactValue(
+                    tx,
+                    existingOffload.locationId,
+                    offloadItem.stockItemId,
+                    parseFloat(offloadItem.quantity),
+                    parseFloat(offloadItem.totalValue),
+                  );
+                }
+              } else {
+                const pos = await storage.getPurchaseOrdersByContainer(containerId);
+                const allLineItems: any[] = [];
+                for (const po of pos) {
+                  const lineItems = await storage.getLineItemsByPO(po.id);
+                  allLineItems.push(...lineItems);
+                }
+                const legacyAdditionalCost = parseFloat(existingOffload.additionalCostPerBale || "0");
+                const legacyItemsMap = new Map<number, { totalQuantity: number; weightedRateSum: number }>();
+                for (const item of allLineItems) {
+                  const stockItemId = item.stockItemId;
+                  if (!stockItemId || stockItemId === 0) continue;
+                  const quantity = parseFloat(item.quantity);
+                  const rate = parseFloat(item.rate || "0");
+                  if (legacyItemsMap.has(stockItemId)) {
+                    const existing = legacyItemsMap.get(stockItemId)!;
+                    existing.totalQuantity += quantity;
+                    existing.weightedRateSum += rate * quantity;
+                  } else {
+                    legacyItemsMap.set(stockItemId, { totalQuantity: quantity, weightedRateSum: rate * quantity });
+                  }
+                }
+                for (const [stockItemId, data] of Array.from(legacyItemsMap)) {
+                  const estimatedValue = data.weightedRateSum + data.totalQuantity * legacyAdditionalCost;
+                  await reverseInventoryByExactValue(
+                    tx,
+                    existingOffload.locationId,
+                    stockItemId,
+                    data.totalQuantity,
+                    estimatedValue,
+                  );
+                }
               }
 
               // Delete stored offload items so they don't persist after reversal
@@ -11206,15 +11220,13 @@ if (asOfDate) {
 
           // Use stored offload items if available (lossless reversal)
           if (storedOffloadItems.length > 0) {
-            // Reduce inventory using EXACT stored values from offload
             for (const offloadItem of storedOffloadItems) {
-              const offloadQty = parseFloat(offloadItem.quantity);
-              await adjustInventory(
+              await reverseInventoryByExactValue(
                 tx,
                 offloadRecord.locationId,
                 offloadItem.stockItemId,
-                -offloadQty,
-                req.session.currentCompanyId!,
+                parseFloat(offloadItem.quantity),
+                parseFloat(offloadItem.totalValue),
               );
             }
             
@@ -11259,12 +11271,13 @@ if (asOfDate) {
             }
 
             for (const [stockItemId, data] of Array.from(itemsMap)) {
-              await adjustInventory(
+              const estimatedValue = data.weightedRateSum + data.totalQuantity * additionalCostPerBale;
+              await reverseInventoryByExactValue(
                 tx,
                 offloadRecord.locationId,
                 stockItemId,
-                -data.totalQuantity,
-                req.session.currentCompanyId!,
+                data.totalQuantity,
+                estimatedValue,
               );
             }
           }
@@ -35353,6 +35366,83 @@ if (asOfDate) {
       await storage.deleteLiveSpreadsheet(id, companyId);
       res.json({ message: "Deleted" });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/repair-inventory-values", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const detectResult = await db.execute(
+        sql`SELECT id, location_id, stock_item_id, quantity, average_rate, total_value
+            FROM inventory
+            WHERE company_id = ${companyId}
+            AND (
+              (CAST(quantity AS DECIMAL) <= 0 AND CAST(total_value AS DECIMAL) > 0.01)
+              OR CAST(average_rate AS DECIMAL) < 0
+              OR (CAST(quantity AS DECIMAL) > 0 AND CAST(total_value AS DECIMAL) < -0.01)
+              OR (CAST(quantity AS DECIMAL) <= 0 AND ABS(CAST(average_rate AS DECIMAL)) > 0.001)
+            )`
+      );
+
+      const corruptedRows = detectResult.rows || detectResult;
+
+      if (!corruptedRows || corruptedRows.length === 0) {
+        return res.json({ message: "No corrupted inventory rows found", corrected: 0, rows: [] });
+      }
+
+      const correctedRows: any[] = [];
+      for (const row of corruptedRows as any[]) {
+        const qty = parseFloat(row.quantity || "0");
+        const oldRate = parseFloat(row.average_rate || "0");
+        const oldValue = parseFloat(row.total_value || "0");
+
+        let newValue = oldValue;
+        let newRate = oldRate;
+
+        if (qty <= 0) {
+          newValue = 0;
+          newRate = 0;
+        } else if (qty > 0 && oldValue < 0) {
+          newValue = 0;
+          newRate = 0;
+        } else if (oldRate < 0) {
+          newRate = 0;
+        }
+
+        await db.execute(
+          sql`UPDATE inventory
+              SET total_value = ${newValue.toFixed(2)},
+                  average_rate = ${newRate.toFixed(2)},
+                  last_updated = NOW()
+              WHERE id = ${row.id}`
+        );
+
+        correctedRows.push({
+          id: row.id,
+          locationId: row.location_id,
+          stockItemId: row.stock_item_id,
+          quantity: qty,
+          oldRate,
+          oldValue,
+          newRate,
+          newValue,
+        });
+
+        console.log(`[InventoryRepair] Corrected row id=${row.id} loc=${row.location_id} item=${row.stock_item_id}: qty=${qty} rate=${oldRate}->${newRate} value=${oldValue}->${newValue}`);
+      }
+
+      res.json({
+        message: `Repaired ${correctedRows.length} corrupted inventory rows`,
+        corrected: correctedRows.length,
+        rows: correctedRows,
+      });
+    } catch (error: any) {
+      console.error("Inventory repair error:", error);
       res.status(500).json({ message: error.message });
     }
   });

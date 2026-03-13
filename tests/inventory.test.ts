@@ -511,6 +511,367 @@ describe("adjustInventory Helper Tests", () => {
     expect(result.newQuantity).toBe(-50);
     expect(result.created).toBe(false);
   });
+
+  it("should never produce a negative average_rate (Bug 2 fix)", async () => {
+    const { adjustInventory } = await import("../server/inventoryHelper");
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "-100.000",
+        averageRate: "50.00",
+        totalValue: "-5000.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    const result = await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      200,
+      ctx.companyId,
+      1.0,
+    );
+
+    expect(result.newQuantity).toBe(100);
+    expect(result.averageRate).toBeGreaterThanOrEqual(0);
+    expect(result.newTotalValue).toBeGreaterThanOrEqual(0);
+  });
+
+  it("should clamp negative prevRate to zero during deduction (Bug 2 fix)", async () => {
+    const { adjustInventory } = await import("../server/inventoryHelper");
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "100.000",
+        averageRate: "-48.00",
+        totalValue: "-4800.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    const result = await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      -200,
+      ctx.companyId,
+    );
+
+    expect(result.newQuantity).toBe(-100);
+    expect(result.newTotalValue).toBe(0);
+    expect(result.averageRate).toBe(0);
+  });
+
+  it("should enforce qty <= 0 implies total_value = 0 and rate = 0 (Bug 4 fix)", async () => {
+    const { adjustInventory } = await import("../server/inventoryHelper");
+
+    const result = await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      -150,
+      ctx.companyId,
+    );
+
+    expect(result.newQuantity).toBe(-50);
+    expect(result.newTotalValue).toBe(0);
+    expect(result.averageRate).toBe(0);
+
+    const record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    expect(parseFloat(record!.totalValue!)).toBe(0);
+    expect(parseFloat(record!.averageRate)).toBe(0);
+  });
+
+  it("should enforce qty > 0 implies total_value >= 0 after deduction", async () => {
+    const { adjustInventory } = await import("../server/inventoryHelper");
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "200.000",
+        averageRate: "50.00",
+        totalValue: "10000.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    const result = await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      -190,
+      ctx.companyId,
+    );
+
+    expect(result.newQuantity).toBe(10);
+    expect(result.newTotalValue).toBeGreaterThanOrEqual(0);
+    expect(result.averageRate).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("reverseInventoryByExactValue Tests", () => {
+  beforeEach(async () => {
+    await resetInventory();
+  });
+
+  it("should subtract exact value and normalize invariants", async () => {
+    const { reverseInventoryByExactValue } = await import("../server/inventoryHelper");
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "190.000",
+        averageRate: "5.56",
+        totalValue: "1056.40",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    await reverseInventoryByExactValue(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      200,
+      500,
+    );
+
+    const record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    const qty = parseFloat(record!.quantity);
+    const value = parseFloat(record!.totalValue!);
+    const rate = parseFloat(record!.averageRate);
+
+    expect(qty).toBeCloseTo(-10, 1);
+    expect(value).toBe(0);
+    expect(rate).toBe(0);
+  });
+
+  it("should produce idempotent results across reverse/re-offload cycles", async () => {
+    const { adjustInventory, reverseInventoryByExactValue } = await import("../server/inventoryHelper");
+
+    const offloadQty = 200;
+    const offloadRate = 5.0;
+    const offloadValue = offloadQty * offloadRate;
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "0.000",
+        averageRate: "0.00",
+        totalValue: "0.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      ctx.companyId,
+      offloadRate,
+    );
+
+    const afterFirstOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    const firstQty = parseFloat(afterFirstOffload!.quantity);
+    const firstValue = parseFloat(afterFirstOffload!.totalValue!);
+    const firstRate = parseFloat(afterFirstOffload!.averageRate);
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      await reverseInventoryByExactValue(
+        db as any,
+        ctx.locationId,
+        ctx.stockItemIds[0],
+        offloadQty,
+        offloadValue,
+      );
+
+      const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+      expect(parseFloat(afterReverse!.quantity)).toBeCloseTo(0, 1);
+      expect(parseFloat(afterReverse!.totalValue!)).toBe(0);
+      expect(parseFloat(afterReverse!.averageRate)).toBe(0);
+
+      await adjustInventory(
+        db as any,
+        ctx.locationId,
+        ctx.stockItemIds[0],
+        offloadQty,
+        ctx.companyId,
+        offloadRate,
+      );
+
+      const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+      expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(firstQty, 1);
+      expect(parseFloat(afterReoffload!.totalValue!)).toBeCloseTo(firstValue, 2);
+      expect(parseFloat(afterReoffload!.averageRate)).toBeCloseTo(firstRate, 2);
+    }
+  });
+
+  it("should handle negative-stock offload reversal without value inflation", async () => {
+    const { adjustInventory, reverseInventoryByExactValue } = await import("../server/inventoryHelper");
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "-10.000",
+        averageRate: "0.00",
+        totalValue: "0.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    const offloadQty = 200;
+    const offloadRate = 1.0;
+    const offloadValue = offloadQty * offloadRate;
+
+    await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      ctx.companyId,
+      offloadRate,
+    );
+
+    const afterOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    expect(parseFloat(afterOffload!.quantity)).toBeCloseTo(190, 1);
+    expect(parseFloat(afterOffload!.averageRate)).toBeGreaterThanOrEqual(0);
+    expect(parseFloat(afterOffload!.totalValue!)).toBeGreaterThanOrEqual(0);
+
+    await reverseInventoryByExactValue(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      offloadValue,
+    );
+
+    const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    const reverseQty = parseFloat(afterReverse!.quantity);
+    const reverseValue = parseFloat(afterReverse!.totalValue!);
+    const reverseRate = parseFloat(afterReverse!.averageRate);
+
+    expect(reverseQty).toBeCloseTo(-10, 1);
+    expect(reverseValue).toBe(0);
+    expect(reverseRate).toBe(0);
+
+    await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      ctx.companyId,
+      offloadRate,
+    );
+
+    const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(190, 1);
+    expect(parseFloat(afterReoffload!.averageRate)).toBeGreaterThanOrEqual(0);
+    expect(parseFloat(afterReoffload!.totalValue!)).toBeGreaterThanOrEqual(0);
+    expect(parseFloat(afterReoffload!.totalValue!)).toBeLessThan(1000);
+  });
+
+  it("should enforce all four invariants after every operation", async () => {
+    const { adjustInventory, reverseInventoryByExactValue } = await import("../server/inventoryHelper");
+
+    function assertInvariants(record: any, label: string) {
+      const qty = parseFloat(record.quantity);
+      const value = parseFloat(record.totalValue || "0");
+      const rate = parseFloat(record.averageRate);
+
+      expect(rate).toBeGreaterThanOrEqual(0);
+
+      if (qty <= 0) {
+        expect(value).toBe(0);
+      }
+
+      if (qty > 0) {
+        expect(value).toBeGreaterThanOrEqual(0);
+      }
+
+      if (qty > 0 && rate > 0) {
+        expect(Math.abs(qty * rate - value)).toBeLessThan(1.0);
+      }
+    }
+
+    await db
+      .update(schema.inventory)
+      .set({
+        quantity: "-100.000",
+        averageRate: "0.00",
+        totalValue: "0.00",
+      })
+      .where(
+        and(
+          eq(schema.inventory.locationId, ctx.locationId),
+          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
+        ),
+      );
+
+    const offloadQty = 200;
+    const offloadValue = 200;
+
+    await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      ctx.companyId,
+      1.0,
+    );
+
+    let record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    assertInvariants(record, "after offload");
+
+    await reverseInventoryByExactValue(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      offloadValue,
+    );
+
+    record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    assertInvariants(record, "after reverse");
+
+    await adjustInventory(
+      db as any,
+      ctx.locationId,
+      ctx.stockItemIds[0],
+      offloadQty,
+      ctx.companyId,
+      1.0,
+    );
+
+    record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
+    assertInvariants(record, "after re-offload");
+  });
 });
 
 describe("Inventory Reconciliation Endpoint Tests", () => {

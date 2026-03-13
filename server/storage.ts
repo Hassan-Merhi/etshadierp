@@ -2332,7 +2332,11 @@ export class DbStorage implements IStorage {
           // Normal case: positive quantity - calculate weighted average
           // Total value = existing value + incoming value (with rounding adjustment), divided by total quantity
           newTotalValue = existingValue + offloadValue;
-          weightedAvgRate = newTotalValue / newQty;
+          if (newQty > 0 && newTotalValue < 0) {
+            console.warn(`[Offload] Clamping: existingValue=${existingValue}, offloadValue=${offloadValue}, newQty=${newQty}`);
+            newTotalValue = newQty * Math.max(adjustedRate, 0);
+          }
+          weightedAvgRate = newQty > 0 ? newTotalValue / newQty : 0;
         }
         
         // Safety check for infinity
