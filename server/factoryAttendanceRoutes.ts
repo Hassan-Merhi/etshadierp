@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
 
@@ -104,6 +104,38 @@ export function registerFactoryAttendanceRoutes(
       }
 
       res.json({ success: true, count: records.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/factory/attendance/worker/:workerId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+  // Returns all attendance records for a single worker across a date range.
+  app.get("/api/factory/attendance/worker/:workerId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company" });
+
+      const workerId = parseInt(req.params.workerId);
+      if (!workerId || isNaN(workerId)) return res.status(400).json({ message: "Invalid workerId" });
+
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
+
+      const records = await db
+        .select()
+        .from(factoryAttendance)
+        .where(
+          and(
+            eq(factoryAttendance.companyId, companyId),
+            eq(factoryAttendance.workerId, workerId),
+            gte(factoryAttendance.attendanceDate, startDate),
+            lte(factoryAttendance.attendanceDate, endDate)
+          )
+        )
+        .orderBy(factoryAttendance.attendanceDate);
+
+      res.json(records);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
