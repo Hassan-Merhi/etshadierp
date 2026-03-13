@@ -1281,10 +1281,6 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
               narration,
             },
           ]);
-
-          await tx.update(factoryWorkerAdvances)
-            .set({ voucherId })
-            .where(eq(factoryWorkerAdvances.id, advance.id));
         }
 
         await writeDaybookEntry(tx, {
