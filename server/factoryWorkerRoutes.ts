@@ -1433,6 +1433,178 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  app.get("/api/factory/advances/unvouchered", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allAdvances = await db.select({
+        id: factoryWorkerAdvances.id,
+        workerId: factoryWorkerAdvances.workerId,
+        advanceDate: factoryWorkerAdvances.advanceDate,
+        amount: factoryWorkerAdvances.amount,
+        remainingBalance: factoryWorkerAdvances.remainingBalance,
+        cashAccountId: factoryWorkerAdvances.cashAccountId,
+        notes: factoryWorkerAdvances.notes,
+        repaymentType: factoryWorkerAdvances.repaymentType,
+        workerName: factoryWorkers.fullName,
+      })
+        .from(factoryWorkerAdvances)
+        .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
+        .where(eq(factoryWorkerAdvances.companyId, companyId))
+        .orderBy(desc(factoryWorkerAdvances.advanceDate));
+
+      const existingVoucherAdvanceIds = await db.select({ voucherNumber: vouchers.voucherNumber })
+        .from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
+        ));
+
+      const voucheredIds = new Set<number>();
+      for (const v of existingVoucherAdvanceIds) {
+        const match = v.voucherNumber.match(/^PAYMENT-ADV-(\d+)-/);
+        if (match) voucheredIds.add(parseInt(match[1]));
+      }
+
+      const unvouchered = allAdvances.filter((a) => !voucheredIds.has(a.id));
+
+      res.json(unvouchered);
+    } catch (error: any) {
+      console.error("Error fetching unvouchered advances:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/advances/post-accounting", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentRole = (req.session as any).currentRole;
+      if (currentRole !== "Admin" && currentRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin or Owner can post accounting" });
+      }
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
+      if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
+
+      const advanceIds: number[] = req.body.advanceIds;
+      if (!advanceIds || !Array.isArray(advanceIds) || advanceIds.length === 0) {
+        return res.status(400).json({ message: "No advance IDs provided" });
+      }
+
+      const [acct] = await db.select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+      if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
+
+      const result = await db.transaction(async (tx: any) => {
+        const existingVouchers = await tx.select({ voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
+          ));
+        const alreadyPostedIds = new Set<number>();
+        for (const v of existingVouchers) {
+          const match = v.voucherNumber.match(/^PAYMENT-ADV-(\d+)-/);
+          if (match) alreadyPostedIds.add(parseInt(match[1]));
+        }
+
+        let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.name, "Factory Worker Advances"),
+          ));
+
+        if (!advancesAccount) {
+          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+
+          [advancesAccount] = await tx.insert(ledgerAccounts).values({
+            companyId,
+            code: nextCode,
+            name: "Factory Worker Advances",
+            accountType: "Asset",
+            active: true,
+            isHidden: false,
+          }).returning();
+        }
+
+        const advances = await tx.select({
+          id: factoryWorkerAdvances.id,
+          amount: factoryWorkerAdvances.amount,
+          advanceDate: factoryWorkerAdvances.advanceDate,
+          workerId: factoryWorkerAdvances.workerId,
+          workerName: factoryWorkers.fullName,
+        })
+          .from(factoryWorkerAdvances)
+          .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
+          .where(and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            inArray(factoryWorkerAdvances.id, advanceIds),
+          ));
+
+        let posted = 0;
+        let skipped = 0;
+        for (const adv of advances) {
+          if (alreadyPostedIds.has(adv.id)) {
+            skipped++;
+            continue;
+          }
+
+          const amount = parseFloat(adv.amount);
+          const voucherNumber = `PAYMENT-ADV-${adv.id}-${Date.now()}`;
+          const narration = `Advance to ${adv.workerName}: $${amount.toFixed(2)} (retroactive)`;
+
+          const [createdVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber,
+            voucherType: "Payment",
+            voucherDate: adv.advanceDate,
+            description: narration,
+            totalAmount: amount.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          }).returning();
+
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: createdVoucher.id,
+              ledgerAccountId: advancesAccount.id,
+              debitAmount: amount.toFixed(2),
+              creditAmount: "0",
+              narration,
+            },
+            {
+              voucherId: createdVoucher.id,
+              ledgerAccountId: cashAccountId,
+              debitAmount: "0",
+              creditAmount: amount.toFixed(2),
+              narration,
+            },
+          ]);
+
+          await tx.update(factoryWorkerAdvances)
+            .set({ cashAccountId } as any)
+            .where(eq(factoryWorkerAdvances.id, adv.id));
+
+          posted++;
+        }
+
+        return { posted, skipped };
+      });
+
+      res.json({ message: `Posted accounting for ${result.posted} advance(s)${result.skipped ? ` (${result.skipped} already posted, skipped)` : ""}`, posted: result.posted, skipped: result.skipped });
+    } catch (error: any) {
+      console.error("Error posting advance accounting:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/:id/advance-balance - Get total outstanding advance balance
   app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: any, res: any) => {
     try {

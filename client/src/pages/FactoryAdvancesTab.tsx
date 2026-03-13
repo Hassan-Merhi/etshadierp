@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Plus, Trash2, Banknote, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Banknote, RotateCcw, BookOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,8 @@ function AdvancesView() {
   const { toast } = useToast();
 
   const [addOpen, setAddOpen] = useState(false);
+  const [postAccountingOpen, setPostAccountingOpen] = useState(false);
+  const [postCashAccountId, setPostCashAccountId] = useState("");
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<AdvanceRecord | null>(null);
@@ -131,6 +133,33 @@ function AdvancesView() {
       const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
+  });
+
+  const { data: unvouchered, isLoading: unvoucheredLoading, refetch: refetchUnvouchered } = useQuery<AdvanceRecord[]>({
+    queryKey: ["/api/factory/advances/unvouchered"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/advances/unvouchered", { credentials: "include" });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    enabled: postAccountingOpen,
+  });
+
+  const postAccountingMutation = useMutation({
+    mutationFn: async (data: { cashAccountId: number; advanceIds: number[] }) => {
+      const res = await apiRequest("POST", "/api/factory/advances/post-accounting", data);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed");
+      return json;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      toast({ title: "Accounting posted", description: `${data.posted} advance(s) posted successfully` });
+      setPostAccountingOpen(false);
+      setPostCashAccountId("");
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const createMutation = useMutation({
@@ -261,7 +290,10 @@ function AdvancesView() {
           </SelectContent>
         </Select>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => { setPostAccountingOpen(true); refetchUnvouchered(); }} data-testid="button-post-accounting">
+            <BookOpen className="h-4 w-4 mr-2" />Post Accounting
+          </Button>
           <Button onClick={() => setAddOpen(true)} data-testid="button-add-advance">
             <Plus className="h-4 w-4 mr-2" />Add Advance
           </Button>
@@ -461,6 +493,101 @@ function AdvancesView() {
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={postAccountingOpen} onOpenChange={(open) => { setPostAccountingOpen(open); if (!open) setPostCashAccountId(""); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Post Accounting for Old Advances</DialogTitle>
+            <DialogDescription>
+              Create payment vouchers for advances that were recorded without a cash account deduction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Cash Account to Credit</Label>
+              <Select value={postCashAccountId} onValueChange={setPostCashAccountId}>
+                <SelectTrigger data-testid="select-post-cash-account">
+                  <SelectValue placeholder="Select cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(cashAccounts || []).map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name} ({a.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Unvouchered Advances</Label>
+              {unvoucheredLoading ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : !unvouchered?.length ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No unvouchered advances found</p>
+                  <p className="text-xs mt-1">All advances already have accounting entries</p>
+                </div>
+              ) : (
+                <div className="border rounded-md mt-2 max-h-64 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Worker</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unvouchered.map((adv) => (
+                        <TableRow key={adv.id} data-testid={`row-unvouchered-${adv.id}`}>
+                          <TableCell className="text-sm font-medium">{adv.workerName}</TableCell>
+                          <TableCell className="text-sm">{formatDate(adv.advanceDate)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmt(adv.amount)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {adv.repaymentType === "manual_repayment" ? "Loan" : "Salary Ded."}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {unvouchered && unvouchered.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Total: {fmt(unvouchered.reduce((s, a) => s + parseFloat(a.amount || "0"), 0))} across {unvouchered.length} advance(s)
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPostAccountingOpen(false); setPostCashAccountId(""); }} data-testid="button-cancel-post-accounting">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!postCashAccountId || !unvouchered?.length) return;
+                postAccountingMutation.mutate({
+                  cashAccountId: parseInt(postCashAccountId),
+                  advanceIds: unvouchered.map((a) => a.id),
+                });
+              }}
+              disabled={!postCashAccountId || !unvouchered?.length || postAccountingMutation.isPending}
+              data-testid="button-confirm-post-accounting"
+            >
+              {postAccountingMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</>
+              ) : (
+                <>Post {unvouchered?.length || 0} Entries</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
