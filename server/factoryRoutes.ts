@@ -9651,12 +9651,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const [lsCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
       const lsToday = new Date().toISOString().split('T')[0];
+      const lsTotalValue = bales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
       await writeDaybookEntry(db, {
         companyId,
         txDate: lsToday,
         txType: "LOADING_SUBMITTED",
         referenceId: orderId,
         description: `Loading submitted for verification: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
+        amountCurrency: lsTotalValue,
+        amountUsd: lsTotalValue,
       });
 
       res.json(updated);
@@ -9777,6 +9780,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           updatedAt: new Date(),
         }).where(eq(customerOrders.id, orderId)).returning();
         const [verifyCustomer] = await db.select({ legalName: customers.legalName }).from(customers).where(eq(customers.id, order.customerId));
+        const verifyBales = await db.select({ priceUsed: customerOrderBales.priceUsed }).from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        const verifyTotalValue = verifyBales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
         const verifyToday = new Date().toISOString().split('T')[0];
         await writeDaybookEntry(db, {
           companyId,
@@ -9784,6 +9789,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           txType: "ORDER_VERIFIED",
           referenceId: orderId,
           description: `Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ? ` – ${notes}` : ""}`,
+          amountCurrency: verifyTotalValue,
+          amountUsd: verifyTotalValue,
         });
         res.json(updated);
       } else {

@@ -79,11 +79,6 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
 }
 
 function renderBaleStockAmount(entry: DaybookEntry, sym: string, amt: number): string {
-  if (entry.txType !== "BALE_STOCK_ENTRY") return `${sym}${formatNumber(amt)}`;
-  if (amt > 0) return `${sym}${formatNumber(amt)}`;
-  const bales = parseBalesMeta(entry);
-  const totalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
-  if (totalKg > 0) return `${formatNumber(totalKg)} kg`;
   return `${sym}${formatNumber(amt)}`;
 }
 
