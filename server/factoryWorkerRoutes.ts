@@ -676,12 +676,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const workerJoinDate = toDateStr(worker.contractStartDate) || toDateStr(worker.dateJoined) || null;
       const effectiveStart = workerJoinDate && workerJoinDate > startDate ? workerJoinDate : startDate;
 
-      if (effectiveStart > endDate) {
-        if (dryRun) {
-          return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, dryRun: true });
-        }
-        await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
-        return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, workerUpdated: true });
+      if (effectiveStart > endDate && dryRun) {
+        return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, dryRun: true });
       }
 
       // Helper functions
@@ -700,9 +696,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const salType = worker.salaryType || "Monthly";
 
       let earned = 0;
+      const validRange = effectiveStart <= endDate;
 
       // Time-based frequencies use payFrequency field; production-based fall back to salaryType
-      if (payFreq === "Hourly") {
+      if (!validRange) {
+        earned = 0;
+      } else if (payFreq === "Hourly") {
         earned = (parseFloat(hoursWorked) || 0) * parseFloat(worker.hourlyRate || "0");
       } else if (payFreq === "Weekly") {
         earned = (days / 7) * parseFloat(worker.weeklySalary || "0");
