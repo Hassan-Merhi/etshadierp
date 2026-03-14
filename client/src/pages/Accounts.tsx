@@ -45,8 +45,11 @@ import {
   Trash2,
   ExternalLink,
   Printer,
+  FileDown,
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { format } from "date-fns";
+import { utils, writeFile } from "@/lib/excelHelper";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useForm } from "react-hook-form";
@@ -641,6 +644,92 @@ export default function Accounts() {
       ? (vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ??
         openingBalance)
       : openingBalance;
+
+  const handleExportStatementToExcel = async () => {
+    if (!selectedAccount || vouchersWithBalance.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Select an account with transactions to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const vouchersByDate: Record<string, GroupedVoucher[]> = {};
+    for (const v of vouchersWithBalance) {
+      const dateKey = v.voucherDate.split("T")[0];
+      if (!vouchersByDate[dateKey]) vouchersByDate[dateKey] = [];
+      vouchersByDate[dateKey].push(v);
+    }
+
+    const sortedDates = Object.keys(vouchersByDate).sort();
+    const workbook = utils.book_new();
+    const isFirstDate = (idx: number) => idx === 0;
+
+    for (let di = 0; di < sortedDates.length; di++) {
+      const dateKey = sortedDates[di];
+      const dayVouchers = vouchersByDate[dateKey];
+      const rows: any[][] = [];
+
+      rows.push(["Voucher No", "Type", "Narration", "Debit", "Credit", "Balance"]);
+
+      if (isFirstDate(di)) {
+        rows.push(["", "", "Opening Balance", "", "", formatAmount(openingBalance)]);
+      }
+
+      const notesForDay: string[] = [];
+
+      for (const v of dayVouchers) {
+        rows.push([
+          v.voucherNumber,
+          v.voucherType,
+          v.narration || "",
+          v.totalDebit > 0 ? formatAmount(v.totalDebit) : "",
+          v.totalCredit > 0 ? formatAmount(v.totalCredit) : "",
+          formatAmount(v.runningBalance ?? 0),
+        ]);
+
+        if (v.voucherDescription && v.voucherDescription.trim()) {
+          notesForDay.push(`${v.voucherNumber}: ${v.voucherDescription.trim()}`);
+        }
+      }
+
+      if (notesForDay.length > 0) {
+        rows.push([]);
+        rows.push(["Notes"]);
+        for (const note of notesForDay) {
+          rows.push([note]);
+        }
+      }
+
+      const sheetData = utils.aoa_to_sheet(rows);
+      (sheetData as any)["!cols"] = [
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 35 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 18 },
+      ];
+
+      const sheetLabel = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy")
+        .substring(0, 31)
+        .replace(/[\\/*?[\]:]/g, "_");
+      utils.book_append_sheet(workbook, sheetData, sheetLabel);
+    }
+
+    const accountName = (selectedAccount.name || "Account").replace(/[\\/*?[\]:]/g, "_").substring(0, 40);
+    const dateRange = periodFilter.fromDate && periodFilter.toDate
+      ? `${periodFilter.fromDate}_to_${periodFilter.toDate}`
+      : format(new Date(), "yyyy-MM-dd");
+    const fileName = `Account_Statement_${accountName}_${dateRange}.xlsx`;
+    await writeFile(workbook, fileName);
+
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${vouchersWithBalance.length} entries across ${sortedDates.length} sheets.`,
+    });
+  };
 
   const handleVoucherClick = (voucher: GroupedVoucher) => {
     if (isFactoryWorkerAccount) return;
@@ -1560,7 +1649,20 @@ export default function Accounts() {
                           })()}
                         </div>
                       </div>
-                      <div className="md:col-span-2 flex justify-end">
+                      <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleExportStatementToExcel()}
+                          disabled={
+                            transactionsLoading ||
+                            vouchersWithBalance.length === 0
+                          }
+                          data-testid="button-export-statement"
+                        >
+                          <FileDown className="w-4 h-4 mr-2" />
+                          Export Excel
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
