@@ -391,6 +391,19 @@ let migrationsDone = false;
       created_at timestamp DEFAULT now(),
       updated_at timestamp DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS inventory_negative_layers (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      location_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      qty decimal(15,3) NOT NULL,
+      provisional_rate decimal(20,4) NOT NULL DEFAULT 0,
+      source_voucher_type varchar(100),
+      source_voucher_id integer,
+      created_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS inv_neg_layers_loc_item ON inventory_negative_layers (location_id, stock_item_id)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
