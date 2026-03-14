@@ -669,12 +669,13 @@ export default function Accounts() {
     for (let di = 0; di < sortedDates.length; di++) {
       const dateKey = sortedDates[di];
       const dayVouchers = vouchersByDate[dateKey];
+      const formattedDate = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
       const rows: any[][] = [];
 
-      rows.push(["Voucher No", "Type", "Narration", "Debit", "Credit", "Balance"]);
+      rows.push(["Voucher No", "Type", "Debit", "Credit", "Running Balance", "Date"]);
 
       if (isFirstDate(di)) {
-        rows.push(["", "", "Opening Balance", "", "", formatAmount(openingBalance)]);
+        rows.push(["", "", "", "", formatAmount(openingBalance), formattedDate]);
       }
 
       const notesForDay: string[] = [];
@@ -683,14 +684,17 @@ export default function Accounts() {
         rows.push([
           v.voucherNumber,
           v.voucherType,
-          v.narration || "",
           v.totalDebit > 0 ? formatAmount(v.totalDebit) : "",
           v.totalCredit > 0 ? formatAmount(v.totalCredit) : "",
           formatAmount(v.runningBalance ?? 0),
+          formattedDate,
         ]);
 
-        if (v.voucherDescription && v.voucherDescription.trim()) {
-          notesForDay.push(`${v.voucherNumber}: ${v.voucherDescription.trim()}`);
+        const noteText = (v.voucherDescription && v.voucherDescription.trim())
+          ? v.voucherDescription.trim()
+          : (v.narration && v.narration.trim()) ? v.narration.trim() : "";
+        if (noteText) {
+          notesForDay.push(`${v.voucherNumber}: ${noteText}`);
         }
       }
 
@@ -706,10 +710,10 @@ export default function Accounts() {
       (sheetData as any)["!cols"] = [
         { wch: 16 },
         { wch: 12 },
-        { wch: 35 },
         { wch: 15 },
         { wch: 15 },
         { wch: 18 },
+        { wch: 14 },
       ];
 
       const sheetLabel = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy")
