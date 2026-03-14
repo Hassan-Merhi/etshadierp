@@ -16,6 +16,15 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
@@ -31,6 +40,8 @@ import {
   Clock,
   User,
   Languages,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 
 type AttendanceStatus = "Present" | "Absent" | "Late" | "Half Day" | "Leave";
@@ -526,6 +537,7 @@ export default function FactoryAttendance() {
 function PerWorkerView() {
   const { toast } = useToast();
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>("");
+  const [workerComboOpen, setWorkerComboOpen] = useState(false);
   const [startDate, setStartDate] = useState<string>(currentMonthStart());
   const [endDate, setEndDate] = useState<string>(currentMonthEnd());
   const [checkedDates, setCheckedDates] = useState<Record<string, boolean>>({});
@@ -619,22 +631,54 @@ function PerWorkerView() {
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1 min-w-[200px]">
               <Label className="text-xs text-muted-foreground">Worker</Label>
-              <Select
-                value={selectedWorkerId}
-                onValueChange={setSelectedWorkerId}
-              >
-                <SelectTrigger data-testid="select-worker" className="w-56">
-                  <SelectValue placeholder={loadingWorkers ? "Loading…" : "Select worker"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(workersList ?? []).map((w) => (
-                    <SelectItem key={w.id} value={String(w.id)}>
-                      {w.fullName}
-                      {w.employeeCode ? ` (${w.employeeCode})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={workerComboOpen} onOpenChange={setWorkerComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={workerComboOpen}
+                    data-testid="select-worker"
+                    className="w-56 justify-between font-normal"
+                  >
+                    <span className="truncate" dir="auto">
+                      {selectedWorker
+                        ? `${selectedWorker.fullName}${selectedWorker.employeeCode ? ` (${selectedWorker.employeeCode})` : ""}`
+                        : loadingWorkers
+                        ? "Loading…"
+                        : "Select worker"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search worker…" data-testid="input-worker-search" />
+                    <CommandList>
+                      <CommandEmpty>No workers found.</CommandEmpty>
+                      <CommandGroup>
+                        {(workersList ?? []).map((w) => (
+                          <CommandItem
+                            key={w.id}
+                            value={`${w.fullName} ${w.employeeCode ?? ""}`}
+                            onSelect={() => {
+                              setSelectedWorkerId(String(w.id));
+                              setWorkerComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 shrink-0 ${selectedWorkerId === String(w.id) ? "opacity-100" : "opacity-0"}`}
+                            />
+                            <span dir="auto" className="truncate">
+                              {w.fullName}
+                              {w.employeeCode ? ` (${w.employeeCode})` : ""}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="flex flex-col gap-1">
