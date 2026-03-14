@@ -110,7 +110,7 @@ export default function FactoryLocationInventory() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryGroup | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
   const [productSearch, setProductSearch] = useState("");
   const [catSortField, setCatSortField] = useState<SortField>("name");
   const [catSortDir, setCatSortDir] = useState<SortDir>("asc");
@@ -310,7 +310,7 @@ export default function FactoryLocationInventory() {
   const filteredCategories = applySortCategories(
     categoryGroups.filter((c) =>
       c.categoryName.toLowerCase().includes(categorySearch.toLowerCase()) &&
-      (categoryFilter === "" || c.categoryName === categoryFilter)
+      (categoryFilter === "__all__" || c.categoryName === categoryFilter)
     ),
     catSortField,
     catSortDir
@@ -324,7 +324,7 @@ export default function FactoryLocationInventory() {
           (p) => {
             const matchesSearch = p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase());
             const matchesCatFilter = selectedCategory.categoryId === -1
-              ? (categoryFilter === "" || p.category === categoryFilter)
+              ? (categoryFilter === "__all__" || p.category === categoryFilter)
               : true;
             if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
             return matchesSearch && matchesCatFilter;
@@ -339,7 +339,7 @@ export default function FactoryLocationInventory() {
     setSelectedLocation(location);
     setSelectedCategory(null);
     setCategorySearch("");
-    setCategoryFilter("");
+    setCategoryFilter("__all__");
     setProductSearch("");
   };
 
@@ -370,7 +370,7 @@ export default function FactoryLocationInventory() {
     setSelectedCategory(null);
     setLocationSearch("");
     setCategorySearch("");
-    setCategoryFilter("");
+    setCategoryFilter("__all__");
     setProformaMode(false);
     setSelections(new Map());
   };
@@ -378,7 +378,7 @@ export default function FactoryLocationInventory() {
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setProductSearch("");
-    setCategoryFilter("");
+    setCategoryFilter("__all__");
   };
 
   const escapeBackHandler = selectedCategory
@@ -909,7 +909,7 @@ export default function FactoryLocationInventory() {
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="__all__">All Categories</SelectItem>
                   {allCategoryNames.map((c) => (
                     <SelectItem key={c.categoryId || 0} value={c.categoryName}>{c.categoryName}</SelectItem>
                   ))}
@@ -1348,7 +1348,7 @@ export default function FactoryLocationInventory() {
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="__all__">All Categories</SelectItem>
                   {allCategoryNamesForProducts.map((name) => (
                     <SelectItem key={name} value={name}>{name}</SelectItem>
                   ))}
