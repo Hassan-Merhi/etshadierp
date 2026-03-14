@@ -1815,13 +1815,13 @@ export default function Accounts() {
                             Account Statement: {selectedAccount?.name}
                           </h2>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: "11px", color: "#555" }}>
-                          <span>
+                        <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: "11px", color: "#555" }}>
+                          <div>
                             {(periodFilter.fromDate || periodFilter.toDate)
                               ? `Period: ${periodLabel}`
                               : "Period: All Transactions"}
-                          </span>
-                          <span>Generated: {formatDisplayDate(new Date())}</span>
+                          </div>
+                          <div>Generated: {formatDisplayDate(new Date())}</div>
                         </div>
                       </div>
                       <div className="rounded-md border overflow-x-auto print:border-0 hidden md:block print:!block">
@@ -1839,13 +1839,13 @@ export default function Accounts() {
                                   data-testid="checkbox-select-all"
                                 />
                               </TableHead>
-                              <TableHead className="w-[100px] py-2 sticky left-0 bg-muted z-10">
+                              <TableHead className="col-date w-[100px] py-2 sticky left-0 bg-muted z-10">
                                 Date
                               </TableHead>
-                              <TableHead className="w-[100px] py-2">
+                              <TableHead className="col-type w-[100px] py-2">
                                 Type
                               </TableHead>
-                              <TableHead className="py-2">
+                              <TableHead className="col-particulars py-2">
                                 Particulars
                               </TableHead>
                               {appMode === "factory" && (
@@ -1853,13 +1853,13 @@ export default function Accounts() {
                                   Notes
                                 </TableHead>
                               )}
-                              {!hideBalances && <TableHead className="text-right w-[120px] py-2">
+                              {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">
                                 Debit
                               </TableHead>}
-                              {!hideBalances && <TableHead className="text-right w-[120px] py-2">
+                              {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">
                                 Credit
                               </TableHead>}
-                              {!hideBalances && <TableHead className="text-right w-[130px] py-2">
+                              {!hideBalances && <TableHead className="col-balance text-right w-[130px] py-2">
                                 Balance
                               </TableHead>}
                             </TableRow>
