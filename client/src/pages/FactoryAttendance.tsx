@@ -876,7 +876,7 @@ const LABELS = {
     title: "Weekly Attendance Sheet",
     resultTitle: "Weekly Attendance Report",
     workerName: "Worker Name",
-    notes: "Notes",
+    notes: "Notes / Signature",
     preparedBy: "Prepared By",
     supervisor: "Supervisor",
     approvedBy: "Approved By",
@@ -891,7 +891,7 @@ const LABELS = {
     title: "\u0643\u0634\u0641 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
     resultTitle: "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
     workerName: "\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0645\u0644",
-    notes: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A",
+    notes: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A / \u062A\u0648\u0642\u064A\u0639",
     preparedBy: "\u0623\u0639\u062F\u0647",
     supervisor: "\u0627\u0644\u0645\u0634\u0631\u0641",
     approvedBy: "\u0627\u0639\u062A\u0645\u062F\u0647",
@@ -955,17 +955,15 @@ function generateWeeklyBlankSheetHtml(
     </tr>`;
   }).join("");
 
-  const htmlDir = lang === "ar" ? "rtl" : "ltr";
   const htmlLang = lang === "ar" ? "ar" : "en";
 
   return `<!DOCTYPE html>
-<html lang="${htmlLang}" dir="${htmlDir}">
+<html lang="${htmlLang}" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <title>${L.title}</title>
   <style>
     ${WEEKLY_CSS}
-    ${lang === "ar" ? "th.name-col { text-align: right; } td.name { text-align: right; }" : ""}
   </style>
 </head>
 <body>
@@ -981,7 +979,7 @@ function generateWeeklyBlankSheetHtml(
         <th style="width:22px">#</th>
         <th class="name-col">${L.workerName}</th>
         ${dayHeaders}
-        <th style="width:70px">${L.notes}</th>
+        <th style="width:90px">${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -1058,17 +1056,15 @@ function generateWeeklyResultsSheetHtml(
     </tr>`;
   }).join("");
 
-  const htmlDir = lang === "ar" ? "rtl" : "ltr";
   const htmlLang = lang === "ar" ? "ar" : "en";
 
   return `<!DOCTYPE html>
-<html lang="${htmlLang}" dir="${htmlDir}">
+<html lang="${htmlLang}" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <title>${L.resultTitle}</title>
   <style>
     ${WEEKLY_CSS}
-    ${lang === "ar" ? "th.name-col { text-align: right; } td.name { text-align: right; }" : ""}
     .summary { display:flex; gap:20px; justify-content:center; margin-bottom:6px; font-size:8pt; }
     .summary span { font-weight:600; }
   </style>
@@ -1090,11 +1086,15 @@ function generateWeeklyResultsSheetHtml(
         <th style="width:22px">#</th>
         <th class="name-col">${L.workerName}</th>
         ${dayHeaders}
-        <th style="width:70px">${L.notes}</th>
+        <th style="width:90px">${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
+  <div class="legend">
+    <span><strong>${lang === "ar" ? "\u062D" : "P"}</strong> = ${lang === "ar" ? "\u062D\u0627\u0636\u0631" : "Present"}</span>
+    <span><strong>${lang === "ar" ? "\u063A" : "A"}</strong> = ${lang === "ar" ? "\u063A\u0627\u0626\u0628" : "Absent"}</span>
+  </div>
   <div class="footer">
     <div>${L.preparedBy}</div>
     <div>${L.supervisor}</div>
