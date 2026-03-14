@@ -8781,9 +8781,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);
-      const { locationId, items } = req.body;
-      if (!locationId || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "locationId and items are required" });
+      const { locationId, items, refNumbers: refNumbersRaw } = req.body;
+      const hasRefNumbers = Array.isArray(refNumbersRaw) && refNumbersRaw.length > 0;
+      const hasItems = Array.isArray(items) && items.length > 0;
+      if (!locationId || (!hasItems && !hasRefNumbers)) {
+        return res.status(400).json({ message: "locationId and either items or refNumbers are required" });
       }
 
       const [order] = await db.select().from(customerOrders)
@@ -8807,7 +8809,65 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let totalAdded = 0;
       const notFound: Array<{ articleCode: string; requestedQty: number; foundQty: number }> = [];
+      const notFoundRefs: string[] = [];
 
+      // ── REF-NUMBER MODE ─────────────────────────────────────────────────────
+      if (hasRefNumbers) {
+        const refNumbers = refNumbersRaw as string[];
+        for (const rawRef of refNumbers) {
+          const refNum = String(rawRef).trim();
+          if (!refNum) continue;
+
+          const [bale] = await db.select().from(factoryBales)
+            .where(and(
+              eq(factoryBales.companyId, companyId),
+              eq(factoryBales.referenceNumber, refNum),
+              or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK"))
+            ));
+
+          if (!bale) { notFoundRefs.push(refNum); continue; }
+          if (alreadyAddedBaleIds.has(bale.id)) continue;
+
+          let priceUsed = "0";
+          if (order.proformaIdUsed) {
+            const [pl] = await db.select().from(customerProformaLines)
+              .where(and(
+                eq(customerProformaLines.proformaId, order.proformaIdUsed),
+                eq(customerProformaLines.articleCode, bale.articleCode || "")
+              ));
+            if (pl) priceUsed = pl.pricePerBale;
+          }
+          if (priceUsed === "0" && bale.productId) {
+            const product = allProducts.find((p: any) => p.id === bale.productId);
+            if (product?.sellingPrice) priceUsed = product.sellingPrice;
+          }
+
+          await db.insert(customerOrderBales).values({
+            orderId,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            locationId: bale.erpLocationId ?? parsedLocationId,
+            weight: bale.weightKg,
+            articleCode: bale.articleCode,
+            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            priceUsed,
+          });
+
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(eq(factoryBales.id, bale.id));
+
+          alreadyAddedBaleIds.add(bale.id);
+          totalAdded++;
+        }
+
+        await recalculateOrderTotals(db, orderId);
+        const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+        return res.json({ added: totalAdded, notFound: [], notFoundRefs, order: updatedOrder, bales: updatedBales });
+      }
+
+      // ── ARTICLE-CODE MODE (existing) ────────────────────────────────────────
       for (const item of items) {
         const articleCode = String(item.articleCode || "").trim();
         const qty = parseInt(item.qty) || 0;

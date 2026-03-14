@@ -120,7 +120,9 @@ export default function FactoryContainerLoadingScan() {
   const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importMode, setImportMode] = useState<"articleCode" | "refNumber">("articleCode");
   const [importPreview, setImportPreview] = useState<Array<{ articleCode: string; qty: number }>>([]);
+  const [importRefNumbers, setImportRefNumbers] = useState<string[]>([]);
   const scannerRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -344,11 +346,14 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const bulkImportMutation = useMutation({
-    mutationFn: async (items: Array<{ articleCode: string; qty: number }>) => {
+    mutationFn: async (payload: { mode: "articleCode"; items: Array<{ articleCode: string; qty: number }> } | { mode: "refNumber"; refNumbers: string[] }) => {
+      const body = payload.mode === "refNumber"
+        ? { locationId: parseInt(selectedLocationId), refNumbers: payload.refNumbers }
+        : { locationId: parseInt(selectedLocationId), items: payload.items };
       const res = await modeApiRequest(
         "POST",
         `/api/factory/customer-orders/${orderId}/bales/bulk-import`,
-        { locationId: parseInt(selectedLocationId), items },
+        body,
       );
       return await res.json();
     },
@@ -356,12 +361,16 @@ export default function FactoryContainerLoadingScan() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setShowImportDialog(false);
       setImportPreview([]);
+      setImportRefNumbers([]);
       const notFoundMsgs = (data.notFound || []).map((n: any) =>
         `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
       );
+      const notFoundRefMsgs = (data.notFoundRefs || []).length > 0
+        ? `Not found: ${(data.notFoundRefs as string[]).join(", ")}`
+        : undefined;
       toast({
         title: `Import complete — ${data.added} bale${data.added === 1 ? "" : "s"} added`,
-        description: notFoundMsgs.length > 0 ? `Short: ${notFoundMsgs.join(", ")}` : undefined,
+        description: notFoundMsgs.length > 0 ? `Short: ${notFoundMsgs.join(", ")}` : notFoundRefMsgs,
       });
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
@@ -446,20 +455,45 @@ export default function FactoryContainerLoadingScan() {
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
-        const parsed = rows
-          .map((r) => ({
-            articleCode: String(
-              r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
-            ).trim(),
-            qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
-          }))
-          .filter((r) => r.articleCode && r.qty > 0);
-        if (parsed.length === 0) {
-          toast({ title: "No valid rows found", description: "Ensure columns are Article Code and Qty", variant: "destructive" });
-          return;
+
+        // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" column, use ref mode
+        const firstRow = rows[0] || {};
+        const refKey = Object.keys(firstRow).find((k) =>
+          /^ref(erence)?([\s_-]?number)?$/i.test(k.trim())
+        );
+
+        if (refKey) {
+          // REF NUMBER MODE
+          const refs = rows
+            .map((r) => String(r[refKey] ?? "").trim())
+            .filter(Boolean);
+          if (refs.length === 0) {
+            toast({ title: "No valid rows found", description: "Ensure the Ref Number column has values", variant: "destructive" });
+            return;
+          }
+          setImportMode("refNumber");
+          setImportRefNumbers(refs);
+          setImportPreview([]);
+          setShowImportDialog(true);
+        } else {
+          // ARTICLE CODE MODE (existing)
+          const parsed = rows
+            .map((r) => ({
+              articleCode: String(
+                r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
+              ).trim(),
+              qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
+            }))
+            .filter((r) => r.articleCode && r.qty > 0);
+          if (parsed.length === 0) {
+            toast({ title: "No valid rows found", description: "Ensure columns are Article Code and Qty, or use a Ref Number column for individual bale import", variant: "destructive" });
+            return;
+          }
+          setImportMode("articleCode");
+          setImportPreview(parsed);
+          setImportRefNumbers([]);
+          setShowImportDialog(true);
         }
-        setImportPreview(parsed);
-        setShowImportDialog(true);
       } catch (err: any) {
         toast({ title: "Parse error", description: err.message, variant: "destructive" });
       }
@@ -1108,49 +1142,91 @@ export default function FactoryContainerLoadingScan() {
       </div>
 
       {/* Import from Excel Dialog */}
-      <Dialog open={showImportDialog} onOpenChange={(open) => { setShowImportDialog(open); if (!open) setImportPreview([]); }}>
+      <Dialog open={showImportDialog} onOpenChange={(open) => { setShowImportDialog(open); if (!open) { setImportPreview([]); setImportRefNumbers([]); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Import Bales from Excel</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Bales will be added oldest-first (by production date) for each article code.
-            </p>
-            {importPreview.length > 0 && (
-              <div className="border rounded-md overflow-auto max-h-[320px]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead>Article Code</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {importPreview.map((row, i) => (
-                      <TableRow key={i} data-testid={`row-import-preview-${i}`}>
-                        <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{row.qty}</TableCell>
+            {importMode === "refNumber" ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Each bale will be looked up and added by its exact ref number.
+                </p>
+                <div className="border rounded-md overflow-auto max-h-[320px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Ref Number</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {importRefNumbers.map((ref, i) => (
+                        <TableRow key={i} data-testid={`row-import-ref-${i}`}>
+                          <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                          <TableCell className="font-mono text-sm">{ref}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {importRefNumbers.length} bale{importRefNumbers.length !== 1 ? "s" : ""} by ref number
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Bales will be added oldest-first (by production date) for each article code.
+                </p>
+                {importPreview.length > 0 && (
+                  <div className="border rounded-md overflow-auto max-h-[320px]">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Article Code</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {importPreview.map((row, i) => (
+                          <TableRow key={i} data-testid={`row-import-preview-${i}`}>
+                            <TableCell className="font-mono text-sm">{row.articleCode}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{row.qty}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {importPreview.reduce((s, r) => s + r.qty, 0)} total bales across {importPreview.length} article code{importPreview.length !== 1 ? "s" : ""}
+                </p>
+              </>
             )}
-            <p className="text-xs text-muted-foreground">
-              {importPreview.reduce((s, r) => s + r.qty, 0)} total bales across {importPreview.length} article code{importPreview.length !== 1 ? "s" : ""}
-            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview([]); }} data-testid="button-cancel-import">
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview([]); setImportRefNumbers([]); }} data-testid="button-cancel-import">
               Cancel
             </Button>
             <Button
-              onClick={() => bulkImportMutation.mutate(importPreview)}
-              disabled={bulkImportMutation.isPending || importPreview.length === 0}
+              onClick={() => {
+                if (importMode === "refNumber") {
+                  bulkImportMutation.mutate({ mode: "refNumber", refNumbers: importRefNumbers });
+                } else {
+                  bulkImportMutation.mutate({ mode: "articleCode", items: importPreview });
+                }
+              }}
+              disabled={bulkImportMutation.isPending || (importMode === "refNumber" ? importRefNumbers.length === 0 : importPreview.length === 0)}
               data-testid="button-confirm-import"
             >
-              {bulkImportMutation.isPending ? "Importing…" : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`}
+              {bulkImportMutation.isPending
+                ? "Importing…"
+                : importMode === "refNumber"
+                  ? `Add ${importRefNumbers.length} Bale${importRefNumbers.length !== 1 ? "s" : ""}`
+                  : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
