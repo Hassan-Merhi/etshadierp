@@ -151,6 +151,12 @@ export default function PendingInvoiceVerify() {
     enabled: !!orderId,
   });
 
+  const { data: currentUser } = useQuery<{ role?: string }>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+
   useEffect(() => {
     if (orderDetail && !containerInitialized) {
       setContainerNumber(orderDetail.containerNumber || "");
@@ -691,7 +697,7 @@ export default function PendingInvoiceVerify() {
               Approve & Verify
             </Button>
           )}
-          {isVerified && orderDetail?.invoiceNumber && (
+          {isVerified && isAdminOrOwner && orderDetail?.invoiceNumber && (
             <Button
               variant="outline"
               onClick={() => setShowFixBalesDialog(true)}

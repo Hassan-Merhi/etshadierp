@@ -152,6 +152,12 @@ export default function FactoryPendingInvoiceVerify() {
     enabled: !!orderId,
   });
 
+  const { data: currentUser } = useQuery<{ role?: string }>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: true,
@@ -723,7 +729,7 @@ export default function FactoryPendingInvoiceVerify() {
               Approve & Verify
             </Button>
           )}
-          {isVerified && orderDetail?.invoiceNumber && (
+          {isVerified && isAdminOrOwner && orderDetail?.invoiceNumber && (
             <Button
               variant="outline"
               onClick={() => setShowFixBalesDialog(true)}
