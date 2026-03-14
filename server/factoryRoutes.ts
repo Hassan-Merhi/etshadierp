@@ -248,7 +248,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           });
         }
 
-        const costPerKg = mixBatch ? parseFloat(mixBatch.costPerKg || "0") : 0;
         const now = new Date();
         const bales: any[] = [];
         let baleIndex = 0;
@@ -281,7 +280,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           for (let i = 0; i < qty; i++) {
             const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
             const isGarbage = product.articleCode?.startsWith("HMD16");
-            const effectiveCostPerKg = isGarbage ? 0 : costPerKg;
+            const productionCostPerKg = parseFloat(product.productionPrice || "0");
+            const effectiveCostPerKg = isGarbage ? 0 : productionCostPerKg;
             const baleTotalCost = weight * effectiveCostPerKg;
 
             const [bale] = await tx
@@ -392,7 +392,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
 
           const baleWeight = parseFloat(bale.weightKg);
-          const baleRate = baleWeight * costPerKg;
+          const baleRate = baleWeight * parseFloat(bale.costPerKg || "0");
           await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
         }
 
