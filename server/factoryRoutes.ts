@@ -7194,7 +7194,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const { startDate, endDate, txType, currencyCode } = req.query;
 
       // ── 1. Query existing factory_daybook_entries ──────────────────────────
-      const conditions: any[] = [eq(factoryDaybookEntries.companyId, companyId)];
+      const conditions: any[] = [
+        eq(factoryDaybookEntries.companyId, companyId),
+        // Exclude void/delete audit entries — they are internal records, not daybook events
+        sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
+        sql`${factoryDaybookEntries.txType} NOT LIKE '%_DELETED'`,
+      ];
       if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
       if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
