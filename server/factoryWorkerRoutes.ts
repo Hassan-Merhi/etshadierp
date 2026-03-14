@@ -18,6 +18,8 @@ import {
   ledgerAccounts,
   vouchers,
   voucherEntries,
+  companies,
+  companySettings,
 } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
@@ -2244,6 +2246,163 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     } catch (error: any) {
       console.error("Error fetching factory worker statement:", error);
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Factory Worker Statement PDF ──────────────────────────────────────────
+  app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const workerId = parseInt(req.params.id);
+      if (isNaN(workerId)) return res.status(400).json({ message: "Invalid worker ID" });
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+
+      // Worker info
+      const [worker] = await db.select().from(factoryWorkers)
+        .where(and(eq(factoryWorkers.id, workerId), eq(factoryWorkers.companyId, companyId)));
+      if (!worker) return res.status(404).json({ message: "Worker not found" });
+      const workerName = worker.fullName || `Worker #${workerId}`;
+
+      // Advances
+      const advConds: any[] = [eq(factoryWorkerAdvances.workerId, workerId), eq(factoryWorkerAdvances.companyId, companyId)];
+      if (startDate) advConds.push(sql`${factoryWorkerAdvances.advanceDate} >= ${startDate}`);
+      if (endDate) advConds.push(sql`${factoryWorkerAdvances.advanceDate} <= ${endDate}`);
+      const advances = await db.select().from(factoryWorkerAdvances).where(and(...advConds)).orderBy(factoryWorkerAdvances.advanceDate);
+
+      // Payrolls
+      const payConds: any[] = [eq(factoryPayrolls.workerId, workerId), eq(factoryPayrolls.companyId, companyId), eq(factoryPayrolls.status, "PAID")];
+      if (startDate) payConds.push(sql`${factoryPayrolls.paidAt}::date >= ${startDate}`);
+      if (endDate) payConds.push(sql`${factoryPayrolls.paidAt}::date <= ${endDate}`);
+      const payrolls = await db.select().from(factoryPayrolls).where(and(...payConds)).orderBy(factoryPayrolls.paidAt);
+
+      // Build entries
+      const entries: any[] = [];
+      for (const adv of advances) {
+        entries.push({ date: adv.advanceDate, type: "Advance", description: adv.notes || "Advance payment", debit: parseFloat(adv.amount || "0"), credit: 0 });
+      }
+      for (const pr of payrolls) {
+        const paidDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : pr.periodEnd;
+        entries.push({ date: paidDate, type: "Payroll", description: `Payroll ${pr.periodStart} to ${pr.periodEnd}`, debit: 0, credit: parseFloat(pr.netSalary || "0") });
+      }
+      entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      let running = 0;
+      const rowsWithBalance = entries.map((e) => {
+        running += e.debit - e.credit;
+        return { ...e, runningBalance: running };
+      });
+
+      // Company info
+      const [co] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [sett] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+      const companyName = (co as any)?.name ?? "Company";
+      const logoUrl: string | null = (sett as any)?.logoUrl ?? null;
+      const baseCurrency = (co as any)?.baseCurrency ?? "USD";
+      const currMap: Record<string, string> = { USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", AED: "AED " };
+      const sym = currMap[baseCurrency.toUpperCase()] ?? (baseCurrency + " ");
+      const fmtAmt = (n: number) => sym + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const fmtDate = (s: string) => new Date(s.split("T")[0] + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      const periodStr = startDate && endDate ? `${fmtDate(startDate)} — ${fmtDate(endDate)}` : startDate ? `From ${fmtDate(startDate)}` : endDate ? `Up to ${fmtDate(endDate)}` : "All Time";
+      const generatedStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=statement_${workerName.replace(/\s+/g, "_")}.pdf`);
+      doc.pipe(res);
+
+      // Header
+      let headerY = 40;
+      let logoWidth = 0;
+      if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
+        try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
+      }
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
+        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
+      doc.fontSize(10).font("Helvetica").fillColor("#555555")
+        .text(`Account Statement: ${workerName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth });
+
+      const headerBottom = Math.max(doc.y, headerY + 52);
+      doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+
+      const metaY = headerBottom + 10;
+      doc.fillColor("#444444").fontSize(8).font("Helvetica");
+      doc.text(`Period: ${periodStr}`, 40, metaY);
+      doc.text(`Generated: ${generatedStr}`, 40, doc.y + 2);
+      doc.moveDown(0.5);
+
+      const PAGE_H = 841.89;
+      const MARGIN_BOTTOM = 60;
+      const colX = [40, 110, 205, 370, 435, 500];
+      const colW = [70, 95, 165, 65, 65, 55];
+      const colHdr = ["DATE", "TYPE", "PARTICULARS", "DEBIT", "CREDIT", "BALANCE"];
+      const colAln: Array<"left" | "right"> = ["left", "left", "left", "right", "right", "right"];
+      const ROW_H = 14;
+      const HDR_H = 15;
+
+      const drawHdr = (y: number) => {
+        doc.rect(40, y, 515, HDR_H).fill("#1F3864");
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        colHdr.forEach((h, i) => doc.text(h, colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] }));
+        doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
+      };
+
+      let tableY = doc.y + 4;
+      drawHdr(tableY);
+      let y = tableY + HDR_H;
+
+      // Opening row
+      doc.rect(40, y, 515, ROW_H).fill("#F0F4FF");
+      doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
+      doc.text("Opening Balance", colX[2] + 2, y + 3, { width: colW[2] - 4, align: "left" });
+      doc.text("-", colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
+      doc.text("-", colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
+      doc.text(`${sym}0.00 Dr`, colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right" });
+      y += ROW_H;
+
+      // Rows
+      rowsWithBalance.forEach((row, idx) => {
+        if (y + ROW_H > PAGE_H - MARGIN_BOTTOM) { doc.addPage(); y = 40; drawHdr(y); y += HDR_H; }
+        if (idx % 2 === 1) { doc.rect(40, y, 515, ROW_H).fill("#F8F8F8"); doc.fillColor("#000000"); }
+        const bal = row.runningBalance;
+        const balSide = bal >= 0 ? "Dr" : "Cr";
+        doc.font("Helvetica").fontSize(7.5);
+        doc.text(fmtDate(row.date), colX[0] + 2, y + 3, { width: colW[0] - 4, align: "left" });
+        doc.text(row.type, colX[1] + 2, y + 3, { width: colW[1] - 4, align: "left" });
+        doc.text(row.description, colX[2] + 2, y + 3, { width: colW[2] - 4, align: "left" });
+        doc.text(row.debit > 0 ? fmtAmt(row.debit) : "-", colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
+        doc.text(row.credit > 0 ? fmtAmt(row.credit) : "-", colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
+        doc.text(`${fmtAmt(bal)} ${balSide}`, colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right" });
+        y += ROW_H;
+      });
+
+      // Footer
+      y += 3;
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      y += 5;
+      const totD = rowsWithBalance.reduce((s, r) => s + r.debit, 0);
+      const totC = rowsWithBalance.reduce((s, r) => s + r.credit, 0);
+      const closing = rowsWithBalance.length > 0 ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance : 0;
+      const closingSide = closing >= 0 ? "Dr" : "Cr";
+
+      if (y + 52 > PAGE_H - 20) { doc.addPage(); y = 40; }
+      doc.rect(40, y, 515, 16).fill("#EFF3FB");
+      doc.fillColor("#000000").font("Helvetica").fontSize(8);
+      doc.text("Current Period Total", colX[2] + 2, y + 4, { width: colW[2] - 4, align: "left" });
+      doc.text(fmtAmt(totD), colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+      doc.text(fmtAmt(totC), colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+      y += 17;
+      doc.rect(40, y, 515, 16).fill("#1F3864");
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+      doc.text("Closing Balance", colX[2] + 2, y + 4, { width: colW[2] - 4, align: "left" });
+      doc.text(`${fmtAmt(closing)} ${closingSide}`, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
+
+      doc.end();
+    } catch (err: any) {
+      console.error("Worker statement PDF error:", err);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
 }

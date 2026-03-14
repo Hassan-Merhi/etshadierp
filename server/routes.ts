@@ -13401,6 +13401,308 @@ if (asOfDate) {
     }
   });
 
+  // ── Account Statement PDF export ──────────────────────────────────────────
+  app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const accountType = req.params.type;
+      const accountId = parseInt(req.params.id);
+      const companyId = (req.session as any).currentCompanyId;
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+
+      // ── 1. Fetch raw entries using existing storage helpers ──
+      let rawEntries: any[] = [];
+      let accountName = "";
+      let rawOB = 0;
+      let obSide = "Dr";
+      const isSupplier = accountType === "supplier";
+
+      if (accountType === "ledger") {
+        rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
+        const [acct] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
+        accountName = acct?.name ?? "Ledger Account";
+        rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
+        obSide = acct?.openingBalanceSide ?? "Dr";
+      } else if (accountType === "bank") {
+        rawEntries = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
+        const [acct] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, accountId));
+        accountName = acct?.name ?? "Bank Account";
+        rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
+        obSide = acct?.openingBalanceSide ?? "Dr";
+      } else if (accountType === "fixed-asset") {
+        rawEntries = await storage.getVoucherEntriesByFixedAsset(accountId, startDate, endDate);
+        const [acct] = await db.select().from(fixedAssets).where(eq(fixedAssets.id, accountId));
+        accountName = acct?.name ?? "Fixed Asset";
+        rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
+        obSide = "Dr";
+      } else if (accountType === "supplier") {
+        rawEntries = await storage.getVoucherEntriesBySupplier(accountId, companyId, startDate, endDate);
+        const [acct] = await db.select().from(suppliers).where(eq(suppliers.id, accountId));
+        accountName = (acct as any)?.legalName ?? "Supplier";
+        rawOB = parseFloat((acct as any)?.openingBalance ?? "0") || 0;
+        obSide = "Cr";
+      } else if (accountType === "employee") {
+        rawEntries = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
+        const [acct] = await db.select().from(employees).where(eq(employees.id, accountId));
+        accountName = acct?.name ?? "Employee";
+        rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
+        obSide = "Dr";
+      } else if (accountType === "customer") {
+        const customerStmt = await storage.getCustomerStatement(accountId, companyId, startDate, endDate);
+        rawEntries = customerStmt.map((row: any) => ({
+          voucherId: row.referenceId ?? row.id,
+          voucherNumber: row.referenceType ? `${row.referenceType}-${row.referenceId}` : `CB-${row.id}`,
+          voucherType: row.transactionType,
+          voucherDate: row.transactionDate,
+          voucherDescription: row.description || "",
+          narration: row.description || "",
+          debitAmount: row.debitAmount,
+          creditAmount: row.creditAmount,
+        }));
+        const [acct] = await db.select().from(customers).where(eq(customers.id, accountId));
+        accountName = acct?.name ?? "Customer";
+        rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
+        obSide = "Dr";
+      } else {
+        return res.status(400).json({ message: "Unknown account type" });
+      }
+
+      // ── 2. Compute opening balance (pre-period if startDate given) ──
+      let openingBalance = isSupplier ? rawOB : (obSide === "Cr" ? -rawOB : rawOB);
+
+      if (startDate) {
+        const typeToColumn: Record<string, any> = {
+          ledger: voucherEntries.ledgerAccountId,
+          bank: voucherEntries.bankAccountId,
+          "fixed-asset": voucherEntries.fixedAssetId,
+          supplier: voucherEntries.supplierId,
+          employee: voucherEntries.employeeId,
+          customer: voucherEntries.customerId,
+        };
+        const col = typeToColumn[accountType];
+        if (col) {
+          const [tot] = await db.select({
+            d: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}),0)`,
+            c: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}),0)`,
+          }).from(voucherEntries)
+            .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(col, accountId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              sql`${vouchers.voucherDate} < ${startDate}`,
+            ));
+          const d = parseFloat(tot?.d ?? "0") || 0;
+          const c = parseFloat(tot?.c ?? "0") || 0;
+          openingBalance += isSupplier ? (c - d) : (d - c);
+        }
+      }
+
+      // ── 3. Group entries by voucherId ──
+      const voucherMap = new Map<number, {
+        voucherId: number; voucherNumber: string; voucherType: string;
+        voucherDate: string; description: string; narration: string;
+        totalDebit: number; totalCredit: number;
+      }>();
+      for (const e of rawEntries) {
+        const vid = Number(e.voucherId);
+        const d = parseFloat(e.debitAmount ?? "0") || 0;
+        const c = parseFloat(e.creditAmount ?? "0") || 0;
+        const existing = voucherMap.get(vid);
+        if (existing) {
+          existing.totalDebit += d;
+          existing.totalCredit += c;
+          if (!existing.narration && e.narration) existing.narration = e.narration;
+        } else {
+          voucherMap.set(vid, {
+            voucherId: vid,
+            voucherNumber: e.voucherNumber ?? "",
+            voucherType: e.voucherType ?? "",
+            voucherDate: e.voucherDate ?? "",
+            description: e.voucherDescription ?? "",
+            narration: e.narration || e.voucherDescription || "",
+            totalDebit: d,
+            totalCredit: c,
+          });
+        }
+      }
+      const rows = Array.from(voucherMap.values()).sort((a, b) => {
+        const dc = new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime();
+        return dc !== 0 ? dc : a.voucherNumber.localeCompare(b.voucherNumber);
+      });
+
+      // ── 4. Compute running balance ──
+      let running = openingBalance;
+      const rowsWithBalance = rows.map((r) => {
+        if (isSupplier) {
+          running += r.totalCredit - r.totalDebit;
+        } else {
+          running += r.totalDebit - r.totalCredit;
+        }
+        return { ...r, runningBalance: running };
+      });
+
+      // ── 5. Company info ──
+      const company = await storage.getCompanyById(companyId);
+      const settings = await storage.getCompanySettings(companyId);
+      const companyName = (company as any)?.name ?? "Company";
+      const logoUrl: string | null = (settings as any)?.logoUrl ?? null;
+      const baseCurrency = (company as any)?.baseCurrency ?? "USD";
+      const currencySymbolMap: Record<string, string> = {
+        USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
+        CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+      };
+      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? (baseCurrency + " ");
+      const fmtAmt = (n: number) => {
+        const abs = Math.abs(n);
+        const formatted = abs % 1 === 0 ? abs.toLocaleString("en") : abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return currSym + formatted;
+      };
+      const fmtDate = (s: string) => {
+        const d = new Date(s.split("T")[0] + "T00:00:00");
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      };
+      const periodStr = startDate && endDate
+        ? `${fmtDate(startDate)} — ${fmtDate(endDate)}`
+        : startDate ? `From ${fmtDate(startDate)}` : endDate ? `Up to ${fmtDate(endDate)}` : "All Time";
+      const generatedStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+      // ── 6. Generate PDF ──
+      const PDFDocument = (await import("pdfkit")).default;
+      const fs = await import("fs");
+
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      res.setHeader("Content-Type", "application/pdf");
+      const safeAccName = accountName.replace(/[^a-zA-Z0-9_-]/g, "_");
+      res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
+      doc.pipe(res);
+
+      // Header
+      let headerY = 40;
+      let logoWidth = 0;
+      if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
+        try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
+      }
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
+        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
+      doc.fontSize(10).font("Helvetica").fillColor("#555555")
+        .text(`Account Statement: ${accountName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth });
+
+      const headerBottom = Math.max(doc.y, headerY + 52);
+      doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc.lineWidth(1).strokeColor("#000000");
+
+      // Meta
+      const metaY = headerBottom + 10;
+      doc.fillColor("#444444").fontSize(8).font("Helvetica");
+      doc.text(`Period: ${periodStr}`, 40, metaY);
+      doc.text(`Generated: ${generatedStr}`, 40, doc.y + 2);
+      doc.moveDown(0.5);
+
+      // Table columns: Date | Type | Particulars | Debit | Credit | Balance
+      const PAGE_H = 841.89;
+      const MARGIN_BOTTOM = 60;
+      const colX  = [40,  110, 205, 370, 435, 500];
+      const colW  = [70,   95, 165,  65,  65,  55];
+      const colHdr = ["DATE", "TYPE", "PARTICULARS", "DEBIT", "CREDIT", "BALANCE"];
+      const colAln: Array<"left"|"right"> = ["left","left","left","right","right","right"];
+      const ROW_H = 14;
+      const HDR_H = 15;
+
+      const drawTableHeader = (y: number) => {
+        doc.rect(40, y, 515, HDR_H).fill("#1F3864");
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        colHdr.forEach((h, i) => {
+          doc.text(h, colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] });
+        });
+        doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
+      };
+
+      let tableY = doc.y + 4;
+      drawTableHeader(tableY);
+      let y = tableY + HDR_H;
+
+      const drawRow = (vals: string[], rowIdx: number, bg?: string) => {
+        if (bg) {
+          doc.rect(40, y, 515, ROW_H).fill(bg);
+          doc.fillColor("#000000");
+        }
+        vals.forEach((v, i) => {
+          if (v) doc.font("Helvetica").fontSize(7.5).text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
+        });
+      };
+
+      // Opening balance row
+      const obSideLabel = openingBalance >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+      const obDisplay = `${fmtAmt(openingBalance)} ${obSideLabel}`;
+      drawRow(["", "Opening Balance", "", "-", "-", obDisplay], 0, "#F0F4FF");
+      y += ROW_H;
+
+      // Transaction rows
+      rowsWithBalance.forEach((row, idx) => {
+        if (y + ROW_H > PAGE_H - MARGIN_BOTTOM) {
+          doc.addPage();
+          y = 40;
+          drawTableHeader(y);
+          y += HDR_H;
+        }
+        const bg = idx % 2 === 1 ? "#F8F8F8" : undefined;
+        const particulars = row.narration || row.description || "";
+        const debitStr = row.totalDebit > 0 ? fmtAmt(row.totalDebit) : "-";
+        const creditStr = row.totalCredit > 0 ? fmtAmt(row.totalCredit) : "-";
+        const bal = row.runningBalance;
+        const balSide = bal >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+        const balStr = `${fmtAmt(bal)} ${balSide}`;
+        drawRow([
+          fmtDate(row.voucherDate),
+          row.voucherType,
+          particulars,
+          debitStr,
+          creditStr,
+          balStr,
+        ], idx, bg);
+        y += ROW_H;
+      });
+
+      // Footer summary
+      y += 3;
+      doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
+      y += 5;
+      doc.lineWidth(1).strokeColor("#000000");
+
+      const totD = rowsWithBalance.reduce((s, r) => s + r.totalDebit, 0);
+      const totC = rowsWithBalance.reduce((s, r) => s + r.totalCredit, 0);
+      const closingBal = rowsWithBalance.length > 0
+        ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance
+        : openingBalance;
+      const closingSide = closingBal >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+
+      const drawSummaryRow = (label: string, debit: string, credit: string, balance: string, isBold = false) => {
+        doc.rect(40, y, 515, 16).fill(isBold ? "#1F3864" : "#EFF3FB");
+        doc.fillColor(isBold ? "#ffffff" : "#000000")
+          .font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(8);
+        doc.text(label, colX[2] + 2, y + 4, { width: colW[2] - 4, align: "left" });
+        if (debit) doc.text(debit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+        if (credit) doc.text(credit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+        if (balance) doc.text(balance, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
+        doc.fillColor("#000000");
+      };
+
+      if (y + 52 > PAGE_H - 20) { doc.addPage(); y = 40; }
+
+      drawSummaryRow("Current Period Total", fmtAmt(totD), fmtAmt(totC), "", false);
+      y += 17;
+      drawSummaryRow("Closing Balance", "", "", `${fmtAmt(closingBal)} ${closingSide}`, true);
+
+      doc.end();
+    } catch (err: any) {
+      console.error("Statement PDF error:", err);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get all vouchers with date filtering
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {

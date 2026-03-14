@@ -46,6 +46,7 @@ import {
   ExternalLink,
   Printer,
   FileDown,
+  FileText,
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
@@ -711,6 +712,21 @@ export default function Accounts() {
       title: "Export successful",
       description: `Downloaded ${fileName} with ${vouchersWithBalance.length} transactions.`,
     });
+  };
+
+  const handleExportStatementToPDF = () => {
+    if (!selectedAccount) return;
+    const params = new URLSearchParams();
+    if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+    if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    if (isFactoryWorkerAccount) {
+      window.open(`/api/factory/workers/${selectedAccount.accountId}/statement-pdf${qs}`, "_blank");
+    } else {
+      let accountType = (selectedAccount.type || "").toLowerCase();
+      if (accountType === "fixed asset") accountType = "fixed-asset";
+      window.open(`/api/accounts/${accountType}/${selectedAccount.accountId}/statement-pdf${qs}`, "_blank");
+    }
   };
 
   const handleVoucherClick = (voucher: GroupedVoucher) => {
@@ -1648,6 +1664,20 @@ export default function Accounts() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleExportStatementToPDF()}
+                          disabled={
+                            transactionsLoading ||
+                            (!isFactoryWorkerAccount && !isFactorySupplierAccount && vouchersWithBalance.length === 0) ||
+                            isFactorySupplierAccount
+                          }
+                          data-testid="button-export-pdf-statement"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Export PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handlePrint()}
                           disabled={
                             transactionsLoading ||
@@ -1656,7 +1686,7 @@ export default function Accounts() {
                           data-testid="button-print-statement"
                         >
                           <Printer className="w-4 h-4 mr-2" />
-                          Print Statement
+                          Print
                         </Button>
                       </div>
                     </div>

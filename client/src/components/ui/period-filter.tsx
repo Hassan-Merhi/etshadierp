@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { CalendarIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -14,7 +14,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
 
-export type PeriodPreset = "today" | "this_month" | "last_1_month" | "last_6_months" | "this_year" | "custom";
+export type PeriodPreset = "all_time" | "today" | "this_month" | "last_1_month" | "last_6_months" | "this_year" | "custom";
 
 export interface PeriodFilterValue {
   fromDate: string;
@@ -31,6 +31,7 @@ interface PeriodFilterProps {
 }
 
 const presetLabels: Record<PeriodPreset, string> = {
+  all_time: "All Time",
   today: "Today",
   this_month: "This Month",
   last_1_month: "Last 1 Month",
@@ -44,6 +45,8 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
   const formatDate = (d: Date) => format(d, "yyyy-MM-dd");
 
   switch (preset) {
+    case "all_time":
+      return { fromDate: "", toDate: "" };
     case "today":
       return {
         fromDate: formatDate(startOfDay(today)),
@@ -127,8 +130,8 @@ export function PeriodFilter({
   const fromDateObj = value.fromDate ? new Date(value.fromDate) : undefined;
   const toDateObj = value.toDate ? new Date(value.toDate) : undefined;
 
-  const displayLabel = value.preset === "custom" 
-    ? `${fromDateObj ? formatDisplayDate(fromDateObj) : ''} - ${toDateObj ? formatDisplayDate(toDateObj) : ''}`
+  const displayLabel = value.preset === "custom"
+    ? `${fromDateObj ? formatDisplayDate(fromDateObj) : ""} - ${toDateObj ? formatDisplayDate(toDateObj) : ""}`
     : presetLabels[value.preset];
 
   return (
@@ -147,6 +150,13 @@ export function PeriodFilter({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => handlePresetChange("all_time")}
+            data-testid="period-preset-all-time"
+          >
+            All Time
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => handlePresetChange("today")}
             data-testid="period-preset-today"
