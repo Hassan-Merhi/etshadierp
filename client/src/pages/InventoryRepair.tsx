@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, AlertTriangle, CheckCircle, Search, Wrench } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle, Search, Wrench, ShieldAlert } from "lucide-react";
 
 interface Discrepancy {
   locationId: number;
@@ -51,11 +51,28 @@ interface RebuildResult {
   warnings: string[];
 }
 
+interface ValueRepairRow {
+  id: number;
+  locationId: number;
+  locationName: string;
+  stockItemId: number;
+  stockItemName: string;
+  quantity: number;
+  oldRate: number;
+  oldValue: number;
+  newRate: number;
+  newValue: number;
+  reason: string;
+}
+
 export default function InventoryRepair() {
   const { toast } = useToast();
   const [result, setResult] = useState<RebuildResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"idle" | "preview" | "applied">("idle");
+
+  const [valueRepairRows, setValueRepairRows] = useState<ValueRepairRow[]>([]);
+  const [valueRepairState, setValueRepairState] = useState<"idle" | "previewing" | "previewed" | "finalizing">("idle");
 
   async function runRebuild(dryRun: boolean) {
     setLoading(true);
@@ -78,6 +95,54 @@ export default function InventoryRepair() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function previewValueRepair() {
+    setValueRepairState("previewing");
+    try {
+      const res = await fetch("/api/admin/repair-inventory-values/preview", { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Preview failed");
+      }
+      const data = await res.json();
+      setValueRepairRows(data.rows || []);
+      setValueRepairState("previewed");
+      toast({
+        title: "Preview Complete",
+        description: data.rows.length > 0
+          ? `Found ${data.rows.length} corrupted inventory value row(s).`
+          : "No corrupted inventory rows found.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to preview value repair",
+        variant: "destructive",
+      });
+      setValueRepairState("idle");
+    }
+  }
+
+  async function finalizeValueRepair() {
+    setValueRepairState("finalizing");
+    try {
+      const res = await apiRequest("POST", "/api/admin/repair-inventory-values", {});
+      const data = await res.json();
+      toast({
+        title: "Repair Complete",
+        description: data.message || `Repaired ${data.corrected} rows.`,
+      });
+      setValueRepairRows([]);
+      setValueRepairState("idle");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to finalize value repair",
+        variant: "destructive",
+      });
+      setValueRepairState("previewed");
     }
   }
 
@@ -262,6 +327,140 @@ export default function InventoryRepair() {
             </Card>
           )}
         </>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 flex-wrap">
+            <ShieldAlert className="h-5 w-5" />
+            Inventory Value Repair
+          </CardTitle>
+          <CardDescription>
+            Detects inventory rows with corrupted valuation (negative rates, value on zero-quantity rows, etc.) and lets you repair them safely.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button
+            onClick={previewValueRepair}
+            disabled={valueRepairState === "previewing" || valueRepairState === "finalizing"}
+            variant="outline"
+            data-testid="button-preview-value-repair"
+          >
+            {valueRepairState === "previewing" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
+            )}
+            Preview Inventory Value Repair
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                disabled={valueRepairState !== "previewed" || valueRepairRows.length === 0}
+                variant="default"
+                data-testid="button-finalize-value-repair"
+              >
+                {valueRepairState === "finalizing" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="mr-2 h-4 w-4" />
+                )}
+                Finalize Repair
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Value Repair</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will update {valueRepairRows.length} inventory row(s) to correct their average rate and total value.
+                  Quantities will not be changed. This action cannot be automatically undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-value-repair">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={finalizeValueRepair}
+                  data-testid="button-confirm-value-repair"
+                >
+                  Yes, Finalize Repair
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
+
+      {valueRepairState === "previewed" && valueRepairRows.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Corrupted Value Rows
+              <Badge variant="secondary" className="ml-2">{valueRepairRows.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                The following rows have invalid valuation and will be corrected if you finalize.
+                Quantities will remain unchanged — only rate and value will be updated.
+              </AlertDescription>
+            </Alert>
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Old Rate</TableHead>
+                    <TableHead className="text-right">Old Value</TableHead>
+                    <TableHead className="text-right">New Rate</TableHead>
+                    <TableHead className="text-right">New Value</TableHead>
+                    <TableHead>Reason</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {valueRepairRows.map((r, i) => (
+                    <TableRow key={r.id} data-testid={`row-value-repair-${i}`}>
+                      <TableCell data-testid={`text-vr-location-${i}`}>{r.locationName}</TableCell>
+                      <TableCell data-testid={`text-vr-item-${i}`}>{r.stockItemName}</TableCell>
+                      <TableCell className="text-right" data-testid={`text-vr-qty-${i}`}>
+                        {r.quantity.toFixed(3)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`text-vr-old-rate-${i}`}>
+                        {r.oldRate.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`text-vr-old-value-${i}`}>
+                        {r.oldValue.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-green-600 dark:text-green-400" data-testid={`text-vr-new-rate-${i}`}>
+                        {r.newRate.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-green-600 dark:text-green-400" data-testid={`text-vr-new-value-${i}`}>
+                        {r.newValue.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-vr-reason-${i}`}>
+                        {r.reason}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {valueRepairState === "previewed" && valueRepairRows.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
+            <p className="text-lg font-medium" data-testid="text-no-corrupted-rows">No corrupted inventory rows found</p>
+            <p className="text-muted-foreground mt-1">All inventory value and rate fields are within valid ranges.</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

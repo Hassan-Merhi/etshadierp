@@ -35413,6 +35413,82 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/admin/repair-inventory-values/preview", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const detectResult = await db.execute(
+        sql`SELECT i.id, i.location_id, i.stock_item_id, i.quantity, i.average_rate, i.total_value,
+                   l.name AS location_name,
+                   si.name AS stock_item_name
+            FROM inventory i
+            LEFT JOIN locations l ON l.id = i.location_id
+            LEFT JOIN stock_items si ON si.id = i.stock_item_id
+            WHERE i.company_id = ${companyId}
+            AND (
+              (CAST(i.quantity AS DECIMAL) <= 0 AND CAST(i.total_value AS DECIMAL) > 0.01)
+              OR CAST(i.average_rate AS DECIMAL) < 0
+              OR (CAST(i.quantity AS DECIMAL) > 0 AND CAST(i.total_value AS DECIMAL) < -0.01)
+              OR (CAST(i.quantity AS DECIMAL) <= 0 AND ABS(CAST(i.average_rate AS DECIMAL)) > 0.001)
+            )`
+      );
+
+      const corruptedRows = detectResult.rows || detectResult;
+
+      if (!corruptedRows || corruptedRows.length === 0) {
+        return res.json({ rows: [] });
+      }
+
+      const previewRows: any[] = [];
+      for (const row of corruptedRows as any[]) {
+        const qty = parseFloat(row.quantity || "0");
+        const oldRate = parseFloat(row.average_rate || "0");
+        const oldValue = parseFloat(row.total_value || "0");
+
+        let newValue = oldValue;
+        let newRate = oldRate;
+        const reasons: string[] = [];
+
+        if (qty <= 0 && oldValue > 0.01) reasons.push("qty <= 0 but value > 0");
+        if (oldRate < 0) reasons.push("negative average_rate");
+        if (qty > 0 && oldValue < -0.01) reasons.push("qty > 0 but total_value < 0");
+        if (qty <= 0 && Math.abs(oldRate) > 0.001) reasons.push("qty <= 0 but rate != 0");
+
+        if (qty <= 0) {
+          newValue = 0;
+          newRate = 0;
+        } else if (qty > 0 && oldValue < 0) {
+          newValue = 0;
+          newRate = 0;
+        } else if (oldRate < 0) {
+          newRate = 0;
+        }
+
+        previewRows.push({
+          id: row.id,
+          locationId: row.location_id,
+          locationName: row.location_name || "Unknown",
+          stockItemId: row.stock_item_id,
+          stockItemName: row.stock_item_name || "Unknown",
+          quantity: qty,
+          oldRate,
+          oldValue,
+          newRate,
+          newValue,
+          reason: reasons.join("; "),
+        });
+      }
+
+      res.json({ rows: previewRows });
+    } catch (error: any) {
+      console.error("Inventory repair preview error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/admin/repair-inventory-values", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
