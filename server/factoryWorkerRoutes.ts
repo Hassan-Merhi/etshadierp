@@ -723,7 +723,30 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
-        earned = computeMonthlyPay(baseSal, effectiveStart, endDate);
+        // Monthly: base pay on actual attendance records in the effective period
+        const attendanceRows = await db.select().from(factoryAttendance).where(and(
+          eq(factoryAttendance.workerId, id),
+          eq(factoryAttendance.companyId, companyId),
+          gte(factoryAttendance.attendanceDate, effectiveStart),
+          lte(factoryAttendance.attendanceDate, endDate),
+        ));
+        if (attendanceRows.length === 0) {
+          // No attendance records — fall back to calendar-day proration
+          earned = computeMonthlyPay(baseSal, effectiveStart, endDate);
+        } else {
+          // Count actual days worked (Present/Late = 1 full day, Half Day = 0.5)
+          let attendedDays = 0;
+          for (const row of attendanceRows) {
+            const s = row.status || "Absent";
+            if (s === "Present" || s === "Late") attendedDays += 1;
+            else if (s === "Half Day") attendedDays += 0.5;
+          }
+          // Daily rate: salary / days in the month of effectiveStart
+          // For multi-month ranges, prorate per month
+          const daysInStartMonth = daysInMonth(effectiveStart);
+          const dailyRate = baseSal / daysInStartMonth;
+          earned = attendedDays * dailyRate;
+        }
       }
 
       // Compute already paid in period (APPROVED or PAID payrolls)
