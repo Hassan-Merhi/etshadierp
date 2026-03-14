@@ -411,7 +411,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
       const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
-        return sum + parseFloat(b.weightKg || "0") * parseFloat(b.costPerKg || "0");
+        return sum + parseFloat(b.costPerKg || "0");
       }, 0);
       const baleMetaJson = JSON.stringify({
         bales: result.bales.map((b: any) => ({
@@ -7443,28 +7443,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
           if (baleIdToEntry.size > 0) {
             const allBaleIds = Array.from(baleIdToEntry.keys());
+            // costPerKg on the bale stores productionPrice (total per bale, not per kg)
             const baleRecords = await db.select({
               id: factoryBales.id,
-              productId: factoryBales.productId,
-              weightKg: factoryBales.weightKg,
+              costPerKg: factoryBales.costPerKg,
             }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
 
-            const productIds = [...new Set(baleRecords.map((b: any) => b.productId).filter(Boolean))];
-            const productMap = new Map<number, any>();
-            if (productIds.length > 0) {
-              const products = await db.select({ id: factoryBaleProducts.id, productionPrice: factoryBaleProducts.productionPrice })
-                .from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds));
-              products.forEach((p: any) => productMap.set(p.id, p));
-            }
-
-            // Accumulate value per daybook row id
+            // Accumulate value per daybook row id — costPerKg is the per-bale production price
             const rowValueMap = new Map<number, number>();
             for (const baleRec of baleRecords) {
               const entries = baleIdToEntry.get(baleRec.id) || [];
-              for (const { row, weightKg } of entries) {
-                const product = baleRec.productId ? productMap.get(baleRec.productId) : null;
-                const pricePerKg = parseFloat(product?.productionPrice || "0");
-                const val = (parseFloat(baleRec.weightKg || String(weightKg)) || 0) * pricePerKg;
+              for (const { row } of entries) {
+                const val = parseFloat(baleRec.costPerKg || "0");
                 rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
               }
             }
