@@ -591,6 +591,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
+  const hydratedVoucherIdRef = useRef<number | null>(null);
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
@@ -648,6 +649,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       setEditVoucherId(voucherIdToEdit);
     } else {
       setEditVoucherId(null);
+      hydratedVoucherIdRef.current = null;
     }
   }, [tabParam, voucherIdToEdit]);
 
@@ -830,6 +832,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Pre-populate form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
+      if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
       // Identify the payment account entry.
       // For asset-type payment accounts: Payment=CR, Receipt=DR
       // For liability-type payment accounts (supplier/employee): Payment=DR, Receipt=CR
@@ -1018,6 +1021,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         notes: voucherToEdit.description || "",
         optional: voucherToEdit.optional || false,
       });
+      
+      hydratedVoucherIdRef.current = voucherToEdit.id;
       
       // Initialize transaction rate from voucher's rate-locked exchange rate
       if (voucherToEdit.exchangeRate) {
@@ -1746,6 +1751,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Pre-populate journal form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
+      if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
       const formEntries = voucherToEdit.entries.map((entry: any) => {
         let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier" = "ledger";
         let accountId = 0;
@@ -1819,6 +1825,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         notes: voucherToEdit.notes || "",
         optional: voucherToEdit.optional || false,
       });
+      hydratedVoucherIdRef.current = voucherToEdit.id;
     }
   }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, journalForm]);
 
@@ -2317,6 +2324,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Pre-populate stock transfer form when editing
   useEffect(() => {
     if (stockTransferToEdit && stockTransferToEdit.items && locations.length > 0 && stockItems.length > 0) {
+      if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
       // Map stock transfer items to form entries
       const formEntries = stockTransferToEdit.items.map((item: any) => {
         const sourceLocation = locations.find(l => l.id === item.sourceLocationId);
@@ -2349,6 +2357,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         notes: stockTransferToEdit.notes || "",
         optional: voucherToEdit?.optional || false,
       });
+      hydratedVoucherIdRef.current = voucherIdToEdit;
     }
   }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]);
 
@@ -2970,6 +2979,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Pre-populate stock adjustment form when editing
   useEffect(() => {
     if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && stockItems.length > 0) {
+      if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
       // Map stock adjustment items to form entries
       const formEntries = stockAdjustmentToEdit.items.map((item: any) => {
         const stockItem = stockItems.find(s => s.id === item.stockItemId);
@@ -3004,6 +3014,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         notes: stockAdjustmentToEdit.notes || "",
         optional: voucherToEdit?.optional || false,
       });
+      hydratedVoucherIdRef.current = voucherIdToEdit;
     }
   }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]);
 
