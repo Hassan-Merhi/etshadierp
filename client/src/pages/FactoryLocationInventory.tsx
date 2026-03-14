@@ -12,12 +12,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -134,6 +135,14 @@ export default function FactoryLocationInventory() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [savedProformaId, setSavedProformaId] = useState<number | null>(null);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteProduct, setDeleteProduct] = useState<FactoryBaleProduct | null>(null);
+  const [deleteQty, setDeleteQty] = useState(1);
+  const [deleteSupervisorUser, setDeleteSupervisorUser] = useState("");
+  const [deleteSupervisorPass, setDeleteSupervisorPass] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
+
   // Edit-mode state (deep-link from CustomerProformas "Edit in Inventory")
   const [editingProformaId, setEditingProformaId] = useState<number | null>(null);
   const [editProformaLines, setEditProformaLines] = useState<Array<{ articleCode: string; quantity: number; pricePerBale: string }>>([]);
@@ -210,6 +219,28 @@ export default function FactoryLocationInventory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
       setSavedProformaId(result.id);
       setTimeout(() => navigate("/factory/sales/proformas"), 800);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeBalesMutation = useMutation({
+    mutationFn: async (data: { productId: number; locationId: number; qty: number; supervisorUsername: string; supervisorPassword: string; reason: string }) => {
+      const res = await modeApiRequest("POST", "/api/factory/stock-entry/remove-by-product", data);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to remove bales");
+      return json;
+    },
+    onSuccess: (result: any) => {
+      toast({ title: "Removed", description: `${result.removed} bale(s) removed from stock.` });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/location-inventory/${selectedLocation?.id}`] });
+      setDeleteDialogOpen(false);
+      setDeleteProduct(null);
+      setDeleteQty(1);
+      setDeleteSupervisorUser("");
+      setDeleteSupervisorPass("");
+      setDeleteReason("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1253,7 +1284,7 @@ export default function FactoryLocationInventory() {
   const allCategoryNamesForProducts = isAllItems
     ? [...new Set(selectedCategory.products.map((p) => p.category || ""))].filter(Boolean).sort()
     : [];
-  const colSpanAll = (isAllItems ? (proformaMode ? 13 : 10) : (proformaMode ? 12 : 9)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 2 : 0);
+  const colSpanAll = (isAllItems ? (proformaMode ? 13 : 11) : (proformaMode ? 12 : 10)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 2 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
@@ -1401,11 +1432,22 @@ export default function FactoryLocationInventory() {
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <button
                         onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                        className={`text-left font-medium ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
+                        className={`text-left font-medium flex-1 ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
                         data-testid={`link-product-mobile-${prod.productId}`}
                       >
                         {prod.productName}
                       </button>
+                      {!proformaMode && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive ml-auto"
+                          onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                          data-testid={`button-delete-product-mobile-${prod.productId}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                       <span>{prod.articleCode}</span>
@@ -1480,11 +1522,22 @@ export default function FactoryLocationInventory() {
                           <Package className="h-4 w-4 text-muted-foreground" />
                           <button
                             onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                            className={`text-left font-medium ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
+                            className={`text-left font-medium flex-1 ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
                             data-testid={`link-product-mobile-sp-${prod.productId}`}
                           >
                             {prod.productName}
                           </button>
+                          {!proformaMode && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive ml-auto"
+                              onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                              data-testid={`button-delete-product-mobile-sp-${prod.productId}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                           <span>{prod.articleCode}</span>
@@ -1541,6 +1594,7 @@ export default function FactoryLocationInventory() {
                 <col style={{ width: "100px" }} />
                 <col style={{ width: "110px" }} />
                 <col style={{ width: "100px" }} />
+                {!proformaMode && <col style={{ width: "44px" }} />}
               </colgroup>
               <thead className="bg-muted/50">
                 <tr className="h-12">
@@ -1557,6 +1611,7 @@ export default function FactoryLocationInventory() {
                   {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
                   {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                   <th className="text-right px-3 font-medium">Total KG</th>
+                  {!proformaMode && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -1608,6 +1663,20 @@ export default function FactoryLocationInventory() {
                           {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                           {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+                          {!proformaMode && (
+                            <td className="px-1 text-center">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive"
+                                title="Remove bales"
+                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                                data-testid={`button-delete-product-${prod.productId}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1623,6 +1692,7 @@ export default function FactoryLocationInventory() {
                       {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
                       {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
+                      {!proformaMode && <td></td>}
                     </tr>
                   </>
                 )}
@@ -1648,6 +1718,7 @@ export default function FactoryLocationInventory() {
                     <col style={{ width: "100px" }} />
                     <col style={{ width: "110px" }} />
                     <col style={{ width: "100px" }} />
+                    {!proformaMode && <col style={{ width: "44px" }} />}
                   </colgroup>
                   <thead className="bg-muted/50">
                     <tr className="h-12">
@@ -1664,6 +1735,7 @@ export default function FactoryLocationInventory() {
                       {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
                       {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                       <th className="text-right px-3 font-medium">Total KG</th>
+                      {!proformaMode && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1707,6 +1779,20 @@ export default function FactoryLocationInventory() {
                           {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                           {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+                          {!proformaMode && (
+                            <td className="px-1 text-center">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive"
+                                title="Remove bales"
+                                onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }}
+                                data-testid={`button-delete-product-sp-${prod.productId}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1722,6 +1808,7 @@ export default function FactoryLocationInventory() {
                       {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalCost)}</td>}
                       {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(spProdTotalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
+                      {!proformaMode && <td></td>}
                     </tr>
                   </tbody>
                 </table>
@@ -1764,6 +1851,87 @@ export default function FactoryLocationInventory() {
       )}
 
       {renderFinalizeDialog()}
+
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!open) { setDeleteDialogOpen(false); setDeleteProduct(null); setDeleteSupervisorUser(""); setDeleteSupervisorPass(""); setDeleteReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Bales from Stock</DialogTitle>
+            <DialogDescription>
+              {deleteProduct && (
+                <>Remove bales of <strong>{deleteProduct.productName}</strong> from <strong>{selectedLocation?.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong> bale(s).</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="delete-qty">Quantity to Remove</Label>
+              <Input
+                id="delete-qty"
+                type="number"
+                min={1}
+                max={deleteProduct?.baleCount ?? 1}
+                value={deleteQty}
+                onChange={(e) => setDeleteQty(Math.max(1, Math.min(deleteProduct?.baleCount ?? 1, parseInt(e.target.value) || 1)))}
+                data-testid="input-delete-qty"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="delete-reason">Reason</Label>
+              <Input
+                id="delete-reason"
+                placeholder="e.g. damaged, lost, correction"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                data-testid="input-delete-reason"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="delete-supervisor-user">Supervisor Username</Label>
+              <Input
+                id="delete-supervisor-user"
+                placeholder="Admin/Owner/Manager username"
+                value={deleteSupervisorUser}
+                onChange={(e) => setDeleteSupervisorUser(e.target.value)}
+                data-testid="input-delete-supervisor-user"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="delete-supervisor-pass">Supervisor Password</Label>
+              <Input
+                id="delete-supervisor-pass"
+                type="password"
+                placeholder="Password"
+                value={deleteSupervisorPass}
+                onChange={(e) => setDeleteSupervisorPass(e.target.value)}
+                data-testid="input-delete-supervisor-pass"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setDeleteProduct(null); setDeleteSupervisorUser(""); setDeleteSupervisorPass(""); setDeleteReason(""); }} data-testid="button-delete-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={removeBalesMutation.isPending || !deleteSupervisorUser || !deleteSupervisorPass || deleteQty < 1}
+              onClick={() => {
+                if (!deleteProduct || !selectedLocation) return;
+                removeBalesMutation.mutate({
+                  productId: deleteProduct.productId,
+                  locationId: selectedLocation.id,
+                  qty: deleteQty,
+                  supervisorUsername: deleteSupervisorUser,
+                  supervisorPassword: deleteSupervisorPass,
+                  reason: deleteReason,
+                });
+              }}
+              data-testid="button-delete-confirm"
+            >
+              {removeBalesMutation.isPending ? "Removing..." : `Remove ${deleteQty} Bale(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

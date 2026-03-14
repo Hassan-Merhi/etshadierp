@@ -734,6 +734,107 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Remove N bales of a specific product from a specific location
+  app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { productId, locationId, qty, supervisorUsername, supervisorPassword, reason } = req.body;
+
+      if (!productId || !locationId || !qty || qty < 1) {
+        return res.status(400).json({ message: "productId, locationId, and qty >= 1 are required" });
+      }
+      if (!supervisorUsername || !supervisorPassword) {
+        return res.status(400).json({ message: "Supervisor credentials are required" });
+      }
+
+      const [supervisor] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, supervisorUsername));
+
+      if (!supervisor) return res.status(403).json({ message: "Supervisor not found" });
+
+      const passwordValid = await verifySupervisorPassword(supervisorPassword, supervisor.password);
+      if (!passwordValid) return res.status(403).json({ message: "Invalid supervisor password" });
+
+      const [role] = await db
+        .select()
+        .from(userCompanyRoles)
+        .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
+
+      if (!role || !["Admin", "Owner", "Manager"].includes(role.role)) {
+        return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
+      }
+
+      const result = await db.transaction(async (tx: any) => {
+        const balesToRemove = await tx
+          .select()
+          .from(factoryBales)
+          .where(
+            and(
+              eq(factoryBales.companyId, companyId),
+              eq(factoryBales.productId, productId),
+              eq(factoryBales.erpLocationId, locationId),
+              or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED"))
+            )
+          )
+          .limit(qty);
+
+        if (balesToRemove.length === 0) {
+          throw new Error("No in-stock bales found for this product at this location");
+        }
+
+        const removedBales: any[] = [];
+        const now = new Date();
+        const [factoryProduct] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, productId));
+        const itemCode = factoryProduct?.articleCode || factoryProduct?.code;
+        let erpStockItemId: number | undefined;
+        if (itemCode) {
+          const [existing] = await tx.select({ id: stockItems.id }).from(stockItems)
+            .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+          if (existing) erpStockItemId = existing.id;
+        }
+
+        for (const bale of balesToRemove) {
+          const [updated] = await tx.update(factoryBales)
+            .set({ status: "REMOVED", updatedAt: now })
+            .where(eq(factoryBales.id, bale.id))
+            .returning();
+          removedBales.push({ ...updated, productName: factoryProduct?.name || factoryProduct?.articleCode || "Unknown" });
+          if (erpStockItemId) {
+            await adjustInventory(tx, bale.erpLocationId!, erpStockItemId, -1, companyId);
+          }
+        }
+        return { removed: removedBales };
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      const baleMetaJson = JSON.stringify({
+        bales: result.removed.map((b: any) => ({
+          id: b.id,
+          ref: b.referenceNumber,
+          productName: b.productName || "Unknown",
+          weightKg: b.weightKg,
+          status: "REMOVED",
+        })),
+      });
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "BALE_REMOVAL",
+        description: `Removed ${result.removed.length} bale(s) from stock. Supervisor: ${supervisorUsername}. Reason: ${reason || "N/A"}`,
+        metaJson: baleMetaJson,
+      });
+
+      res.json({ removed: result.removed.length, bales: result.removed });
+    } catch (error: any) {
+      console.error("Error removing bales by product:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/location-inventory/:locationId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -9169,6 +9270,139 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error force-syncing bale status:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Export a single customer order to Excel with full bale detail
+  app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      // Load customer
+      const [customer] = await db.select().from(customers)
+        .where(eq(customers.id, order.customerId));
+
+      // Load bale links
+      const baleLinks = await db.select().from(customerOrderBales)
+        .where(eq(customerOrderBales.orderId, orderId));
+
+      // Load bale details
+      const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
+      const baleRows: any[] = baleIds.length > 0
+        ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
+        : [];
+
+      // Load products for name mapping
+      const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
+      const productRecords: any[] = productIds.length > 0
+        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds as number[]))
+        : [];
+      const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
+
+      // Load charges
+      const charges = await db.select().from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+
+      // ── Sheet 1: Order Summary ──
+      const summarySheet = workbook.addWorksheet("Order Summary");
+      summarySheet.columns = [
+        { header: "Field", key: "field", width: 28 },
+        { header: "Value", key: "value", width: 40 },
+      ];
+      const summaryRows = [
+        { field: "Order #", value: order.id },
+        { field: "Invoice Number", value: order.invoiceNumber || "-" },
+        { field: "Customer", value: customer?.legalName || `Customer #${order.customerId}` },
+        { field: "Order Date", value: order.orderDate || "-" },
+        { field: "Status", value: order.status },
+        { field: "Container Number", value: order.containerNumber || "-" },
+        { field: "Shipping Company", value: order.shippingCompany || "-" },
+        { field: "Total Bales", value: order.totalQtyBales || baleRows.length },
+        { field: "Subtotal (Bales)", value: parseFloat(order.subtotalBales || "0") },
+        { field: "Freight Amount", value: parseFloat(order.freightAmount || "0") },
+        { field: "Other Charges", value: parseFloat(order.otherChargesTotal || "0") },
+        { field: "Grand Total", value: parseFloat(order.grandTotal || "0") },
+      ];
+      summaryRows.forEach((r) => summarySheet.addRow(r));
+      summarySheet.getRow(1).font = { bold: true };
+
+      // ── Sheet 2: Bale Details ──
+      const baleSheet = workbook.addWorksheet("Bale Details");
+      baleSheet.columns = [
+        { header: "#", key: "seq", width: 6 },
+        { header: "Reference", key: "ref", width: 18 },
+        { header: "Article Code", key: "articleCode", width: 14 },
+        { header: "Product Name", key: "productName", width: 30 },
+        { header: "Weight (kg)", key: "weightKg", width: 14 },
+        { header: "Cost/kg", key: "costPerKg", width: 12 },
+        { header: "Status", key: "status", width: 16 },
+        { header: "Price Used", key: "priceUsed", width: 14 },
+      ];
+      baleSheet.getRow(1).font = { bold: true };
+
+      // Map baleId -> price from link table
+      const balePriceMap = new Map<number, string>(baleLinks.map((l: any) => [l.baleId, l.priceUsed]));
+
+      baleRows.forEach((bale: any, i: number) => {
+        const product = productMap.get(bale.productId);
+        baleSheet.addRow({
+          seq: i + 1,
+          ref: bale.referenceNumber || bale.baleCode || "-",
+          articleCode: product?.articleCode || bale.articleCode || "-",
+          productName: product?.name || product?.articleCode || "-",
+          weightKg: parseFloat(bale.weightKg || "0"),
+          costPerKg: parseFloat(bale.costPerKg || "0"),
+          status: bale.status || "-",
+          priceUsed: parseFloat(balePriceMap.get(bale.id) || "0"),
+        });
+      });
+
+      // Totals row
+      if (baleRows.length > 0) {
+        const totalRow = baleSheet.addRow({
+          seq: "",
+          ref: "TOTAL",
+          articleCode: "",
+          productName: "",
+          weightKg: baleRows.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0),
+          costPerKg: "",
+          status: "",
+          priceUsed: "",
+        });
+        totalRow.font = { bold: true };
+      }
+
+      // ── Sheet 3: Charges ──
+      if (charges.length > 0) {
+        const chargeSheet = workbook.addWorksheet("Charges");
+        chargeSheet.columns = [
+          { header: "Description", key: "description", width: 36 },
+          { header: "Amount", key: "amount", width: 16 },
+        ];
+        chargeSheet.getRow(1).font = { bold: true };
+        charges.forEach((c: any) => chargeSheet.addRow({ description: c.description, amount: parseFloat(c.amount || "0") }));
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const fileName = `order_${orderId}_${order.invoiceNumber || "draft"}_${dateStr}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Error exporting order to Excel:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

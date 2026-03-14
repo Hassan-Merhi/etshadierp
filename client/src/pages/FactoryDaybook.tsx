@@ -78,6 +78,15 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
   }
 }
 
+function renderBaleStockAmount(entry: DaybookEntry, sym: string, amt: number): string {
+  if (entry.txType !== "BALE_STOCK_ENTRY") return `${sym}${formatNumber(amt)}`;
+  if (amt > 0) return `${sym}${formatNumber(amt)}`;
+  const bales = parseBalesMeta(entry);
+  const totalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+  if (totalKg > 0) return `${formatNumber(totalKg)} kg`;
+  return `${sym}${formatNumber(amt)}`;
+}
+
 function formatDaybookDescription(entry: DaybookEntry): string {
   if (entry.txType === "BALE_STOCK_ENTRY") {
     const bales = parseBalesMeta(entry);
@@ -206,7 +215,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">{renderBaleStockAmount(entry, sym, amt)}</p>
           </div>
           {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
             <div className="text-right">
@@ -693,7 +702,7 @@ export default function FactoryDaybook() {
                         {formatDaybookDescription(entry)}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
+                        {renderBaleStockAmount(entry, currencySymbol(entry.currencyCode), parseFloat(entry.amountCurrency || "0"))}
                       </TableCell>
                       {hasNonUsd && (
                         <TableCell className="text-right font-mono text-muted-foreground">

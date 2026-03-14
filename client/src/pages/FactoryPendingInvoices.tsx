@@ -8,7 +8,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { ClipboardCheck, Eye, Package, Trash2 } from "lucide-react";
+import { ClipboardCheck, Eye, Package, Trash2, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -208,6 +208,20 @@ export default function FactoryPendingInvoices() {
                           data-testid={`button-review-order-${order.id}`}
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Export to Excel"
+                          onClick={() => {
+                            const a = document.createElement("a");
+                            a.href = `/api/factory/customer-orders/${order.id}/export/excel`;
+                            a.download = "";
+                            a.click();
+                          }}
+                          data-testid={`button-export-order-${order.id}`}
+                        >
+                          <Download className="h-4 w-4" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
