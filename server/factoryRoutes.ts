@@ -2317,22 +2317,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      // Try insert; if code/articleCode constraint fires (race condition or cross-company clash),
-      // append a short unique suffix and retry once.
+      // Try insert; if code/articleCode constraint fires (race condition),
+      // keep incrementing the numeric suffix until we find a free slot.
       let product: any;
-      try {
-        const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
-        [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
-      } catch (insertErr: any) {
-        const msg: string = insertErr?.message || "";
-        const isCodeDup = msg.includes("unique") && (msg.includes("company_code") || msg.includes("article_code") || msg.includes("_code"));
-        if (!isCodeDup) throw insertErr;
-        // Suffix with timestamp to guarantee uniqueness
-        const suffix = Date.now().toString(36).toUpperCase();
-        articleCode = `${articleCode}-${suffix}`;
-        code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
-        const parsed2 = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
-        [product] = await db.insert(factoryBaleProducts).values(parsed2).returning();
+      const knownPrefixesRetry = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16", "HMD00"];
+      const retryPrefix = knownPrefixesRetry.find(p => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length)));
+      let retryAttempts = 0;
+      while (true) {
+        try {
+          const parsed = insertFactoryBaleProductSchema.parse({ ...req.body, companyId, code, articleCode });
+          [product] = await db.insert(factoryBaleProducts).values(parsed).returning();
+          break;
+        } catch (insertErr: any) {
+          const msg: string = insertErr?.message || "";
+          const isCodeDup = msg.includes("unique") && (msg.includes("company_code") || msg.includes("article_code") || msg.includes("_code"));
+          if (!isCodeDup || !retryPrefix || retryAttempts >= 100) throw insertErr;
+          retryAttempts++;
+          const currentNum = parseInt(articleCode.slice(retryPrefix.length)) || 0;
+          const nextCandidate = `${retryPrefix}${String(currentNum + 1).padStart(3, "0")}`;
+          articleCode = nextCandidate;
+          code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+        }
       }
       res.json(product);
     } catch (error: any) {
