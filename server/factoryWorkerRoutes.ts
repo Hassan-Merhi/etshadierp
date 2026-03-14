@@ -668,6 +668,22 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!worker) return res.status(404).json({ message: "Worker not found" });
       if (!worker.active) return res.status(400).json({ message: "Worker contract already ended" });
 
+      const toDateStr = (v: any): string | null => {
+        if (!v) return null;
+        if (v instanceof Date) return v.toISOString().split("T")[0];
+        return String(v).split("T")[0];
+      };
+      const workerJoinDate = toDateStr(worker.contractStartDate) || toDateStr(worker.dateJoined) || null;
+      const effectiveStart = workerJoinDate && workerJoinDate > startDate ? workerJoinDate : startDate;
+
+      if (effectiveStart > endDate) {
+        if (dryRun) {
+          return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, dryRun: true });
+        }
+        await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
+        return res.json({ earned: "0.00", paid: "0.00", balance: "0.00", effectiveStart, workerUpdated: true });
+      }
+
       // Helper functions
       const daysInPeriod = (s: string, e: string) => Math.floor((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const countWeekdays = (s: string, e: string) => {
@@ -677,8 +693,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       };
       const daysInMonth = (dateStr: string) => { const d = new Date(dateStr); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
 
-      const days = daysInPeriod(startDate, endDate);
-      const weekdays = countWeekdays(startDate, endDate);
+      const days = daysInPeriod(effectiveStart, endDate);
+      const weekdays = countWeekdays(effectiveStart, endDate);
       const baseSal = parseFloat(worker.baseSalary || "0");
       const payFreq = worker.payFrequency || "Monthly";
       const salType = worker.salaryType || "Monthly";
@@ -698,7 +714,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         const bales = await db.select().from(factoryBales).where(and(
           eq(factoryBales.companyId, companyId),
           eq(factoryBales.finalizedBy, id),
-          gte(factoryBales.finalizedAt, new Date(startDate)),
+          gte(factoryBales.finalizedAt, new Date(effectiveStart)),
           lte(factoryBales.finalizedAt, new Date(endDate + "T23:59:59.999Z")),
         ));
         if (salType === "Per Bale") {
@@ -708,14 +724,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
-        earned = computeMonthlyPay(baseSal, startDate, endDate);
+        earned = computeMonthlyPay(baseSal, effectiveStart, endDate);
       }
 
       // Compute already paid in period (APPROVED or PAID payrolls)
       const paidPayrolls = await db.select().from(factoryPayrolls).where(and(
         eq(factoryPayrolls.workerId, id),
         eq(factoryPayrolls.companyId, companyId),
-        gte(factoryPayrolls.periodStart, startDate),
+        gte(factoryPayrolls.periodStart, effectiveStart),
         lte(factoryPayrolls.periodEnd, endDate),
         inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
       ));
@@ -724,7 +740,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // dryRun: just return calculation, no DB changes
       if (dryRun) {
-        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), dryRun: true });
+        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), effectiveStart, dryRun: true });
       }
 
       const settlementStatus = payNow ? "PAID" : "APPROVED";
@@ -734,7 +750,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const [settlement] = await db.insert(factoryPayrolls).values({
         companyId,
         workerId: id,
-        periodStart: startDate,
+        periodStart: effectiveStart,
         periodEnd: endDate,
         baseSalary: String(earned.toFixed(2)),
         baleEarnings: "0",
@@ -765,7 +781,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
 
-      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), settlementPayrollId: settlement.id, workerUpdated: true });
+      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), balance: balance.toFixed(2), effectiveStart, settlementPayrollId: settlement.id, workerUpdated: true });
     } catch (error: any) {
       console.error("Error settling worker contract:", error);
       res.status(500).json({ message: error.message });
