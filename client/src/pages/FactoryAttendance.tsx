@@ -864,7 +864,7 @@ function getWeekDays(dateStr: string): WeekDay[] {
       dayName: enNames[i],
       dayNameAr: arNames[i],
       date: cur,
-      iso: cur.toISOString().split("T")[0],
+      iso: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`,
       dayNum: cur.getDate(),
     });
   }
