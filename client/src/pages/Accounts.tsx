@@ -381,12 +381,11 @@ export default function Accounts() {
     enabled: !!selectedAccount && isFactorySupplierAccount,
   });
 
-  // Fetch pre-period balance when a period start date is set (factory mode only)
   const prePeriodAccountType = selectedAccount
     ? (selectedAccount.type || "").toLowerCase().replace(" ", "-")
     : null;
   const { data: prePeriodData } = useQuery<{ balance: number }>({
-    queryKey: selectedAccount && periodFilter.fromDate && appMode === "factory"
+    queryKey: selectedAccount && periodFilter.fromDate
       ? [`/api/accounts/${prePeriodAccountType}/${selectedAccount.accountId}/pre-period-balance`, { endDate: periodFilter.fromDate }]
       : [],
     queryFn: async () => {
@@ -398,7 +397,7 @@ export default function Accounts() {
       if (!res.ok) return { balance: 0 };
       return res.json();
     },
-    enabled: !!selectedAccount && !!periodFilter.fromDate && appMode === "factory" && !isFactoryWorkerAccount,
+    enabled: !!selectedAccount && !!periodFilter.fromDate && !isFactoryWorkerAccount,
   });
 
   // Restore account from URL params when accounts load
@@ -593,9 +592,9 @@ export default function Accounts() {
   const groupedVouchers = groupTransactionsByVoucher();
 
   // Calculate opening balance
-  // In factory mode, when a period start date is active, use the pre-period balance
+  // When a period start date is active, use the pre-period balance (sum of all transactions before the period)
   const getOpeningBalance = (): number => {
-    if (appMode === "factory" && periodFilter.fromDate && prePeriodData !== undefined) {
+    if (periodFilter.fromDate && prePeriodData !== undefined) {
       return prePeriodData.balance;
     }
     const rawOpeningBalance = parseBalance(
@@ -1807,22 +1806,23 @@ export default function Accounts() {
                     </div>
                   ) : (
                     <div ref={printRef} className="print-container">
-                      {/* Print header - only visible when printing */}
-                      <div className="hidden print:block mb-6 pb-4 border-b">
-                        <h1 className="text-2xl font-bold mb-2">
-                          {selectedCompany?.name}
-                        </h1>
-                        <h2 className="text-xl font-semibold mb-1">
-                          Ledger: {selectedAccount?.name}
-                        </h2>
-                        {(periodFilter.fromDate || periodFilter.toDate) && (
-                          <p className="text-sm text-muted-foreground">
-                            {periodLabel}
-                          </p>
-                        )}
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Printed on: {formatDisplayDate(new Date())}
-                        </p>
+                      <div className="hidden print:block print-header">
+                        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+                          <h1 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "#111" }}>
+                            {selectedCompany?.name}
+                          </h1>
+                          <h2 style={{ fontSize: "14px", fontWeight: 600, margin: "4px 0 0", color: "#333" }}>
+                            Account Statement: {selectedAccount?.name}
+                          </h2>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: "11px", color: "#555" }}>
+                          <span>
+                            {(periodFilter.fromDate || periodFilter.toDate)
+                              ? `Period: ${periodLabel}`
+                              : "Period: All Transactions"}
+                          </span>
+                          <span>Generated: {formatDisplayDate(new Date())}</span>
+                        </div>
                       </div>
                       <div className="rounded-md border overflow-x-auto print:border-0 hidden md:block print:!block">
                         <Table>
