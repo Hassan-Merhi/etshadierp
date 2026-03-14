@@ -7443,18 +7443,44 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
           if (baleIdToEntry.size > 0) {
             const allBaleIds = Array.from(baleIdToEntry.keys());
-            // costPerKg on the bale stores productionPrice (total per bale, not per kg)
+            // Fetch costPerKg, productId, and articleCode for multi-level fallback
             const baleRecords = await db.select({
               id: factoryBales.id,
               costPerKg: factoryBales.costPerKg,
+              productId: factoryBales.productId,
+              articleCode: factoryBales.articleCode,
             }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
+
+            // Build product price map: by id (primary) and by articleCode (fallback)
+            const productPriceById = new Map<number, number>();
+            const productPriceByArticleCode = new Map<string, number>();
+            const zeroBales = baleRecords.filter((b: any) => parseFloat(b.costPerKg || "0") === 0);
+            if (zeroBales.length > 0) {
+              // All products for this company so we can match by articleCode too
+              const allProducts = await db.select({
+                id: factoryBaleProducts.id,
+                articleCode: factoryBaleProducts.articleCode,
+                productionPrice: factoryBaleProducts.productionPrice,
+              }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+              allProducts.forEach((p: any) => {
+                productPriceById.set(p.id, parseFloat(p.productionPrice || "0"));
+                if (p.articleCode) productPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
+              });
+            }
 
             // Accumulate value per daybook row id — costPerKg is the per-bale production price
             const rowValueMap = new Map<number, number>();
             for (const baleRec of baleRecords) {
               const entries = baleIdToEntry.get(baleRec.id) || [];
+              const storedCost = parseFloat(baleRec.costPerKg || "0");
+              let val = storedCost;
+              if (val === 0) {
+                // fallback 1: productId → productionPrice
+                if (baleRec.productId) val = productPriceById.get(baleRec.productId) || 0;
+                // fallback 2: articleCode → productionPrice
+                if (val === 0 && baleRec.articleCode) val = productPriceByArticleCode.get(baleRec.articleCode) || 0;
+              }
               for (const { row } of entries) {
-                const val = parseFloat(baleRec.costPerKg || "0");
                 rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
               }
             }
