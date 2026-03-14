@@ -87,6 +87,11 @@ function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: S
   });
 }
 
+const SPECIAL_FACTORY_CATS = ["Wipers", "Garbage"];
+function isSpecialFactoryCategory(name: string) {
+  return SPECIAL_FACTORY_CATS.some((s) => s.toLowerCase() === name.trim().toLowerCase());
+}
+
 function applySortCategories(items: CategoryGroup[], field: SortField, dir: SortDir) {
   return [...items].sort((a, b) => {
     let cmp = 0;
@@ -105,6 +110,7 @@ export default function FactoryLocationInventory() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryGroup | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [productSearch, setProductSearch] = useState("");
   const [catSortField, setCatSortField] = useState<SortField>("name");
   const [catSortDir, setCatSortDir] = useState<SortDir>("asc");
@@ -303,19 +309,25 @@ export default function FactoryLocationInventory() {
 
   const filteredCategories = applySortCategories(
     categoryGroups.filter((c) =>
-      c.categoryName.toLowerCase().includes(categorySearch.toLowerCase())
+      c.categoryName.toLowerCase().includes(categorySearch.toLowerCase()) &&
+      (categoryFilter === "" || c.categoryName === categoryFilter)
     ),
     catSortField,
     catSortDir
   );
+  const regularCategories = filteredCategories.filter((c) => !isSpecialFactoryCategory(c.categoryName));
+  const specialCategories = filteredCategories.filter((c) => isSpecialFactoryCategory(c.categoryName));
 
   const filteredProducts = selectedCategory
     ? applySortProducts(
         selectedCategory.products.filter(
           (p) => {
             const matchesSearch = p.productName.toLowerCase().includes(productSearch.toLowerCase()) || p.articleCode.toLowerCase().includes(productSearch.toLowerCase());
-            if (proformaMode && showSelectedOnly) return matchesSearch && selections.has(p.productId);
-            return matchesSearch;
+            const matchesCatFilter = selectedCategory.categoryId === -1
+              ? (categoryFilter === "" || p.category === categoryFilter)
+              : true;
+            if (proformaMode && showSelectedOnly) return matchesSearch && matchesCatFilter && selections.has(p.productId);
+            return matchesSearch && matchesCatFilter;
           }
         ),
         prodSortField,
@@ -327,6 +339,7 @@ export default function FactoryLocationInventory() {
     setSelectedLocation(location);
     setSelectedCategory(null);
     setCategorySearch("");
+    setCategoryFilter("");
     setProductSearch("");
   };
 
@@ -357,6 +370,7 @@ export default function FactoryLocationInventory() {
     setSelectedCategory(null);
     setLocationSearch("");
     setCategorySearch("");
+    setCategoryFilter("");
     setProformaMode(false);
     setSelections(new Map());
   };
@@ -364,6 +378,7 @@ export default function FactoryLocationInventory() {
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setProductSearch("");
+    setCategoryFilter("");
   };
 
   const escapeBackHandler = selectedCategory
@@ -837,11 +852,17 @@ export default function FactoryLocationInventory() {
   }
 
   if (!selectedCategory) {
-    const totalBales = filteredCategories.reduce((s, c) => s + c.baleCount, 0);
-    const totalKg = filteredCategories.reduce((s, c) => s + c.totalWeight, 0);
-    const totalValue = filteredCategories.reduce((s, c) => s + c.totalCost, 0);
-    const totalSellValue = filteredCategories.reduce((s, c) => s + c.totalSellValue, 0);
-    const totalProducts = filteredCategories.reduce((s, c) => s + c.productCount, 0);
+    const totalBales = regularCategories.reduce((s, c) => s + c.baleCount, 0);
+    const totalKg = regularCategories.reduce((s, c) => s + c.totalWeight, 0);
+    const totalValue = regularCategories.reduce((s, c) => s + c.totalCost, 0);
+    const totalSellValue = regularCategories.reduce((s, c) => s + c.totalSellValue, 0);
+    const totalProducts = regularCategories.reduce((s, c) => s + c.productCount, 0);
+    const spTotalBales = specialCategories.reduce((s, c) => s + c.baleCount, 0);
+    const spTotalKg = specialCategories.reduce((s, c) => s + c.totalWeight, 0);
+    const spTotalValue = specialCategories.reduce((s, c) => s + c.totalCost, 0);
+    const spTotalSellValue = specialCategories.reduce((s, c) => s + c.totalSellValue, 0);
+    const spTotalProducts = specialCategories.reduce((s, c) => s + c.productCount, 0);
+    const allCategoryNames = [...categoryGroups].sort((a, b) => a.categoryName.localeCompare(b.categoryName));
 
     return (
       <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -882,7 +903,18 @@ export default function FactoryLocationInventory() {
                 data-testid="input-search-categories"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter">
+                <SelectTrigger className="w-[140px]" data-testid="select-category-filter-trigger">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Categories</SelectItem>
+                  {allCategoryNames.map((c) => (
+                    <SelectItem key={c.categoryId || 0} value={c.categoryName}>{c.categoryName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={catSortField} onValueChange={(v) => setCatSortField(v as SortField)} data-testid="select-cat-sort-field">
                 <SelectTrigger className="w-[120px]" data-testid="select-cat-sort-trigger">
                   <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -1003,72 +1035,171 @@ export default function FactoryLocationInventory() {
             <div className="text-center py-8 text-muted-foreground">No bales found at this location.</div>
           ) : (
             <>
-              <div className="md:hidden space-y-3">
-                {filteredCategories.map((cat) => (
-                  <Card
-                    key={cat.categoryId || 0}
-                    className="p-3 cursor-pointer hover-elevate"
-                    onClick={() => handleCategoryClick(cat)}
-                    data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Layers className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{cat.categoryName}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
-                      <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
-                      <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
-                      {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono">{formatAmount(cat.totalCost)}</span></div>}
-                      {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
-                    </div>
-                  </Card>
-                ))}
-                {filteredCategories.length > 0 && (
-                  <Card className="p-3 bg-muted/50" data-testid="text-category-totals">
-                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                      <span>Total ({totalProducts} products, {totalBales.toLocaleString()} bales)</span>
-                      <span className="font-mono">{fmt(totalKg)} KG</span>
-                    </div>
-                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalValue)}</div>}
-                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
-                  </Card>
-                )}
-              </div>
-
-              <div className="hidden md:block rounded-md border overflow-hidden w-full">
-                <table className="w-full table-fixed text-sm">
-                  <colgroup>
-                    <col />
-                    <col style={{ width: "100px" }} />
-                    <col style={{ width: "110px" }} />
-                    <col style={{ width: "130px" }} />
-                    <col style={{ width: "140px" }} />
-                    <col style={{ width: "140px" }} />
-                  </colgroup>
-                  <thead className="bg-muted/50">
-                    <tr className="h-12">
-                      <th className="text-left px-3 font-medium">Category</th>
-                      <th className="text-right px-3 font-medium">Products</th>
-                      <th className="text-right px-3 font-medium">Bales</th>
-                      <th className="text-right px-3 font-medium">Total KG</th>
-                      {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
-                      {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCategories.length === 0 ? (
-                      <tr>
-                        <td colSpan={hideTotalValue ? 4 : 6} className="text-center py-8 text-muted-foreground">No categories found matching your search</td>
-                      </tr>
+              {/* ── Regular categories ── */}
+              {(regularCategories.length > 0 || specialCategories.length === 0) && (
+                <>
+                  <div className="md:hidden space-y-3">
+                    {regularCategories.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground text-sm">No categories found matching your search</div>
                     ) : (
                       <>
-                        {filteredCategories.map((cat) => (
+                        {regularCategories.map((cat) => (
+                          <Card
+                            key={cat.categoryId || 0}
+                            className="p-3 cursor-pointer hover-elevate"
+                            onClick={() => handleCategoryClick(cat)}
+                            data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <Layers className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{cat.categoryName}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
+                              <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
+                              <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
+                              {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono">{formatAmount(cat.totalCost)}</span></div>}
+                              {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
+                            </div>
+                          </Card>
+                        ))}
+                        <Card className="p-3 bg-muted/50" data-testid="text-category-totals">
+                          <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                            <span>Total ({totalProducts} products, {totalBales.toLocaleString()} bales)</span>
+                            <span className="font-mono">{fmt(totalKg)} KG</span>
+                          </div>
+                          {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalValue)}</div>}
+                          {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
+                        </Card>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="hidden md:block rounded-md border overflow-hidden w-full">
+                    <table className="w-full table-fixed text-sm">
+                      <colgroup>
+                        <col />
+                        <col style={{ width: "100px" }} />
+                        <col style={{ width: "110px" }} />
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "140px" }} />
+                        <col style={{ width: "140px" }} />
+                      </colgroup>
+                      <thead className="bg-muted/50">
+                        <tr className="h-12">
+                          <th className="text-left px-3 font-medium">Category</th>
+                          <th className="text-right px-3 font-medium">Products</th>
+                          <th className="text-right px-3 font-medium">Bales</th>
+                          <th className="text-right px-3 font-medium">Total KG</th>
+                          {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                          {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regularCategories.length === 0 ? (
+                          <tr>
+                            <td colSpan={hideTotalValue ? 4 : 6} className="text-center py-8 text-muted-foreground">No categories found matching your search</td>
+                          </tr>
+                        ) : (
+                          <>
+                            {regularCategories.map((cat) => (
+                              <tr
+                                key={cat.categoryId || 0}
+                                className="border-t hover-elevate cursor-pointer h-12"
+                                onClick={() => handleCategoryClick(cat)}
+                                data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
+                              >
+                                <td className="px-3 font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <Layers className="h-4 w-4 text-muted-foreground" />
+                                    {cat.categoryName}
+                                  </div>
+                                </td>
+                                <td className="text-right px-3 font-mono">{cat.productCount}</td>
+                                <td className="text-right px-3 font-mono">{cat.baleCount.toLocaleString()}</td>
+                                <td className="text-right px-3 font-mono">{fmt(cat.totalWeight)}</td>
+                                {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(cat.totalCost)}</td>}
+                                {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(cat.totalSellValue)}</td>}
+                              </tr>
+                            ))}
+                            <tr className="border-t bg-muted/50 h-12 font-bold">
+                              <td className="px-3">Total</td>
+                              <td className="text-right px-3 font-mono">{totalProducts}</td>
+                              <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
+                              <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
+                              {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalValue)}</td>}
+                              {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {/* ── Special categories (Wipers / Garbage) ── */}
+              {specialCategories.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
+                  <div className="md:hidden space-y-3">
+                    {specialCategories.map((cat) => (
+                      <Card
+                        key={cat.categoryId || 0}
+                        className="p-3 cursor-pointer hover-elevate"
+                        onClick={() => handleCategoryClick(cat)}
+                        data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{cat.categoryName}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-muted-foreground">Products: </span><span>{cat.productCount}</span></div>
+                          <div className="text-right"><span className="text-muted-foreground">Bales: </span><span className="font-mono">{cat.baleCount.toLocaleString()}</span></div>
+                          <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(cat.totalWeight)}</span></div>
+                          {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono">{formatAmount(cat.totalCost)}</span></div>}
+                          {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono text-primary">{formatAmount(cat.totalSellValue)}</span></div>}
+                        </div>
+                      </Card>
+                    ))}
+                    <Card className="p-3 bg-muted/50" data-testid="text-special-category-totals">
+                      <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                        <span>Total ({spTotalProducts} products, {spTotalBales.toLocaleString()} bales)</span>
+                        <span className="font-mono">{fmt(spTotalKg)} KG</span>
+                      </div>
+                      {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(spTotalValue)}</div>}
+                      {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(spTotalSellValue)} sell</div>}
+                    </Card>
+                  </div>
+
+                  <div className="hidden md:block rounded-md border overflow-hidden w-full">
+                    <table className="w-full table-fixed text-sm">
+                      <colgroup>
+                        <col />
+                        <col style={{ width: "100px" }} />
+                        <col style={{ width: "110px" }} />
+                        <col style={{ width: "130px" }} />
+                        <col style={{ width: "140px" }} />
+                        <col style={{ width: "140px" }} />
+                      </colgroup>
+                      <thead className="bg-muted/50">
+                        <tr className="h-12">
+                          <th className="text-left px-3 font-medium">Category</th>
+                          <th className="text-right px-3 font-medium">Products</th>
+                          <th className="text-right px-3 font-medium">Bales</th>
+                          <th className="text-right px-3 font-medium">Total KG</th>
+                          {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                          {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {specialCategories.map((cat) => (
                           <tr
                             key={cat.categoryId || 0}
                             className="border-t hover-elevate cursor-pointer h-12"
                             onClick={() => handleCategoryClick(cat)}
-                            data-testid={`row-category-${cat.categoryId || "uncategorized"}`}
+                            data-testid={`row-category-special-${cat.categoryId || "uncategorized"}`}
                           >
                             <td className="px-3 font-medium">
                               <div className="flex items-center gap-2">
@@ -1085,17 +1216,17 @@ export default function FactoryLocationInventory() {
                         ))}
                         <tr className="border-t bg-muted/50 h-12 font-bold">
                           <td className="px-3">Total</td>
-                          <td className="text-right px-3 font-mono">{totalProducts}</td>
-                          <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
-                          <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalValue)}</td>}
-                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
+                          <td className="text-right px-3 font-mono">{spTotalProducts}</td>
+                          <td className="text-right px-3 font-mono">{spTotalBales.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>
+                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(spTotalValue)}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(spTotalSellValue)}</td>}
                         </tr>
-                      </>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           )}
           {!inventoryLoading && !globalSearchResults && filteredCategories.length > 0 && (
@@ -1109,10 +1240,19 @@ export default function FactoryLocationInventory() {
   }
 
   const isAllItems = selectedCategory.categoryId === -1;
-  const totalBales = filteredProducts.reduce((s, p) => s + p.baleCount, 0);
-  const totalKg = filteredProducts.reduce((s, p) => s + p.totalWeight, 0);
-  const totalCost = filteredProducts.reduce((s, p) => s + p.totalCost, 0);
-  const totalSellValue = filteredProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const regularProducts = isAllItems ? filteredProducts.filter((p) => !isSpecialFactoryCategory(p.category || "")) : filteredProducts;
+  const specialProducts = isAllItems ? filteredProducts.filter((p) => isSpecialFactoryCategory(p.category || "")) : [];
+  const totalBales = regularProducts.reduce((s, p) => s + p.baleCount, 0);
+  const totalKg = regularProducts.reduce((s, p) => s + p.totalWeight, 0);
+  const totalCost = regularProducts.reduce((s, p) => s + p.totalCost, 0);
+  const totalSellValue = regularProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const spProdTotalBales = specialProducts.reduce((s, p) => s + p.baleCount, 0);
+  const spProdTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
+  const spProdTotalCost = specialProducts.reduce((s, p) => s + p.totalCost, 0);
+  const spProdTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const allCategoryNamesForProducts = isAllItems
+    ? [...new Set(selectedCategory.products.map((p) => p.category || ""))].filter(Boolean).sort()
+    : [];
   const colSpanAll = (isAllItems ? (proformaMode ? 13 : 10) : (proformaMode ? 12 : 9)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 2 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
@@ -1201,7 +1341,20 @@ export default function FactoryLocationInventory() {
               data-testid="input-search-products"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAllItems && (
+              <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter-products">
+                <SelectTrigger className="w-[140px]" data-testid="select-category-filter-products-trigger">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Categories</SelectItem>
+                  {allCategoryNamesForProducts.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-prod-sort-field">
               <SelectTrigger className="w-[120px]" data-testid="select-prod-sort-trigger">
                 <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -1226,11 +1379,11 @@ export default function FactoryLocationInventory() {
         </div>
 
         <div className="md:hidden space-y-3">
-          {filteredProducts.length === 0 ? (
+          {regularProducts.length === 0 && specialProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No products found matching your search</div>
           ) : (
             <>
-              {filteredProducts.map((prod) => {
+              {regularProducts.map((prod) => {
                 const avgRate = (prod as any).productionPrice || 0;
                 const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                 const isSelected = selections.has(prod.productId);
@@ -1296,145 +1449,285 @@ export default function FactoryLocationInventory() {
                   </Card>
                 );
               })}
-              <Card className="p-3 bg-muted/50" data-testid="text-product-totals">
-                <div className="flex items-center justify-between gap-2 font-bold text-sm">
-                  <span>Total ({filteredProducts.length} products, {totalBales.toLocaleString()} bales)</span>
-                  <span className="font-mono">{fmt(totalKg)} KG</span>
-                </div>
-                {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalCost)}</div>}
-              {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
-              </Card>
-            </>
-          )}
-        </div>
-
-        <div className="hidden md:block rounded-md border overflow-hidden w-full">
-          <table className="w-full table-fixed text-sm">
-            <colgroup>
-              {proformaMode && <col style={{ width: "36px" }} />}
-              {isAllItems && <col style={{ width: "110px" }} />}
-              <col style={{ width: "100px" }} />
-              <col />
-              <col style={{ width: "70px" }} />
-              {proformaMode && <col style={{ width: "80px" }} />}
-              {proformaMode && <col style={{ width: "100px" }} />}
-              <col style={{ width: "90px" }} />
-              <col style={{ width: "90px" }} />
-              <col style={{ width: "100px" }} />
-              <col style={{ width: "110px" }} />
-              <col style={{ width: "100px" }} />
-            </colgroup>
-            <thead className="bg-muted/50">
-              <tr className="h-12">
-                {proformaMode && <th className="px-2"></th>}
-                {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
-                <th className="text-left px-3 font-medium">Article Code</th>
-                <th className="text-left px-3 font-medium">Bale Name</th>
-                <th className="text-right px-3 font-medium">Bales</th>
-                {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
-                {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
-                <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
-                {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
-                {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
-                {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
-                <th className="text-right px-3 font-medium">Total KG</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={colSpanAll} className="text-center py-8 text-muted-foreground">No products found matching your search</td>
-                </tr>
-              ) : (
+              {regularProducts.length > 0 && (
+                <Card className="p-3 bg-muted/50" data-testid="text-product-totals">
+                  <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                    <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
+                    <span className="font-mono">{fmt(totalKg)} KG</span>
+                  </div>
+                  {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(totalCost)}</div>}
+                  {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(totalSellValue)} sell</div>}
+                </Card>
+              )}
+              {isAllItems && specialProducts.length > 0 && (
                 <>
-                  {filteredProducts.map((prod) => {
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Wipers &amp; Garbage</p>
+                  {specialProducts.map((prod) => {
                     const avgRate = (prod as any).productionPrice || 0;
                     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
                     const isSelected = selections.has(prod.productId);
                     const selection = selections.get(prod.productId);
                     return (
-                      <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-${prod.productId}`}>
-                        {proformaMode && (
-                          <td className="px-2 text-center">
+                      <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`row-product-special-${prod.productId}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          {proformaMode && (
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSelection(prod)}
-                              data-testid={`checkbox-product-${prod.productId}`}
+                              data-testid={`checkbox-product-mobile-${prod.productId}`}
                             />
-                          </td>
-                        )}
-                        {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
-                        <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
-                        <td className="px-3 font-medium">
+                          )}
+                          <Package className="h-4 w-4 text-muted-foreground" />
                           <button
                             onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)}
-                            className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
-                            data-testid={`link-product-desktop-${prod.productId}`}
+                            className={`text-left font-medium ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`}
+                            data-testid={`link-product-mobile-sp-${prod.productId}`}
                           >
                             {prod.productName}
                           </button>
-                        </td>
-                        <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
-                        {proformaMode && (
-                          <td className="text-right px-3">
-                            {isSelected && selection ? (
-                              <Input
-                                type="number"
-                                value={selection.selectedQty}
-                                onChange={(e) => updateSelectionQty(prod.productId, e.target.value)}
-                                className="w-[70px] text-right ml-auto"
-                                min={1}
-                                max={prod.baleCount}
-                                data-testid={`input-qty-${prod.productId}`}
-                              />
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                          <span>{prod.articleCode}</span>
+                          <span className="text-xs text-muted-foreground">| {prod.category}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-muted-foreground">Bales: </span><span className="font-mono">{prod.baleCount.toLocaleString()}</span></div>
+                          <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
+                          <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
+                          {!hideAvgRate && <div><span className="text-muted-foreground">Cost/Bale: </span><span className="font-mono">{formatAmount(avgRate)}</span></div>}
+                          {!hideAvgRate && <div className="text-right"><span className="text-muted-foreground">Sell Price: </span><span className="font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                          {!hideTotalValue && <div className="text-right"><span className="text-muted-foreground">Cost Value: </span><span className="font-mono font-medium">{formatAmount(prod.totalCost)}</span></div>}
+                          {!hideTotalValue && <div className="col-span-2 text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+                        </div>
+                        {proformaMode && isSelected && selection && (
+                          <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground">Qty:</span>
+                            <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} max={prod.baleCount} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
+                            <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
+                            <span className="text-xs text-muted-foreground ml-2">Price:</span>
+                            <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile-sp-${prod.productId}`} />
+                          </div>
                         )}
-                        {proformaMode && (
-                          <td className="text-right px-3">
-                            {isSelected && selection ? (
-                              <Input
-                                type="number"
-                                value={selection.pricePerBale}
-                                onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)}
-                                className="w-[90px] text-right ml-auto"
-                                step="0.01"
-                                data-testid={`input-price-${prod.productId}`}
-                              />
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                        )}
-                        <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                        {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
-                        {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                        {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
-                        {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
-                        <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-                      </tr>
+                      </Card>
                     );
                   })}
-                  <tr className="border-t bg-muted/50 h-12 font-bold">
-                    {proformaMode && <td></td>}
-                    <td className="px-3" colSpan={colSpanLabel}>Total ({filteredProducts.length} products)</td>
-                    <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
-                    {proformaMode && <td></td>}
-                    {proformaMode && <td></td>}
-                    <td className="text-right px-3 font-mono"></td>
-                    {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                    {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                    {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
-                    {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
-                    <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                  </tr>
+                  <Card className="p-3 bg-muted/50" data-testid="text-special-product-totals">
+                    <div className="flex items-center justify-between gap-2 font-bold text-sm">
+                      <span>Total ({specialProducts.length} products, {spProdTotalBales.toLocaleString()} bales)</span>
+                      <span className="font-mono">{fmt(spProdTotalKg)} KG</span>
+                    </div>
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold mt-1">Cost: {formatAmount(spProdTotalCost)}</div>}
+                    {!hideTotalValue && <div className="text-right text-sm font-mono font-bold text-primary">{formatAmount(spProdTotalSellValue)} sell</div>}
+                  </Card>
                 </>
               )}
-            </tbody>
-          </table>
+            </>
+          )}
+        </div>
+
+        <div className="hidden md:block space-y-0 w-full">
+          <div className="rounded-md border overflow-hidden w-full">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                {proformaMode && <col style={{ width: "36px" }} />}
+                {isAllItems && <col style={{ width: "110px" }} />}
+                <col style={{ width: "100px" }} />
+                <col />
+                <col style={{ width: "70px" }} />
+                {proformaMode && <col style={{ width: "80px" }} />}
+                {proformaMode && <col style={{ width: "100px" }} />}
+                <col style={{ width: "90px" }} />
+                <col style={{ width: "90px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "110px" }} />
+                <col style={{ width: "100px" }} />
+              </colgroup>
+              <thead className="bg-muted/50">
+                <tr className="h-12">
+                  {proformaMode && <th className="px-2"></th>}
+                  {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
+                  <th className="text-left px-3 font-medium">Article Code</th>
+                  <th className="text-left px-3 font-medium">Bale Name</th>
+                  <th className="text-right px-3 font-medium">Bales</th>
+                  {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
+                  {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
+                  <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
+                  {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
+                  {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
+                  {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                  {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
+                  <th className="text-right px-3 font-medium">Total KG</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regularProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={colSpanAll} className="text-center py-8 text-muted-foreground">
+                      {specialProducts.length > 0 ? "No regular products found" : "No products found matching your search"}
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {regularProducts.map((prod) => {
+                      const avgRate = (prod as any).productionPrice || 0;
+                      const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+                      const isSelected = selections.has(prod.productId);
+                      const selection = selections.get(prod.productId);
+                      return (
+                        <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-${prod.productId}`}>
+                          {proformaMode && (
+                            <td className="px-2 text-center">
+                              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product-${prod.productId}`} />
+                            </td>
+                          )}
+                          {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
+                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
+                          <td className="px-3 font-medium">
+                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
+                              {prod.productName}
+                            </button>
+                          </td>
+                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                          {proformaMode && (
+                            <td className="text-right px-3">
+                              {isSelected && selection ? (
+                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} max={prod.baleCount} data-testid={`input-qty-${prod.productId}`} />
+                              ) : (<span className="text-muted-foreground">-</span>)}
+                            </td>
+                          )}
+                          {proformaMode && (
+                            <td className="text-right px-3">
+                              {isSelected && selection ? (
+                                <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-[90px] text-right ml-auto" step="0.01" data-testid={`input-price-${prod.productId}`} />
+                              ) : (<span className="text-muted-foreground">-</span>)}
+                            </td>
+                          )}
+                          <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
+                          {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                          {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t bg-muted/50 h-12 font-bold">
+                      {proformaMode && <td></td>}
+                      <td className="px-3" colSpan={colSpanLabel}>Total ({regularProducts.length} products)</td>
+                      <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
+                      {proformaMode && <td></td>}
+                      {proformaMode && <td></td>}
+                      <td className="text-right px-3 font-mono"></td>
+                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
+                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
+                      {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
+                      {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
+                      <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {isAllItems && specialProducts.length > 0 && (
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
+              <div className="rounded-md border overflow-hidden w-full">
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    {proformaMode && <col style={{ width: "36px" }} />}
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "100px" }} />
+                    <col />
+                    <col style={{ width: "70px" }} />
+                    {proformaMode && <col style={{ width: "80px" }} />}
+                    {proformaMode && <col style={{ width: "100px" }} />}
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "100px" }} />
+                  </colgroup>
+                  <thead className="bg-muted/50">
+                    <tr className="h-12">
+                      {proformaMode && <th className="px-2"></th>}
+                      <th className="text-left px-3 font-medium">Category</th>
+                      <th className="text-left px-3 font-medium">Article Code</th>
+                      <th className="text-left px-3 font-medium">Bale Name</th>
+                      <th className="text-right px-3 font-medium">Bales</th>
+                      {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
+                      {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
+                      <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
+                      {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
+                      {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
+                      {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                      {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
+                      <th className="text-right px-3 font-medium">Total KG</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {specialProducts.map((prod) => {
+                      const avgRate = (prod as any).productionPrice || 0;
+                      const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
+                      const isSelected = selections.has(prod.productId);
+                      const selection = selections.get(prod.productId);
+                      return (
+                        <tr key={prod.productId} className={`border-t h-12 ${proformaMode && isSelected ? "bg-primary/5" : ""}`} data-testid={`row-product-special-${prod.productId}`}>
+                          {proformaMode && (
+                            <td className="px-2 text-center">
+                              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product-sp-${prod.productId}`} />
+                            </td>
+                          )}
+                          <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
+                          <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
+                          <td className="px-3 font-medium">
+                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
+                              {prod.productName}
+                            </button>
+                          </td>
+                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                          {proformaMode && (
+                            <td className="text-right px-3">
+                              {isSelected && selection ? (
+                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} max={prod.baleCount} data-testid={`input-qty-sp-${prod.productId}`} />
+                              ) : (<span className="text-muted-foreground">-</span>)}
+                            </td>
+                          )}
+                          {proformaMode && (
+                            <td className="text-right px-3">
+                              {isSelected && selection ? (
+                                <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-[90px] text-right ml-auto" step="0.01" data-testid={`input-price-sp-${prod.productId}`} />
+                              ) : (<span className="text-muted-foreground">-</span>)}
+                            </td>
+                          )}
+                          <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
+                          {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                          {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
+                          {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+                          <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t bg-muted/50 h-12 font-bold">
+                      {proformaMode && <td></td>}
+                      <td className="px-3" colSpan={colSpanLabel}>Total ({specialProducts.length} products)</td>
+                      <td className="text-right px-3 font-mono">{spProdTotalBales.toLocaleString()}</td>
+                      {proformaMode && <td></td>}
+                      {proformaMode && <td></td>}
+                      <td className="text-right px-3 font-mono"></td>
+                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
+                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
+                      {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalCost)}</td>}
+                      {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(spProdTotalSellValue)}</td>}
+                      <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {filteredProducts.length > 0 && (
