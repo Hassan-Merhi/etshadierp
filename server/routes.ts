@@ -15195,8 +15195,9 @@ if (asOfDate) {
           return res.status(404).json({ message: "Voucher not found" });
         }
 
-        // Verify voucher belongs to current company
-        if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        // Verify voucher belongs to current company (respect factory mode company)
+        const effectiveCompanyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+        if (existingVoucher.companyId !== effectiveCompanyId) {
           return res
             .status(403)
             .json({
@@ -35343,7 +35344,7 @@ if (asOfDate) {
 
   app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const voucherId = parseInt(req.params.id);

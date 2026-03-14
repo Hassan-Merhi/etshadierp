@@ -81,22 +81,18 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
 function formatDaybookDescription(entry: DaybookEntry): string {
   if (entry.txType === "BALE_STOCK_ENTRY") {
     const bales = parseBalesMeta(entry);
-    if (bales.length > 0) {
-      const groups = new Map<string, number>();
-      bales.forEach((b) => {
-        const name = b.productName || "Unknown";
-        groups.set(name, (groups.get(name) || 0) + 1);
-      });
-      const total = bales.length;
-      const parts = Array.from(groups.entries()).map(([name, count]) =>
-        groups.size === 1 ? name : `${count}x ${name}`
-      );
-      return `${total} bale${total !== 1 ? "s" : ""} - ${parts.join(" | ")}`;
+    if (bales.length === 1) {
+      return bales[0].productName || bales[0].ref || "Unknown";
+    }
+    if (bales.length > 1) {
+      return `${bales.length} bales`;
     }
     return entry.description
       .replace(/^Stock entry:\s*/i, "")
+      .replace(/\d+ bales? - /i, "")
       .replace(/\s*[–-]\s*REF\w+/g, "")
-      .replace(/,\s*REF\w+/g, "");
+      .replace(/,\s*REF\w+/g, "")
+      .trim();
   }
   return entry.description;
 }
