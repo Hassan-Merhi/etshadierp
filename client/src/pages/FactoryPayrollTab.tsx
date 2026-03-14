@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users, Trash2, CalendarDays,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,7 +57,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   PAID: { label: "Paid", variant: "outline", className: "border-green-500 text-green-700 dark:text-green-400" },
 };
 
-
 function fmt(val: string | number | null | undefined) {
   const n = parseFloat(String(val || 0));
   return isNaN(n) ? "0.00" : n.toFixed(2);
@@ -66,6 +65,13 @@ function fmt(val: string | number | null | undefined) {
 function fmtDate(d: string | null | undefined, fmt: (d: string | Date) => string) {
   if (!d) return "—";
   return fmt(d);
+}
+
+interface PayrollGroup {
+  key: string;
+  periodStart: string;
+  periodEnd: string;
+  records: PayrollRecord[];
 }
 
 export default function FactoryPayrollTab() {
@@ -80,6 +86,11 @@ export default function FactoryPayrollTab() {
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Post-pay PDF state
+  const [paidPayrollIds, setPaidPayrollIds] = useState<number[]>([]);
+  const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
 
   const [runForm, setRunForm] = useState({
     periodStart: new Date().toISOString().slice(0, 7) + "-01",
@@ -128,6 +139,27 @@ export default function FactoryPayrollTab() {
 
   const activeWorkers = useMemo(() => workers?.filter((w) => w.active) || [], [workers]);
 
+  // Group payrolls by period
+  const payrollGroups = useMemo((): PayrollGroup[] => {
+    const map = new Map<string, PayrollGroup>();
+    for (const p of payrolls || []) {
+      const key = `${p.periodStart}|${p.periodEnd}`;
+      if (!map.has(key)) {
+        map.set(key, { key, periodStart: p.periodStart, periodEnd: p.periodEnd, records: [] });
+      }
+      map.get(key)!.records.push(p);
+    }
+    return Array.from(map.values());
+  }, [payrolls]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   const previewMutation = useMutation({
     mutationFn: async () => {
       const body: any = {
@@ -167,6 +199,9 @@ export default function FactoryPayrollTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       toast({ title: "Payroll generated", description: `${data.created} records created` });
       setRunOpen(false); setPreviewOpen(false);
+      // Auto-expand the new group
+      const key = `${runForm.periodStart}|${runForm.periodEnd}`;
+      setExpandedGroups((prev) => new Set([...prev, key]));
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -180,12 +215,13 @@ export default function FactoryPayrollTab() {
       if (!res.ok) throw new Error(data.message || "Failed");
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
-      toast({ title: "Marked as paid" });
+      setPaidPayrollIds([vars.id]);
+      setPrintSummaryOpen(true);
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -205,7 +241,8 @@ export default function FactoryPayrollTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
-      toast({ title: "Marked as paid", description: `${selectedIds.size} records updated` });
+      setPaidPayrollIds([...selectedIds]);
+      setPrintSummaryOpen(true);
       setSelectedIds(new Set()); setBulkPayOpen(false); setBulkCashAccountId("");
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -225,6 +262,14 @@ export default function FactoryPayrollTab() {
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
+  const printSummaryPDF = async () => {
+    const res = await apiRequest("POST", "/api/factory/payrolls/payment-summary-pdf", { payrollIds: paidPayrollIds });
+    if (!res.ok) { toast({ title: "PDF failed", variant: "destructive" }); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  };
+
   const stats = useMemo(() => {
     const all = payrolls || [];
     const uniqueWorkers = new Set(all.map((p) => p.workerId)).size;
@@ -232,7 +277,6 @@ export default function FactoryPayrollTab() {
     const paid = all.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
     return { uniqueWorkers, pending, paid };
   }, [payrolls]);
-
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -280,7 +324,7 @@ export default function FactoryPayrollTab() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-sm font-semibold">Payroll Records</h2>
-          <p className="text-xs text-muted-foreground">{payrolls?.length || 0} total records</p>
+          <p className="text-xs text-muted-foreground">{payrolls?.length || 0} total · {payrollGroups.length} batch{payrollGroups.length !== 1 ? "es" : ""}</p>
         </div>
         <div className="flex gap-2">
           {selectedIds.size > 0 && (
@@ -300,119 +344,158 @@ export default function FactoryPayrollTab() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
-          ) : payrolls?.length === 0 ? (
+          ) : payrollGroups.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <DollarSign className="mx-auto h-8 w-8 mb-3 opacity-30" />
               <p className="font-medium">No payroll records yet</p>
               <p className="text-sm mt-1">Click "Run Payroll" to generate records</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={(v) => {
-                          if (v) setSelectedIds(new Set(unpaidPayrolls.map((p) => p.id)));
-                          else setSelectedIds(new Set());
-                        }}
-                        data-testid="checkbox-select-all"
-                      />
-                    </TableHead>
-                    <TableHead>Worker</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-center">Attendance</TableHead>
-                    <TableHead className="text-right">Base</TableHead>
-                    <TableHead className="text-right">Bonus</TableHead>
-                    <TableHead className="text-right">Deductions</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Paid On</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payrolls?.map((p) => {
-                    const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.DRAFT;
-                    const canPay = p.status !== "PAID";
-                    return (
-                      <TableRow key={p.id} data-testid={`row-payroll-${p.id}`}>
-                        <TableCell>
-                          {canPay && (
-                            <Checkbox
-                              checked={selectedIds.has(p.id)}
-                              onCheckedChange={() => toggleSelect(p.id)}
-                              data-testid={`checkbox-payroll-${p.id}`}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">{p.worker?.fullName || `Worker #${p.workerId}`}</p>
-                            {p.worker?.position && <p className="text-xs text-muted-foreground">{p.worker.position}</p>}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {fmtDate(p.periodStart, formatDisplayDate)} – {fmtDate(p.periodEnd, formatDisplayDate)}
-                        </TableCell>
-                        <TableCell className="text-center" data-testid={`text-attendance-${p.id}`}>
-                          {p.totalWorkingDays && p.totalWorkingDays > 0 ? (
-                            <div className="text-sm font-mono">
-                              <span>{Number(p.presentDays) % 1 === 0 ? Number(p.presentDays).toFixed(0) : p.presentDays}/{p.totalWorkingDays}</span>
-                              <span className="block text-xs text-muted-foreground">{Number(p.absentDays) > 0 ? `${Number(p.absentDays) % 1 === 0 ? Number(p.absentDays).toFixed(0) : p.absentDays} absent` : "full"}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">${fmt(p.baseSalary)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">${fmt(p.bonuses)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">${fmt(p.deductions)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
-                        <TableCell>
-                          <Badge variant={cfg.variant} className={`text-xs ${cfg.className}`}>
-                            {cfg.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {canPay && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }}
-                                data-testid={`button-pay-${p.id}`}
-                              >
-                                Pay
-                              </Button>
-                            )}
-                            {p.status === "DRAFT" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => setDeleteTargetId(p.id)}
-                                data-testid={`button-delete-payroll-${p.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <div className="divide-y">
+              {payrollGroups.map((group) => {
+                const isExpanded = expandedGroups.has(group.key);
+                const total = group.records.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
+                const paidCount = group.records.filter((p) => p.status === "PAID").length;
+                const unpaidCount = group.records.length - paidCount;
+                const groupUnpaid = group.records.filter((p) => p.status !== "PAID");
+                const allGroupSelected = groupUnpaid.length > 0 && groupUnpaid.every((p) => selectedIds.has(p.id));
+
+                return (
+                  <div key={group.key}>
+                    {/* Batch summary row */}
+                    <div
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate"
+                      onClick={() => toggleGroup(group.key)}
+                      data-testid={`group-${group.key}`}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      }
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">
+                          {fmtDate(group.periodStart, formatDisplayDate)} – {fmtDate(group.periodEnd, formatDisplayDate)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{group.records.length} worker{group.records.length !== 1 ? "s" : ""}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <p className="text-sm font-semibold font-mono">${total.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {paidCount > 0 && <span className="text-green-600 dark:text-green-400">{paidCount} paid</span>}
+                            {paidCount > 0 && unpaidCount > 0 && " · "}
+                            {unpaidCount > 0 && <span className="text-amber-600 dark:text-amber-400">{unpaidCount} pending</span>}
+                          </p>
+                        </div>
+                        {groupUnpaid.length > 0 && (
+                          <Checkbox
+                            checked={allGroupSelected}
+                            onCheckedChange={(v) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                groupUnpaid.forEach((p) => v ? next.add(p.id) : next.delete(p.id));
+                                return next;
+                              });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-group-${group.key}`}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded worker rows */}
+                    {isExpanded && (
+                      <div className="overflow-x-auto bg-muted/30">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-10 pl-8"></TableHead>
+                              <TableHead>Worker</TableHead>
+                              <TableHead className="text-center">Present</TableHead>
+                              <TableHead className="text-center">Absent</TableHead>
+                              <TableHead className="text-right">Net</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Paid On</TableHead>
+                              <TableHead></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.records.map((p) => {
+                              const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.DRAFT;
+                              const canPay = p.status !== "PAID";
+                              return (
+                                <TableRow key={p.id} data-testid={`row-payroll-${p.id}`}>
+                                  <TableCell className="pl-8">
+                                    {canPay && (
+                                      <Checkbox
+                                        checked={selectedIds.has(p.id)}
+                                        onCheckedChange={() => toggleSelect(p.id)}
+                                        data-testid={`checkbox-payroll-${p.id}`}
+                                      />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium text-sm">{p.worker?.fullName || `Worker #${p.workerId}`}</p>
+                                      {p.worker?.position && <p className="text-xs text-muted-foreground">{p.worker.position}</p>}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center font-mono text-sm" data-testid={`text-present-${p.id}`}>
+                                    {p.presentDays != null ? (Number(p.presentDays) % 1 === 0 ? Number(p.presentDays).toFixed(0) : p.presentDays) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-center font-mono text-sm" data-testid={`text-absent-${p.id}`}>
+                                    {p.absentDays != null ? (Number(p.absentDays) % 1 === 0 ? Number(p.absentDays).toFixed(0) : p.absentDays) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={cfg.variant} className={`text-xs ${cfg.className}`}>
+                                      {cfg.label}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      {canPay && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => { setPayTargetId(p.id); setPayCashAccountId(""); setPayOpen(true); }}
+                                          data-testid={`button-pay-${p.id}`}
+                                        >
+                                          Pay
+                                        </Button>
+                                      )}
+                                      {p.status === "DRAFT" && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => setDeleteTargetId(p.id)}
+                                          data-testid={`button-delete-payroll-${p.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Run Payroll Dialog */}
       <Dialog open={runOpen} onOpenChange={setRunOpen}>
         <DialogContent className="max-w-2xl" data-testid="dialog-run-payroll">
           <DialogHeader>
@@ -441,7 +524,7 @@ export default function FactoryPayrollTab() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Cash Account</Label>
+              <Label className="text-xs">Cash Account (optional, used at payment)</Label>
               <Select value={runForm.cashAccountId} onValueChange={(v) => setRunForm((f) => ({ ...f, cashAccountId: v }))}>
                 <SelectTrigger data-testid="select-cash-account"><SelectValue placeholder="Select account (optional)" /></SelectTrigger>
                 <SelectContent>
@@ -507,6 +590,7 @@ export default function FactoryPayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl" data-testid="dialog-preview-payroll">
           <DialogHeader>
@@ -591,6 +675,7 @@ export default function FactoryPayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Attendance Detail Dialog */}
       <Dialog open={attendanceDetail !== null} onOpenChange={(open) => { if (!open) setAttendanceDetail(null); }}>
         <DialogContent className="max-w-md" data-testid="dialog-attendance-detail">
           <DialogHeader>
@@ -660,15 +745,16 @@ export default function FactoryPayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Single Pay Dialog */}
       <Dialog open={payOpen} onOpenChange={(open) => { if (!open) { setPayOpen(false); setPayTargetId(null); } }}>
         <DialogContent data-testid="dialog-mark-paid">
           <DialogHeader>
-            <DialogTitle>Mark as Paid</DialogTitle>
-            <DialogDescription>Select the cash account to record this payment.</DialogDescription>
+            <DialogTitle>Pay Worker</DialogTitle>
+            <DialogDescription>Select the cash or bank account to record this payment. This will settle the payroll liability.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Cash Account</Label>
+              <Label className="text-xs">Cash / Bank Account</Label>
               <Select value={payCashAccountId} onValueChange={setPayCashAccountId}>
                 <SelectTrigger data-testid="select-pay-cash-account"><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent>
@@ -690,15 +776,16 @@ export default function FactoryPayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Pay Dialog */}
       <Dialog open={bulkPayOpen} onOpenChange={setBulkPayOpen}>
         <DialogContent data-testid="dialog-bulk-pay">
           <DialogHeader>
             <DialogTitle>Pay {selectedIds.size} Records</DialogTitle>
-            <DialogDescription>Select the cash account for this bulk payment.</DialogDescription>
+            <DialogDescription>Select the cash or bank account for this bulk payment. This settles the payroll liability for all selected workers.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Cash Account</Label>
+              <Label className="text-xs">Cash / Bank Account</Label>
               <Select value={bulkCashAccountId} onValueChange={setBulkCashAccountId}>
                 <SelectTrigger data-testid="select-bulk-cash-account"><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent>
@@ -720,6 +807,29 @@ export default function FactoryPayrollTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Post-payment: Print Summary Dialog */}
+      <Dialog open={printSummaryOpen} onOpenChange={setPrintSummaryOpen}>
+        <DialogContent data-testid="dialog-print-summary">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              Payment Recorded
+            </DialogTitle>
+            <DialogDescription>
+              {paidPayrollIds.length} worker{paidPayrollIds.length !== 1 ? "s" : ""} marked as paid. You can print a compact payment summary PDF.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPrintSummaryOpen(false)}>Close</Button>
+            <Button onClick={printSummaryPDF} data-testid="button-print-summary">
+              <Printer className="h-4 w-4 mr-2" />
+              Print Summary PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
       <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
         <DialogContent>
           <DialogHeader>
@@ -729,12 +839,12 @@ export default function FactoryPayrollTab() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTargetId(null)} data-testid="button-cancel-delete-payroll">Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteTargetId(null)}>Cancel</Button>
             <Button
               variant="destructive"
               onClick={() => deleteTargetId && deleteMutation.mutate(deleteTargetId)}
               disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete-payroll"
+              data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>

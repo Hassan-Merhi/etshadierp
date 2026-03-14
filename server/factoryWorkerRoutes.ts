@@ -81,6 +81,23 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     });
   }
 
+  async function findOrCreateLedger(tx: any, companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+    let [found] = await tx.select({ id: ledgerAccounts.id })
+      .from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
+    if (!found) {
+      const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
+      const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
+      [found] = await tx.insert(ledgerAccounts).values({
+        companyId, code: nextCode, name, accountType,
+        active: true, isHidden: false,
+      }).returning();
+    }
+    return found;
+  }
+
   // GET /api/factory/workers - List workers
   app.get("/api/factory/workers", requireAuth, async (req: any, res: any) => {
     try {
@@ -1017,6 +1034,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       const created = await db.transaction(async (tx: any) => {
         let count = 0;
+        let totalNet = 0;
         for (const worker of targetWorkers) {
           const baseSal = parseFloat(worker.baseSalary || "0");
           const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
@@ -1037,13 +1055,36 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
             status: "DRAFT", notes: notes || null,
             cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
           } as any);
+          totalNet += net;
           count++;
+        }
+        // Accounting: Dr Payroll Expense / Cr Payroll Payable
+        if (totalNet > 0) {
+          const expenseAcc = await findOrCreateLedger(tx, companyId, "Factory Worker Payroll", "Expense");
+          const payableAcc = await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability");
+          const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
+          const [genVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `PAYROLL-GEN-${Date.now()}`,
+            voucherType: "Journal",
+            voucherDate: periodStart,
+            description: desc,
+            totalAmount: totalNet.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          }).returning();
+          await tx.insert(voucherEntries).values([
+            { voucherId: genVoucher.id, ledgerAccountId: expenseAcc.id, debitAmount: totalNet.toFixed(2), creditAmount: "0", narration: desc },
+            { voucherId: genVoucher.id, ledgerAccountId: payableAcc.id, debitAmount: "0", creditAmount: totalNet.toFixed(2), narration: desc },
+          ]);
         }
         await writeDaybookEntry(tx, {
           companyId,
           txDate: periodStart,
           txType: "PAYROLL_GENERATED",
           description: `Payroll generated: ${count} worker${count !== 1 ? "s" : ""} for period ${periodStart} – ${periodEnd}`,
+          amountCurrency: totalNet,
+          amountUsd: totalNet,
         });
         return count;
       });
@@ -1076,25 +1117,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         const prToday = new Date().toISOString().split("T")[0];
 
         if (cashAccountId) {
-          let [payrollAccount] = await tx.select({ id: ledgerAccounts.id })
-            .from(ledgerAccounts)
-            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Payroll")));
-
-          if (!payrollAccount) {
-            const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
-              .from(ledgerAccounts)
-              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-            const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
-            [payrollAccount] = await tx.insert(ledgerAccounts).values({
-              companyId, code: nextCode,
-              name: "Factory Worker Payroll",
-              accountType: "Expense",
-              active: true, isHidden: false,
-            }).returning();
-          }
+          // Accounting: Dr Payroll Payable / Cr Cash (settling the liability created at run time)
+          const payableAcc = await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability");
 
           const netAmt = parseFloat(payroll.netSalary || "0");
-          const narration = `Payroll: ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
+          const narration = `Payroll payment: ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
 
           const [pVoucher] = await tx.insert(vouchers).values({
             companyId,
@@ -1110,7 +1137,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           await tx.insert(voucherEntries).values([
             {
               voucherId: pVoucher.id,
-              ledgerAccountId: payrollAccount.id,
+              ledgerAccountId: payableAcc.id,
               debitAmount: netAmt.toFixed(2),
               creditAmount: "0",
               narration,
@@ -1188,26 +1215,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
         const bulkPrToday = new Date().toISOString().split("T")[0];
 
-        let payrollAccount: { id: number } | undefined;
-        if (cashId) {
-          let [found] = await tx.select({ id: ledgerAccounts.id })
-            .from(ledgerAccounts)
-            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Payroll")));
-
-          if (!found) {
-            const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
-              .from(ledgerAccounts)
-              .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-            const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
-            [found] = await tx.insert(ledgerAccounts).values({
-              companyId, code: nextCode,
-              name: "Factory Worker Payroll",
-              accountType: "Expense",
-              active: true, isHidden: false,
-            }).returning();
-          }
-          payrollAccount = found;
-        }
+        // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
+        const payableAcc = cashId ? await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability") : null;
 
         const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];
         const workerRows = await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
@@ -1219,10 +1228,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           const advAmt = parseFloat(pr.advances || "0");
           await settleAdvancesForPayroll(tx, companyId, pr.workerId, advAmt);
 
-          if (cashId && payrollAccount) {
+          if (cashId && payableAcc) {
             const netAmt = parseFloat(pr.netSalary || "0");
             const workerName = (workerMap.get(pr.workerId) as string)?.trim() || `Worker #${pr.workerId}`;
-            const narration = `Payroll: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
+            const narration = `Payroll payment: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
 
             const [pVoucher] = await tx.insert(vouchers).values({
               companyId,
@@ -1238,7 +1247,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
             await tx.insert(voucherEntries).values([
               {
                 voucherId: pVoucher.id,
-                ledgerAccountId: payrollAccount.id,
+                ledgerAccountId: payableAcc.id,
                 debitAmount: netAmt.toFixed(2),
                 creditAmount: "0",
                 narration,
@@ -1263,6 +1272,96 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json({ updated: payrollIds.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/payrolls/payment-summary-pdf - Compact payment summary PDF
+  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { payrollIds } = req.body;
+      if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
+
+      const payrollRows = await db.select().from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
+      if (!payrollRows.length) return res.status(404).json({ message: "No payroll records found" });
+
+      const workerIdList = [...new Set(payrollRows.map((p: any) => p.workerId))];
+      const workerRows = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+        .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIdList));
+      const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
+
+      const [companyRow] = await db.select({ name: companies.name })
+        .from(companies).where(eq(companies.id, companyId));
+      const companyName = companyRow?.name || "Company";
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      const chunks: Buffer[] = [];
+      doc.on("data", (c: Buffer) => chunks.push(c));
+      doc.on("end", () => {
+        const pdf = Buffer.concat(chunks);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="payment-summary.pdf"`);
+        res.send(pdf);
+      });
+
+      // Header
+      doc.fontSize(14).font("Helvetica-Bold").text(companyName, { align: "center" });
+      doc.fontSize(10).font("Helvetica").text("Payment Summary", { align: "center" });
+      doc.moveDown(0.3);
+      doc.fontSize(8).fillColor("#666666")
+        .text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
+      doc.moveDown(0.8);
+
+      // Period range
+      const periods = [...new Set(payrollRows.map((p: any) => `${p.periodStart} – ${p.periodEnd}`))];
+      doc.fontSize(8).fillColor("#333333").text(`Period: ${periods.join(", ")}`);
+      doc.moveDown(0.5);
+
+      // Table header
+      const COL = { name: 40, present: 280, absent: 330, amount: 400 };
+      const rowH = 18;
+      const tableTop = doc.y;
+
+      doc.rect(40, tableTop, 515, rowH).fill("#1F3864");
+      doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold");
+      doc.text("Worker Name", COL.name, tableTop + 5, { width: 220 });
+      doc.text("Present", COL.present, tableTop + 5, { width: 45, align: "center" });
+      doc.text("Absent", COL.absent, tableTop + 5, { width: 45, align: "center" });
+      doc.text("Amount", COL.amount, tableTop + 5, { width: 90, align: "right" });
+
+      let y = tableTop + rowH;
+      let totalAmt = 0;
+      doc.font("Helvetica").fillColor("#000000");
+
+      payrollRows.forEach((p: any, i: number) => {
+        const name = (workerMap.get(p.workerId) as string) || `Worker #${p.workerId}`;
+        const present = p.presentDays != null ? Number(p.presentDays) : "—";
+        const absent = p.absentDays != null ? Number(p.absentDays) : "—";
+        const net = parseFloat(p.netSalary || "0");
+        totalAmt += net;
+
+        if (i % 2 === 1) doc.rect(40, y, 515, rowH).fill("#f5f7fa");
+        doc.fillColor("#000000").fontSize(8);
+        doc.text(name, COL.name, y + 5, { width: 220 });
+        doc.text(typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—", COL.present, y + 5, { width: 45, align: "center" });
+        doc.text(typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—", COL.absent, y + 5, { width: 45, align: "center" });
+        doc.text(net.toFixed(2), COL.amount, y + 5, { width: 90, align: "right" });
+        y += rowH;
+      });
+
+      // Footer total
+      doc.moveDown(0.5);
+      doc.rect(40, y + 4, 515, rowH).fill("#1F3864");
+      doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold");
+      doc.text("Total Amount Paid", COL.name, y + 9, { width: 340 });
+      doc.text(totalAmt.toFixed(2), COL.amount, y + 9, { width: 90, align: "right" });
+
+      doc.end();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
