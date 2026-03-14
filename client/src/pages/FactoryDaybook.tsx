@@ -3,7 +3,7 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Eye, ExternalLink, History, List, AlignJustify, SlidersHorizontal, Package, Trash2 } from "lucide-react";
+import { BookOpen, Eye, ExternalLink, List, AlignJustify, Package, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,6 +78,36 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
   }
 }
 
+function formatDaybookDescription(entry: DaybookEntry): string {
+  if (entry.txType === "BALE_STOCK_ENTRY") {
+    const bales = parseBalesMeta(entry);
+    if (bales.length > 0) {
+      const groups = new Map<string, number>();
+      bales.forEach((b) => {
+        const name = b.productName || "Unknown";
+        groups.set(name, (groups.get(name) || 0) + 1);
+      });
+      const total = bales.length;
+      const parts = Array.from(groups.entries()).map(([name, count]) =>
+        groups.size === 1 ? name : `${count}x ${name}`
+      );
+      return `${total} bale${total !== 1 ? "s" : ""} - ${parts.join(" | ")}`;
+    }
+    return entry.description
+      .replace(/^Stock entry:\s*/i, "")
+      .replace(/\s*[–-]\s*REF\w+/g, "")
+      .replace(/,\s*REF\w+/g, "");
+  }
+  return entry.description;
+}
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", AUD: "A$", LBP: "LL", LKR: "₨",
+};
+function currencySymbol(code: string): string {
+  return CURRENCY_SYMBOLS[code] || code + " ";
+}
+
 const TX_TYPE_LABELS: Record<string, string> = {
   CONTAINER_IMPORT: "Container Import",
   OFFLOAD_RAW_STOCK: "Offload Raw Stock",
@@ -136,6 +166,128 @@ const VOUCHER_TX_TYPES: Record<string, string> = {
   FREIGHT_PAYMENT: "payment",
 };
 
+function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
+  entry: DaybookEntry;
+  onClose: () => void;
+  onNavigate: (path: string) => void;
+  formatDisplayDate: (d: string) => string;
+}) {
+  const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+  const isBaleStockEntry = entry.txType === "BALE_STOCK_ENTRY";
+
+  const { data: voucherData } = useQuery<any>({
+    queryKey: ["/api/vouchers", entry.referenceId],
+    queryFn: async () => {
+      const res = await fetch(`/api/vouchers/${entry.referenceId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: isVoucherBacked && !!entry.referenceId,
+  });
+
+  const bales = parseBalesMeta(entry);
+  const amt = parseFloat(entry.amountCurrency || "0");
+  const sym = currencySymbol(entry.currencyCode);
+
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <DialogTitle>Transaction Details</DialogTitle>
+          <Badge variant="default">{formatTxType(entry.txType)}</Badge>
+        </div>
+        <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        {/* Description */}
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+          <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
+        </div>
+
+        {/* Amount summary */}
+        <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+          </div>
+          {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">USD Equivalent</p>
+              <p className="text-sm font-mono">${formatNumber(parseFloat(entry.amountUsd || "0"))}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Voucher entries */}
+        {isVoucherBacked && voucherData && Array.isArray(voucherData.entries) && voucherData.entries.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Entries</p>
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {voucherData.entries.map((e: any, i: number) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="px-3 py-2">
+                        <p className="font-medium">{e.accountName || e.account_name || "—"}</p>
+                        {e.accountBalance !== undefined && (
+                          <p className="text-xs text-muted-foreground">Balance: {sym}{formatNumber(parseFloat(e.accountBalance || "0"))}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(parseFloat(e.amount || e.debit || e.credit || "0"))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/20">
+                    <td className="px-3 py-2 font-semibold">Total</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold">{sym}{formatNumber(amt)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Bale list for stock entries */}
+        {isBaleStockEntry && bales.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Bales ({bales.length})</p>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {bales.map((bale) => (
+                <div
+                  key={bale.ref}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate cursor-pointer"
+                  onClick={() => { onClose(); onNavigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
+                  data-testid={`view-bale-row-${bale.ref}`}
+                >
+                  <div>
+                    <span className="font-mono font-medium">{bale.ref}</span>
+                    <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
+                    <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
+                      {bale.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function FactoryDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -159,9 +311,7 @@ export default function FactoryDaybook() {
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
   const [editAmountUsd, setEditAmountUsd] = useState("");
   const [editReason, setEditReason] = useState("");
-  const [showHistory, setShowHistory] = useState<number | null>(null);
-  const [baleViewerEntry, setBaleViewerEntry] = useState<DaybookEntry | null>(null);
-  const [baleChooserEntry, setBaleChooserEntry] = useState<DaybookEntry | null>(null);
+  const [viewEntry, setViewEntry] = useState<DaybookEntry | null>(null);
   const [optionalFilter, setOptionalFilter] = useState<"all" | "exclude" | "only">("all");
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
 
@@ -261,16 +411,6 @@ export default function FactoryDaybook() {
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
-  const { data: editHistory = [] } = useQuery<any[]>({
-    queryKey: ["/api/factory/daybook", showHistory, "edits"],
-    queryFn: async () => {
-      const res = await fetch(`/api/factory/daybook/${showHistory}/edits`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: showHistory !== null,
-  });
-
   const voidMutation = useMutation({
     mutationFn: async (entryId: number) => {
       const res = await factoryApiRequest("DELETE", `/api/factory/daybook/entry/${entryId}/void`);
@@ -304,34 +444,8 @@ export default function FactoryDaybook() {
     }
   };
 
-  const openSourceRecord = (entry: DaybookEntry) => {
-    if (entry.txType === "BALE_STOCK_ENTRY") {
-      const bales = parseBalesMeta(entry);
-      if (bales.length === 1) {
-        navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bales[0].ref)}`);
-      } else if (bales.length > 1) {
-        setBaleViewerEntry(entry);
-      }
-      return;
-    }
-    if (entry.txType === "INVOICE" && entry.referenceId) {
-      navigate(`/factory/sales/invoices/${entry.referenceId}`);
-      return;
-    }
-    const tab = VOUCHER_TX_TYPES[entry.txType];
-    if (tab && entry.referenceId) {
-      navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
-    }
-  };
-
   const editSourceRecord = (entry: DaybookEntry) => {
     if (entry.txType === "BALE_STOCK_ENTRY") {
-      const bales = parseBalesMeta(entry);
-      if (bales.length === 1) {
-        navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bales[0].ref)}`);
-      } else if (bales.length > 1) {
-        setBaleChooserEntry(entry);
-      }
       return;
     }
     if (entry.txType === "INVOICE" && entry.referenceId) {
@@ -484,16 +598,17 @@ export default function FactoryDaybook() {
           ) : !isDetailed ? (
             condensedRows.length > 0 ? (
               <div className="overflow-x-auto">
-                <Table>
+                {(() => {
+                  const hasNonUsdC = condensedRows.some((r) => r.currencyCode !== "USD");
+                  return (
+                  <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Currency</TableHead>
-                      <TableHead className="text-right">Amount (Currency)</TableHead>
-                      <TableHead className="text-right">FX Rate</TableHead>
-                      <TableHead className="text-right">Amount (USD)</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      {hasNonUsdC && <TableHead className="text-right">FX Rate</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -508,26 +623,24 @@ export default function FactoryDaybook() {
                         <TableCell className="text-muted-foreground text-sm">
                           {row.count === 1 ? "1 entry" : `${row.count} entries`}
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{row.currencyCode}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatNumber(row.totalAmountCurrency)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {row.currencyCode === "USD"
-                            ? "-"
-                            : row.fxRateToUsd
-                            ? parseFloat(row.fxRateToUsd).toFixed(4)
-                            : "mixed"}
-                        </TableCell>
                         <TableCell className="text-right font-mono font-medium">
-                          ${formatNumber(row.totalAmountUsd)}
+                          {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
                         </TableCell>
+                        {hasNonUsdC && (
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {row.currencyCode === "USD"
+                              ? "-"
+                              : row.fxRateToUsd
+                              ? parseFloat(row.fxRateToUsd).toFixed(4)
+                              : "mixed"}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                  );
+                })()}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -538,27 +651,26 @@ export default function FactoryDaybook() {
             )
           ) : filteredEntries.length > 0 ? (
             <div className="overflow-x-auto">
+              {(() => {
+                const hasNonUsd = filteredEntries.some((e) => e.currencyCode !== "USD");
+                return (
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead className="text-right">Amount (Currency)</TableHead>
-                    <TableHead className="text-right">FX Rate</TableHead>
-                    <TableHead className="text-right">Amount (USD)</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    {hasNonUsd && <TableHead className="text-right">FX Rate</TableHead>}
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredEntries.map((entry) => {
-                    const balesMeta = parseBalesMeta(entry);
-                    const hasSource = (!!VOUCHER_TX_TYPES[entry.txType] || entry.txType === "INVOICE") && !!entry.referenceId
-                      || (entry.txType === "BALE_STOCK_ENTRY" && balesMeta.length > 0);
                     const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                     const isRowClickable = isBaleTransfer;
                     const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                    const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
                     return (
                     <TableRow
                       key={entry.id}
@@ -581,35 +693,29 @@ export default function FactoryDaybook() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-xs truncate" title={entry.description}>
-                        {entry.description}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{entry.currencyCode}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(entry.amountCurrency || "0"))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">
-                        {entry.currencyCode === "USD" ? "-" : parseFloat(entry.fxRateToUsd).toFixed(4)}
+                      <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
+                        {formatDaybookDescription(entry)}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        ${formatNumber(parseFloat(entry.amountUsd || "0"))}
+                        {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
                       </TableCell>
+                      {hasNonUsd && (
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {entry.currencyCode === "USD" ? "-" : parseFloat(entry.fxRateToUsd).toFixed(4)}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex gap-1">
-                          {hasSource && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="View"
-                              onClick={(e) => { e.stopPropagation(); openSourceRecord(entry); }}
-                              data-testid={`button-view-source-${entry.id}`}
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {hasSource && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="View details"
+                            onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                            data-testid={`button-view-${entry.id}`}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          {canEdit && (
                             <Button
                               size="icon"
                               variant="ghost"
@@ -620,20 +726,6 @@ export default function FactoryDaybook() {
                               <ExternalLink className="h-3 w-3" />
                             </Button>
                           )}
-                          {canEditDaybook && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Edit daybook entry"
-                              onClick={(e) => { e.stopPropagation(); openEditDialog(entry); }}
-                              data-testid={`button-edit-daybook-${entry.id}`}
-                            >
-                              <SlidersHorizontal className="h-3 w-3" />
-                            </Button>
-                          )}
-                          <Button size="icon" variant="ghost" title="Edit history" onClick={(e) => { e.stopPropagation(); setShowHistory(entry.id); }} data-testid={`button-history-daybook-${entry.id}`}>
-                            <History className="h-3 w-3" />
-                          </Button>
                           {isAdminOrOwner && isVoucherBacked && (
                             <Button
                               size="icon"
@@ -652,6 +744,8 @@ export default function FactoryDaybook() {
                   })}
                 </TableBody>
               </Table>
+                );
+              })()}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -710,127 +804,10 @@ export default function FactoryDaybook() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showHistory !== null} onOpenChange={(open) => { if (!open) setShowHistory(null); }}>
-        <DialogContent data-testid="dialog-edit-history">
-          <DialogHeader>
-            <DialogTitle>Edit History</DialogTitle>
-            <DialogDescription>All changes made to this entry</DialogDescription>
-          </DialogHeader>
-          {editHistory.length === 0 ? (
-            <p className="text-center text-muted-foreground py-4 text-sm">No edits have been made to this entry</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {editHistory.map((edit: any) => (
-                <div key={edit.id} className="rounded-md border p-3 space-y-1" data-testid={`edit-history-${edit.id}`}>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{formatDisplayDate(edit.editedAt)} {new Date(edit.editedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                    <span>User #{edit.editedBy || "?"}</span>
-                  </div>
-                  <p className="text-sm font-medium">Reason: {edit.reason}</p>
-                  {(() => {
-                    try {
-                      const before = JSON.parse(edit.beforeJson || "{}");
-                      const after = JSON.parse(edit.afterJson || "{}");
-                      const changes: string[] = [];
-                      if (before.description !== after.description) changes.push("description");
-                      if (before.amountCurrency !== after.amountCurrency) changes.push("amount");
-                      if (before.amountUsd !== after.amountUsd) changes.push("amount (USD)");
-                      if (before.txDate !== after.txDate) changes.push("date");
-                      return changes.length > 0 ? (
-                        <p className="text-xs text-muted-foreground">Changed: {changes.join(", ")}</p>
-                      ) : null;
-                    } catch { return null; }
-                  })()}
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Bale Viewer Dialog — shows all bales from a multi-bale stock entry */}
-      <Dialog open={baleViewerEntry !== null} onOpenChange={(open) => { if (!open) setBaleViewerEntry(null); }}>
-        <DialogContent className="max-w-lg" data-testid="dialog-bale-viewer">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Bales from this stock entry
-            </DialogTitle>
-            <DialogDescription>
-              {baleViewerEntry && (() => {
-                const bales = parseBalesMeta(baleViewerEntry);
-                return `${bales.length} bale${bales.length !== 1 ? "s" : ""} created`;
-              })()}
-            </DialogDescription>
-          </DialogHeader>
-          {baleViewerEntry && (() => {
-            const bales = parseBalesMeta(baleViewerEntry);
-            return (
-              <div className="max-h-80 overflow-y-auto space-y-1">
-                {bales.map((bale) => (
-                  <div
-                    key={bale.ref}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate cursor-pointer"
-                    onClick={() => { setBaleViewerEntry(null); navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
-                    data-testid={`bale-viewer-row-${bale.ref}`}
-                  >
-                    <div>
-                      <span className="font-mono font-medium">{bale.ref}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
-                      <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
-                        {bale.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-
-      {/* Bale Chooser Dialog — choose a bale then open Barcode Lookup */}
-      <Dialog open={baleChooserEntry !== null} onOpenChange={(open) => { if (!open) setBaleChooserEntry(null); }}>
-        <DialogContent className="max-w-lg" data-testid="dialog-bale-chooser">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Choose a bale
-            </DialogTitle>
-            <DialogDescription>
-              Select a bale to open in Barcode Lookup
-            </DialogDescription>
-          </DialogHeader>
-          {baleChooserEntry && (() => {
-            const bales = parseBalesMeta(baleChooserEntry);
-            return (
-              <div className="max-h-80 overflow-y-auto space-y-1">
-                {bales.map((bale) => (
-                  <button
-                    key={bale.ref}
-                    type="button"
-                    className="w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate text-left"
-                    onClick={() => { setBaleChooserEntry(null); navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
-                    data-testid={`bale-chooser-row-${bale.ref}`}
-                  >
-                    <div>
-                      <span className="font-mono font-medium">{bale.ref}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
-                      <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
-                        {bale.status}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
+      {/* View Details Modal */}
+      <Dialog open={viewEntry !== null} onOpenChange={(open) => { if (!open) setViewEntry(null); }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-view-entry">
+          {viewEntry && <ViewEntryModal entry={viewEntry} onClose={() => setViewEntry(null)} onNavigate={navigate} formatDisplayDate={formatDisplayDate} />}
         </DialogContent>
       </Dialog>
 

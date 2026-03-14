@@ -408,13 +408,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (!productGroups.has(name)) productGroups.set(name, []);
         if (ref) productGroups.get(name)!.push(ref);
       }
-      const descParts = Array.from(productGroups.entries()).map(([name, refs]) => {
-        if (refs.length === 0) return name;
-        const shown = refs.slice(0, 4);
-        const extra = refs.length > 4 ? ` +${refs.length - 4} more` : "";
-        return `${name} – ${shown.join(", ")}${extra}`;
-      });
-      const stockEntryDesc = `Stock entry: ${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} – ${descParts.join(" | ")}`;
+      const descParts = Array.from(productGroups.keys());
+      const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
       const baleMetaJson = JSON.stringify({
         bales: result.bales.map((b: any) => ({
           id: b.id,
