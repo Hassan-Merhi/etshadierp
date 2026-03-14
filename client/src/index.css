@@ -448,4 +448,35 @@
   .print-container tr {
     page-break-inside: avoid;
   }
+
+  .print-container table th:nth-child(1),
+  .print-container table td:nth-child(1) {
+    width: 90px;
+    min-width: 90px;
+  }
+
+  .print-container table th:nth-child(2),
+  .print-container table td:nth-child(2) {
+    width: 80px;
+    min-width: 80px;
+  }
+
+  .print-container table th:nth-child(3),
+  .print-container table td:nth-child(3) {
+    width: auto;
+  }
+
+  .print-container table th:nth-last-child(1),
+  .print-container table td:nth-last-child(1),
+  .print-container table th:nth-last-child(2),
+  .print-container table td:nth-last-child(2),
+  .print-container table th:nth-last-child(3),
+  .print-container table td:nth-last-child(3) {
+    width: 100px;
+    min-width: 100px;
+  }
+
+  .print-container .border-t-2 {
+    border-top: 2px solid #999 !important;
+  }
 }
