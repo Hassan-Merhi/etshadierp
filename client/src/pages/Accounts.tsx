@@ -2172,7 +2172,7 @@ export default function Accounts() {
                               </TableCell>
                               <TableCell className="w-[130px] py-2"></TableCell>
                             </TableRow>
-                            <TableRow>
+                            <TableRow className="row-totals">
                               <TableCell
                                 colSpan={appMode === "factory" ? 4 : 3}
                                 className="text-right font-medium py-2"

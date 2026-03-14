@@ -473,6 +473,13 @@
     min-width: 100px;
   }
 
+  .print-container .row-totals {
+    background-color: #f0f2f4 !important;
+    font-weight: 600;
+    border-top: 1px solid #bbb !important;
+    page-break-inside: avoid;
+  }
+
   .print-container .border-t-2 {
     border-top: 2px solid #999 !important;
   }
