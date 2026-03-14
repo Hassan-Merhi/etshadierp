@@ -9137,7 +9137,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const role = session.role;
+      const role = (session.currentRole || session.role || "").toLowerCase();
       if (role !== "admin" && role !== "owner") {
         return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
       }
@@ -9148,6 +9148,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (!["VERIFIED", "FINALIZED"].includes(order.status)) {
         return res.status(400).json({ message: "Order must be VERIFIED or FINALIZED to force-sync bale statuses" });
+      }
+      if (!order.invoiceNumber) {
+        return res.status(400).json({ message: "Order must have an invoice number (previously finalized) to use force-sync" });
       }
 
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
