@@ -273,6 +273,12 @@ function AuthenticatedApp() {
   const [currentLocation] = useLocation();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Reset scroll position on every route change so the new page always starts at top
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
+  }, [currentLocation]);
   
   const { data: user, isLoading, error } = useQuery<any>({
     queryKey: ["/api/auth/me"],

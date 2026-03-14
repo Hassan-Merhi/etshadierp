@@ -3733,9 +3733,34 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
+      {/* Mobile horizontal tab bar — visible on small screens only */}
+      {!isPOS && (
+        <div className="sm:hidden flex overflow-x-auto gap-1 pb-1 -mx-1 px-1">
+          {sidebarGroups.flatMap((g) => g.items).map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key as typeof activeTab)}
+                data-testid={`tab-mobile-${item.key}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md whitespace-nowrap flex-shrink-0 transition-colors ${
+                  isActive
+                    ? "bg-background shadow-sm font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex gap-6">
         {!isPOS && (
-          <nav className="w-56 shrink-0 space-y-4">
+          <nav className="hidden sm:block w-56 shrink-0 space-y-4">
             {sidebarGroups.map((group) => (
               <div key={group.label}>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">

@@ -478,32 +478,50 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                     <Badge variant="secondary" className="ml-2">{users.length}</Badge>
                   </div>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Current Page</TableHead>
-                      <TableHead>Last Active</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((presence: any) => (
-                      <TableRow key={presence.id} data-testid={`row-presence-${presence.id}`}>
-                        <TableCell className="font-medium">{presence.username}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{presence.role || "—"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {getPageLabel(presence.currentRoute)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatTimeAgo(presence.lastSeen)}
-                        </TableCell>
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Current Page</TableHead>
+                        <TableHead>Last Active</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((presence: any) => (
+                        <TableRow key={presence.id} data-testid={`row-presence-${presence.id}`}>
+                          <TableCell className="font-medium">{presence.username}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{presence.role || "—"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {getPageLabel(presence.currentRoute)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatTimeAgo(presence.lastSeen)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {/* Mobile card list */}
+                <div className="sm:hidden divide-y">
+                  {users.map((presence: any) => (
+                    <div key={presence.id} data-testid={`row-presence-${presence.id}`} className="p-3 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm">{presence.username}</span>
+                        <Badge variant="outline" className="text-xs">{presence.role || "—"}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{getPageLabel(presence.currentRoute)}</span>
+                        <span>{formatTimeAgo(presence.lastSeen)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </Card>
             ))}
           </div>
@@ -2896,8 +2914,27 @@ function LoginHistoryTab() {
     ];
 
     return (
-      <div className="flex h-full">
-        <nav className="w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-settings">
+      <div className="flex flex-col sm:flex-row h-full">
+        {/* Mobile section selector — visible only on small screens */}
+        <div className="sm:hidden border-b p-3">
+          <Select value={activeSection} onValueChange={setActiveSection}>
+            <SelectTrigger data-testid="select-settings-section">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sidebarGroups.map((group) =>
+                group.items.length > 0 ? group.items.map((item) => (
+                  <SelectItem key={item.key} value={item.key} data-testid={`tab-mobile-${item.key}`}>
+                    {item.label}
+                  </SelectItem>
+                )) : null
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop sidebar nav — hidden on small screens */}
+        <nav className="hidden sm:block w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-settings">
           {sidebarGroups.map((group) => (
             <div key={group.label}>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
@@ -2922,7 +2959,7 @@ function LoginHistoryTab() {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
           {activeSection === "companies" && (
             <div className="space-y-4">
