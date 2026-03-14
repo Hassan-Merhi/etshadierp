@@ -675,7 +675,7 @@ export default function Accounts() {
       rows.push(["Voucher No", "Type", "Debit", "Credit", "Running Balance", "Date"]);
 
       if (isFirstDate(di)) {
-        rows.push(["", "", "", "", formatAmount(openingBalance), formattedDate]);
+        rows.push(["", "Opening Balance", "", "", formatAmount(openingBalance), formattedDate]);
       }
 
       const notesForDay: string[] = [];
@@ -706,15 +706,17 @@ export default function Accounts() {
         }
       }
 
-      const sheetData = utils.aoa_to_sheet(rows);
-      (sheetData as any)["!cols"] = [
-        { wch: 16 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 18 },
-        { wch: 14 },
-      ];
+      const sheetData = {
+        ...utils.aoa_to_sheet(rows),
+        "!cols": [
+          { wch: 16 },
+          { wch: 12 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 18 },
+          { wch: 14 },
+        ],
+      };
 
       const sheetLabel = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy")
         .substring(0, 31)
