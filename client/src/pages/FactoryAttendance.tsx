@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import * as XLSX from "xlsx";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -177,7 +178,7 @@ export default function FactoryAttendance() {
     setNotesMap((prev) => ({ ...prev, [workerId]: notes }));
   };
 
-  const [printDialog, setPrintDialog] = useState<"blank" | "results" | null>(null);
+  const [printDialog, setPrintDialog] = useState<"blank" | "results" | "excel-blank" | "excel-results" | null>(null);
 
   const openPrintWindow = (html: string) => {
     const w = window.open("", "_blank");
@@ -204,6 +205,10 @@ export default function FactoryAttendance() {
         lang
       );
       openPrintWindow(html);
+    } else if (printDialog === "excel-blank") {
+      exportWeeklyExcel(data?.workers ?? [], weekDays, shift, lang, "blank", {}, {}, selectedDate);
+    } else if (printDialog === "excel-results") {
+      exportWeeklyExcel(data?.workers ?? [], weekDays, shift, lang, "results", attendanceMap, notesMap, selectedDate);
     }
     setPrintDialog(null);
   };
@@ -324,12 +329,32 @@ export default function FactoryAttendance() {
                   <Button
                     variant="outline"
                     size="default"
+                    data-testid="button-export-excel-blank"
+                    onClick={() => setPrintDialog("excel-blank")}
+                    disabled={!workers.length}
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Blank Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="default"
                     data-testid="button-export-pdf"
                     onClick={() => setPrintDialog("results")}
                     disabled={!workers.length}
                   >
-                    <FileDown className="h-4 w-4 mr-1" />
+                    <Printer className="h-4 w-4 mr-1" />
                     Export PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    data-testid="button-export-excel-results"
+                    onClick={() => setPrintDialog("excel-results")}
+                    disabled={!workers.length}
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Export Excel
                   </Button>
                   <Button
                     size="default"
@@ -507,7 +532,7 @@ export default function FactoryAttendance() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Languages className="h-4 w-4" />
-              Choose Print Language
+              {printDialog?.startsWith("excel") ? "Choose Export Language" : "Choose Print Language"}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-2">
@@ -962,6 +987,10 @@ const WEEKLY_CSS = `
   h1 { font-size: 13pt; text-align: center; margin: 0 0 2px; }
   .subtitle { text-align: center; font-size: 8pt; color: #555; margin-bottom: 6px; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+  col.col-num   { width: 3%; }
+  col.col-name  { width: 22%; }
+  col.col-day   { width: 10%; }
+  col.col-notes { width: 13%; }
   th { background: #e8e8e8; border: 1px solid #aaa; padding: 3px 2px; font-size: 7pt; text-align: center; white-space: nowrap; overflow: hidden; }
   th.name-col { text-align: left; }
   td { border: 1px solid #ccc; padding: 2px 3px; font-size: 7.5pt; vertical-align: middle; height: 17px; }
@@ -977,6 +1006,16 @@ const WEEKLY_CSS = `
   @media print { button { display: none; } }
 `;
 
+const WEEKLY_COLGROUP = `
+  <colgroup>
+    <col class="col-num">
+    <col class="col-name">
+    <col class="col-day"><col class="col-day"><col class="col-day">
+    <col class="col-day"><col class="col-day"><col class="col-day">
+    <col class="col-notes">
+  </colgroup>
+`;
+
 function generateWeeklyBlankSheetHtml(
   workers: WorkerRow[],
   weekDays: WeekDay[],
@@ -986,7 +1025,7 @@ function generateWeeklyBlankSheetHtml(
   const L = LABELS[lang];
   const dayHeaders = weekDays.map((d) => {
     const name = lang === "ar" ? d.dayNameAr : d.dayName;
-    return `<th class="day-col" style="width:52px">${name}<br/>${d.dayNum}</th>`;
+    return `<th>${name}<br/>${d.dayNum}</th>`;
   }).join("");
 
   const rows = workers.map((w, i) => {
@@ -1018,12 +1057,13 @@ function generateWeeklyBlankSheetHtml(
     &nbsp;&nbsp;|&nbsp;&nbsp; ${L.totalWorkers}: <strong>${workers.length}</strong>
   </div>
   <table>
+    ${WEEKLY_COLGROUP}
     <thead>
       <tr>
-        <th style="width:22px">#</th>
+        <th>#</th>
         <th class="name-col">${L.workerName}</th>
         ${dayHeaders}
-        <th style="width:90px">${L.notes}</th>
+        <th>${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -1072,8 +1112,8 @@ function generateWeeklyResultsSheetHtml(
   const dayHeaders = weekDays.map((d) => {
     const name = lang === "ar" ? d.dayNameAr : d.dayName;
     const isSelected = d.iso === selectedDate;
-    const bg = isSelected ? "background:#d0e0f0;" : "";
-    return `<th class="day-col" style="width:52px;${bg}">${name}<br/>${d.dayNum}</th>`;
+    const bg = isSelected ? " style=\"background:#d0e0f0\"" : "";
+    return `<th${bg}>${name}<br/>${d.dayNum}</th>`;
   }).join("");
 
   const present = workers.filter((w) => (attendanceMap[w.id] ?? "Present") === "Present").length;
@@ -1125,12 +1165,13 @@ function generateWeeklyResultsSheetHtml(
     <div>${lang === "ar" ? "\u063A\u0627\u0626\u0628" : "Absent"}: <span style="color:#b91c1c">${absent}</span></div>
   </div>
   <table>
+    ${WEEKLY_COLGROUP}
     <thead>
       <tr>
-        <th style="width:22px">#</th>
+        <th>#</th>
         <th class="name-col">${L.workerName}</th>
         ${dayHeaders}
-        <th style="width:90px">${L.notes}</th>
+        <th>${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -1146,6 +1187,65 @@ function generateWeeklyResultsSheetHtml(
   </div>
 </body>
 </html>`;
+}
+
+function exportWeeklyExcel(
+  workers: WorkerRow[],
+  weekDays: WeekDay[],
+  shift: string,
+  lang: PrintLang,
+  type: "blank" | "results",
+  attendanceMap: Record<number, AttendanceStatus>,
+  notesMap: Record<number, string>,
+  selectedDate: string
+) {
+  const L = LABELS[lang];
+  const wb = XLSX.utils.book_new();
+
+  const dayColHeaders = weekDays.map((d) =>
+    `${lang === "ar" ? d.dayNameAr : d.dayName} ${d.dayNum}`
+  );
+  const headers = ["#", L.workerName, ...dayColHeaders, L.notes];
+
+  const dataRows = workers.map((w, i) => {
+    const dayCells = weekDays.map((d) => {
+      if (type === "results" && d.iso === selectedDate) {
+        const s = attendanceMap[w.id] ?? "Present";
+        return STATUS_MARKS[s] ?? s.charAt(0);
+      }
+      return "";
+    });
+    const notes = type === "results" ? (notesMap[w.id] ?? "") : "";
+    return [
+      i + 1,
+      `${w.fullName}${w.employeeCode ? ` (${w.employeeCode})` : ""}`,
+      ...dayCells,
+      notes,
+    ];
+  });
+
+  const totalCols = 2 + weekDays.length + 1;
+  const colWidths = [
+    { wch: 4 },
+    { wch: 30 },
+    ...weekDays.map(() => ({ wch: 10 })),
+    { wch: 22 },
+  ];
+
+  const subtitle = `${L.week}: ${weekLabel(weekDays)}${shift ? `  |  ${L.shift}: ${shift}` : ""}  |  ${L.totalWorkers}: ${workers.length}`;
+  const allRows = [[L.title], [subtitle], headers, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(allRows);
+  ws["!cols"] = colWidths;
+  ws["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+  ];
+
+  const sheetName = (type === "blank" ? L.title : L.resultTitle).substring(0, 31);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const weekRange = weekLabel(weekDays).replace(/[^a-z0-9]/gi, "-");
+  XLSX.writeFile(wb, `attendance-${type}-${weekRange}.xlsx`);
 }
 
 function escHtml(str: string) {
