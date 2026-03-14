@@ -654,76 +654,53 @@ export default function Accounts() {
       return;
     }
 
-    const vouchersByDate: Record<string, GroupedVoucher[]> = {};
+    const ledgerName = selectedAccount.name || "Account";
+    const rows: any[][] = [];
+
+    rows.push(["Ledger", "Type", "Debit", "Credit", "Running Balance", "Date", "Notes"]);
+
+    const firstDate = vouchersWithBalance[0]?.voucherDate.split("T")[0] ?? "";
+    const openingDateFormatted = firstDate
+      ? format(new Date(firstDate + "T00:00:00"), "dd MMM yyyy")
+      : "";
+    rows.push([ledgerName, "Opening Balance", "", "", formatAmount(openingBalance), openingDateFormatted, ""]);
+
     for (const v of vouchersWithBalance) {
       const dateKey = v.voucherDate.split("T")[0];
-      if (!vouchersByDate[dateKey]) vouchersByDate[dateKey] = [];
-      vouchersByDate[dateKey].push(v);
-    }
-
-    const sortedDates = Object.keys(vouchersByDate).sort();
-    const workbook = utils.book_new();
-    const isFirstDate = (idx: number) => idx === 0;
-
-    for (let di = 0; di < sortedDates.length; di++) {
-      const dateKey = sortedDates[di];
-      const dayVouchers = vouchersByDate[dateKey];
       const formattedDate = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
-      const rows: any[][] = [];
+      const noteText = (v.voucherDescription && v.voucherDescription.trim())
+        ? v.voucherDescription.trim()
+        : (v.narration && v.narration.trim()) ? v.narration.trim() : "";
 
-      rows.push(["Voucher No", "Type", "Debit", "Credit", "Running Balance", "Date"]);
-
-      if (isFirstDate(di)) {
-        rows.push(["", "Opening Balance", "", "", formatAmount(openingBalance), formattedDate]);
-      }
-
-      const notesForDay: string[] = [];
-
-      for (const v of dayVouchers) {
-        rows.push([
-          v.voucherNumber,
-          v.voucherType,
-          v.totalDebit > 0 ? formatAmount(v.totalDebit) : "",
-          v.totalCredit > 0 ? formatAmount(v.totalCredit) : "",
-          formatAmount(v.runningBalance ?? 0),
-          formattedDate,
-        ]);
-
-        const noteText = (v.voucherDescription && v.voucherDescription.trim())
-          ? v.voucherDescription.trim()
-          : (v.narration && v.narration.trim()) ? v.narration.trim() : "";
-        if (noteText) {
-          notesForDay.push(`${v.voucherNumber}: ${noteText}`);
-        }
-      }
-
-      if (notesForDay.length > 0) {
-        rows.push([]);
-        rows.push(["Notes"]);
-        for (const note of notesForDay) {
-          rows.push([note]);
-        }
-      }
-
-      const sheetData = {
-        ...utils.aoa_to_sheet(rows),
-        "!cols": [
-          { wch: 16 },
-          { wch: 12 },
-          { wch: 15 },
-          { wch: 15 },
-          { wch: 18 },
-          { wch: 14 },
-        ],
-      };
-
-      const sheetLabel = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy")
-        .substring(0, 31)
-        .replace(/[\\/*?[\]:]/g, "_");
-      utils.book_append_sheet(workbook, sheetData, sheetLabel);
+      rows.push([
+        ledgerName,
+        v.voucherType,
+        v.totalDebit > 0 ? formatAmount(v.totalDebit) : "",
+        v.totalCredit > 0 ? formatAmount(v.totalCredit) : "",
+        formatAmount(v.runningBalance ?? 0),
+        formattedDate,
+        noteText,
+      ]);
     }
 
-    const accountName = (selectedAccount.name || "Account").replace(/[\\/*?[\]:]/g, "_").substring(0, 40);
+    const workbook = utils.book_new();
+    const sheetData = {
+      ...utils.aoa_to_sheet(rows),
+      "!cols": [
+        { wch: 25 },
+        { wch: 14 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 30 },
+      ],
+    };
+
+    const sheetLabel = ledgerName.substring(0, 31).replace(/[\\/*?[\]:]/g, "_");
+    utils.book_append_sheet(workbook, sheetData, sheetLabel);
+
+    const accountName = ledgerName.replace(/[\\/*?[\]:]/g, "_").substring(0, 40);
     const dateRange = periodFilter.fromDate && periodFilter.toDate
       ? `${periodFilter.fromDate}_to_${periodFilter.toDate}`
       : format(new Date(), "yyyy-MM-dd");
@@ -732,7 +709,7 @@ export default function Accounts() {
 
     toast({
       title: "Export successful",
-      description: `Downloaded ${fileName} with ${vouchersWithBalance.length} entries across ${sortedDates.length} sheets.`,
+      description: `Downloaded ${fileName} with ${vouchersWithBalance.length} transactions.`,
     });
   };
 
