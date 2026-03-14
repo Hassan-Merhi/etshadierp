@@ -108,6 +108,7 @@ interface QuantityPickerState {
 
 const STORAGE_KEY = "stockTransferOrder_selectedLocations";
 const SESSION_STATE_KEY = "stockTransferOrder_session_state";
+const DRAFT_KEY = "stockTransferOrder_autosave_draft";
 
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
@@ -163,6 +164,11 @@ export default function StockTransferOrder() {
   const matrixRef = useRef<HTMLDivElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const prevDialogOpen = useRef(false);
+
+  // Autosave draft state (new transfers only)
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [hasDraft, setHasDraft] = useState<boolean>(false);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -251,6 +257,65 @@ export default function StockTransferOrder() {
       setEditDataLoaded(true);
     }
   }, [editVoucherId, existingTransfer, existingVoucher, locations, stockItems, editDataLoaded]);
+
+  // On mount: check for existing draft (new transfers only)
+  useEffect(() => {
+    if (editVoucherId !== null) return;
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d?.orderItems?.length > 0 || d?.destinationLocationId) {
+          setHasDraft(true);
+        }
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosave debounce effect (new transfers only)
+  useEffect(() => {
+    if (editVoucherId !== null) return;
+    if (!destinationLocationId && orderItems.length === 0) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      setAutosaveStatus("saving");
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          destinationLocationId,
+          orderItems,
+          transferDate: transferDate.toISOString(),
+          isOptional,
+          savedAt: new Date().toISOString(),
+        }));
+        setAutosaveStatus("saved");
+      } catch {
+        setAutosaveStatus("failed");
+      }
+    }, 800);
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+  }, [destinationLocationId, orderItems, transferDate, isOptional, editVoucherId]);
+
+  const restoreDraft = () => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const d = JSON.parse(saved);
+      if (d.destinationLocationId) setDestinationLocationId(d.destinationLocationId);
+      if (d.orderItems) setOrderItems(d.orderItems);
+      if (d.transferDate) setTransferDate(new Date(d.transferDate));
+      if (d.isOptional !== undefined) setIsOptional(d.isOptional);
+      setHasDraft(false);
+      toast({ title: "Draft restored" });
+    } catch {
+      toast({ title: "Could not restore draft", variant: "destructive" });
+    }
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+  };
 
   useEffect(() => {
     if (prevDialogOpen.current && !quantityPicker.open) {
@@ -610,6 +675,8 @@ export default function StockTransferOrder() {
       }
     },
     onSuccess: () => {
+      localStorage.removeItem(DRAFT_KEY);
+      setAutosaveStatus("idle");
       toast({
         title: editVoucherId ? "Order Updated" : "Order Processed",
         description: editVoucherId ? "Successfully updated stock transfer voucher" : "Successfully created stock transfer voucher",
@@ -666,6 +733,15 @@ export default function StockTransferOrder() {
 
   return (
     <div className="space-y-4">
+      {hasDraft && !editVoucherId && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-2 text-sm" data-testid="banner-draft-restore">
+          <span className="text-amber-800 dark:text-amber-300">You have an unsaved draft. Restore it to continue where you left off.</span>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button size="sm" variant="outline" onClick={discardDraft} data-testid="button-discard-draft">Discard</Button>
+            <Button size="sm" onClick={restoreDraft} data-testid="button-restore-draft">Restore Draft</Button>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="heading-stock-transfer-order">
@@ -1032,6 +1108,11 @@ export default function StockTransferOrder() {
                       <span className="font-mono text-lg">{formatNumber(totalBales, 0)}</span>
                     </div>
                     
+                    {!editVoucherId && autosaveStatus !== "idle" && (
+                      <p className={`text-xs text-center ${autosaveStatus === "saved" ? "text-green-600 dark:text-green-400" : autosaveStatus === "failed" ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-autosave-status">
+                        {autosaveStatus === "saving" ? "Saving draft..." : autosaveStatus === "saved" ? "Draft saved" : "Draft save failed"}
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
