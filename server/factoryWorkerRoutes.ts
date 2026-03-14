@@ -81,21 +81,35 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     });
   }
 
-  async function findOrCreateLedger(tx: any, companyId: number, name: string, accountType: string): Promise<{ id: number }> {
-    let [found] = await tx.select({ id: ledgerAccounts.id })
+  async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+    let [found] = await db.select({ id: ledgerAccounts.id })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
-    if (!found) {
-      const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+    if (found) return found;
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const [maxRow] = await db.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-      const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
-      [found] = await tx.insert(ledgerAccounts).values({
-        companyId, code: nextCode, name, accountType,
-        active: true, isHidden: false,
-      }).returning();
+      const nextCode = String((parseInt(maxRow?.maxCode || "0") || 0) + 1 + attempt);
+      try {
+        [found] = await db.insert(ledgerAccounts).values({
+          companyId, code: nextCode, name, accountType,
+          active: true, isHidden: false,
+        }).returning();
+        if (found) return found;
+      } catch (err: any) {
+        if (err?.message?.includes("company_code_unique")) {
+          const [nowFound] = await db.select({ id: ledgerAccounts.id })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
+          if (nowFound) return nowFound;
+          continue;
+        }
+        throw err;
+      }
     }
-    return found;
+    throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
   }
 
   // GET /api/factory/workers - List workers
@@ -1032,6 +1046,12 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
       }
 
+      // Pre-resolve ledger accounts OUTSIDE the transaction to prevent concurrent insert conflicts
+      const [expenseAcc, payableAccGen] = await Promise.all([
+        findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense"),
+        findOrCreateLedger(companyId, "Payroll Payable", "Liability"),
+      ]);
+
       const created = await db.transaction(async (tx: any) => {
         let count = 0;
         let totalNet = 0;
@@ -1060,8 +1080,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         }
         // Accounting: Dr Payroll Expense / Cr Payroll Payable
         if (totalNet > 0) {
-          const expenseAcc = await findOrCreateLedger(tx, companyId, "Factory Worker Payroll", "Expense");
-          const payableAcc = await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability");
+          const payableAcc = payableAccGen;
           const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
           const [genVoucher] = await tx.insert(vouchers).values({
             companyId,
@@ -1102,6 +1121,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const id = parseInt(req.params.id);
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
 
+      // Pre-resolve ledger OUTSIDE the transaction to prevent concurrent insert conflicts
+      const payableAccSingle = cashAccountId
+        ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
+        : null;
+
       const updated = await db.transaction(async (tx: any) => {
         const [payroll] = await tx.update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(), cashAccountId } as any)
@@ -1118,7 +1142,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
         if (cashAccountId) {
           // Accounting: Dr Payroll Payable / Cr Cash (settling the liability created at run time)
-          const payableAcc = await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability");
+          const payableAcc = payableAccSingle!;
 
           const netAmt = parseFloat(payroll.netSalary || "0");
           const narration = `Payroll payment: ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
@@ -1205,6 +1229,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;
 
+      // Pre-resolve ledger OUTSIDE the transaction to prevent concurrent insert conflicts
+      const payableAccBulk = cashId
+        ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
+        : null;
+
       await db.transaction(async (tx: any) => {
         const payrollsToMark = await tx.select().from(factoryPayrolls)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
@@ -1216,7 +1245,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         const bulkPrToday = new Date().toISOString().split("T")[0];
 
         // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
-        const payableAcc = cashId ? await findOrCreateLedger(tx, companyId, "Payroll Payable", "Liability") : null;
+        const payableAcc = payableAccBulk;
 
         const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];
         const workerRows = await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
