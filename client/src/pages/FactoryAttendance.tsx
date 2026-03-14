@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
@@ -29,6 +30,7 @@ import {
   UserX,
   Clock,
   User,
+  Languages,
 } from "lucide-react";
 
 type AttendanceStatus = "Present" | "Absent" | "Late" | "Half Day" | "Leave";
@@ -164,6 +166,8 @@ export default function FactoryAttendance() {
     setNotesMap((prev) => ({ ...prev, [workerId]: notes }));
   };
 
+  const [printDialog, setPrintDialog] = useState<"blank" | "results" | null>(null);
+
   const openPrintWindow = (html: string) => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -173,20 +177,24 @@ export default function FactoryAttendance() {
     setTimeout(() => w.print(), 400);
   };
 
-  const handlePrintBlank = () => {
-    const html = generateBlankSheetHtml(data?.workers ?? [], selectedDate, shift);
-    openPrintWindow(html);
-  };
-
-  const handleExportResults = () => {
-    const html = generateResultsSheetHtml(
-      data?.workers ?? [],
-      attendanceMap,
-      notesMap,
-      selectedDate,
-      shift
-    );
-    openPrintWindow(html);
+  const handlePrintWithLang = (lang: "en" | "ar") => {
+    const weekDays = getWeekDays(selectedDate);
+    if (printDialog === "blank") {
+      const html = generateWeeklyBlankSheetHtml(data?.workers ?? [], weekDays, shift, lang);
+      openPrintWindow(html);
+    } else if (printDialog === "results") {
+      const html = generateWeeklyResultsSheetHtml(
+        data?.workers ?? [],
+        attendanceMap,
+        notesMap,
+        weekDays,
+        selectedDate,
+        shift,
+        lang
+      );
+      openPrintWindow(html);
+    }
+    setPrintDialog(null);
   };
 
   const workers = data?.workers ?? [];
@@ -296,7 +304,7 @@ export default function FactoryAttendance() {
                     variant="outline"
                     size="default"
                     data-testid="button-print-blank"
-                    onClick={handlePrintBlank}
+                    onClick={() => setPrintDialog("blank")}
                     disabled={!workers.length}
                   >
                     <Printer className="h-4 w-4 mr-1" />
@@ -306,7 +314,7 @@ export default function FactoryAttendance() {
                     variant="outline"
                     size="default"
                     data-testid="button-export-pdf"
-                    onClick={handleExportResults}
+                    onClick={() => setPrintDialog("results")}
                     disabled={!workers.length}
                   >
                     <FileDown className="h-4 w-4 mr-1" />
@@ -482,6 +490,33 @@ export default function FactoryAttendance() {
           </Card>
         </>
       )}
+
+      <Dialog open={printDialog !== null} onOpenChange={(open) => { if (!open) setPrintDialog(null); }}>
+        <DialogContent className="max-w-xs" data-testid="dialog-print-language">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Languages className="h-4 w-4" />
+              Choose Print Language
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => handlePrintWithLang("en")}
+              data-testid="button-print-english"
+            >
+              English
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handlePrintWithLang("ar")}
+              data-testid="button-print-arabic"
+              dir="rtl"
+            >
+              العربية
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -804,79 +839,162 @@ function formatDate(dateStr: string) {
   }
 }
 
-const ARABIC_FONT_CSS = `
-  font-family: 'Segoe UI', Tahoma, Arial, 'Noto Sans Arabic', sans-serif;
-`;
+type PrintLang = "en" | "ar";
 
-const PRINT_BASE_CSS = `
-  @page { size: A4 portrait; margin: 18mm 15mm; }
+interface WeekDay {
+  dayName: string;
+  dayNameAr: string;
+  date: Date;
+  iso: string;
+  dayNum: number;
+}
+
+function getWeekDays(dateStr: string): WeekDay[] {
+  const d = new Date(dateStr + "T00:00:00");
+  const dow = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((dow === 0 ? 7 : dow) - 1));
+  const enNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const arNames = ["\u0627\u0644\u0627\u062B\u0646\u064A\u0646", "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621", "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621", "\u0627\u0644\u062E\u0645\u064A\u0633", "\u0627\u0644\u062C\u0645\u0639\u0629", "\u0627\u0644\u0633\u0628\u062A"];
+  const days: WeekDay[] = [];
+  for (let i = 0; i < 6; i++) {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + i);
+    days.push({
+      dayName: enNames[i],
+      dayNameAr: arNames[i],
+      date: cur,
+      iso: cur.toISOString().split("T")[0],
+      dayNum: cur.getDate(),
+    });
+  }
+  return days;
+}
+
+const LABELS = {
+  en: {
+    title: "Weekly Attendance Sheet",
+    resultTitle: "Weekly Attendance Report",
+    workerName: "Worker Name",
+    notes: "Notes",
+    preparedBy: "Prepared By",
+    supervisor: "Supervisor",
+    approvedBy: "Approved By",
+    totalWorkers: "Total Workers",
+    week: "Week",
+    shift: "Shift",
+    present: "P = Present",
+    absent: "A = Absent",
+    mark: "Mark P / A or \u2713 / \u2717 in each cell",
+  },
+  ar: {
+    title: "\u0643\u0634\u0641 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
+    resultTitle: "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
+    workerName: "\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0645\u0644",
+    notes: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A",
+    preparedBy: "\u0623\u0639\u062F\u0647",
+    supervisor: "\u0627\u0644\u0645\u0634\u0631\u0641",
+    approvedBy: "\u0627\u0639\u062A\u0645\u062F\u0647",
+    totalWorkers: "\u0645\u062C\u0645\u0648\u0639 \u0627\u0644\u0639\u0645\u0627\u0644",
+    week: "\u0627\u0644\u0623\u0633\u0628\u0648\u0639",
+    shift: "\u0627\u0644\u0648\u0631\u062F\u064A\u0629",
+    present: "\u062D = \u062D\u0627\u0636\u0631",
+    absent: "\u063A = \u063A\u0627\u0626\u0628",
+    mark: "\u0636\u0639 \u062D / \u063A \u0623\u0648 \u2713 / \u2717 \u0641\u064A \u0643\u0644 \u062E\u0627\u0646\u0629",
+  },
+} as const;
+
+function weekLabel(weekDays: WeekDay[]): string {
+  const first = weekDays[0].date;
+  const last = weekDays[weekDays.length - 1].date;
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${fmt(first)} \u2013 ${fmt(last)}, ${last.getFullYear()}`;
+}
+
+const WEEKLY_CSS = `
+  @page { size: A4 landscape; margin: 10mm 12mm; }
   * { box-sizing: border-box; }
-  body { ${ARABIC_FONT_CSS} font-size: 10pt; color: #111; margin: 0; }
-  h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
-  .subtitle { text-align: center; font-size: 10pt; color: #555; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  th { background: #f0f0f0; border: 1px solid #bbb; padding: 5px 6px; font-size: 9pt; text-align: left; }
-  td { border: 1px solid #ccc; padding: 5px 6px; font-size: 9pt; vertical-align: middle; }
-  td.num { width: 28px; text-align: center; color: #888; }
-  td.name { width: 55%; unicode-bidi: plaintext; }
-  tr:nth-child(even) td { background: #fafafa; }
-  .legend { margin-top: 14px; font-size: 8.5pt; color: #555; }
-  .legend span { margin-right: 16px; }
-  .footer { margin-top: 20px; display: flex; justify-content: space-between; font-size: 9pt; }
-  .footer div { border-top: 1px solid #333; padding-top: 4px; width: 140px; text-align: center; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, 'Noto Sans Arabic', sans-serif; font-size: 7.5pt; color: #111; margin: 0; }
+  h1 { font-size: 13pt; text-align: center; margin: 0 0 2px; }
+  .subtitle { text-align: center; font-size: 8pt; color: #555; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+  th { background: #e8e8e8; border: 1px solid #aaa; padding: 3px 2px; font-size: 7pt; text-align: center; white-space: nowrap; overflow: hidden; }
+  th.name-col { text-align: left; }
+  td { border: 1px solid #ccc; padding: 2px 3px; font-size: 7.5pt; vertical-align: middle; height: 17px; }
+  td.num { text-align: center; color: #888; }
+  td.name { text-align: left; unicode-bidi: plaintext; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.day { text-align: center; }
+  td.notes { font-size: 7pt; }
+  tr:nth-child(even) td { background: #f7f7f7; }
+  .legend { margin-top: 6px; font-size: 7pt; color: #555; text-align: center; }
+  .legend span { margin: 0 10px; }
+  .footer { margin-top: 12px; display: flex; justify-content: space-between; font-size: 7.5pt; }
+  .footer div { border-top: 1px solid #333; padding-top: 3px; width: 120px; text-align: center; }
   @media print { button { display: none; } }
 `;
 
-function generateBlankSheetHtml(workers: WorkerRow[], date: string, shift: string) {
-  const formattedDate = formatDate(date);
-  const rows = workers
-    .map(
-      (w, i) => `
-      <tr>
-        <td class="num">${i + 1}</td>
-        <td class="name" dir="auto">${escHtml(w.fullName)}</td>
-        <td style="width:12%;text-align:center"></td>
-        <td style="width:12%;text-align:center"></td>
-        <td style="width:21%"></td>
-      </tr>`
-    )
-    .join("");
+function generateWeeklyBlankSheetHtml(
+  workers: WorkerRow[],
+  weekDays: WeekDay[],
+  shift: string,
+  lang: PrintLang
+) {
+  const L = LABELS[lang];
+  const dayHeaders = weekDays.map((d) => {
+    const name = lang === "ar" ? d.dayNameAr : d.dayName;
+    return `<th class="day-col" style="width:52px">${name}<br/>${d.dayNum}</th>`;
+  }).join("");
+
+  const rows = workers.map((w, i) => {
+    const dayCells = weekDays.map(() => `<td class="day"></td>`).join("");
+    return `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="name" dir="auto">${escHtml(w.fullName)}</td>
+      ${dayCells}
+      <td class="notes"></td>
+    </tr>`;
+  }).join("");
+
+  const htmlDir = lang === "ar" ? "rtl" : "ltr";
+  const htmlLang = lang === "ar" ? "ar" : "en";
 
   return `<!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="${htmlLang}" dir="${htmlDir}">
 <head>
   <meta charset="utf-8" />
-  <title>Attendance Sheet — ${escHtml(date)}</title>
-  <style>${PRINT_BASE_CSS}</style>
+  <title>${L.title}</title>
+  <style>
+    ${WEEKLY_CSS}
+    ${lang === "ar" ? "th.name-col { text-align: right; } td.name { text-align: right; }" : ""}
+  </style>
 </head>
 <body>
-  <h1>Attendance Sheet</h1>
+  <h1>${L.title}</h1>
   <div class="subtitle">
-    Date: <strong>${escHtml(formattedDate)}</strong>
-    ${shift ? `&nbsp;&nbsp;|&nbsp;&nbsp; Shift: <strong>${escHtml(shift)}</strong>` : ""}
-    &nbsp;&nbsp;|&nbsp;&nbsp; Total Workers: <strong>${workers.length}</strong>
+    ${L.week}: <strong>${weekLabel(weekDays)}</strong>
+    ${shift ? `&nbsp;&nbsp;|&nbsp;&nbsp; ${L.shift}: <strong>${escHtml(shift)}</strong>` : ""}
+    &nbsp;&nbsp;|&nbsp;&nbsp; ${L.totalWorkers}: <strong>${workers.length}</strong>
   </div>
   <table>
     <thead>
       <tr>
-        <th style="width:28px">#</th>
-        <th>Worker Name</th>
-        <th style="width:12%;text-align:center">P</th>
-        <th style="width:12%;text-align:center">A</th>
-        <th style="width:21%">Notes / Signature</th>
+        <th style="width:22px">#</th>
+        <th class="name-col">${L.workerName}</th>
+        ${dayHeaders}
+        <th style="width:70px">${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="legend">
-    <span><strong>P</strong> = Present</span>
-    <span><strong>A</strong> = Absent</span>
-    <span>Mark with ✓ in the appropriate column</span>
+    <span><strong>${lang === "ar" ? "\u062D" : "P"}</strong> = ${lang === "ar" ? "\u062D\u0627\u0636\u0631" : "Present"}</span>
+    <span><strong>${lang === "ar" ? "\u063A" : "A"}</strong> = ${lang === "ar" ? "\u063A\u0627\u0626\u0628" : "Absent"}</span>
+    <span>${L.mark}</span>
   </div>
   <div class="footer">
-    <div>Prepared By</div>
-    <div>Supervisor</div>
-    <div>Approved By</div>
+    <div>${L.preparedBy}</div>
+    <div>${L.supervisor}</div>
+    <div>${L.approvedBy}</div>
   </div>
 </body>
 </html>`;
@@ -890,75 +1008,97 @@ const STATUS_PRINT_COLORS: Record<string, string> = {
   Leave: "#7e22ce",
 };
 
-function generateResultsSheetHtml(
+const STATUS_MARKS: Record<string, string> = {
+  Present: "\u2713",
+  Absent: "\u2717",
+  Late: "L",
+  "Half Day": "\u00BD",
+  Leave: "\u2014",
+};
+
+function generateWeeklyResultsSheetHtml(
   workers: WorkerRow[],
   attendanceMap: Record<number, AttendanceStatus>,
   notesMap: Record<number, string>,
-  date: string,
-  shift: string
+  weekDays: WeekDay[],
+  selectedDate: string,
+  shift: string,
+  lang: PrintLang
 ) {
-  const formattedDate = formatDate(date);
+  const L = LABELS[lang];
+
+  const dayHeaders = weekDays.map((d) => {
+    const name = lang === "ar" ? d.dayNameAr : d.dayName;
+    const isSelected = d.iso === selectedDate;
+    const bg = isSelected ? "background:#d0e0f0;" : "";
+    return `<th class="day-col" style="width:52px;${bg}">${name}<br/>${d.dayNum}</th>`;
+  }).join("");
 
   const present = workers.filter((w) => (attendanceMap[w.id] ?? "Present") === "Present").length;
   const absent = workers.filter((w) => attendanceMap[w.id] === "Absent").length;
-  const other = workers.filter((w) => {
-    const s = attendanceMap[w.id] ?? "Present";
-    return s !== "Present" && s !== "Absent";
-  }).length;
 
-  const rows = workers
-    .map((w, i) => {
-      const status = attendanceMap[w.id] ?? "Present";
-      const color = STATUS_PRINT_COLORS[status] ?? "#374151";
-      const notes = escHtml(notesMap[w.id] ?? "");
-      return `
-      <tr>
-        <td class="num">${i + 1}</td>
-        <td class="name" dir="auto">${escHtml(w.fullName)}</td>
-        <td style="width:18%;font-weight:600;color:${color}">${escHtml(status)}</td>
-        <td style="width:22%;color:#555">${notes}</td>
-      </tr>`;
-    })
-    .join("");
+  const rows = workers.map((w, i) => {
+    const status = attendanceMap[w.id] ?? "Present";
+    const color = STATUS_PRINT_COLORS[status] ?? "#374151";
+    const mark = STATUS_MARKS[status] ?? status.charAt(0);
+    const notes = escHtml(notesMap[w.id] ?? "");
+
+    const dayCells = weekDays.map((d) => {
+      if (d.iso === selectedDate) {
+        return `<td class="day" style="font-weight:700;color:${color};font-size:9pt">${mark}</td>`;
+      }
+      return `<td class="day"></td>`;
+    }).join("");
+
+    return `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="name" dir="auto">${escHtml(w.fullName)}</td>
+      ${dayCells}
+      <td class="notes" style="color:#555">${notes}</td>
+    </tr>`;
+  }).join("");
+
+  const htmlDir = lang === "ar" ? "rtl" : "ltr";
+  const htmlLang = lang === "ar" ? "ar" : "en";
 
   return `<!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="${htmlLang}" dir="${htmlDir}">
 <head>
   <meta charset="utf-8" />
-  <title>Attendance Report — ${escHtml(date)}</title>
+  <title>${L.resultTitle}</title>
   <style>
-    ${PRINT_BASE_CSS}
-    .summary { display:flex; gap:32px; margin-bottom:10px; font-size:10pt; }
+    ${WEEKLY_CSS}
+    ${lang === "ar" ? "th.name-col { text-align: right; } td.name { text-align: right; }" : ""}
+    .summary { display:flex; gap:20px; justify-content:center; margin-bottom:6px; font-size:8pt; }
     .summary span { font-weight:600; }
   </style>
 </head>
 <body>
-  <h1>Attendance Report</h1>
+  <h1>${L.resultTitle}</h1>
   <div class="subtitle">
-    Date: <strong>${escHtml(formattedDate)}</strong>
-    ${shift ? `&nbsp;&nbsp;|&nbsp;&nbsp; Shift: <strong>${escHtml(shift)}</strong>` : ""}
+    ${L.week}: <strong>${weekLabel(weekDays)}</strong>
+    ${shift ? `&nbsp;&nbsp;|&nbsp;&nbsp; ${L.shift}: <strong>${escHtml(shift)}</strong>` : ""}
   </div>
   <div class="summary">
-    <div>Total Workers: <span>${workers.length}</span></div>
-    <div>Present: <span style="color:#15803d">${present}</span></div>
-    <div>Absent: <span style="color:#b91c1c">${absent}</span></div>
-    <div>Other: <span style="color:#b45309">${other}</span></div>
+    <div>${L.totalWorkers}: <span>${workers.length}</span></div>
+    <div>${lang === "ar" ? "\u062D\u0627\u0636\u0631" : "Present"}: <span style="color:#15803d">${present}</span></div>
+    <div>${lang === "ar" ? "\u063A\u0627\u0626\u0628" : "Absent"}: <span style="color:#b91c1c">${absent}</span></div>
   </div>
   <table>
     <thead>
       <tr>
-        <th style="width:28px">#</th>
-        <th>Worker Name</th>
-        <th style="width:18%">Status</th>
-        <th style="width:22%">Notes</th>
+        <th style="width:22px">#</th>
+        <th class="name-col">${L.workerName}</th>
+        ${dayHeaders}
+        <th style="width:70px">${L.notes}</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="footer">
-    <div>Prepared By</div>
-    <div>Supervisor</div>
-    <div>Approved By</div>
+    <div>${L.preparedBy}</div>
+    <div>${L.supervisor}</div>
+    <div>${L.approvedBy}</div>
   </div>
 </body>
 </html>`;
