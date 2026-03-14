@@ -410,6 +410,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
+      const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
+        return sum + parseFloat(b.weightKg || "0") * parseFloat(b.costPerKg || "0");
+      }, 0);
       const baleMetaJson = JSON.stringify({
         bales: result.bales.map((b: any) => ({
           id: b.id,
@@ -424,6 +427,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         txDate: today,
         txType: "BALE_STOCK_ENTRY",
         description: stockEntryDesc,
+        amountCurrency: totalBaleValue,
+        amountUsd: totalBaleValue,
         metaJson: baleMetaJson,
       });
 
