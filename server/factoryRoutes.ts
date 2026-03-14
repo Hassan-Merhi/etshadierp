@@ -7416,6 +7416,101 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           });
       }
 
+      // ── 2b. Enrich zero-amount entries for BALE_STOCK_ENTRY and loading types ──
+      // These were written before amount-population was in place; derive on the fly.
+      const zeroRows = filteredDaybookRows.filter(
+        (r: any) => parseFloat(r.amountCurrency || "0") === 0 &&
+          ["BALE_STOCK_ENTRY", "LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType)
+      );
+
+      if (zeroRows.length > 0) {
+        // BALE_STOCK_ENTRY: derive from bale IDs stored in metaJson
+        const baleStockRows = zeroRows.filter((r: any) => r.txType === "BALE_STOCK_ENTRY");
+        if (baleStockRows.length > 0) {
+          // Collect all bale IDs across all zero bale stock entries
+          const baleIdToEntry = new Map<number, any[]>();
+          for (const row of baleStockRows) {
+            try {
+              const meta = JSON.parse(row.metaJson || "{}");
+              const bales: any[] = Array.isArray(meta.bales) ? meta.bales : [];
+              for (const b of bales) {
+                if (b.id) {
+                  if (!baleIdToEntry.has(b.id)) baleIdToEntry.set(b.id, []);
+                  baleIdToEntry.get(b.id)!.push({ row, weightKg: parseFloat(b.weightKg || "0") });
+                }
+              }
+            } catch {}
+          }
+          if (baleIdToEntry.size > 0) {
+            const allBaleIds = Array.from(baleIdToEntry.keys());
+            const baleRecords = await db.select({
+              id: factoryBales.id,
+              productId: factoryBales.productId,
+              weightKg: factoryBales.weightKg,
+            }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
+
+            const productIds = [...new Set(baleRecords.map((b: any) => b.productId).filter(Boolean))];
+            const productMap = new Map<number, any>();
+            if (productIds.length > 0) {
+              const products = await db.select({ id: factoryBaleProducts.id, productionPrice: factoryBaleProducts.productionPrice })
+                .from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds));
+              products.forEach((p: any) => productMap.set(p.id, p));
+            }
+
+            // Accumulate value per daybook row id
+            const rowValueMap = new Map<number, number>();
+            for (const baleRec of baleRecords) {
+              const entries = baleIdToEntry.get(baleRec.id) || [];
+              for (const { row, weightKg } of entries) {
+                const product = baleRec.productId ? productMap.get(baleRec.productId) : null;
+                const pricePerKg = parseFloat(product?.productionPrice || "0");
+                const val = (parseFloat(baleRec.weightKg || String(weightKg)) || 0) * pricePerKg;
+                rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
+              }
+            }
+
+            // Patch the filteredDaybookRows in-place
+            for (const row of filteredDaybookRows as any[]) {
+              if (row.txType === "BALE_STOCK_ENTRY" && parseFloat(row.amountCurrency || "0") === 0) {
+                const derived = rowValueMap.get(row.id);
+                if (derived && derived > 0) {
+                  row.amountCurrency = String(derived.toFixed(2));
+                  row.amountUsd = String(derived.toFixed(2));
+                }
+              }
+            }
+          }
+        }
+
+        // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrderBales.priceUsed
+        const loadingRows = zeroRows.filter((r: any) =>
+          ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
+        );
+        if (loadingRows.length > 0) {
+          const orderIds = [...new Set(loadingRows.map((r: any) => r.referenceId as number))];
+          const orderBaleValues = await db.select({
+            orderId: customerOrderBales.orderId,
+            priceUsed: customerOrderBales.priceUsed,
+          }).from(customerOrderBales).where(inArray(customerOrderBales.orderId, orderIds));
+
+          const orderTotals = new Map<number, number>();
+          for (const b of orderBaleValues) {
+            const oid = b.orderId;
+            orderTotals.set(oid, (orderTotals.get(oid) || 0) + parseFloat(b.priceUsed || "0"));
+          }
+
+          for (const row of filteredDaybookRows as any[]) {
+            if (["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(row.txType) && parseFloat(row.amountCurrency || "0") === 0) {
+              const total = orderTotals.get(row.referenceId);
+              if (total && total > 0) {
+                row.amountCurrency = String(total.toFixed(2));
+                row.amountUsd = String(total.toFixed(2));
+              }
+            }
+          }
+        }
+      }
+
       // ── 3. Merge + sort ────────────────────────────────────────────────────
       const merged = [...filteredDaybookRows, ...syntheticRows].sort((a: any, b: any) => {
         if (b.txDate > a.txDate) return 1;
