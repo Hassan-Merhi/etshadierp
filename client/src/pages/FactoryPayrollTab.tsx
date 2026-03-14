@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users, Trash2,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, X, Users, Trash2, CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,30 +34,29 @@ interface PayrollRecord {
 }
 interface CashAccount { id: number; name: string; code: string; }
 
+interface AttendanceEntry { date: string; status: string; }
+interface PreviewWorkerRow {
+  id: number;
+  name: string;
+  position: string | null;
+  base: number;
+  bonus: number;
+  advanceDeduction: number;
+  net: number;
+  totalWorkingDays: number;
+  presentDays: number;
+  absentDays: number;
+  presentDates: AttendanceEntry[];
+  absentDates: AttendanceEntry[];
+  halfDayDates: AttendanceEntry[];
+}
+
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline"; className: string }> = {
   DRAFT: { label: "Draft", variant: "outline", className: "border-amber-400 text-amber-700 dark:text-amber-400" },
   APPROVED: { label: "Approved", variant: "outline", className: "border-blue-400 text-blue-700 dark:text-blue-400" },
   PAID: { label: "Paid", variant: "outline", className: "border-green-500 text-green-700 dark:text-green-400" },
 };
 
-function computeMonthlyPayPreview(salary: number, startStr: string, endStr: string): number {
-  const start = new Date(startStr + "T00:00:00");
-  const end   = new Date(endStr   + "T00:00:00");
-  let total = 0;
-  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (cur <= end) {
-    const year  = cur.getFullYear();
-    const month = cur.getMonth();
-    const monthLastDay    = new Date(year, month + 1, 0);
-    const daysInThisMonth = monthLastDay.getDate();
-    const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
-    const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    total += salary * (daysInSeg / daysInThisMonth);
-    cur = new Date(year, month + 1, 1);
-  }
-  return total;
-}
 
 function fmt(val: string | number | null | undefined) {
   const n = parseFloat(String(val || 0));
@@ -95,6 +94,13 @@ export default function FactoryPayrollTab() {
   });
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewRows, setPreviewRows] = useState<PreviewWorkerRow[]>([]);
+  const [attendanceDetail, setAttendanceDetail] = useState<{
+    name: string;
+    presentDates: AttendanceEntry[];
+    absentDates: AttendanceEntry[];
+    halfDayDates: AttendanceEntry[];
+  } | null>(null);
 
   const { data: payrolls, isLoading } = useQuery<PayrollRecord[]>({
     queryKey: ["/api/factory/payrolls"],
@@ -121,6 +127,27 @@ export default function FactoryPayrollTab() {
   });
 
   const activeWorkers = useMemo(() => workers?.filter((w) => w.active) || [], [workers]);
+
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = {
+        periodStart: runForm.periodStart,
+        periodEnd: runForm.periodEnd,
+        bonusPerWorker: runForm.bonusPerWorker,
+      };
+      if (!runForm.targetAll) body.workerIds = runForm.pickedWorkerIds;
+      if (runForm.daysCount) body.daysCount = runForm.daysCount;
+      const res = await apiRequest("POST", "/api/factory/payrolls/preview", body);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to load preview");
+      return data as PreviewWorkerRow[];
+    },
+    onSuccess: (data) => {
+      setPreviewRows(data);
+      setPreviewOpen(true);
+    },
+    onError: (err: Error) => toast({ title: "Preview failed", description: err.message, variant: "destructive" }),
+  });
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -206,25 +233,6 @@ export default function FactoryPayrollTab() {
     return { uniqueWorkers, pending, paid };
   }, [payrolls]);
 
-  const previewData = useMemo(() => {
-    if (!activeWorkers.length) return [];
-    const target = runForm.targetAll ? activeWorkers : activeWorkers.filter((w) => runForm.pickedWorkerIds.includes(w.id));
-    const start = new Date(runForm.periodStart);
-    const end = new Date(runForm.periodEnd);
-    const days = runForm.daysCount ? parseInt(runForm.daysCount) : Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
-    const bonus = parseFloat(runForm.bonusPerWorker || "0");
-    return target.map((w) => {
-      const base = parseFloat(w.baseSalary || "0");
-      const freq = (w as any).payFrequency || w.salaryType || "Monthly";
-      let calc = 0;
-      if (freq === "Weekly") calc = (days / 7) * parseFloat((w as any).weeklySalary || base.toString());
-      else if (freq === "Bi-Weekly") calc = (days / 14) * parseFloat((w as any).biWeeklySalary || base.toString());
-      else if (freq === "Daily" || w.salaryType === "Daily") calc = days * base;
-      else calc = computeMonthlyPayPreview(base, runForm.periodStart, runForm.periodEnd);
-      const net = calc + bonus;
-      return { id: w.id, name: w.fullName, position: w.position, base: calc, bonus, net };
-    });
-  }, [activeWorkers, runForm]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -487,43 +495,86 @@ export default function FactoryPayrollTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRunOpen(false)}>Cancel</Button>
-            <Button onClick={() => setPreviewOpen(true)} data-testid="button-preview-payroll">
-              <ChevronDown className="h-4 w-4 mr-2" />Preview
+            <Button
+              onClick={() => previewMutation.mutate()}
+              disabled={previewMutation.isPending}
+              data-testid="button-preview-payroll"
+            >
+              <ChevronDown className="h-4 w-4 mr-2" />
+              {previewMutation.isPending ? "Loading..." : "Preview"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-2xl" data-testid="dialog-preview-payroll">
+        <DialogContent className="max-w-3xl" data-testid="dialog-preview-payroll">
           <DialogHeader>
             <DialogTitle>Payroll Preview</DialogTitle>
             <DialogDescription>
-              {previewData.length} workers · Period: {runForm.periodStart} to {runForm.periodEnd} · Total: ${previewData.reduce((s, r) => s + r.net, 0).toFixed(2)}
+              {previewRows.length} workers · Period: {runForm.periodStart} to {runForm.periodEnd} · Total: ${previewRows.reduce((s, r) => s + r.net, 0).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[50vh] overflow-y-auto">
+          <div className="max-h-[55vh] overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Worker</TableHead>
+                  <TableHead className="text-center">Present</TableHead>
+                  <TableHead className="text-center">Absent</TableHead>
                   <TableHead className="text-right">Base</TableHead>
                   <TableHead className="text-right">Bonus</TableHead>
                   <TableHead className="text-right">Net</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {previewData.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <p className="text-sm font-medium">{r.name}</p>
-                      {r.position && <p className="text-xs text-muted-foreground">{r.position}</p>}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm">${r.base.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">${r.bonus.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">${r.net.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
+                {previewRows.map((r) => {
+                  const hasAtt = r.totalWorkingDays > 0 || r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                  return (
+                    <TableRow key={r.id} data-testid={`row-preview-${r.id}`}>
+                      <TableCell>
+                        <p className="text-sm font-medium">{r.name}</p>
+                        {r.position && <p className="text-xs text-muted-foreground">{r.position}</p>}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {hasAtt ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto py-0.5 px-2 font-mono text-green-700 dark:text-green-400"
+                            onClick={() => setAttendanceDetail({ name: r.name, presentDates: r.presentDates, absentDates: r.absentDates, halfDayDates: r.halfDayDates })}
+                            data-testid={`button-present-${r.id}`}
+                          >
+                            {r.presentDays % 1 === 0 ? r.presentDays.toFixed(0) : r.presentDays}
+                            {r.halfDayDates.length > 0 && (
+                              <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">½</Badge>
+                            )}
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {hasAtt ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto py-0.5 px-2 font-mono text-red-700 dark:text-red-400"
+                            onClick={() => setAttendanceDetail({ name: r.name, presentDates: r.presentDates, absentDates: r.absentDates, halfDayDates: r.halfDayDates })}
+                            data-testid={`button-absent-${r.id}`}
+                          >
+                            {r.absentDays % 1 === 0 ? r.absentDays.toFixed(0) : r.absentDays}
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">${r.base.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">${r.bonus.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-semibold">${r.net.toFixed(2)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -531,11 +582,80 @@ export default function FactoryPayrollTab() {
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Back</Button>
             <Button
               onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending || previewData.length === 0}
+              disabled={generateMutation.isPending || previewRows.length === 0}
               data-testid="button-confirm-payroll"
             >
-              {generateMutation.isPending ? "Generating..." : `Generate ${previewData.length} Records`}
+              {generateMutation.isPending ? "Generating..." : `Generate ${previewRows.length} Records`}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={attendanceDetail !== null} onOpenChange={(open) => { if (!open) setAttendanceDetail(null); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-attendance-detail">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Attendance Details — {attendanceDetail?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {attendanceDetail && (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {attendanceDetail.presentDates.length === 0 && attendanceDetail.absentDates.length === 0 && attendanceDetail.halfDayDates.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No attendance records for this period.</p>
+              ) : (
+                <>
+                  {attendanceDetail.presentDates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+                        Present ({attendanceDetail.presentDates.length})
+                      </p>
+                      <div className="space-y-0.5">
+                        {attendanceDetail.presentDates.map((e) => (
+                          <div key={e.date} className="flex items-center justify-between text-sm py-0.5">
+                            <span className="font-mono text-muted-foreground">{e.date}</span>
+                            <Badge variant="outline" className="text-xs border-green-400 text-green-700 dark:text-green-400">{e.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {attendanceDetail.halfDayDates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
+                        Half Day ({attendanceDetail.halfDayDates.length})
+                      </p>
+                      <div className="space-y-0.5">
+                        {attendanceDetail.halfDayDates.map((e) => (
+                          <div key={e.date} className="flex items-center justify-between text-sm py-0.5">
+                            <span className="font-mono text-muted-foreground">{e.date}</span>
+                            <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 dark:text-amber-400">{e.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {attendanceDetail.absentDates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">
+                        Absent ({attendanceDetail.absentDates.length})
+                      </p>
+                      <div className="space-y-0.5">
+                        {attendanceDetail.absentDates.map((e) => (
+                          <div key={e.date} className="flex items-center justify-between text-sm py-0.5">
+                            <span className="font-mono text-muted-foreground">{e.date}</span>
+                            <Badge variant="outline" className="text-xs border-red-400 text-red-700 dark:text-red-400">{e.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAttendanceDetail(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

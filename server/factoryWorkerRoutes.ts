@@ -860,6 +860,132 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // POST /api/factory/payrolls/preview - Preview payroll calculation with attendance breakdown (no DB writes)
+  app.post("/api/factory/payrolls/preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker } = req.body;
+      if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
+
+      const days = daysCount
+        ? parseInt(daysCount)
+        : Math.floor((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const bonus = parseFloat(bonusPerWorker || "0");
+
+      let targetWorkers;
+      if (workerIds && workerIds.length > 0) {
+        targetWorkers = await db.select().from(factoryWorkers)
+          .where(and(eq(factoryWorkers.companyId, companyId), inArray(factoryWorkers.id, workerIds)));
+      } else {
+        targetWorkers = await db.select().from(factoryWorkers)
+          .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
+      }
+
+      // Fetch all attendance records for the period in one query
+      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const attendanceRecords = workerIdList.length
+        ? await db.select().from(factoryAttendance).where(
+            and(
+              eq(factoryAttendance.companyId, companyId),
+              gte(factoryAttendance.attendanceDate, periodStart),
+              lte(factoryAttendance.attendanceDate, periodEnd),
+              inArray(factoryAttendance.workerId, workerIdList)
+            )
+          )
+        : [];
+
+      const attendanceByWorker = new Map<number, any[]>();
+      for (const att of attendanceRecords) {
+        const list = attendanceByWorker.get(att.workerId) || [];
+        list.push(att);
+        attendanceByWorker.set(att.workerId, list);
+      }
+
+      // Outstanding advances
+      const allAdvances = await db.select().from(factoryWorkerAdvances)
+        .where(and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.fullyPaid, false),
+          eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+        ));
+      const advanceByWorker: Record<number, number> = {};
+      for (const adv of allAdvances) {
+        advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
+      }
+
+      // Count weekdays in period for totalWorkingDays
+      let totalWorkingDays = 0;
+      const cur = new Date(periodStart + "T00:00:00");
+      const periodEndDate = new Date(periodEnd + "T00:00:00");
+      while (cur <= periodEndDate) {
+        const dow = cur.getDay();
+        if (dow !== 0 && dow !== 6) totalWorkingDays++;
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      const result = targetWorkers.map((worker: any) => {
+        const baseSal = parseFloat(worker.baseSalary || "0");
+        const freq = worker.payFrequency || worker.salaryType || "Monthly";
+        let base = 0;
+        if (freq === "Weekly") base = (days / 7) * baseSal;
+        else if (freq === "Bi-Weekly") base = (days / 14) * baseSal;
+        else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
+        else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+
+        const advanceDeduction = Math.min(advanceByWorker[worker.id] || 0, base + bonus);
+        const net = base + bonus - advanceDeduction;
+
+        const workerAtt = attendanceByWorker.get(worker.id) || [];
+        let presentDays = 0;
+        let absentDays = 0;
+        const presentDates: { date: string; status: string }[] = [];
+        const absentDates: { date: string; status: string }[] = [];
+        const halfDayDates: { date: string; status: string }[] = [];
+
+        for (const att of workerAtt) {
+          const entry = { date: att.attendanceDate, status: att.status };
+          if (att.status === "Present" || att.status === "Late" || att.status === "Leave") {
+            presentDays += 1;
+            presentDates.push(entry);
+          } else if (att.status === "Half Day") {
+            presentDays += 0.5;
+            absentDays += 0.5;
+            halfDayDates.push(entry);
+          } else if (att.status === "Absent") {
+            absentDays += 1;
+            absentDates.push(entry);
+          }
+        }
+
+        // Sort dates ascending
+        presentDates.sort((a, b) => a.date.localeCompare(b.date));
+        absentDates.sort((a, b) => a.date.localeCompare(b.date));
+        halfDayDates.sort((a, b) => a.date.localeCompare(b.date));
+
+        return {
+          id: worker.id,
+          name: worker.fullName,
+          position: worker.position || null,
+          base,
+          bonus,
+          advanceDeduction,
+          net,
+          totalWorkingDays,
+          presentDays,
+          absentDays,
+          presentDates,
+          absentDates,
+          halfDayDates,
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // POST /api/factory/payrolls/generate-bulk - Generate draft payrolls for multiple workers
   app.post("/api/factory/payrolls/generate-bulk", requireAuth, async (req: any, res: any) => {
     try {
