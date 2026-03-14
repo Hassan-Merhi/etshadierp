@@ -9080,6 +9080,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/customer-orders/:id/finalize-preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      if (orderBales.length === 0) return res.json({ baleCount: 0, bales: [] });
+
+      const baleIds = orderBales.map((b: any) => b.baleId);
+      const baleRows = await db.select({
+        id: factoryBales.id,
+        baleReference: factoryBales.baleReference,
+        productName: factoryBales.productName,
+        weightKg: factoryBales.weightKg,
+        status: factoryBales.status,
+        erpLocationId: factoryBales.erpLocationId,
+      }).from(factoryBales).where(inArray(factoryBales.id, baleIds));
+
+      const locIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locationRecords = locIds.length > 0
+        ? await db.select().from(locations).where(inArray(locations.id, locIds as number[]))
+        : [];
+      const locationMap = new Map(locationRecords.map((l: any) => [l.id, l.name]));
+
+      const availableBales = baleRows.filter((b: any) =>
+        ["IN_STOCK", "FINALIZED", "RESERVED_FOR_ORDER"].includes(b.status)
+      );
+
+      res.json({
+        baleCount: availableBales.length,
+        totalBalesInOrder: orderBales.length,
+        bales: availableBales.map((b: any) => ({
+          id: b.id,
+          baleReference: b.baleReference,
+          productName: b.productName,
+          weightKg: parseFloat(b.weightKg || "0"),
+          locationName: locationMap.get(b.erpLocationId) || "Unknown",
+          status: b.status,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching finalize preview:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/customer-orders/:id/force-sync-bale-status", requireAuth, async (req: any, res: any) => {
+    try {
+      const session = req.session as any;
+      const companyId = session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const role = session.role;
+      if (role !== "admin" && role !== "owner") {
+        return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
+      }
+
+      const orderId = parseInt(req.params.id);
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (!["VERIFIED", "FINALIZED"].includes(order.status)) {
+        return res.status(400).json({ message: "Order must be VERIFIED or FINALIZED to force-sync bale statuses" });
+      }
+
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales" });
+
+      let updated = 0;
+      for (const b of orderBales) {
+        const [existing] = await db.select({ status: factoryBales.status }).from(factoryBales).where(eq(factoryBales.id, b.baleId));
+        if (existing && existing.status !== "SOLD") {
+          await db.update(factoryBales).set({ status: "SOLD", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
+          updated++;
+        }
+      }
+
+      res.json({ message: `${updated} bale(s) marked as SOLD`, updated, total: orderBales.length });
+    } catch (error: any) {
+      console.error("Error force-syncing bale status:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
