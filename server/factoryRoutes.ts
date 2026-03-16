@@ -695,7 +695,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             .where(eq(factoryBales.id, bale.id))
             .returning();
 
-          removedBales.push(updated);
+          const factoryProductForBale = productMap.get(bale.productId as number);
+          removedBales.push({ ...updated, productName: factoryProductForBale?.name || factoryProductForBale?.articleCode || "Unknown" });
 
           const factoryProduct = productMap.get(bale.productId as number);
           const itemCode = factoryProduct?.articleCode || factoryProduct?.code || bale.articleCode || bale.baleCode;
@@ -723,11 +724,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
 
       const today = new Date().toISOString().split('T')[0];
+      const removalMetaJson = JSON.stringify({
+        bales: result.removed.map((b: any) => ({
+          id: b.id,
+          ref: b.referenceNumber,
+          productName: b.productName || "Unknown",
+          weightKg: b.weightKg,
+          status: "REMOVED",
+        })),
+      });
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
         txType: "BALE_REMOVAL",
         description: `Removed ${result.removed.length} bale(s) from stock. Supervisor: ${supervisorUsername}. Reason: ${reason || "N/A"}`,
+        metaJson: removalMetaJson,
       });
 
       res.json({ removed: result.removed.length, bales: result.removed });

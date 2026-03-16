@@ -174,6 +174,8 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 }) {
   const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
   const isBaleStockEntry = entry.txType === "BALE_STOCK_ENTRY";
+  const isBaleRemoval = entry.txType === "BALE_REMOVAL";
+  const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
 
   const { data: voucherData } = useQuery<any>({
     queryKey: ["/api/vouchers", entry.referenceId],
@@ -256,10 +258,12 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
           </div>
         )}
 
-        {/* Bale list for stock entries */}
-        {isBaleStockEntry && bales.length > 0 && (
+        {/* Bale list for stock entries and removals */}
+        {hasBalesMeta && bales.length > 0 && (
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Bales ({bales.length})</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+              {isBaleRemoval ? "Removed Bales" : "Bales"} ({bales.length})
+            </p>
             <div className="max-h-64 overflow-y-auto space-y-1">
               {bales.map((bale) => (
                 <div
