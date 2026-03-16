@@ -2691,7 +2691,43 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      return res.json({ product, pressed, sales, loaded });
+      // Current stock: IN_STOCK + FINALIZED bales grouped by location
+      const inStockBales = await db.select({
+        id: factoryBales.id,
+        weightKg: factoryBales.weightKg,
+        erpLocationId: factoryBales.erpLocationId,
+      }).from(factoryBales)
+        .where(and(
+          eq(factoryBales.companyId, companyId),
+          eq(factoryBales.productId, productId),
+          inArray(factoryBales.status, ['IN_STOCK', 'FINALIZED'])
+        ));
+
+      const locStockMap = new Map<number, { locationId: number; locationName: string; qty: number; totalWeight: number }>();
+      for (const bale of inStockBales) {
+        const locId = bale.erpLocationId ?? 0;
+        const existing = locStockMap.get(locId) ?? { locationId: locId, locationName: 'Unknown', qty: 0, totalWeight: 0 };
+        existing.qty += 1;
+        existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
+        locStockMap.set(locId, existing);
+      }
+      const locIds = [...locStockMap.keys()].filter(id => id > 0);
+      if (locIds.length > 0) {
+        const locRecords = await db.select({ id: locations.id, name: locations.name })
+          .from(locations)
+          .where(inArray(locations.id, locIds));
+        for (const loc of locRecords) {
+          const entry = locStockMap.get(loc.id);
+          if (entry) entry.locationName = loc.name;
+        }
+      }
+      const currentStock = {
+        totalQty: inStockBales.length,
+        totalWeight: inStockBales.reduce((s, b) => s + (parseFloat(b.weightKg as any) || 0), 0),
+        locations: Array.from(locStockMap.values()).sort((a, b) => b.qty - a.qty),
+      };
+
+      return res.json({ product, pressed, sales, loaded, currentStock });
     } catch (error: any) {
       console.error("Error fetching bale product detail:", error);
       res.status(500).json({ message: error.message });

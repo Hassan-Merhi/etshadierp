@@ -258,6 +258,13 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
           </div>
         )}
 
+        {/* Fallback for old bale removal entries without saved bale details */}
+        {isBaleRemoval && bales.length === 0 && (
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+            Bale details were not recorded for this entry (created before bale tracking was enabled).
+          </div>
+        )}
+
         {/* Bale list for stock entries and removals */}
         {hasBalesMeta && bales.length > 0 && (
           <div>

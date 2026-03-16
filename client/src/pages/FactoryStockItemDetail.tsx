@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Printer, TrendingUp, Ship } from "lucide-react";
+import { ArrowLeft, Printer, TrendingUp, Ship, Package } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -38,11 +38,25 @@ interface LoadedEntry {
   status: string;
 }
 
+interface StockLocation {
+  locationId: number;
+  locationName: string;
+  qty: number;
+  totalWeight: number;
+}
+
+interface CurrentStock {
+  totalQty: number;
+  totalWeight: number;
+  locations: StockLocation[];
+}
+
 interface BaleProductDetail {
   product: { id: number; name: string; articleCode: string | null };
   pressed: PressedEntry[];
   sales: SaleEntry[];
   loaded: LoadedEntry[];
+  currentStock: CurrentStock;
 }
 
 const fmt = (n: number) => {
@@ -112,6 +126,63 @@ export default function FactoryStockItemDetail() {
         </Card>
       ) : !data ? null : (
         <div className="space-y-4 sm:space-y-6">
+
+          {/* Box 0: Current Stock */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Current Stock
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!data.currentStock || data.currentStock.totalQty === 0 ? (
+                <div className="py-6 text-center text-muted-foreground text-sm">No bales currently in stock</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">Total Bales</p>
+                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-qty">{data.currentStock.totalQty}</p>
+                    </div>
+                    <div className="rounded-md border px-4 py-3">
+                      <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
+                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-weight">{fmt(data.currentStock.totalWeight)} <span className="text-sm font-normal text-muted-foreground">kg</span></p>
+                    </div>
+                  </div>
+                  {data.currentStock.locations.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Location</TableHead>
+                            <TableHead className="text-right">Bales</TableHead>
+                            <TableHead className="text-right">Weight (kg)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {data.currentStock.locations.map((loc) => (
+                            <TableRow key={loc.locationId} data-testid={`row-stock-location-${loc.locationId}`}>
+                              <TableCell className="text-sm">{loc.locationName}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{loc.qty}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">{fmt(loc.totalWeight)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <TableFooter>
+                          <TableRow className="font-semibold text-sm">
+                            <TableCell>Total</TableCell>
+                            <TableCell className="text-right font-mono">{data.currentStock.totalQty}</TableCell>
+                            <TableCell className="text-right font-mono">{fmt(data.currentStock.totalWeight)}</TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Box 1: Pressed / Printed */}
           <Card>
