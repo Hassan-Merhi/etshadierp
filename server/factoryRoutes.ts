@@ -1441,7 +1441,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  // Hard-delete a factory supplier (force — works even when active or has transaction records)
+  // Hard-delete a factory supplier — cascades through all related records
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -1455,6 +1455,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
 
+      // 1. Collect container IDs belonging to this supplier
+      const supplierContainers = await db
+        .select({ id: factoryContainers.id })
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, id)));
+      const containerIds = supplierContainers.map((c) => c.id);
+
+      // 2. Cascade-delete container-level dependents (only when containers exist)
+      if (containerIds.length > 0) {
+        await db.delete(factoryFxAllocations).where(inArray(factoryFxAllocations.containerId, containerIds));
+        await db.delete(factoryOffloadAdditionalCharges).where(inArray(factoryOffloadAdditionalCharges.containerId, containerIds));
+        await db.delete(factoryContainerCommissions).where(inArray(factoryContainerCommissions.containerId, containerIds));
+        await db.delete(factoryMixBatchSources).where(inArray(factoryMixBatchSources.containerId, containerIds));
+        await db.delete(factoryRawStock).where(inArray(factoryRawStock.containerId, containerIds));
+        await db.delete(factoryContainers).where(inArray(factoryContainers.id, containerIds));
+      }
+
+      // 3. Delete supplier-level financial records
+      await db.delete(factorySupplierFxTransfers).where(
+        and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          or(eq(factorySupplierFxTransfers.fromSupplierId, id), eq(factorySupplierFxTransfers.toSupplierId, id))
+        )
+      );
+      await db.delete(factorySupplierPayments).where(
+        and(eq(factorySupplierPayments.companyId, companyId), eq(factorySupplierPayments.supplierId, id))
+      );
+      await db.delete(factorySupplierScoreSnapshots).where(
+        and(eq(factorySupplierScoreSnapshots.companyId, companyId), eq(factorySupplierScoreSnapshots.supplierId, id))
+      );
+
+      // 4. Finally delete the supplier itself
       await db
         .delete(factorySuppliers)
         .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)));
