@@ -107,6 +107,7 @@ interface FxTransfer {
   fxRateToUsd: string;
   toAmountUsd: string;
   notes: string | null;
+  sourceType: string | null;
 }
 
 interface StatementResponse {
@@ -116,6 +117,21 @@ interface StatementResponse {
   obCommissions: ObCommission[];
   payments: SupplierPayment[];
   fxTransfers: FxTransfer[];
+  linkedSupplierGroups: Array<{
+    supplierId: number;
+    supplierName: string;
+    containerCount: number;
+    lastActivity: string | null;
+    currencyGroups: Array<{
+      currencyCode: string;
+      containers: any[];
+      totalValue: string;
+      totalCommission: string;
+      totalPaid: string;
+      netPayable: string;
+      containerCount: number;
+    }>;
+  }>;
   summary: {
     totalContainers: number;
     totalKg: string;
@@ -237,6 +253,7 @@ export default function FactorySuppliers() {
         toAmountUsd: toAmountUsd.toFixed(4),
         date: data.date,
         notes: data.notes || null,
+        sourceType: (data as any).sourceType || "supplier",
       };
       const res = await factoryApiRequest("POST", "/api/factory/supplier-fx-transfers", payload);
       if (!res.ok) {
@@ -994,273 +1011,198 @@ export default function FactorySuppliers() {
               </Card>
             )}
 
+            {/* Phase 2: Broker linked supplier container groups */}
+            {statementData.linkedSupplierGroups && statementData.linkedSupplierGroups.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Linked Supplier Containers
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {statementData.linkedSupplierGroups.map(group => (
+                    <div key={group.supplierId} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs"><Link2 className="h-3 w-3 mr-1" />{group.supplierName}</Badge>
+                        <span className="text-xs text-muted-foreground">{group.containerCount} container{group.containerCount !== 1 ? "s" : ""}</span>
+                      </div>
+                      {group.currencyGroups.map(cg => (
+                        <div key={cg.currencyCode} className="pl-4 border-l-2 border-muted space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{cg.currencyCode} · {cg.containerCount} containers</span>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                              <span>Total: {cg.currencyCode} {formatNum(cg.totalValue)}</span>
+                              <span>Paid: {cg.currencyCode} {formatNum(cg.totalPaid)}</span>
+                              <span className={parseFloat(cg.netPayable) > 0 ? "font-medium text-foreground" : "text-green-600 dark:text-green-400"}>
+                                Balance: {parseFloat(cg.netPayable) > 0 ? `${cg.currencyCode} ${formatNum(cg.netPayable)}` : "Settled"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="h-8 text-xs">Date</TableHead>
+                                  <TableHead className="h-8 text-xs">Container</TableHead>
+                                  <TableHead className="h-8 text-xs">Status</TableHead>
+                                  <TableHead className="h-8 text-xs text-right">Value ({cg.currencyCode})</TableHead>
+                                  <TableHead className="h-8 text-xs text-right">Commission</TableHead>
+                                  <TableHead className="h-8 text-xs">Notes</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {cg.containers.map((c: any) => (
+                                  <TableRow key={c.id} className="text-xs">
+                                    <TableCell className="py-1 whitespace-nowrap">{formatDate(c.date)}</TableCell>
+                                    <TableCell className="py-1 font-medium">{c.containerNumber}</TableCell>
+                                    <TableCell className="py-1">
+                                      <Badge variant={statusColor(c.status)} className="text-xs">{c.status}</Badge>
+                                    </TableCell>
+                                    <TableCell className="py-1 text-right tabular-nums">{formatNum(c.value)}</TableCell>
+                                    <TableCell className="py-1 text-right tabular-nums text-destructive">
+                                      {parseFloat(c.commissionAmount || "0") > 0 ? `${c.commissionCurrencyCode} ${formatNum(c.commissionAmount)}` : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-1 text-muted-foreground max-w-[100px] truncate">{c.notes || "—"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  Container Ledger
+                  Activity Ledger
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {statementData.statement.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Container</TableHead>
-                          <TableHead>Origin</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Declared Kg</TableHead>
-                          <TableHead className="text-right">Actual Kg</TableHead>
-                          <TableHead className="text-right">Diff</TableHead>
-                          <TableHead className="text-right">Rate/Kg</TableHead>
-                          <TableHead className="text-right">Value</TableHead>
-                          <TableHead className="text-right">Commission</TableHead>
-                          <TableHead>Notes</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statementData.statement.map((entry, idx) => {
-                          const runningTotal = statementData.statement
-                            .slice(0, idx + 1)
-                            .reduce((sum, e) => sum + parseFloat(e.value), 0);
+                {(() => {
+                  type RowType = "purchase" | "payment" | "fx" | "commission";
+                  const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
+                  const allRows: Array<{
+                    key: string; date: string | null; type: RowType;
+                    ref: string; detail: string; amount: string; amountIsNeg: boolean;
+                    status?: string; notes?: string | null; onDelete?: () => void;
+                  }> = [
+                    ...statementData.statement.map(e => ({
+                      key: `c-${e.id}`,
+                      date: e.date,
+                      type: "purchase" as RowType,
+                      ref: e.containerNumber,
+                      detail: [e.origin, e.currencyCode !== "USD" ? `${e.currencyCode} ${formatNum(e.value)} @ ${formatNum(e.fxRateToUsd)}` : ""].filter(Boolean).join(" · "),
+                      amount: `$${formatNum(e.value)}`,
+                      amountIsNeg: false,
+                      status: e.status,
+                      notes: [e.notes, (parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "")].filter(Boolean).join(" · ") || null,
+                    })),
+                    ...statementData.payments.map(p => ({
+                      key: `p-${p.id}`,
+                      date: p.date,
+                      type: "payment" as RowType,
+                      ref: "Payment",
+                      detail: p.currencyCode !== "USD" ? `${p.currencyCode} ${formatNum(p.amount)} @ ${formatNum(p.fxRateToUsd || "1")}` : "",
+                      amount: `$${formatNum(p.amountUsd)}`,
+                      amountIsNeg: false,
+                      notes: p.notes,
+                      onDelete: () => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); },
+                    })),
+                    ...(statementData.fxTransfers || []).map(t => {
+                      const isOut = t.fromSupplierId === statementSupplierId;
+                      return {
+                        key: `f-${t.id}`,
+                        date: t.date,
+                        type: "fx" as RowType,
+                        ref: isOut ? `FX → Broker` : `FX ← Linked`,
+                        detail: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)} → $${formatNum(t.toAmountUsd)}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}` : `+$${formatNum(t.toAmountUsd)} received`,
+                        amount: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)}` : `$${formatNum(t.toAmountUsd)}`,
+                        amountIsNeg: isOut,
+                        notes: t.notes,
+                      };
+                    }),
+                    ...(statementData.obCommissions || []).map(oc => ({
+                      key: `oc-${oc.rawStockId}`,
+                      date: oc.date,
+                      type: "commission" as RowType,
+                      ref: oc.containerNumber,
+                      detail: oc.personName || "",
+                      amount: `${oc.currencyCode !== "USD" ? `${oc.currencyCode} ${formatNum(oc.amount)}` : `$${formatNum(oc.amount)}`}`,
+                      amountIsNeg: true,
+                      notes: null,
+                    })),
+                  ].sort((a, b) => {
+                    const da = a.date ? new Date(a.date).getTime() : 0;
+                    const db = b.date ? new Date(b.date).getTime() : 0;
+                    return db - da;
+                  });
 
-                          return (
-                            <TableRow key={entry.id} data-testid={`row-statement-${entry.id}`}>
-                              <TableCell className="whitespace-nowrap text-sm">
-                                {formatDate(entry.date)}
+                  const typeBadge = (type: RowType) => {
+                    if (type === "purchase") return <Badge variant="outline" className="text-xs font-normal">Purchase</Badge>;
+                    if (type === "payment") return <Badge variant="secondary" className="text-xs font-normal">Payment</Badge>;
+                    if (type === "fx") return <Badge className="text-xs font-normal bg-blue-500 dark:bg-blue-600">FX</Badge>;
+                    return <Badge variant="destructive" className="text-xs font-normal">Commission</Badge>;
+                  };
+
+                  if (allRows.length === 0) return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-lg font-medium">No activity yet</p>
+                    </div>
+                  );
+
+                  return (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Reference</TableHead>
+                            <TableHead>Detail</TableHead>
+                            <TableHead className="text-right">Amount (USD)</TableHead>
+                            <TableHead>Notes</TableHead>
+                            <TableHead className="w-8" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allRows.map(row => (
+                            <TableRow key={row.key} data-testid={row.type === "purchase" ? `row-statement-${row.key}` : undefined}>
+                              <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date || "")}</TableCell>
+                              <TableCell>{typeBadge(row.type)}</TableCell>
+                              <TableCell className="text-sm font-medium">
+                                <span>{row.ref}</span>
+                                {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
-                              <TableCell className="font-medium text-sm">
-                                {entry.containerNumber}
+                              <TableCell className="text-sm text-muted-foreground">{row.detail || "—"}</TableCell>
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                                {row.amountIsNeg && row.type !== "payment" ? "−" : row.type === "payment" ? "−" : ""}{row.amount}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {entry.origin || "-"}
-                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
-                                <Badge variant={statusColor(entry.status)} className="text-xs">
-                                  {entry.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">
-                                {formatKg(entry.declaredKg)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">
-                                {formatKg(entry.actualReceivedKg || entry.totalKg)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">
-                                {entry.differenceKg && parseFloat(entry.differenceKg) !== 0 ? (
-                                  <span className={parseFloat(entry.differenceKg) < 0 ? "text-destructive" : ""}>
-                                    {formatKg(entry.differenceKg)}
-                                  </span>
-                                ) : "-"}
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">
-                                {entry.ratePerKg ? `$${parseFloat(entry.ratePerKg).toFixed(4)}` : "-"}
-                              </TableCell>
-                              <TableCell className="text-right text-sm font-medium tabular-nums">
-                                ${formatNum(entry.value)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums text-destructive">
-                                {parseFloat(entry.totalCommission) > 0 ? `$${formatNum(entry.totalCommission)}` : "-"}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-32 truncate">
-                                {entry.notes || "-"}
+                                {row.onDelete && (
+                                  <Button variant="ghost" size="icon" onClick={row.onDelete}>
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                        <TableRow className="border-t-2 font-bold">
-                          <TableCell colSpan={4}>TOTAL</TableCell>
-                          <TableCell className="text-right tabular-nums">-</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatKg(statementData.summary.totalKg)}
-                          </TableCell>
-                          <TableCell>-</TableCell>
-                          <TableCell>-</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            ${formatNum(statementData.summary.totalValue)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-destructive">
-                            {parseFloat(statementData.summary.totalCommissions) > 0
-                              ? `$${formatNum(statementData.summary.totalCommissions)}`
-                              : "-"}
-                          </TableCell>
-                          <TableCell>-</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-lg font-medium">No containers from this supplier</p>
-                  </div>
-                )}
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
-
-            {statementData.obCommissions && statementData.obCommissions.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Opening Balance Commissions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Person</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">Amount (USD)</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statementData.obCommissions.map((oc) => (
-                          <TableRow key={oc.rawStockId}>
-                            <TableCell className="text-sm whitespace-nowrap">{formatDate(oc.date)}</TableCell>
-                            <TableCell className="text-sm font-mono">{oc.containerNumber}</TableCell>
-                            <TableCell className="text-sm">{oc.personName || "-"}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">
-                              {oc.currencyCode !== "USD" ? `${oc.currencyCode} ` : "$"}{formatNum(oc.amount)}
-                            </TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">
-                              ${formatNum(oc.amountUsd)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="border-t-2 font-bold">
-                          <TableCell colSpan={3}>Total Commissions</TableCell>
-                          <TableCell />
-                          <TableCell className="text-right tabular-nums">
-                            ${formatNum(statementData.summary.totalObCommissions)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {statementData.payments && statementData.payments.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Payments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Notes</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">USD Amount</TableHead>
-                          <TableHead className="w-8" />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statementData.payments.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="text-sm whitespace-nowrap">{formatDate(p.date)}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.notes || "-"}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">
-                              {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}{formatNum(p.amount)}
-                              {p.currencyCode !== "USD" && p.fxRateToUsd && (
-                                <span className="text-xs text-muted-foreground ml-1">@ {formatNum(p.fxRateToUsd)}</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">
-                              ${formatNum(p.amountUsd)}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); }}
-                                data-testid={`button-delete-payment-${p.id}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="border-t-2 font-bold">
-                          <TableCell colSpan={2}>Total Paid</TableCell>
-                          <TableCell />
-                          <TableCell className="text-right tabular-nums">
-                            ${formatNum(statementData.summary.totalPayments)}
-                          </TableCell>
-                          <TableCell />
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {statementData.fxTransfers && statementData.fxTransfers.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <ArrowRightLeft className="h-4 w-4" />
-                    FX Settlements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Direction</TableHead>
-                          <TableHead className="text-right">From Amount</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                          <TableHead className="text-right">USD Received</TableHead>
-                          <TableHead>Notes</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {statementData.fxTransfers.map((t) => {
-                          const isOutgoing = t.fromSupplierId === statementSupplierId;
-                          return (
-                            <TableRow key={t.id}>
-                              <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
-                              <TableCell className="text-sm">
-                                {isOutgoing
-                                  ? <Badge variant="outline" className="text-xs">Out → Broker</Badge>
-                                  : <Badge variant="secondary" className="text-xs">In ← Linked</Badge>
-                                }
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">
-                                {isOutgoing
-                                  ? <span className="text-destructive">{t.fromCurrencyCode} {formatNum(t.fromAmount)}</span>
-                                  : <span className="text-muted-foreground">—</span>
-                                }
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                                {formatNum(t.fxRateToUsd)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm tabular-nums font-medium">
-                                {isOutgoing
-                                  ? <span className="text-muted-foreground">—</span>
-                                  : <span className="text-green-600 dark:text-green-400">+${formatNum(t.toAmountUsd)}</span>
-                                }
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{t.notes || "-"}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {parseFloat(statementData.summary.totalPayments || "0") > 0 && (
               <Card className="border-primary/20">
@@ -1388,16 +1330,10 @@ export default function FactorySuppliers() {
               <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
               <Button
                 onClick={() => {
-                  const sourceLabel: Record<FxSourceType, string> = {
-                    supplier: "Supplier Balance",
-                    commission: "Commission",
-                    both: "Both",
-                  };
-                  const prefix = fxSourceType !== "supplier" ? `[Source: ${sourceLabel[fxSourceType]}] ` : "";
                   fxConversionMutation.mutate({
                     ...fxConversionForm,
-                    notes: (prefix + (fxConversionForm.notes || "")).trim() || null as any,
-                  });
+                    sourceType: fxSourceType,
+                  } as any);
                 }}
                 disabled={
                   !fxConversionForm.amount ||

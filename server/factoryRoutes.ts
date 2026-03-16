@@ -1880,6 +1880,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           finalPayableAmount: c.finalPayableAmount,
           commissionAmount: c.commissionAmount || "0",
           commissionCurrencyCode: c.commissionCurrencyCode || "USD",
+          commissionSupplierId: (c as any).commissionSupplierId || null,
+          commissionNotes: (c as any).commissionNotes || null,
           commissions: containerCommissions,
           totalCommission: totalCommission.toFixed(2),
           notes: c.notes,
@@ -1990,6 +1992,103 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }));
       const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
 
+      // Phase 2: Broker statement — aggregate linked suppliers if this is a broker
+      const linkedSuppliers = await db
+        .select({ id: factorySuppliers.id, name: factorySuppliers.name })
+        .from(factorySuppliers)
+        .where(and(
+          eq(factorySuppliers.parentId, supplierId),
+          eq(factorySuppliers.companyId, companyId)
+        ));
+
+      const linkedSupplierGroups: any[] = [];
+      for (const linked of linkedSuppliers) {
+        const linkedContainers = await db
+          .select()
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, linked.id)))
+          .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt);
+
+        const linkedPayments = await db
+          .select()
+          .from(factorySupplierPayments)
+          .where(and(eq(factorySupplierPayments.companyId, companyId), eq(factorySupplierPayments.supplierId, linked.id)));
+
+        const linkedFxTransfers = await db
+          .select()
+          .from(factorySupplierFxTransfers)
+          .where(and(
+            eq(factorySupplierFxTransfers.companyId, companyId),
+            sql`(${factorySupplierFxTransfers.fromSupplierId} = ${linked.id} OR ${factorySupplierFxTransfers.toSupplierId} = ${linked.id})`
+          ));
+
+        const linkedByCurrency: Record<string, { containers: any[]; totalValue: number; totalCommission: number }> = {};
+        for (const c of linkedContainers) {
+          const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const value = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+          const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
+          const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
+          const cc = c.currencyCode || "USD";
+          if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };
+          linkedByCurrency[cc].containers.push({
+            id: c.id,
+            containerNumber: c.containerNumber,
+            date: (c as any).arrivalDate || c.createdAt,
+            value: value.toFixed(2),
+            currencyCode: cc,
+            fxRateToUsd: c.fxRateToUsd || "1",
+            status: c.status,
+            commissionAmount: c.commissionAmount || "0",
+            commissionCurrencyCode: c.commissionCurrencyCode || "USD",
+            commissionSupplierId: (c as any).commissionSupplierId || null,
+            commissionNotes: (c as any).commissionNotes || null,
+            notes: c.notes,
+          });
+          linkedByCurrency[cc].totalValue += value;
+          linkedByCurrency[cc].totalCommission += totalComm;
+        }
+
+        const linkedPaidByCurrency: Record<string, number> = {};
+        for (const p of (linkedPayments as any[])) {
+          const cc = p.currencyCode || "USD";
+          linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
+        }
+        for (const t of (linkedFxTransfers as any[])) {
+          if (t.fromSupplierId === linked.id) {
+            const cc = t.fromCurrencyCode || "USD";
+            linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
+          }
+        }
+
+        const linkedCurrencyGroups = Object.entries(linkedByCurrency).map(([cc, data]) => {
+          const paid = linkedPaidByCurrency[cc] || 0;
+          const netPayable = data.totalValue - data.totalCommission - paid;
+          return {
+            currencyCode: cc,
+            containers: data.containers,
+            totalValue: data.totalValue.toFixed(2),
+            totalCommission: data.totalCommission.toFixed(2),
+            totalPaid: paid.toFixed(2),
+            netPayable: netPayable.toFixed(2),
+            containerCount: data.containers.length,
+            lastActivity: linkedContainers.length > 0
+              ? ((linkedContainers[linkedContainers.length - 1] as any).arrivalDate || linkedContainers[linkedContainers.length - 1].createdAt)
+              : null,
+          };
+        });
+
+        linkedSupplierGroups.push({
+          supplierId: linked.id,
+          supplierName: linked.name,
+          containerCount: linkedContainers.length,
+          currencyGroups: linkedCurrencyGroups,
+          lastActivity: linkedContainers.length > 0
+            ? ((linkedContainers[linkedContainers.length - 1] as any).arrivalDate || linkedContainers[linkedContainers.length - 1].createdAt)
+            : null,
+        });
+      }
+
       res.json({
         supplier,
         statement,
@@ -1997,6 +2096,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         obCommissions,
         payments,
         fxTransfers,
+        linkedSupplierGroups,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),
@@ -3226,7 +3326,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const fxRateNum = parseFloat(fxRate);
       const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum;
 
-      const values = {
+      const values: any = {
         ...parsed,
         currencyCode,
         fxRateToUsd: fxRate,
@@ -3235,6 +3335,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         fxRateDateImport: importDate,
         ratePerKgUsd: String(ratePerKgUsd),
       };
+
+      // Auto-set commissionSupplierId to broker (parentId) if supplier has one and not already set
+      if (parsed.supplierId && !parsed.commissionSupplierId) {
+        const [sup] = await db
+          .select({ parentId: factorySuppliers.parentId })
+          .from(factorySuppliers)
+          .where(eq(factorySuppliers.id, parsed.supplierId));
+        if (sup?.parentId) values.commissionSupplierId = sup.parentId;
+      }
+
       const [container] = await db.insert(factoryContainers).values(values).returning();
       await writeDaybookEntry(db, {
         companyId,

@@ -61,6 +61,8 @@ export default function FactoryContainers() {
     commissionAmount: "",
     commissionCurrencyCode: "USD",
     commissionAccountId: "",
+    commissionSupplierId: "",
+    commissionNotes: "",
   });
   const [currency, setCurrency] = useState("USD");
   const [fxRate, setFxRate] = useState("1");
@@ -99,6 +101,20 @@ export default function FactoryContainers() {
     queryKey: ["/api/factory/suppliers"],
   });
 
+  // Auto-set commissionSupplierId to broker (parentId) when supplier changes
+  useEffect(() => {
+    if (!formData.supplierId) {
+      setFormData(f => ({ ...f, commissionSupplierId: "" }));
+      return;
+    }
+    const sup = suppliers?.find(s => s.id === parseInt(formData.supplierId));
+    if (sup?.parentId) {
+      setFormData(f => ({ ...f, commissionSupplierId: String(sup.parentId) }));
+    } else if (!formData.commissionSupplierId) {
+      setFormData(f => ({ ...f, commissionSupplierId: "" }));
+    }
+  }, [formData.supplierId, suppliers]);
+
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
   });
@@ -114,6 +130,8 @@ export default function FactoryContainers() {
         commissionAmount: data.commissionAmount || "0",
         commissionCurrencyCode: data.commissionCurrencyCode || "USD",
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
+        commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
+        commissionNotes: data.commissionNotes || null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -144,6 +162,8 @@ export default function FactoryContainers() {
         commissionAmount: data.commissionAmount || "0",
         commissionCurrencyCode: data.commissionCurrencyCode || "USD",
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
+        commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
+        commissionNotes: data.commissionNotes || null,
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -272,6 +292,8 @@ export default function FactoryContainers() {
       commissionAmount: "",
       commissionCurrencyCode: "USD",
       commissionAccountId: "",
+      commissionSupplierId: "",
+      commissionNotes: "",
     });
     setCurrency("USD");
     setFxRate("1");
@@ -293,6 +315,8 @@ export default function FactoryContainers() {
       commissionAmount: (c as any).commissionAmount || "",
       commissionCurrencyCode: (c as any).commissionCurrencyCode || "USD",
       commissionAccountId: (c as any).commissionAccountId ? String((c as any).commissionAccountId) : "",
+      commissionSupplierId: (c as any).commissionSupplierId ? String((c as any).commissionSupplierId) : "",
+      commissionNotes: (c as any).commissionNotes || "",
     });
     setCurrency((c as any).currencyCode || "USD");
     setFxRate((c as any).fxRateToUsd || "1");
@@ -651,6 +675,23 @@ export default function FactoryContainers() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            {formData.commissionSupplierId && (
+              <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                Broker: <span className="font-medium text-foreground">
+                  {suppliers?.find(s => s.id === parseInt(formData.commissionSupplierId))?.name || `Supplier #${formData.commissionSupplierId}`}
+                </span>
+                <span className="ml-2 text-xs">(auto-linked from supplier)</span>
+              </div>
+            )}
+            <div>
+              <Label>Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input
+                value={formData.commissionNotes}
+                onChange={(e) => setFormData({ ...formData, commissionNotes: e.target.value })}
+                placeholder="e.g. Commission for container facilitation"
+                data-testid="input-commission-notes"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

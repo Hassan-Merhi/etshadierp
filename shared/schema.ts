@@ -2293,6 +2293,8 @@ export const factoryContainers = pgTable("factory_containers", {
   commissionAmount: decimal("commission_amount", { precision: 20, scale: 2 }).default("0"),
   commissionCurrencyCode: varchar("commission_currency_code", { length: 10 }).default("USD"),
   commissionAccountId: integer("commission_account_id"),
+  commissionSupplierId: integer("commission_supplier_id"),
+  commissionNotes: text("commission_notes"),
   dutyAmount: decimal("duty_amount", { precision: 20, scale: 2 }),
   dutyAccountId: integer("duty_account_id"),
   dutyStatus: text("duty_status").notNull().default("NONE"),
@@ -2331,6 +2333,8 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
   commissionAmount: z.string().optional().nullable(),
   commissionCurrencyCode: z.string().optional().nullable(),
   commissionAccountId: z.number().optional().nullable(),
+  commissionSupplierId: z.number().optional().nullable(),
+  commissionNotes: z.string().optional().nullable(),
   dutyAmount: z.string().optional().nullable(),
   dutyAccountId: z.number().optional().nullable(),
   dutyStatus: z.enum(["NONE", "PENDING", "CONFIRMED"]).optional(),
@@ -2430,6 +2434,7 @@ export const factorySupplierFxTransfers = pgTable("factory_supplier_fx_transfers
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull(),
   toAmountUsd: decimal("to_amount_usd", { precision: 20, scale: 4 }).notNull(),
   notes: text("notes"),
+  sourceType: text("source_type"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
