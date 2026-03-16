@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -93,6 +94,13 @@ export default function FactoryContainers() {
       .catch(() => {});
   }, [currency]);
 
+  // Sync commission currency with container currency in create mode
+  useEffect(() => {
+    if (!editingContainer) {
+      setFormData(f => ({ ...f, commissionCurrencyCode: currency }));
+    }
+  }, [currency, editingContainer]);
+
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
     queryKey: ["/api/factory/containers"],
   });
@@ -101,7 +109,7 @@ export default function FactoryContainers() {
     queryKey: ["/api/factory/suppliers"],
   });
 
-  // Auto-set commissionSupplierId to broker (parentId) when supplier changes
+  // Auto-fill broker (commissionSupplierId) when supplier changes
   useEffect(() => {
     if (!formData.supplierId) {
       setFormData(f => ({ ...f, commissionSupplierId: "" }));
@@ -128,7 +136,7 @@ export default function FactoryContainers() {
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
         commissionAmount: data.commissionAmount || "0",
-        commissionCurrencyCode: data.commissionCurrencyCode || "USD",
+        commissionCurrencyCode: data.commissionCurrencyCode || currency,
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
@@ -140,9 +148,13 @@ export default function FactoryContainers() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      toast({ title: "Created", description: "Container added successfully" });
+      const hasCommission = parseFloat(vars.commissionAmount || "0") > 0;
+      toast({
+        title: "Container saved",
+        description: hasCommission ? "Broker commission added." : "Container created successfully.",
+      });
       resetForm();
       setCreateOpen(false);
     },
@@ -160,7 +172,7 @@ export default function FactoryContainers() {
         fxRateToUsd: fxRateSource === "manual" ? fxRate : undefined,
         fxRateSource,
         commissionAmount: data.commissionAmount || "0",
-        commissionCurrencyCode: data.commissionCurrencyCode || "USD",
+        commissionCurrencyCode: data.commissionCurrencyCode || currency,
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
@@ -172,9 +184,13 @@ export default function FactoryContainers() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      toast({ title: "Updated", description: "Container updated" });
+      const hasCommission = parseFloat(vars.data.commissionAmount || "0") > 0;
+      toast({
+        title: "Container saved",
+        description: hasCommission ? "Commission linked." : "Container updated.",
+      });
       resetForm();
       setEditingContainer(null);
     },
@@ -332,7 +348,23 @@ export default function FactoryContainers() {
     }
   };
 
-  const activeSuppliers = suppliers?.filter((s) => s.isActive);
+  const activeSuppliers = suppliers?.filter((s) => s.isActive) ?? [];
+
+  // Suppliers filtered by selected broker
+  const brokerIdNum = formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null;
+  const filteredSupplierList = brokerIdNum
+    ? activeSuppliers.filter(s => s.parentId === brokerIdNum || !s.parentId)
+    : activeSuppliers;
+
+  // Selected supplier for mismatch detection
+  const selectedSupplier = formData.supplierId
+    ? activeSuppliers.find(s => s.id === parseInt(formData.supplierId)) ?? null
+    : null;
+
+  const brokerMismatch =
+    selectedSupplier?.parentId &&
+    formData.commissionSupplierId &&
+    selectedSupplier.parentId !== parseInt(formData.commissionSupplierId);
 
   const filteredContainers = containers?.filter((c) => {
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
@@ -424,76 +456,81 @@ export default function FactoryContainers() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Container #</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Origin</TableHead>
-                  <TableHead className="text-right">Total Kg</TableHead>
-                  <TableHead className="text-right">Rate/Kg</TableHead>
-                  <TableHead>Currency</TableHead>
+                  <TableHead>Supplier / Broker</TableHead>
+                  <TableHead>Commission</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Arrival</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredContainers.map((c) => (
-                  <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
-                    <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.supplierName || "-"}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.origin || "-"}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {c.totalKg ? formatNumber(parseFloat(c.totalKg)) : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {c.ratePerKg ? formatNumber(parseFloat(c.ratePerKg)) : "-"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {(c as any).currencyCode || "USD"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
-                        {c.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {c.arrivalDate || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => navigate("/factory/raw-stock")}
-                                data-testid={`button-offload-container-${c.id}`}
-                              >
-                                <ArrowDown className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Offload to Production</TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(c)}
-                          data-testid={`button-edit-container-${c.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteMutation.mutate(c.id)}
-                          data-testid={`button-delete-container-${c.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredContainers.map((c) => {
+                  const commAmt = parseFloat((c as any).commissionAmount || "0");
+                  const commCcy = (c as any).commissionCurrencyCode || "USD";
+                  const brokerSupId = (c as any).commissionSupplierId;
+                  const brokerName = brokerSupId
+                    ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null
+                    : null;
+                  return (
+                    <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
+                      <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5">
+                          <div className="font-medium">{c.supplierName || <span className="text-muted-foreground">—</span>}</div>
+                          {brokerName && (
+                            <div className="text-xs text-muted-foreground">{brokerName}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
+                          {c.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {c.arrivalDate || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => navigate("/factory/raw-stock")}
+                                  data-testid={`button-offload-container-${c.id}`}
+                                >
+                                  <ArrowDown className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Offload to Production</TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(c)}
+                            data-testid={`button-edit-container-${c.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteMutation.mutate(c.id)}
+                            data-testid={`button-delete-container-${c.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -518,216 +555,304 @@ export default function FactoryContainers() {
       <Dialog open={createOpen || !!editingContainer} onOpenChange={(open) => {
         if (!open) { setCreateOpen(false); setEditingContainer(null); resetForm(); }
       }}>
-        <DialogContent>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingContainer ? "Edit Container" : "Add Factory Container"}</DialogTitle>
             <DialogDescription>
               {editingContainer ? "Update container details" : "Track a new incoming factory container"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Container Number *</Label>
-              <Input
-                value={formData.containerNumber}
-                onChange={(e) => setFormData({ ...formData, containerNumber: e.target.value })}
-                placeholder="e.g., CNTR-2024-001"
-                data-testid="input-container-number"
-              />
-            </div>
-            <div>
-              <Label>Supplier</Label>
-              <Select value={formData.supplierId} onValueChange={(val) => setFormData({ ...formData, supplierId: val })}>
-                <SelectTrigger data-testid="select-container-supplier">
-                  <SelectValue placeholder="Select factory supplier..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeSuppliers?.map((s) => (
-                    <SelectItem key={s.id} value={s.id.toString()}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Origin</Label>
-              <Input
-                value={formData.origin}
-                onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                placeholder="Country/city of origin"
-                data-testid="input-container-origin"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
+          <div className="max-h-[62vh] overflow-y-auto space-y-6 pr-1">
+            {/* ── Section 1: Basic ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">Basic</p>
+                <Separator className="flex-1" />
+              </div>
               <div>
-                <Label>Total Kg</Label>
+                <Label>Container Number *</Label>
                 <Input
-                  type="number"
-                  value={formData.totalKg}
-                  onChange={(e) => setFormData({ ...formData, totalKg: e.target.value })}
-                  placeholder="0.000"
-                  data-testid="input-container-total-kg"
+                  value={formData.containerNumber}
+                  onChange={(e) => setFormData({ ...formData, containerNumber: e.target.value })}
+                  placeholder="e.g., CNTR-2024-001"
+                  data-testid="input-container-number"
                 />
               </div>
               <div>
-                <Label>Rate per Kg</Label>
+                <Label>Origin</Label>
                 <Input
-                  type="number"
-                  value={formData.ratePerKg}
-                  onChange={(e) => setFormData({ ...formData, ratePerKg: e.target.value })}
-                  placeholder="0.00"
-                  data-testid="input-container-rate"
+                  value={formData.origin}
+                  onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                  placeholder="Country/city of origin"
+                  data-testid="input-container-origin"
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Currency</Label>
-                <Select value={currency} onValueChange={(val) => setCurrency(val)}>
-                  <SelectTrigger data-testid="select-container-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="AUD">AUD</SelectItem>
-                    <SelectItem value="LBP">LBP</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label>FX Rate to USD {currency !== "USD" ? (fxRateSource === "auto" ? `(Auto${fxEffectiveDate ? ` — ${fxEffectiveDate}` : ""})` : "(Manual)") : ""}</Label>
-                  {currency !== "USD" && (
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground underline"
-                      onClick={() => setFxRateSource(fxRateSource === "auto" ? "manual" : "auto")}
-                      data-testid="button-toggle-fx-source"
-                    >
-                      {fxRateSource === "auto" ? "Switch to Manual" : "Switch to Auto"}
-                    </button>
-                  )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Arrival Date</Label>
+                  <Input
+                    type="date"
+                    value={formData.arrivalDate}
+                    onChange={(e) => setFormData({ ...formData, arrivalDate: e.target.value })}
+                    data-testid="input-container-arrival"
+                  />
                 </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                    <SelectTrigger data-testid="select-container-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PENDING">Pending</SelectItem>
+                      <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
+                      <SelectItem value="AVAILABLE">Available</SelectItem>
+                      <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>Notes</Label>
                 <Input
-                  type="number"
-                  value={fxRate}
-                  onChange={(e) => setFxRate(e.target.value)}
-                  disabled={currency === "USD" || fxRateSource === "auto"}
-                  readOnly={currency !== "USD" && fxRateSource === "auto"}
-                  placeholder="1"
-                  data-testid="input-container-fx-rate"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes"
+                  data-testid="input-container-notes"
                 />
               </div>
             </div>
-            {currency !== "USD" && formData.ratePerKg && fxRate && (
-              <div className="text-sm text-muted-foreground">
-                Computed USD Rate/Kg: {formatNumber(parseFloat(formData.ratePerKg) * parseFloat(fxRate))} USD
+
+            {/* ── Section 2: Supplier & Broker ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">Supplier &amp; Broker</p>
+                <Separator className="flex-1" />
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
+
+              {/* Broker first so supplier list can filter */}
               <div>
-                <Label>Commission Amount</Label>
-                <Input
-                  type="number"
-                  value={formData.commissionAmount}
-                  onChange={(e) => setFormData({ ...formData, commissionAmount: e.target.value })}
-                  placeholder="0.00"
-                  data-testid="input-container-commission"
-                />
-              </div>
-              <div>
-                <Label>Commission Currency</Label>
+                <Label>Broker / Commission To <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                 <Select
-                  value={formData.commissionCurrencyCode}
-                  onValueChange={(val) => setFormData({ ...formData, commissionCurrencyCode: val })}
+                  value={formData.commissionSupplierId || "__none__"}
+                  onValueChange={(val) => {
+                    const newBroker = val === "__none__" ? "" : val;
+                    setFormData(f => ({
+                      ...f,
+                      commissionSupplierId: newBroker,
+                      // If current supplier doesn't belong to new broker, clear it
+                      supplierId: (() => {
+                        if (!newBroker || !f.supplierId) return f.supplierId;
+                        const sup = activeSuppliers.find(s => s.id === parseInt(f.supplierId));
+                        if (sup?.parentId && sup.parentId !== parseInt(newBroker)) return "";
+                        return f.supplierId;
+                      })(),
+                    }));
+                  }}
                 >
-                  <SelectTrigger data-testid="select-commission-currency">
-                    <SelectValue />
+                  <SelectTrigger data-testid="select-container-broker">
+                    <SelectValue placeholder="Select broker..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="AUD">AUD</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                    <SelectItem value="LBP">LBP</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {activeSuppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div>
-              <Label>Commission Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-              <Select
-                value={formData.commissionAccountId || "__none__"}
-                onValueChange={(val) => setFormData({ ...formData, commissionAccountId: val === "__none__" ? "" : val })}
-              >
-                <SelectTrigger data-testid="select-commission-account">
-                  <SelectValue placeholder="Select account..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {ledgerAccounts.map((acc: any) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>
-                      {acc.name}{acc.code ? ` (${acc.code})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {formData.commissionSupplierId && (
-              <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                Broker: <span className="font-medium text-foreground">
-                  {suppliers?.find(s => s.id === parseInt(formData.commissionSupplierId))?.name || `Supplier #${formData.commissionSupplierId}`}
-                </span>
-                <span className="ml-2 text-xs">(auto-linked from supplier)</span>
-              </div>
-            )}
-            <div>
-              <Label>Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-              <Input
-                value={formData.commissionNotes}
-                onChange={(e) => setFormData({ ...formData, commissionNotes: e.target.value })}
-                placeholder="e.g. Commission for container facilitation"
-                data-testid="input-commission-notes"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
               <div>
-                <Label>Arrival Date</Label>
+                <Label>Purchase Supplier</Label>
+                <Select
+                  value={formData.supplierId || "__none__"}
+                  onValueChange={(val) => setFormData({ ...formData, supplierId: val === "__none__" ? "" : val })}
+                >
+                  <SelectTrigger data-testid="select-container-supplier">
+                    <SelectValue placeholder="Select supplier..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {filteredSupplierList.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                        {s.parentId ? " (linked)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.commissionSupplierId && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Showing suppliers linked to broker + standalone suppliers
+                  </p>
+                )}
+              </div>
+
+              {/* Auto-linked helper */}
+              {selectedSupplier?.parentId && !brokerMismatch && formData.commissionSupplierId && (
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                  Linked to Broker:{" "}
+                  <span className="font-medium text-foreground">
+                    {activeSuppliers.find(s => s.id === selectedSupplier.parentId)?.name ?? `#${selectedSupplier.parentId}`}
+                  </span>
+                </div>
+              )}
+
+              {/* Mismatch warning */}
+              {brokerMismatch && (
+                <div className="rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-300 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    This supplier belongs to <strong>{activeSuppliers.find(s => s.id === selectedSupplier?.parentId)?.name ?? `Broker #${selectedSupplier?.parentId}`}</strong>, not the selected broker. Please fix the mismatch before saving.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Section 3: Money & Commission ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">Money &amp; Commission</p>
+                <Separator className="flex-1" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Total Kg</Label>
+                  <Input
+                    type="number"
+                    value={formData.totalKg}
+                    onChange={(e) => setFormData({ ...formData, totalKg: e.target.value })}
+                    placeholder="0.000"
+                    data-testid="input-container-total-kg"
+                  />
+                </div>
+                <div>
+                  <Label>Rate per Kg</Label>
+                  <Input
+                    type="number"
+                    value={formData.ratePerKg}
+                    onChange={(e) => setFormData({ ...formData, ratePerKg: e.target.value })}
+                    placeholder="0.00"
+                    data-testid="input-container-rate"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Currency</Label>
+                  <Select value={currency} onValueChange={(val) => setCurrency(val)}>
+                    <SelectTrigger data-testid="select-container-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label>FX Rate {currency !== "USD" ? (fxRateSource === "auto" ? `(Auto${fxEffectiveDate ? ` — ${fxEffectiveDate}` : ""})` : "(Manual)") : ""}</Label>
+                    {currency !== "USD" && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground underline"
+                        onClick={() => setFxRateSource(fxRateSource === "auto" ? "manual" : "auto")}
+                        data-testid="button-toggle-fx-source"
+                      >
+                        {fxRateSource === "auto" ? "Switch to Manual" : "Switch to Auto"}
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    type="number"
+                    value={fxRate}
+                    onChange={(e) => setFxRate(e.target.value)}
+                    disabled={currency === "USD" || fxRateSource === "auto"}
+                    readOnly={currency !== "USD" && fxRateSource === "auto"}
+                    placeholder="1"
+                    data-testid="input-container-fx-rate"
+                  />
+                </div>
+              </div>
+
+              {currency !== "USD" && formData.ratePerKg && fxRate && (
+                <div className="text-sm text-muted-foreground">
+                  Computed USD Rate/Kg: {formatNumber(parseFloat(formData.ratePerKg) * parseFloat(fxRate))} USD
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Commission Amount</Label>
+                  <Input
+                    type="number"
+                    value={formData.commissionAmount}
+                    onChange={(e) => setFormData({ ...formData, commissionAmount: e.target.value })}
+                    placeholder="0.00"
+                    data-testid="input-container-commission"
+                  />
+                </div>
+                <div>
+                  <Label>Commission Currency</Label>
+                  <Select
+                    value={formData.commissionCurrencyCode}
+                    onValueChange={(val) => setFormData({ ...formData, commissionCurrencyCode: val })}
+                  >
+                    <SelectTrigger data-testid="select-commission-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label>Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                 <Input
-                  type="date"
-                  value={formData.arrivalDate}
-                  onChange={(e) => setFormData({ ...formData, arrivalDate: e.target.value })}
-                  data-testid="input-container-arrival"
+                  value={formData.commissionNotes}
+                  onChange={(e) => setFormData({ ...formData, commissionNotes: e.target.value })}
+                  placeholder="e.g. Commission for container facilitation"
+                  data-testid="input-commission-notes"
                 />
               </div>
+
               <div>
-                <Label>Status</Label>
-                <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
-                  <SelectTrigger data-testid="select-container-status">
-                    <SelectValue />
+                <Label>Commission Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Select
+                  value={formData.commissionAccountId || "__none__"}
+                  onValueChange={(val) => setFormData({ ...formData, commissionAccountId: val === "__none__" ? "" : val })}
+                >
+                  <SelectTrigger data-testid="select-commission-account">
+                    <SelectValue placeholder="Select account..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PENDING">Pending</SelectItem>
-                    <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
-                    <SelectItem value="AVAILABLE">Available</SelectItem>
-                    <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {ledgerAccounts.map((acc: any) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div>
-              <Label>Notes</Label>
-              <Input
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes"
-                data-testid="input-container-notes"
-              />
             </div>
           </div>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -737,7 +862,12 @@ export default function FactoryContainers() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!formData.containerNumber || createMutation.isPending || updateMutation.isPending}
+              disabled={
+                !formData.containerNumber ||
+                !!brokerMismatch ||
+                createMutation.isPending ||
+                updateMutation.isPending
+              }
               data-testid="button-save-container"
             >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingContainer ? "Update" : "Create"}
