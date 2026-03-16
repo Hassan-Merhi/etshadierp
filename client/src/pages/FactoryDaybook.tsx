@@ -655,11 +655,17 @@ export default function FactoryDaybook() {
                               </TableCell>
                             )}
                           </TableRow>
-                          {isExpanded && expandedEntries.map((entry) => (
+                          {isExpanded && expandedEntries.map((entry) => {
+                            const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                            const isRowClickable = isBaleTransfer;
+                            const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                            const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+                            return (
                             <TableRow 
                               key={entry.id} 
                               data-testid={`row-expanded-${entry.id}`}
-                              className="bg-muted/30"
+                              className={`bg-muted/30 ${isRowClickable ? "cursor-pointer" : ""}`}
+                              onClick={isRowClickable ? (e) => handleEntryClick(entry, e) : undefined}
                             >
                               <TableCell className="pl-8 font-mono text-sm whitespace-nowrap">
                                 {formatDisplayDate(entry.txDate + "T00:00:00")}
@@ -682,8 +688,44 @@ export default function FactoryDaybook() {
                                     : "-"}
                                 </TableCell>
                               )}
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    title="View details"
+                                    onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                    data-testid={`button-view-${entry.id}`}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                  {canEdit && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      title="Edit"
+                                      onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+                                      data-testid={`button-edit-source-${entry.id}`}
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  {isAdminOrOwner && isVoucherBacked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      title="Void voucher"
+                                      onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+                                      data-testid={`button-void-voucher-${entry.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       );
                     })}
