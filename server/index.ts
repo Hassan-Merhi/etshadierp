@@ -404,6 +404,22 @@ let migrationsDone = false;
       updated_at timestamp DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS inv_neg_layers_loc_item ON inventory_negative_layers (location_id, stock_item_id)`,
+    // Mix batch daily consumption (Mar 2026)
+    `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS operator_user text`,
+    `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS batch_date date`,
+    `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS carry_forward_from_id integer`,
+    `CREATE TABLE IF NOT EXISTS factory_daily_usages (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      mix_batch_id integer NOT NULL,
+      kg_used numeric NOT NULL,
+      operator_user text,
+      used_date date NOT NULL DEFAULT CURRENT_DATE,
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_daily_usages_batch_idx ON factory_daily_usages (mix_batch_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_daily_usages_company_date_idx ON factory_daily_usages (company_id, used_date)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
