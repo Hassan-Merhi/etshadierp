@@ -2062,6 +2062,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .orderBy(desc(factorySupplierFxTransfers.date));
 
+      // Phase 3: Enrich FX transfers with counterparty supplier names for bilateral visibility
+      const fxSupplierIds = [...new Set((fxTransfers as any[]).flatMap((t: any) => [t.fromSupplierId, t.toSupplierId]).filter(Boolean))];
+      const fxSupplierNames: Record<number, string> = {};
+      if (fxSupplierIds.length > 0) {
+        const fxSups = await db.select({ id: factorySuppliers.id, name: factorySuppliers.name })
+          .from(factorySuppliers).where(inArray(factorySuppliers.id, fxSupplierIds));
+        for (const s of fxSups) fxSupplierNames[s.id] = s.name;
+      }
+      const enrichedFxTransfers = (fxTransfers as any[]).map((t: any) => ({
+        ...t,
+        fromSupplierName: fxSupplierNames[t.fromSupplierId] || "",
+        toSupplierName: fxSupplierNames[t.toSupplierId] || "",
+      }));
+
       // Build per-currency payment totals (using original currency amounts, not USD)
       const paidByCurrency: Record<string, number> = {};
       // Phase 2: Track commission reductions from FX settlements (source = commission or both)
@@ -2072,7 +2086,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
       }
       // FX transfers out of this supplier reduce its original currency balance
-      for (const t of (fxTransfers as any[])) {
+      for (const t of enrichedFxTransfers) {
         if (t.fromSupplierId === supplierId) {
           const cc = t.fromCurrencyCode || "USD";
           paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
@@ -2286,16 +2300,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amountIsNeg: true,
           notes: p.notes,
         })),
-        ...(fxTransfers as any[]).map((t: any) => {
+        ...enrichedFxTransfers.map((t: any) => {
           const isOut = t.fromSupplierId === supplierId;
           const cc = isOut ? (t.fromCurrencyCode || "USD") : "USD";
           const amt = isOut ? t.fromAmount : t.toAmountUsd;
+          const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
           return {
             key: `fx-${t.id}`,
             date: t.date,
             type: "fx",
-            ref: null,
-            detail: isOut ? `FX → USD (${t.sourceType || "supplier"})` : "FX received",
+            ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
+            detail: isOut ? `${t.fromCurrencyCode} ${parseFloat(t.fromAmount || "0").toFixed(2)} → $${parseFloat(t.toAmountUsd || "0").toFixed(2)}${t.sourceType ? ` · ${t.sourceType}` : ""}` : `+$${parseFloat(t.toAmountUsd || "0").toFixed(2)} received`,
             amount: fmtAmt(amt, cc, isOut),
             amountIsNeg: isOut,
             notes: t.notes,
@@ -2324,7 +2339,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyGroups,
         obCommissions,
         payments,
-        fxTransfers,
+        fxTransfers: enrichedFxTransfers,
         linkedSupplierGroups,
         ledger,
         summary: {
@@ -4564,7 +4579,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      const { supplierId: reqSupplierId, supplierName, receivedKg, costPerKg, currencyCode, fxRateToUsd, notes } = req.body;
+      const { supplierId: reqSupplierId, supplierName, receivedKg, costPerKg, currencyCode, fxRateToUsd, notes,
+              commissionAmount, commissionCurrencyCode, commissionPersonName, commissionNotes, commissionFxRateToUsd } = req.body;
 
       if (receivedKg !== undefined && parseFloat(receivedKg) <= 0) {
         return res.status(400).json({ message: "Received KG must be positive" });
@@ -4628,6 +4644,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
 
         if (notes !== undefined) containerUpdates.notes = notes;
+
+        // Phase 4: commission field edits on OB raw-stock
+        if (commissionAmount !== undefined) rawUpdates.commissionAmount = String(parseFloat(commissionAmount));
+        if (commissionCurrencyCode !== undefined) rawUpdates.commissionCurrencyCode = commissionCurrencyCode;
+        if (commissionPersonName !== undefined) rawUpdates.commissionPersonName = commissionPersonName;
+        if (commissionNotes !== undefined) rawUpdates.commissionNotes = commissionNotes;
+        if (commissionFxRateToUsd !== undefined) rawUpdates.commissionFxRateToUsd = String(parseFloat(commissionFxRateToUsd));
+        if (commissionAmount !== undefined || commissionFxRateToUsd !== undefined || commissionCurrencyCode !== undefined) {
+          const [cur] = await tx.select({ commissionCurrencyCode: factoryRawStock.commissionCurrencyCode, commissionFxRateToUsd: factoryRawStock.commissionFxRateToUsd })
+            .from(factoryRawStock).where(eq(factoryRawStock.id, id)).limit(1);
+          const resolvedCommCurr = commissionCurrencyCode ?? cur?.commissionCurrencyCode ?? "USD";
+          const resolvedCommFx = parseFloat(commissionFxRateToUsd ?? cur?.commissionFxRateToUsd ?? "1");
+          const resolvedCommAmt = parseFloat(commissionAmount ?? "0");
+          rawUpdates.commissionAmountUsd = resolvedCommCurr === "USD" ? String(resolvedCommAmt) : String(resolvedCommAmt * resolvedCommFx);
+        }
 
         if (reqSupplierId !== undefined) {
           const [sup] = await tx

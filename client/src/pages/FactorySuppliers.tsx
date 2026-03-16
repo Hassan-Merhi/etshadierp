@@ -102,6 +102,8 @@ interface FxTransfer {
   id: number;
   fromSupplierId: number;
   toSupplierId: number;
+  fromSupplierName?: string;
+  toSupplierName?: string;
   date: string;
   fromCurrencyCode: string;
   fromAmount: string;
@@ -346,6 +348,28 @@ export default function FactorySuppliers() {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
       }
       toast({ title: "OB commission deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [editObComm, setEditObComm] = useState<null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string }>(null);
+
+  const updateObCommissionMutation = useMutation({
+    mutationFn: async (data: { rawStockId: number; commissionAmount: string; commissionCurrencyCode: string; commissionPersonName: string; commissionNotes: string }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/raw-stock/opening-balance/${data.rawStockId}`, {
+        commissionAmount: data.commissionAmount,
+        commissionCurrencyCode: data.commissionCurrencyCode,
+        commissionPersonName: data.commissionPersonName,
+        commissionNotes: data.commissionNotes,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to update"); }
+    },
+    onSuccess: () => {
+      if (statementSupplierId) queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+      setEditObComm(null);
+      toast({ title: "Commission updated" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1120,7 +1144,7 @@ export default function FactorySuppliers() {
                   const allRows: Array<{
                     key: string; date: string | null; type: RowType;
                     ref: string; detail: string; amount: string; amountIsNeg: boolean;
-                    status?: string; notes?: string | null; onDelete?: () => void;
+                    status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
                   }> = [
                     ...statementData.statement.map(e => ({
                       key: `c-${e.id}`,
@@ -1146,11 +1170,12 @@ export default function FactorySuppliers() {
                     })),
                     ...(statementData.fxTransfers || []).map(t => {
                       const isOut = t.fromSupplierId === statementSupplierId;
+                      const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
                       return {
                         key: `f-${t.id}`,
                         date: t.date,
                         type: "fx" as RowType,
-                        ref: isOut ? `FX → Broker` : `FX ← Linked`,
+                        ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
                         detail: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)} → $${formatNum(t.toAmountUsd)}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}` : `+$${formatNum(t.toAmountUsd)} received`,
                         amount: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)}` : `$${formatNum(t.toAmountUsd)}`,
                         amountIsNeg: isOut,
@@ -1166,6 +1191,7 @@ export default function FactorySuppliers() {
                       amount: `${oc.currencyCode !== "USD" ? `${oc.currencyCode} ${formatNum(oc.amount)}` : `$${formatNum(oc.amount)}`}`,
                       amountIsNeg: true,
                       notes: null,
+                      onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
                       onDelete: () => { if (confirm("Delete this opening balance commission entry? This cannot be undone.")) deleteObCommissionMutation.mutate(oc.rawStockId); },
                     })),
                   ].sort((a, b) => {
@@ -1217,11 +1243,18 @@ export default function FactorySuppliers() {
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
-                                {row.onDelete && (
-                                  <Button variant="ghost" size="icon" onClick={row.onDelete}>
-                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                )}
+                                <div className="flex items-center gap-1">
+                                  {row.onEdit && (
+                                    <Button variant="ghost" size="icon" onClick={row.onEdit}>
+                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  )}
+                                  {row.onDelete && (
+                                    <Button variant="ghost" size="icon" onClick={row.onDelete}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -2023,6 +2056,56 @@ export default function FactorySuppliers() {
               data-testid="button-save-supplier"
             >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSupplier ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* OB Commission Edit Dialog */}
+      <Dialog open={!!editObComm} onOpenChange={(open) => { if (!open) setEditObComm(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit OB Commission
+            </DialogTitle>
+            <DialogDescription>Update the opening balance commission entry.</DialogDescription>
+          </DialogHeader>
+          {editObComm && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>Amount</Label>
+                  <Input type="number" step="0.01" value={editObComm.amount} onChange={e => setEditObComm(p => p ? { ...p, amount: e.target.value } : null)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Input value={editObComm.currencyCode} onChange={e => setEditObComm(p => p ? { ...p, currencyCode: e.target.value.toUpperCase() } : null)} maxLength={10} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Person / Broker</Label>
+                <Input value={editObComm.personName} onChange={e => setEditObComm(p => p ? { ...p, personName: e.target.value } : null)} placeholder="Name (optional)" />
+              </div>
+              <div className="space-y-1">
+                <Label>Notes</Label>
+                <Input value={editObComm.notes} onChange={e => setEditObComm(p => p ? { ...p, notes: e.target.value } : null)} placeholder="Notes (optional)" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditObComm(null)}>Cancel</Button>
+            <Button
+              disabled={updateObCommissionMutation.isPending || !editObComm?.amount}
+              onClick={() => editObComm && updateObCommissionMutation.mutate({
+                rawStockId: editObComm.rawStockId,
+                commissionAmount: editObComm.amount,
+                commissionCurrencyCode: editObComm.currencyCode,
+                commissionPersonName: editObComm.personName,
+                commissionNotes: editObComm.notes,
+              })}
+            >
+              {updateObCommissionMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
