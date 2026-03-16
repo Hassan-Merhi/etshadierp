@@ -44,6 +44,7 @@ interface CustomerOrder {
   otherChargesTotal: string;
   grandTotal: string;
   totalQtyBales: number;
+  totalWeightKg: string;
   customerName: string;
 }
 
@@ -188,6 +189,7 @@ export default function FactoryInvoices() {
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total Bales</TableHead>
+                <TableHead className="text-right">Total Weight (kg)</TableHead>
                 <TableHead className="text-right">Grand Total</TableHead>
                 <TableHead className="w-[120px]">Actions</TableHead>
               </TableRow>
@@ -195,7 +197,7 @@ export default function FactoryInvoices() {
             <TableBody>
               {orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     No invoices found
                   </TableCell>
                 </TableRow>
@@ -221,6 +223,11 @@ export default function FactoryInvoices() {
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
                       {order.totalQtyBales ?? "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono" data-testid={`text-total-weight-${order.id}`}>
+                      {parseFloat(order.totalWeightKg || "0") > 0
+                        ? parseFloat(order.totalWeightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                        : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
                       {parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}

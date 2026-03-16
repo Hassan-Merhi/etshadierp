@@ -173,6 +173,7 @@ export default function FactoryInvoiceDetail() {
   const totalCharges = parseFloat(order.freightAmount || "0") + parseFloat(order.otherChargesTotal || "0");
   const grandTotal = parseFloat(order.grandTotal || "0");
   const totalBalesQty = sortedLines.reduce((sum, line) => sum + (line.qty || 0), 0);
+  const totalWeightKg = sortedLines.reduce((sum, line) => sum + (Number(line.totalWeight) || 0), 0);
 
   const isPendingVerification = order.status === "PENDING_VERIFICATION";
   const isVerifiedStatus = order.status === "VERIFIED";
@@ -388,6 +389,12 @@ export default function FactoryInvoiceDetail() {
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>Total Bales Qty</span>
             <span data-testid="text-total-bales-qty">{totalBalesQty}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>Total Weight</span>
+            <span className="font-mono" data-testid="text-total-weight-kg">
+              {totalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
+            </span>
           </div>
         </div>
       </Card>
