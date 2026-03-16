@@ -200,6 +200,7 @@ export default function FactorySuppliers() {
     toSupplierId: 0,
     selectedCurrency: "",
     amount: "",
+    availableBalance: "",  // for validation only — not sent to backend
     fxRateToUsd: "",
     date: today,
     notes: "",
@@ -211,10 +212,12 @@ export default function FactorySuppliers() {
       toSupplierId,
       selectedCurrency: currencyCode,
       amount: netPayable,
+      availableBalance: netPayable,
       fxRateToUsd: "",
       date: today,
       notes: "",
     });
+    setFxSourceType("supplier");
     setFxConversionOpen(true);
   };
 
@@ -712,21 +715,27 @@ export default function FactorySuppliers() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Balance</div>
-                        {child.currencyBalances && child.currencyBalances.length > 0 && child.currencyBalances[0].currencyCode !== "USD" ? (
-                          <>
-                            <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
-                              {child.currencyBalances[0].currencyCode} {formatNum(child.currencyBalances[0].balance.toFixed(2))}
-                            </div>
+                      <div className="text-right min-w-[90px]">
+                        <div className="text-xs text-muted-foreground mb-0.5">Balance</div>
+                        {child.currencyBalances && child.currencyBalances.some(b => b.currencyCode !== "USD" && b.balance > 0) ? (
+                          <div className="space-y-0.5" data-testid={`text-child-balance-${child.id}`}>
+                            {child.currencyBalances.filter(b => b.balance > 0).map(b => (
+                              <div key={b.currencyCode} className="text-sm font-bold tabular-nums">
+                                {b.currencyCode !== "USD" ? (
+                                  <span className="text-amber-600 dark:text-amber-400">{b.currencyCode} {formatNum(b.balance.toFixed(2))}</span>
+                                ) : (
+                                  <span>${formatNum(b.balance.toFixed(2))}</span>
+                                )}
+                              </div>
+                            ))}
                             <div className="text-xs text-muted-foreground">~${formatNum(child.totalValue)} USD</div>
-                          </>
+                          </div>
                         ) : (
                           <>
                             <div className="text-base font-bold tabular-nums" data-testid={`text-child-balance-${child.id}`}>
-                              ${formatNum(child.totalValue)}
+                              {parseFloat(child.totalValue || "0") > 0 ? `$${formatNum(child.totalValue)}` : <span className="text-muted-foreground text-sm">Settled</span>}
                             </div>
-                            <div className="text-xs text-muted-foreground">USD</div>
+                            {parseFloat(child.totalValue || "0") > 0 && <div className="text-xs text-muted-foreground">USD</div>}
                           </>
                         )}
                       </div>
@@ -1324,7 +1333,17 @@ export default function FactorySuppliers() {
                   onChange={(e) => setFxConversionForm(prev => ({ ...prev, amount: e.target.value }))}
                   data-testid="input-fx-amount"
                 />
-                <p className="text-xs text-muted-foreground mt-1">You can convert a partial amount</p>
+                {(() => {
+                  const avail = parseFloat(fxConversionForm.availableBalance || "0");
+                  const entered = parseFloat(fxConversionForm.amount || "0");
+                  const exceeds = entered > avail + 0.005;
+                  return (
+                    <p className={`text-xs mt-1 ${exceeds ? "text-destructive" : "text-muted-foreground"}`}>
+                      Available: {avail.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}
+                      {exceeds && " — exceeds available balance"}
+                    </p>
+                  );
+                })()}
               </div>
 
               <div>
@@ -1368,17 +1387,29 @@ export default function FactorySuppliers() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
               <Button
-                onClick={() => fxConversionMutation.mutate(fxConversionForm)}
+                onClick={() => {
+                  const sourceLabel: Record<FxSourceType, string> = {
+                    supplier: "Supplier Balance",
+                    commission: "Commission",
+                    both: "Both",
+                  };
+                  const prefix = fxSourceType !== "supplier" ? `[Source: ${sourceLabel[fxSourceType]}] ` : "";
+                  fxConversionMutation.mutate({
+                    ...fxConversionForm,
+                    notes: (prefix + (fxConversionForm.notes || "")).trim() || null as any,
+                  });
+                }}
                 disabled={
                   !fxConversionForm.amount ||
                   !fxConversionForm.fxRateToUsd ||
                   parseFloat(fxConversionForm.amount) <= 0 ||
                   parseFloat(fxConversionForm.fxRateToUsd) <= 0 ||
+                  (!!fxConversionForm.availableBalance && parseFloat(fxConversionForm.amount) > parseFloat(fxConversionForm.availableBalance) + 0.005) ||
                   fxConversionMutation.isPending
                 }
                 data-testid="button-submit-fx-conversion"
               >
-                {fxConversionMutation.isPending ? "Recording..." : "Record Transfer"}
+                {fxConversionMutation.isPending ? "Recording..." : "Record Settlement"}
               </Button>
             </DialogFooter>
           </DialogContent>
