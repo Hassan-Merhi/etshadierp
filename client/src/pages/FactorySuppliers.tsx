@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +139,8 @@ export default function FactorySuppliers() {
   const [showInactive, setShowInactive] = useState(false);
   const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
   const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);
+  type SupplierFilter = "all" | "brokers" | "standalone" | "with-balance" | "zero-balance" | "has-foreign" | "has-recent";
+  const [activeFilter, setActiveFilter] = useState<SupplierFilter>("all");
   const [formData, setFormData] = useState({
     name: "",
     contactPerson: "",
@@ -148,6 +150,8 @@ export default function FactorySuppliers() {
     notes: "",
     parentId: null as number | null,
   });
+  // "role" in create form: "broker" | "standalone" | "linked"
+  const [formRole, setFormRole] = useState<"broker" | "standalone" | "linked">("standalone");
   const { toast } = useToast();
 
   const { data: suppliers, isLoading } = useQuery<SupplierWithBalance[]>({
@@ -185,8 +189,10 @@ export default function FactorySuppliers() {
     queryKey: ["/api/ledger-accounts"],
   });
 
-  // FX Transfer state (internal transfer: sub-supplier foreign currency → parent USD bucket)
+  // FX Transfer state (internal settlement: linked supplier foreign currency → broker USD bucket)
   const [fxConversionOpen, setFxConversionOpen] = useState(false);
+  type FxSourceType = "supplier" | "commission" | "both";
+  const [fxSourceType, setFxSourceType] = useState<FxSourceType>("supplier");
   const [obEditSupplier, setObEditSupplier] = useState<{ id: number; name: string; currentBalance: string } | null>(null);
   const [obEditValue, setObEditValue] = useState("");
   const [fxConversionForm, setFxConversionForm] = useState({
@@ -417,10 +423,14 @@ export default function FactorySuppliers() {
   const resetForm = () => {
     setFormData({ name: "", contactPerson: "", phone: "", email: "", address: "", notes: "", parentId: null });
     setCreateSubAccountParentId(null);
+    setFormRole("standalone");
   };
 
   const openEdit = (s: FactorySupplier) => {
     setEditingSupplier(s);
+    const pid = (s as any).parentId ?? null;
+    const hasChildren = allSuppliers.some((c: any) => c.parentId === s.id);
+    setFormRole(pid ? "linked" : hasChildren ? "broker" : "standalone");
     setFormData({
       name: s.name,
       contactPerson: s.contactPerson || "",
@@ -428,7 +438,7 @@ export default function FactorySuppliers() {
       email: s.email || "",
       address: s.address || "",
       notes: s.notes || "",
-      parentId: (s as any).parentId ?? null,
+      parentId: pid,
     });
   };
 
@@ -436,6 +446,7 @@ export default function FactorySuppliers() {
     resetForm();
     setFormData(prev => ({ ...prev, parentId: parentSupplier.id }));
     setCreateSubAccountParentId(parentSupplier.id);
+    setFormRole("linked");
     setCreateOpen(true);
   };
 
@@ -492,8 +503,7 @@ export default function FactorySuppliers() {
   const inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
   // Top-level: no parentId
   const topLevelSuppliers = allSuppliers.filter((s) => !(s as any).parentId);
-  const displayedTopLevel = showInactive ? topLevelSuppliers : topLevelSuppliers.filter((s) => s.isActive);
-  // Sub-accounts by parentId
+  // Linked suppliers (have parentId) grouped by broker
   const subAccountsByParent: Record<number, SupplierWithBalance[]> = {};
   for (const s of allSuppliers) {
     const pid = (s as any).parentId;
@@ -503,7 +513,31 @@ export default function FactorySuppliers() {
     }
   }
 
-  // Auto-expand all parent suppliers when data loads
+  // Determine broker vs standalone for each top-level
+  const isBroker = (s: SupplierWithBalance) => !!(subAccountsByParent[s.id]?.length);
+  const hasRecentActivity = (s: SupplierWithBalance) => {
+    if (!s.lastContainerDate) return false;
+    const days = (Date.now() - new Date(s.lastContainerDate).getTime()) / (1000 * 86400);
+    return days <= 60;
+  };
+  const hasForeignCurrency = (s: SupplierWithBalance) =>
+    !!(s.currencyBalances?.some((b) => b.currencyCode !== "USD" && b.balance > 0));
+
+  // Apply filter
+  const activeTopLevelBase = topLevelSuppliers.filter((s) => showInactive ? true : s.isActive);
+  const displayedTopLevel = activeTopLevelBase.filter((s) => {
+    switch (activeFilter) {
+      case "brokers": return isBroker(s);
+      case "standalone": return !isBroker(s);
+      case "with-balance": return parseFloat(s.totalValue || "0") > 0;
+      case "zero-balance": return parseFloat(s.totalValue || "0") <= 0;
+      case "has-foreign": return hasForeignCurrency(s);
+      case "has-recent": return hasRecentActivity(s);
+      default: return true;
+    }
+  });
+
+  // Auto-expand all broker (parent) suppliers when data loads
   useEffect(() => {
     if (allSuppliers.length > 0) {
       const parentIds = new Set<number>();
@@ -522,13 +556,17 @@ export default function FactorySuppliers() {
   }, [suppliers]);
 
   const activeTopLevel = topLevelSuppliers.filter((s) => s.isActive);
+  const brokerCount = activeTopLevel.filter(isBroker).length;
+  const standaloneCount = activeTopLevel.filter((s) => !isBroker(s)).length;
   const totalBalance = activeTopLevel.reduce((sum, s) => sum + parseFloat(s.totalValue || "0"), 0);
   const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
 
-  // ── Parent Supplier Overview ──────────────────────────────────────────────
+  // ── Broker Overview ──────────────────────────────────────────────────────
   if (parentViewSupplierId && !statementSupplierId) {
     const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
     const children = subAccountsByParent[parentViewSupplierId] || [];
+    const foreignCurrencies = children.flatMap(c => (c.currencyBalances || []).filter(b => b.currencyCode !== "USD" && b.balance > 0));
+    const hasFX = foreignCurrencies.length > 0;
 
     const openChildStatement = (childId: number) => {
       setStatementReturnToParent(true);
@@ -547,11 +585,17 @@ export default function FactorySuppliers() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-parent-supplier-name">
-              {parentSup?.name || "Loading..."}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-parent-supplier-name">
+                {parentSup?.name || "Loading..."}
+              </h1>
+              <Badge variant="secondary" className="text-xs">
+                <Building2 className="h-3 w-3 mr-1" />
+                Broker
+              </Badge>
+            </div>
             <p className="text-muted-foreground text-sm">
-              {children.length} sub-account{children.length !== 1 ? "s" : ""}
+              {children.length} linked supplier{children.length !== 1 ? "s" : ""}
             </p>
           </div>
           {parentSup && (
@@ -562,17 +606,17 @@ export default function FactorySuppliers() {
               data-testid="button-parent-own-statement"
             >
               <FileText className="h-3.5 w-3.5 mr-1.5" />
-              Own Statement
+              Broker Statement
             </Button>
           )}
         </div>
 
-        {/* Parent totals card */}
+        {/* Broker summary cards */}
         {parentSup && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card>
               <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Total Balance (approx. USD)</div>
+                <div className="text-xs text-muted-foreground">Total Owed (approx. USD)</div>
                 <div className="text-2xl font-bold mt-1 tabular-nums" data-testid="text-parent-total-balance">
                   ~${formatNum(parentSup.totalValue)}
                 </div>
@@ -588,28 +632,43 @@ export default function FactorySuppliers() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Sub-accounts</div>
+                <div className="text-xs text-muted-foreground">Linked Suppliers</div>
                 <div className="text-2xl font-bold mt-1">
                   {children.length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Foreign Currency Pending</div>
+                <div className="text-2xl font-bold mt-1">
+                  {hasFX ? (
+                    <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Globe className="h-5 w-5" />
+                      {[...new Set(foreignCurrencies.map(b => b.currencyCode))].join(", ")}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-base">None</span>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Sub-accounts list */}
+        {/* Linked Suppliers list */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <GitBranch className="h-4 w-4" />
-              Sub-accounts &amp; Commission Accounts
+              <Link2 className="h-4 w-4" />
+              Linked Suppliers
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {children.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
                 <Users className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                <p>No sub-accounts yet</p>
+                <p>No linked suppliers yet</p>
               </div>
             ) : (
               <div className="divide-y">
@@ -721,10 +780,23 @@ export default function FactorySuppliers() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-statement-supplier-name">
-              {statementData?.supplier?.name || allSuppliers.find(s => s.id === statementSupplierId)?.name || "Supplier Statement"}
-            </h1>
-            <p className="text-muted-foreground text-sm">Full Supplier Statement</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-statement-supplier-name">
+                {statementData?.supplier?.name || allSuppliers.find(s => s.id === statementSupplierId)?.name || "Supplier Statement"}
+              </h1>
+              {statementData?.supplier?.parentId ? (
+                <Badge variant="outline" className="text-xs">
+                  <Link2 className="h-3 w-3 mr-1" />
+                  Linked Supplier
+                </Badge>
+              ) : statementData?.supplier && !statementData.supplier.parentId && subAccountsByParent[statementData.supplier.id]?.length ? (
+                <Badge variant="secondary" className="text-xs">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  Broker
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-muted-foreground text-sm">Settlement Statement</p>
           </div>
         </div>
 
@@ -839,8 +911,8 @@ export default function FactorySuppliers() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
                     <span className="flex items-center gap-2">
-                      <ArrowRightLeft className="h-4 w-4" />
-                      Balance by Currency
+                      <Globe className="h-4 w-4" />
+                      Currency Pools
                     </span>
                     {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0) && (
                       <Button
@@ -849,13 +921,14 @@ export default function FactorySuppliers() {
                         onClick={() => {
                           const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0);
                           if (firstNonUsd && statementSupplierId && statementData.supplier.parentId) {
+                            setFxSourceType("supplier");
                             openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, firstNonUsd.netPayable);
                           }
                         }}
                         data-testid="button-fx-convert"
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
-                        Transfer to Parent (USD)
+                        Settle FX to Broker
                       </Button>
                     )}
                   </CardTitle>
@@ -896,10 +969,10 @@ export default function FactorySuppliers() {
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
-                                  onClick={() => statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable)}
+                                  onClick={() => { setFxSourceType("supplier"); statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable); }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  Transfer
+                                  Settle
                                 </Button>
                               )}
                             </TableCell>
@@ -914,7 +987,10 @@ export default function FactorySuppliers() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Container History</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Container Ledger
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {statementData.statement.length > 0 ? (
@@ -1123,7 +1199,7 @@ export default function FactorySuppliers() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <ArrowRightLeft className="h-4 w-4" />
-                    FX Transfers
+                    FX Settlements
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1147,8 +1223,8 @@ export default function FactorySuppliers() {
                               <TableCell className="text-sm whitespace-nowrap">{formatDate(t.date)}</TableCell>
                               <TableCell className="text-sm">
                                 {isOutgoing
-                                  ? <Badge variant="outline" className="text-xs">Out → Parent</Badge>
-                                  : <Badge variant="secondary" className="text-xs">In ← Sub</Badge>
+                                  ? <Badge variant="outline" className="text-xs">Out → Broker</Badge>
+                                  : <Badge variant="secondary" className="text-xs">In ← Linked</Badge>
                                 }
                               </TableCell>
                               <TableCell className="text-right text-sm tabular-nums">
@@ -1192,21 +1268,49 @@ export default function FactorySuppliers() {
           </>
         ) : null}
 
-        {/* FX Transfer Dialog — internal transfer: sub-supplier foreign currency → parent USD bucket */}
+        {/* FX Settlement Dialog — internal settlement: linked supplier foreign currency → broker USD bucket */}
         <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4" />
-                Transfer to Parent (USD)
+                FX Settlement to Broker (USD)
               </DialogTitle>
               <DialogDescription>
-                Internal FX transfer: moves this sub-supplier's foreign currency balance into the parent supplier's USD bucket. This is NOT a voucher payment.
+                Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Source type selector */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Settlement Source</Label>
+                <div className="flex gap-2">
+                  {(["supplier", "commission", "both"] as const).map(t => {
+                    const labels: Record<string, string> = { supplier: "Supplier Balance", commission: "Commission", both: "Both" };
+                    return (
+                      <Button
+                        key={t}
+                        type="button"
+                        variant={fxSourceType === t ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setFxSourceType(t)}
+                        data-testid={`fx-source-${t}`}
+                      >
+                        {labels[t]}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {fxSourceType === "commission" && (
+                  <p className="text-xs text-muted-foreground mt-1">Settling the broker's commission from this supplier's foreign currency earnings.</p>
+                )}
+                {fxSourceType === "both" && (
+                  <p className="text-xs text-muted-foreground mt-1">Settling both the outstanding balance and commission in one FX operation.</p>
+                )}
+              </div>
               <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
-                <span className="text-sm font-medium">{fxConversionForm.selectedCurrency} balance being converted</span>
+                <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">{fxConversionForm.selectedCurrency} balance being settled</span>
               </div>
 
               <div>
@@ -1297,13 +1401,15 @@ export default function FactorySuppliers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Factory Suppliers</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Brokers &amp; Suppliers</h1>
           <p className="text-muted-foreground mt-1">
-            {activeSuppliers.length} active supplier{activeSuppliers.length !== 1 ? "s" : ""}
-            {inactiveSuppliers.length > 0 && ` / ${inactiveSuppliers.length} inactive`}
+            {brokerCount > 0 && `${brokerCount} broker${brokerCount !== 1 ? "s" : ""}`}
+            {brokerCount > 0 && standaloneCount > 0 && " · "}
+            {standaloneCount > 0 && `${standaloneCount} standalone`}
+            {inactiveSuppliers.length > 0 && ` · ${inactiveSuppliers.length} inactive`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {inactiveSuppliers.length > 0 && (
             <Button
               variant="outline"
@@ -1324,12 +1430,46 @@ export default function FactorySuppliers() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {/* Filter bar */}
+      <div className="flex gap-2 flex-wrap">
+        {(["all", "brokers", "standalone", "with-balance", "zero-balance", "has-foreign", "has-recent"] as const).map(f => {
+          const labels: Record<string, string> = {
+            all: "All",
+            brokers: "Brokers",
+            standalone: "Standalone",
+            "with-balance": "With Balance",
+            "zero-balance": "Zero Balance",
+            "has-foreign": "Has Foreign Currency",
+            "has-recent": "Recent Activity",
+          };
+          return (
+            <Button
+              key={f}
+              variant={activeFilter === f ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveFilter(f)}
+              data-testid={`filter-${f}`}
+            >
+              {labels[f]}
+            </Button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Active Suppliers</div>
+            <div className="text-xs text-muted-foreground">Brokers</div>
+            <div className="text-2xl font-bold mt-1" data-testid="text-broker-count">
+              {brokerCount}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">Standalone Suppliers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-suppliers">
-              {activeSuppliers.length}
+              {standaloneCount}
             </div>
           </CardContent>
         </Card>
@@ -1343,7 +1483,7 @@ export default function FactorySuppliers() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Total Balance</div>
+            <div className="text-xs text-muted-foreground">Total Balance (USD)</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-balance">
               ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: totalBalance % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}
             </div>
@@ -1387,7 +1527,8 @@ export default function FactorySuppliers() {
                             {sup.name}
                           </button>
                           {!sup.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
-                          {isChild && <Badge variant="outline" className="text-xs">Sub-account</Badge>}
+                          {!isChild && isParent && <Badge variant="secondary" className="text-xs"><Building2 className="h-3 w-3 mr-1" />Broker</Badge>}
+                          {isChild && <Badge variant="outline" className="text-xs"><Link2 className="h-3 w-3 mr-1" />Linked Supplier</Badge>}
                           {sup.pendingContainers > 0 && (
                             <Badge variant="outline" className="text-xs">
                               {sup.pendingContainers} pending
@@ -1488,10 +1629,10 @@ export default function FactorySuppliers() {
                               variant="ghost"
                               size="icon"
                               onClick={(e) => { e.stopPropagation(); openCreateSubAccount(sup); }}
-                              title="Add Sub-Account"
+                              title="Add Linked Supplier"
                               data-testid={`button-add-subaccount-${sup.id}`}
                             >
-                              <GitBranch className="h-4 w-4" />
+                              <Link2 className="h-4 w-4" />
                             </Button>
                           )}
                           {sup.isActive && (
@@ -1615,11 +1756,11 @@ export default function FactorySuppliers() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={String(paymentDialogSupplier.id)}>
-                        {paymentDialogSupplier.name} (main)
+                        {paymentDialogSupplier.name} (broker)
                       </SelectItem>
                       {children.map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name} (sub-account)
+                          {c.name} (linked supplier)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1744,17 +1885,69 @@ export default function FactorySuppliers() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingSupplier ? "Edit Supplier" : createSubAccountParentId ? "Add Sub-Account" : "Add Factory Supplier"}
+              {editingSupplier ? "Edit Supplier" : formRole === "linked" ? "Add Linked Supplier" : "Add Broker / Supplier"}
             </DialogTitle>
             <DialogDescription>
               {editingSupplier
                 ? "Update supplier details"
-                : createSubAccountParentId
-                  ? `Sub-account under: ${allSuppliers.find(s => s.id === createSubAccountParentId)?.name || ""}`
-                  : "Create a new factory supplier"}
+                : formRole === "linked"
+                  ? `Linked to: ${allSuppliers.find(s => s.id === formData.parentId)?.name || ""}`
+                  : "Create a new broker or standalone supplier"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Role selector — only for new entries that aren't pre-set as linked */}
+            {!editingSupplier && !createSubAccountParentId && (
+              <div>
+                <Label>Role</Label>
+                <div className="flex gap-2 mt-1">
+                  {(["broker", "standalone"] as const).map(r => {
+                    const roleLabel: Record<string, string> = { broker: "Broker", standalone: "Standalone Supplier" };
+                    const roleIcon = r === "broker"
+                      ? <Building2 className="h-3.5 w-3.5 mr-1" />
+                      : <Globe className="h-3.5 w-3.5 mr-1" />;
+                    return (
+                      <Button
+                        key={r}
+                        type="button"
+                        variant={formRole === r ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setFormRole(r);
+                          setFormData(prev => ({ ...prev, parentId: null }));
+                        }}
+                        data-testid={`role-btn-${r}`}
+                      >
+                        {roleIcon}
+                        {roleLabel[r]}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {formRole === "broker" && (
+                  <p className="text-xs text-muted-foreground mt-1.5">A Broker groups linked suppliers; payments can be made at the broker or supplier level.</p>
+                )}
+              </div>
+            )}
+            {/* Broker selector — if role = linked and no parent pre-set */}
+            {(formRole === "linked" && !createSubAccountParentId && !editingSupplier) && (
+              <div>
+                <Label>Parent Broker *</Label>
+                <Select
+                  value={formData.parentId ? String(formData.parentId) : ""}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, parentId: parseInt(v) }))}
+                >
+                  <SelectTrigger data-testid="select-parent-broker">
+                    <SelectValue placeholder="Select broker..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {topLevelSuppliers.filter(s => s.isActive).map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Name *</Label>
               <Input
