@@ -110,6 +110,7 @@ import OptionalVouchers from "@/pages/OptionalVouchers";
 import SalesReportDetail from "@/pages/SalesReportDetail";
 import FactoryImport from "@/pages/FactoryImport";
 import FactoryBaleRelabeling from "@/pages/FactoryBaleRelabeling";
+import WipersReEntry from "@/pages/WipersReEntry";
 import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
@@ -668,6 +669,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
                     <Route path="/factory/bale-relabeling" component={FactoryBaleRelabeling} />
+                    <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
                     <Route path="/factory/users"><Redirect to="/factory/settings" /></Route>
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
                     <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />

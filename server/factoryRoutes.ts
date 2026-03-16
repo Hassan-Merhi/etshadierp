@@ -200,12 +200,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { items, erpLocationId, mixBatchId } = req.body;
+      const { items, erpLocationId, mixBatchId, entryDate } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "items array is required" });
       }
       if (!erpLocationId) {
         return res.status(400).json({ message: "Location is required" });
+      }
+
+      // Parse optional backdated entry date
+      let effectiveEntryDate: Date | null = null;
+      let effectiveDateStr: string | null = null;
+      if (entryDate && typeof entryDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
+        effectiveEntryDate = new Date(entryDate + "T00:00:00.000Z");
+        effectiveDateStr = entryDate;
       }
 
       const result = await db.transaction(async (tx: any) => {
@@ -251,6 +259,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
 
         const now = new Date();
+        const finalizedAtTs = effectiveEntryDate ?? now;
         const bales: any[] = [];
         let baleIndex = 0;
         let totalWeight = 0;
@@ -302,8 +311,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 costPerKg: String(effectiveCostPerKg),
                 totalCost: String(baleTotalCost),
                 status: "IN_STOCK",
-                finalizedAt: now,
+                finalizedAt: finalizedAtTs,
                 finalizedBy: item.finalizedBy ?? null,
+                stockEntryDate: effectiveDateStr,
               })
               .returning();
 
@@ -402,7 +412,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return { bales, totalWeight };
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = effectiveDateStr || new Date().toISOString().split('T')[0];
       // Build a meaningful description with product names and reference codes
       const productGroups = new Map<string, string[]>();
       for (const bale of result.bales) {

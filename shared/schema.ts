@@ -2598,6 +2598,7 @@ export const factoryBales = pgTable("factory_bales", {
   pressedAt: timestamp("pressed_at"),
   finalizedAt: timestamp("finalized_at"),
   finalizedBy: integer("finalized_by"),
+  stockEntryDate: date("stock_entry_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

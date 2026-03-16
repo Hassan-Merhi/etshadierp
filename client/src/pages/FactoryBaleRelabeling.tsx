@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag, FileSpreadsheet, Eye
@@ -332,8 +333,28 @@ export default function FactoryBaleRelabeling() {
     setApplyResult(null);
   };
 
+  const [, navigate] = useLocation();
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full">
+      {/* Sub-nav tabs */}
+      <div className="border-b px-6 flex items-center gap-1 pt-4 flex-shrink-0">
+        <button
+          className="px-4 py-2 text-sm font-medium rounded-t-md border-b-2 border-primary text-primary"
+          data-testid="tab-relabeling"
+        >
+          Bale Relabeling
+        </button>
+        <button
+          onClick={() => navigate("/factory/bale-relabeling/wipers-re-entry")}
+          className="px-4 py-2 text-sm font-medium rounded-t-md text-muted-foreground hover-elevate"
+          data-testid="tab-wipers-re-entry"
+        >
+          Wipers Re-Entry by Date
+        </button>
+      </div>
+
+    <div className="space-y-6 p-6 overflow-y-auto flex-1">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Bale Relabeling</h1>
@@ -785,6 +806,7 @@ export default function FactoryBaleRelabeling() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
