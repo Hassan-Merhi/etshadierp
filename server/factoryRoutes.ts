@@ -5614,6 +5614,138 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/daily-report/export", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const format = (req.query.format as string) || "excel";
+
+      const usages = await db
+        .select({
+          id: factoryDailyUsages.id,
+          mixBatchId: factoryDailyUsages.mixBatchId,
+          kgUsed: factoryDailyUsages.kgUsed,
+          operatorUser: factoryDailyUsages.operatorUser,
+          usedDate: factoryDailyUsages.usedDate,
+          notes: factoryDailyUsages.notes,
+          createdAt: factoryDailyUsages.createdAt,
+          batchCode: factoryMixBatches.batchCode,
+          batchName: factoryMixBatches.name,
+          costPerKg: factoryMixBatches.costPerKg,
+        })
+        .from(factoryDailyUsages)
+        .innerJoin(factoryMixBatches, eq(factoryDailyUsages.mixBatchId, factoryMixBatches.id))
+        .where(and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${date}`))
+        .orderBy(factoryDailyUsages.createdAt);
+
+      const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
+
+      if (format === "excel") {
+        const ExcelJS = (await import("exceljs")).default;
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet("Daily Report");
+
+        sheet.columns = [
+          { header: "Date", key: "date", width: 14 },
+          { header: "Batch Code", key: "batchCode", width: 18 },
+          { header: "Batch Name", key: "batchName", width: 28 },
+          { header: "Operator", key: "operatorUser", width: 20 },
+          { header: "KG Used", key: "kgUsed", width: 14 },
+          { header: "Cost / KG", key: "costPerKg", width: 14 },
+          { header: "Notes", key: "notes", width: 32 },
+        ];
+
+        const headerRow = sheet.getRow(1);
+        headerRow.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+        });
+
+        for (const u of usages) {
+          sheet.addRow({
+            date: u.usedDate,
+            batchCode: u.batchCode,
+            batchName: u.batchName || "",
+            operatorUser: u.operatorUser || "",
+            kgUsed: parseFloat(u.kgUsed || "0"),
+            costPerKg: parseFloat(u.costPerKg || "0"),
+            notes: u.notes || "",
+          });
+        }
+
+        const totalRow = sheet.addRow({
+          date: "",
+          batchCode: "TOTAL",
+          batchName: "",
+          operatorUser: "",
+          kgUsed: totalKgUsed,
+          costPerKg: "",
+          notes: "",
+        });
+        totalRow.eachCell((cell) => { cell.font = { bold: true }; });
+
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="raw-production-daily-report-${date}.xlsx"`);
+        await workbook.xlsx.write(res);
+        return res.end();
+      }
+
+      if (format === "pdf") {
+        const PDFDocument = (await import("pdfkit")).default;
+        const doc = new PDFDocument({ margin: 40, size: "A4" });
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="raw-production-daily-report-${date}.pdf"`);
+        doc.pipe(res);
+
+        doc.fontSize(16).font("Helvetica-Bold").text("Raw Production Daily Report", { align: "center" });
+        doc.fontSize(11).font("Helvetica").text(`Date: ${date}`, { align: "center" });
+        doc.moveDown();
+
+        const colX = [40, 140, 270, 360, 430, 490];
+        const headers = ["Batch Code", "Batch Name", "Operator", "KG Used", "Cost/KG", "Notes"];
+
+        doc.fontSize(9).font("Helvetica-Bold");
+        headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { continued: i < headers.length - 1, width: colX[i + 1] ? colX[i + 1] - colX[i] - 4 : 80 }));
+        doc.moveDown(0.3);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+        doc.moveDown(0.3);
+
+        doc.font("Helvetica").fontSize(9);
+        for (const u of usages) {
+          const y = doc.y;
+          const cols = [
+            u.batchCode,
+            u.batchName || "—",
+            u.operatorUser || "—",
+            `${parseFloat(u.kgUsed || "0").toFixed(3)} kg`,
+            `$${parseFloat(u.costPerKg || "0").toFixed(4)}`,
+            u.notes || "—",
+          ];
+          cols.forEach((c, i) => {
+            doc.text(String(c), colX[i], y, { width: colX[i + 1] ? colX[i + 1] - colX[i] - 4 : 60, lineBreak: false });
+          });
+          doc.moveDown(1);
+        }
+
+        doc.moveDown(0.5);
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+        doc.moveDown(0.3);
+        doc.font("Helvetica-Bold").fontSize(10).text(`Total KG Consumed: ${totalKgUsed.toFixed(3)} kg`, { align: "right" });
+
+        doc.end();
+        return;
+      }
+
+      return res.status(400).json({ message: "Invalid format. Use excel or pdf." });
+    } catch (error: any) {
+      console.error("Error exporting daily report:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 7. Factory Pressing (create-and-print)
   // ───────────────────────────────────────────────

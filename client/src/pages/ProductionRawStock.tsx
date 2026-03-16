@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { Button } from "@/components/ui/button";
@@ -921,6 +921,24 @@ export default function ProductionRawStock() {
                   className="w-auto"
                   data-testid="input-daily-report-date"
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/api/factory/daily-report/export?date=${dailyReportDate}&format=excel`, "_blank")}
+                  data-testid="button-export-daily-excel"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/api/factory/daily-report/export?date=${dailyReportDate}&format=pdf`, "_blank")}
+                  data-testid="button-export-daily-pdf"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
               </div>
               {dailyReportLoading ? (
                 <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
