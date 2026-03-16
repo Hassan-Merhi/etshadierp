@@ -11869,8 +11869,10 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const mixBatchIds = data.factory_mix_batches.map((b: any) => b.id);
       if (mixBatchIds.length > 0) {
         data.factory_mix_batch_sources = await db.select().from(factoryMixBatchSources).where(inArray(factoryMixBatchSources.mixBatchId, mixBatchIds));
+        data.factory_daily_usages = await db.select().from(factoryDailyUsages).where(inArray(factoryDailyUsages.mixBatchId, mixBatchIds));
       } else {
         data.factory_mix_batch_sources = [];
+        data.factory_daily_usages = [];
       }
 
       data.factory_pressing_batches = await db.select().from(factoryPressingBatches).where(byCompany(factoryPressingBatches));
@@ -12004,7 +12006,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             "factory_settings", "factory_suppliers", "factory_categories", "factory_bale_products",
             "factory_fx_rates", "factory_bale_sequences", "factory_containers", "factory_raw_stock",
             "factory_container_commissions", "factory_offload_additional_charges", "factory_duty_audit_log",
-            "factory_mix_batches", "factory_mix_batch_sources", "factory_pressing_batches",
+            "factory_daily_usages", "factory_mix_batches", "factory_mix_batch_sources", "factory_pressing_batches",
             "factory_bales", "factory_workers", "factory_payrolls", "factory_worker_documents",
             "factory_daybook_entries", "factory_daybook_entry_edits", "factory_waste_entries",
             "factory_bale_photos", "factory_alerts", "factory_daily_kpi_snapshots",
@@ -12243,7 +12245,9 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             }
 
             if (t.factory_mix_batches?.length) {
-              await insertAndMap("factory_mix_batches", factoryMixBatches, t.factory_mix_batches, {});
+              await insertAndMap("factory_mix_batches", factoryMixBatches, t.factory_mix_batches, {
+                carryForwardFromId: "factory_mix_batches",
+              });
             }
 
             if (t.factory_mix_batch_sources?.length) {
@@ -12253,6 +12257,12 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
                 supplierId: "factory_suppliers",
                 sourceBatchId: "factory_mix_batches",
               }, { hasCompanyId: false });
+            }
+
+            if (t.factory_daily_usages?.length) {
+              await insertAndMap("factory_daily_usages", factoryDailyUsages, t.factory_daily_usages, {
+                mixBatchId: "factory_mix_batches",
+              });
             }
 
             if (t.factory_pressing_batches?.length) {
