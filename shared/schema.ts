@@ -2446,6 +2446,24 @@ export const insertFactorySupplierFxTransferSchema = createInsertSchema(factoryS
 export type InsertFactorySupplierFxTransfer = z.infer<typeof insertFactorySupplierFxTransferSchema>;
 export type FactorySupplierFxTransfer = typeof factorySupplierFxTransfers.$inferSelect;
 
+// Phase 1: Per-entry FX allocation persistence (oldest-first traceability)
+export const factoryFxAllocations = pgTable("factory_fx_allocations", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  fxTransferId: integer("fx_transfer_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  sourceType: varchar("source_type", { length: 20 }).notNull().default("supplier"),
+  allocatedAmount: decimal("allocated_amount", { precision: 20, scale: 4 }).notNull(),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  fxTransferIdx: index("factory_fx_alloc_transfer_idx").on(t.fxTransferId),
+  containerIdx: index("factory_fx_alloc_container_idx").on(t.containerId),
+  companyIdx: index("factory_fx_alloc_company_idx").on(t.companyId),
+}));
+
+export type FactoryFxAllocation = typeof factoryFxAllocations.$inferSelect;
+
 export const factoryMixBatches = pgTable("factory_mix_batches", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

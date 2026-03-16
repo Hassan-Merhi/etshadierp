@@ -88,6 +88,7 @@ import {
   insertFactorySupplierPaymentSchema,
   factorySupplierFxTransfers,
   insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
   baleRecodeSessions,
   baleRecodeItems,
   factoryWorkerAdvances,
@@ -1698,6 +1699,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const [created] = await db.insert(factorySupplierFxTransfers).values(parsed).returning();
 
+      // ── Phase 1: Oldest-first allocation persistence ──────────────────────────
+      // Allocate this FX transfer against containers ordered by creation date
+      try {
+        const allContainers = await db
+          .select({ id: factoryContainers.id, finalPayableAmount: factoryContainers.finalPayableAmount, actualReceivedKg: factoryContainers.actualReceivedKg, totalKg: factoryContainers.totalKg, ratePerKg: factoryContainers.ratePerKg })
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, fromSupId), eq(factoryContainers.currencyCode, currCode)))
+          .orderBy(factoryContainers.createdAt); // oldest first
+
+        const cIds = allContainers.map((c: any) => c.id);
+        const prevAllocs = cIds.length > 0
+          ? await db.select({ containerId: factoryFxAllocations.containerId, allocatedAmount: factoryFxAllocations.allocatedAmount })
+              .from(factoryFxAllocations)
+              .where(and(eq(factoryFxAllocations.companyId, companyId), inArray(factoryFxAllocations.containerId, cIds)))
+          : [];
+
+        const allocatedPerContainer: Record<number, number> = {};
+        for (const a of prevAllocs) allocatedPerContainer[a.containerId] = (allocatedPerContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
+
+        let rem = parseFloat(created.fromAmount);
+        const rows: any[] = [];
+        for (const c of allContainers) {
+          if (rem <= 0.001) break;
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const val = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+          const used = allocatedPerContainer[c.id] || 0;
+          const avail = Math.max(0, val - used);
+          if (avail <= 0.001) continue;
+          const toAlloc = Math.min(rem, avail);
+          rows.push({ companyId, fxTransferId: created.id, containerId: c.id, sourceType: created.sourceType || "supplier", allocatedAmount: toAlloc.toFixed(4), currencyCode: currCode });
+          rem -= toAlloc;
+        }
+        if (rows.length > 0) await db.insert(factoryFxAllocations).values(rows);
+      } catch (allocErr) {
+        console.error("FX allocation error (non-fatal):", allocErr);
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       await writeDaybookEntry(db, {
         companyId,
         txDate: created.date,
@@ -2020,6 +2060,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       // Build per-currency payment totals (using original currency amounts, not USD)
       const paidByCurrency: Record<string, number> = {};
+      // Phase 2: Track commission reductions from FX settlements (source = commission or both)
+      const fxCommOut: Record<string, number> = {};
+      const fxBothOut: Record<string, number> = {};
       for (const p of (payments as any[])) {
         const cc = p.currencyCode || "USD";
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
@@ -2029,6 +2072,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (t.fromSupplierId === supplierId) {
           const cc = t.fromCurrencyCode || "USD";
           paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
+          if (t.sourceType === "commission") {
+            fxCommOut[cc] = (fxCommOut[cc] || 0) + parseFloat(t.fromAmount || "0");
+          } else if (t.sourceType === "both") {
+            fxBothOut[cc] = (fxBothOut[cc] || 0) + parseFloat(t.fromAmount || "0");
+          }
         }
         // FX transfers into this supplier (parent) add to its USD bucket
         if (t.toSupplierId === supplierId) {
@@ -2039,12 +2087,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => {
         const paid = paidByCurrency[cc] || 0;
         const netPayable = data.totalValue - data.totalCommission - paid;
+        // Phase 2: commission remaining = totalCommission minus what was settled via FX
+        // "both" is treated as commission-first (capped at totalCommission), then supplier
+        const commFxReduction = Math.min(data.totalCommission, (fxCommOut[cc] || 0) + (fxBothOut[cc] || 0));
+        const remainingCommission = Math.max(0, data.totalCommission - commFxReduction);
         return {
           currencyCode: cc,
           containers: data.containers,
           totalKg: data.totalKg.toFixed(3),
           totalValue: data.totalValue.toFixed(2),
           totalCommission: data.totalCommission.toFixed(2),
+          remainingCommission: remainingCommission.toFixed(2),
           totalDirectCommission: data.totalDirectCommission.toFixed(2),
           totalPaid: paid.toFixed(2),
           netPayable: netPayable.toFixed(2),
@@ -2180,14 +2233,96 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         });
       }
 
+      // ── Phase 1: Fetch per-container FX allocations ──────────────────────────
+      const containerIds = containers.map((c: any) => c.id);
+      const allocationsByContainer: Record<number, number> = {};
+      if (containerIds.length > 0) {
+        const allocs = await db
+          .select({ containerId: factoryFxAllocations.containerId, allocatedAmount: factoryFxAllocations.allocatedAmount })
+          .from(factoryFxAllocations)
+          .where(and(eq(factoryFxAllocations.companyId, companyId), inArray(factoryFxAllocations.containerId, containerIds)));
+        for (const a of allocs) {
+          allocationsByContainer[a.containerId] = (allocationsByContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
+        }
+      }
+      // Enrich each statement row with allocatedAmount + remainingAmount
+      const enrichedStatement = statement.map((s: any) => {
+        const val = parseFloat(s.value || "0");
+        const comm = parseFloat(s.totalCommission || "0");
+        const netVal = val - comm;
+        const allocAmt = allocationsByContainer[s.id] || 0;
+        return { ...s, allocatedAmount: allocAmt.toFixed(2), remainingAmount: Math.max(0, netVal - allocAmt).toFixed(2) };
+      });
+      // ── Phase 5: Build pre-sorted unified ledger ─────────────────────────────
+      const fmtAmt = (amt: string, cc: string, neg: boolean) => {
+        const prefix = cc !== "USD" ? `${cc} ` : "$";
+        const sign = neg ? "-" : "+";
+        return `${sign}${prefix}${parseFloat(amt || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      const ledger: any[] = [
+        ...enrichedStatement.map((s: any) => ({
+          key: `c-${s.id}`,
+          date: s.date,
+          type: "purchase",
+          ref: s.containerNumber,
+          detail: `${s.origin || ""} · ${parseFloat(s.actualReceivedKg || s.totalKg || "0").toFixed(0)} kg`,
+          amount: fmtAmt(s.value, s.currencyCode, false),
+          amountIsNeg: false,
+          notes: s.notes,
+          allocatedAmount: s.allocatedAmount,
+          remainingAmount: s.remainingAmount,
+        })),
+        ...(payments as any[]).map((p: any) => ({
+          key: `p-${p.id}`,
+          date: p.date,
+          type: "payment",
+          ref: null,
+          detail: p.method || "Payment",
+          amount: fmtAmt(p.amount, p.currencyCode || "USD", true),
+          amountIsNeg: true,
+          notes: p.notes,
+        })),
+        ...(fxTransfers as any[]).map((t: any) => {
+          const isOut = t.fromSupplierId === supplierId;
+          const cc = isOut ? (t.fromCurrencyCode || "USD") : "USD";
+          const amt = isOut ? t.fromAmount : t.toAmountUsd;
+          return {
+            key: `fx-${t.id}`,
+            date: t.date,
+            type: "fx",
+            ref: null,
+            detail: isOut ? `FX → USD (${t.sourceType || "supplier"})` : "FX received",
+            amount: fmtAmt(amt, cc, isOut),
+            amountIsNeg: isOut,
+            notes: t.notes,
+          };
+        }),
+        ...obCommissions.map((oc: any) => ({
+          key: `oc-${oc.rawStockId}`,
+          date: oc.date,
+          type: "commission",
+          ref: oc.containerNumber,
+          detail: oc.personName || "",
+          amount: fmtAmt(oc.amount, oc.currencyCode, true),
+          amountIsNeg: true,
+          notes: null,
+        })),
+      ].sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db2 = b.date ? new Date(b.date).getTime() : 0;
+        return db2 - da;
+      });
+      // ─────────────────────────────────────────────────────────────────────────
+
       res.json({
         supplier,
-        statement,
+        statement: enrichedStatement,
         currencyGroups,
         obCommissions,
         payments,
         fxTransfers,
         linkedSupplierGroups,
+        ledger,
         summary: {
           totalContainers: statement.length,
           totalKg: totalKg.toFixed(3),

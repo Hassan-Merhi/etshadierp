@@ -38,6 +38,7 @@ interface CurrencyGroup {
   totalKg: string;
   totalValue: string;
   totalCommission: string;
+  remainingCommission: string;
   totalDirectCommission: string;
   netPayable: string;
   totalOwed: string;
@@ -329,6 +330,22 @@ export default function FactorySuppliers() {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
       }
       toast({ title: "Payment deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteObCommissionMutation = useMutation({
+    mutationFn: async (rawStockId: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/raw-stock/opening-balance/${rawStockId}`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete OB commission"); }
+    },
+    onSuccess: () => {
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+      }
+      toast({ title: "OB commission deleted" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -988,9 +1005,16 @@ export default function FactorySuppliers() {
                               {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.totalValue)}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums text-destructive">
-                              {parseFloat(group.totalCommission) > 0
-                                ? `${group.currencyCode !== "USD" ? group.currencyCode + " " : "$"}${formatNum(group.totalCommission)}`
-                                : "-"}
+                              {parseFloat(group.totalCommission) > 0 ? (
+                                <span>
+                                  {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.remainingCommission ?? group.totalCommission)}
+                                  {group.remainingCommission != null && parseFloat(group.remainingCommission) < parseFloat(group.totalCommission) && (
+                                    <span className="text-xs text-muted-foreground ml-1 line-through">
+                                      {formatNum(group.totalCommission)}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : "-"}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
                               {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.netPayable)}
@@ -1142,6 +1166,7 @@ export default function FactorySuppliers() {
                       amount: `${oc.currencyCode !== "USD" ? `${oc.currencyCode} ${formatNum(oc.amount)}` : `$${formatNum(oc.amount)}`}`,
                       amountIsNeg: true,
                       notes: null,
+                      onDelete: () => { if (confirm("Delete this opening balance commission entry? This cannot be undone.")) deleteObCommissionMutation.mutate(oc.rawStockId); },
                     })),
                   ].sort((a, b) => {
                     const da = a.date ? new Date(a.date).getTime() : 0;
