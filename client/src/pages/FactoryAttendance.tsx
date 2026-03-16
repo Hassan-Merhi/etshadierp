@@ -1218,7 +1218,7 @@ function exportWeeklyExcel(
     const notes = type === "results" ? (notesMap[w.id] ?? "") : "";
     return [
       i + 1,
-      `${w.fullName}${w.employeeCode ? ` (${w.employeeCode})` : ""}`,
+      w.fullName,
       ...dayCells,
       notes,
     ];
