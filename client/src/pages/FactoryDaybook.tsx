@@ -3,7 +3,7 @@ import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Eye, ExternalLink, List, AlignJustify, Package, Trash2 } from "lucide-react";
+import { BookOpen, Eye, ExternalLink, List, AlignJustify, Package, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -305,7 +305,8 @@ export default function FactoryDaybook() {
   const [endDate, setEndDate] = useState(today);
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
-  const [isDetailed, setIsDetailed] = useState(true);
+  const [isDetailed, setIsDetailed] = useState(false);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
@@ -365,6 +366,7 @@ export default function FactoryDaybook() {
       totalAmountCurrency: number;
       fxRateToUsd: string | null;
       totalAmountUsd: number;
+      key: string;
     }> = {};
     filteredEntries.forEach((e) => {
       const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
@@ -377,6 +379,7 @@ export default function FactoryDaybook() {
           totalAmountCurrency: 0,
           fxRateToUsd: e.fxRateToUsd,
           totalAmountUsd: 0,
+          key: key,
         };
       }
       grouped[key].count += 1;
@@ -391,6 +394,11 @@ export default function FactoryDaybook() {
       return a.txType.localeCompare(b.txType);
     });
   }, [filteredEntries]);
+
+  const getEntriesForCondensedRow = (rowKey: string): DaybookEntry[] => {
+    const [date, txType, currencyCode] = rowKey.split("|");
+    return filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
+  };
 
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
@@ -612,31 +620,73 @@ export default function FactoryDaybook() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {condensedRows.map((row, idx) => (
-                      <TableRow key={idx} data-testid={`row-condensed-${row.date}-${row.txType}`}>
-                        <TableCell className="font-mono text-sm whitespace-nowrap">
-                          {formatDisplayDate(row.date + "T00:00:00")}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="default">{formatTxType(row.txType)}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {row.count === 1 ? "1 entry" : `${row.count} entries`}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
-                        </TableCell>
-                        {hasNonUsdC && (
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {row.currencyCode === "USD"
-                              ? "-"
-                              : row.fxRateToUsd
-                              ? parseFloat(row.fxRateToUsd).toFixed(4)
-                              : "mixed"}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
+                    {condensedRows.map((row) => {
+                      const isExpanded = expandedRowKey === row.key;
+                      const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                      return (
+                        <tbody key={row.key}>
+                          <TableRow 
+                            data-testid={`row-condensed-${row.date}-${row.txType}`}
+                            onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                            className="cursor-pointer hover-elevate"
+                          >
+                            <TableCell className="font-mono text-sm whitespace-nowrap">
+                              <div className="flex items-center gap-1">
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                {formatDisplayDate(row.date + "T00:00:00")}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="default">{formatTxType(row.txType)}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {row.count === 1 ? "1 entry" : `${row.count} entries`}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
+                            </TableCell>
+                            {hasNonUsdC && (
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                {row.currencyCode === "USD"
+                                  ? "-"
+                                  : row.fxRateToUsd
+                                  ? parseFloat(row.fxRateToUsd).toFixed(4)
+                                  : "mixed"}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                          {isExpanded && expandedEntries.map((entry) => (
+                            <TableRow 
+                              key={entry.id} 
+                              data-testid={`row-expanded-${entry.id}`}
+                              className="bg-muted/30"
+                            >
+                              <TableCell className="pl-8 font-mono text-sm whitespace-nowrap">
+                                {formatDisplayDate(entry.txDate + "T00:00:00")}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{formatTxType(entry.txType)}</Badge>
+                              </TableCell>
+                              <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
+                                {formatDaybookDescription(entry)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium">
+                                {currencySymbol(entry.currencyCode)}{formatNumber(entry.amountCurrency)}
+                              </TableCell>
+                              {hasNonUsdC && (
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                  {entry.currencyCode === "USD"
+                                    ? "-"
+                                    : entry.fxRateToUsd
+                                    ? parseFloat(entry.fxRateToUsd).toFixed(4)
+                                    : "-"}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </tbody>
+                      );
+                    })}
                   </TableBody>
                 </Table>
                   );
