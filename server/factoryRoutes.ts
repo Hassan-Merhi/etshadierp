@@ -8402,21 +8402,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const customersWithBalances = await Promise.all(
         allCustomers.map(async (customer) => {
-          if (customer.ledgerAccountId) {
-            const entries = await db.select().from(voucherEntries)
-              .where(eq(voucherEntries.ledgerAccountId, customer.ledgerAccountId));
-            const openingBalance = parseFloat(customer.openingBalance || "0");
-            const openingSide = customer.openingBalanceSide || "Dr";
-            const balance = entries.reduce((sum, entry) => {
-              const debit = parseFloat(entry.debitAmount || "0");
-              const credit = parseFloat(entry.creditAmount || "0");
-              if (debit > 0 && credit === 0) return sum + debit;
-              else if (credit > 0 && debit === 0) return sum - credit;
-              return sum;
-            }, openingSide === "Dr" ? openingBalance : -openingBalance);
-            return { ...customer, balance: Math.abs(balance), balanceSide: balance >= 0 ? "Dr" : "Cr" };
-          }
-
+          // Always read balance from customerBalances (factory receivable ledger).
+          // Previously this branched on ledgerAccountId and read from ERP voucherEntries,
+          // but voucherEntries only contains charge-specific journal entries — the bale
+          // subtotal is never posted there — so that path showed balance = charges only.
           const [balRow] = await db.select({ total: sql<string>`COALESCE(SUM(CAST(debit_amount AS numeric) - CAST(credit_amount AS numeric)), 0)` })
             .from(customerBalances)
             .where(and(eq(customerBalances.customerId, customer.id), eq(customerBalances.companyId, companyId)));
