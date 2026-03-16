@@ -216,19 +216,23 @@ export default function FactorySuppliers() {
     toSupplierId: 0,
     selectedCurrency: "",
     amount: "",
-    availableBalance: "",  // for validation only — not sent to backend
+    availableBalance: "",     // shown in dialog — recalculated on source type change
+    supplierBalance: "",      // netPayable (supplier net after commission)
+    commissionBalance: "",    // totalCommission for this currency
     fxRateToUsd: "",
     date: today,
     notes: "",
   });
 
-  const openFxConversionDialog = (fromSupplierId: number, toSupplierId: number, currencyCode: string, netPayable: string) => {
+  const openFxConversionDialog = (fromSupplierId: number, toSupplierId: number, currencyCode: string, netPayable: string, totalCommission = "0") => {
     setFxConversionForm({
       fromSupplierId,
       toSupplierId,
       selectedCurrency: currencyCode,
       amount: netPayable,
       availableBalance: netPayable,
+      supplierBalance: netPayable,
+      commissionBalance: totalCommission,
       fxRateToUsd: "",
       date: today,
       notes: "",
@@ -948,7 +952,7 @@ export default function FactorySuppliers() {
                           const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0);
                           if (firstNonUsd && statementSupplierId && statementData.supplier.parentId) {
                             setFxSourceType("supplier");
-                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, firstNonUsd.netPayable);
+                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, firstNonUsd.netPayable, firstNonUsd.totalCommission);
                           }
                         }}
                         data-testid="button-fx-convert"
@@ -995,7 +999,7 @@ export default function FactorySuppliers() {
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
-                                  onClick={() => { setFxSourceType("supplier"); statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable); }}
+                                  onClick={() => { setFxSourceType("supplier"); statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable, group.totalCommission); }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
                                   Settle
@@ -1238,13 +1242,24 @@ export default function FactorySuppliers() {
                 <div className="flex gap-2">
                   {(["supplier", "commission", "both"] as const).map(t => {
                     const labels: Record<string, string> = { supplier: "Supplier Balance", commission: "Commission", both: "Both" };
+                    const getAvail = (src: string) => {
+                      const s = parseFloat(fxConversionForm.supplierBalance || "0");
+                      const c = parseFloat(fxConversionForm.commissionBalance || "0");
+                      if (src === "supplier") return s.toFixed(2);
+                      if (src === "commission") return c.toFixed(2);
+                      return (s + c).toFixed(2);
+                    };
                     return (
                       <Button
                         key={t}
                         type="button"
                         variant={fxSourceType === t ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setFxSourceType(t)}
+                        onClick={() => {
+                          setFxSourceType(t);
+                          const newAvail = getAvail(t);
+                          setFxConversionForm(prev => ({ ...prev, availableBalance: newAvail, amount: newAvail }));
+                        }}
                         data-testid={`fx-source-${t}`}
                       >
                         {labels[t]}
@@ -1252,12 +1267,10 @@ export default function FactorySuppliers() {
                     );
                   })}
                 </div>
-                {fxSourceType === "commission" && (
-                  <p className="text-xs text-muted-foreground mt-1">Settling the broker's commission from this supplier's foreign currency earnings.</p>
-                )}
-                {fxSourceType === "both" && (
-                  <p className="text-xs text-muted-foreground mt-1">Settling both the outstanding balance and commission in one FX operation.</p>
-                )}
+                <div className="mt-2 grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+                  <span>Supplier net: <span className="font-medium text-foreground">{parseFloat(fxConversionForm.supplierBalance || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}</span></span>
+                  <span>Commission: <span className="font-medium text-foreground">{parseFloat(fxConversionForm.commissionBalance || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}</span></span>
+                </div>
               </div>
               <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
                 <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />

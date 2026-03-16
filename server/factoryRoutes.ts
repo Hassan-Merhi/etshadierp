@@ -1605,6 +1605,97 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(factorySuppliers.id, parsed.toSupplierId), eq(factorySuppliers.companyId, companyId)));
       if (!toSupplier) return res.status(404).json({ message: "To-supplier not found" });
 
+      // ── Balance validation (Phase 3) ─────────────────────────────────────────
+      const currCode = parsed.fromCurrencyCode;
+      const fromSupId = parsed.fromSupplierId;
+      const sourceType = (parsed as any).sourceType || "supplier";
+
+      // 1. Containers for this supplier in this currency
+      const contRows = await db
+        .select({
+          finalPayableAmount: factoryContainers.finalPayableAmount,
+          actualReceivedKg: factoryContainers.actualReceivedKg,
+          totalKg: factoryContainers.totalKg,
+          ratePerKg: factoryContainers.ratePerKg,
+          id: factoryContainers.id,
+        })
+        .from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          eq(factoryContainers.supplierId, fromSupId),
+          eq(factoryContainers.currencyCode, currCode)
+        ));
+
+      const containerIds = contRows.map((c: any) => c.id);
+      const totalValue = contRows.reduce((s: number, c: any) => {
+        const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+        const rate = parseFloat(c.ratePerKg || "0");
+        return s + (c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate);
+      }, 0);
+
+      // 2. Commissions from factoryContainerCommissions for these containers
+      let totalCommission = 0;
+      if (containerIds.length > 0) {
+        const commRows = await db
+          .select({ commissionTotal: factoryContainerCommissions.commissionTotal })
+          .from(factoryContainerCommissions)
+          .where(and(
+            eq(factoryContainerCommissions.companyId, companyId),
+            inArray(factoryContainerCommissions.containerId, containerIds)
+          ));
+        totalCommission = commRows.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
+      }
+
+      // 3. Payments in this currency
+      const payRows = await db
+        .select({ amount: factorySupplierPayments.amount })
+        .from(factorySupplierPayments)
+        .where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          eq(factorySupplierPayments.supplierId, fromSupId),
+          eq(factorySupplierPayments.currencyCode, currCode)
+        ));
+      const totalPaid = payRows.reduce((s: number, p: any) => s + parseFloat(p.amount || "0"), 0);
+
+      // 4. Existing FX transfers out for this supplier + currency
+      const fxRows = await db
+        .select({ fromAmount: factorySupplierFxTransfers.fromAmount, sourceType: factorySupplierFxTransfers.sourceType })
+        .from(factorySupplierFxTransfers)
+        .where(and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          eq(factorySupplierFxTransfers.fromSupplierId, fromSupId),
+          eq(factorySupplierFxTransfers.fromCurrencyCode, currCode)
+        ));
+
+      // FX deducted from supplier bucket (source = supplier or both)
+      const fxSupplierOut = fxRows
+        .filter((t: any) => !t.sourceType || t.sourceType === "supplier" || t.sourceType === "both")
+        .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
+      // FX deducted from commission bucket (source = commission or both)
+      const fxCommOut = fxRows
+        .filter((t: any) => t.sourceType === "commission" || t.sourceType === "both")
+        .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
+
+      const supplierAvail = totalValue - totalCommission - totalPaid - fxSupplierOut;
+      const commAvail = totalCommission - fxCommOut;
+
+      let available: number;
+      if (sourceType === "commission") {
+        available = commAvail;
+      } else if (sourceType === "both") {
+        available = supplierAvail + commAvail;
+      } else {
+        available = supplierAvail; // "supplier" (default)
+      }
+
+      const requested = parseFloat(parsed.fromAmount as string);
+      if (requested > available + 0.01) {
+        return res.status(422).json({
+          message: `Amount exceeds available ${sourceType} balance. Available: ${currCode} ${available.toFixed(2)}, Requested: ${currCode} ${requested.toFixed(2)}`,
+        });
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       const [created] = await db.insert(factorySupplierFxTransfers).values(parsed).returning();
 
       await writeDaybookEntry(db, {
