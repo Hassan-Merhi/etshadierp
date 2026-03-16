@@ -60,6 +60,29 @@ function computeMonthlyPay(salary: number, startStr: string, endStr: string): nu
   return total;
 }
 
+// Helper: Compute monthly pay from actual attendance records.
+// Monthly payroll uses attendance-based calculation (Present/Late = 1 day, Half Day = 0.5 day)
+// rather than calendar-day proration to match actual work performed.
+function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: any[]): number {
+  const daysInMonth = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  };
+
+  // Count actual days worked: Present/Late = 1 full day, Half Day = 0.5
+  let attendedDays = 0;
+  for (const row of attendanceRows) {
+    const s = row.status || "Absent";
+    if (s === "Present" || s === "Late") attendedDays += 1;
+    else if (s === "Half Day") attendedDays += 0.5;
+  }
+
+  // Daily rate: salary / days in the month of periodStart
+  const daysInStartMonth = daysInMonth(periodStart);
+  const dailyRate = baseSalary / daysInStartMonth;
+  return attendedDays * dailyRate;
+}
+
 export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: any) {
 
   async function writeDaybookEntry(dbOrTx: any, opts: {
@@ -767,18 +790,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           // No attendance records — fall back to calendar-day proration
           earned = computeMonthlyPay(baseSal, effectiveStart, endDate);
         } else {
-          // Count actual days worked (Present/Late = 1 full day, Half Day = 0.5)
-          let attendedDays = 0;
-          for (const row of attendanceRows) {
-            const s = row.status || "Absent";
-            if (s === "Present" || s === "Late") attendedDays += 1;
-            else if (s === "Half Day") attendedDays += 0.5;
-          }
-          // Daily rate: salary / days in the month of effectiveStart
-          // For multi-month ranges, prorate per month
-          const daysInStartMonth = daysInMonth(effectiveStart);
-          const dailyRate = baseSal / daysInStartMonth;
-          earned = attendedDays * dailyRate;
+          earned = computeMonthlyPayFromAttendance(baseSal, effectiveStart, attendanceRows);
         }
       }
 
@@ -964,7 +976,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (freq === "Weekly") base = (days / 7) * baseSal;
         else if (freq === "Bi-Weekly") base = (days / 14) * baseSal;
         else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
-        else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+        else {
+          // Monthly: use attendance-based calculation if records exist
+          const workerAttRecords = attendanceByWorker.get(worker.id) || [];
+          if (workerAttRecords.length === 0) {
+            base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+          } else {
+            base = computeMonthlyPayFromAttendance(baseSal, periodStart, workerAttRecords);
+          }
+        }
 
         const advanceDeduction = Math.min(advanceByWorker[worker.id] || 0, base + bonus);
         const net = base + bonus - advanceDeduction;
@@ -1039,6 +1059,25 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       const daysInMonth = (d: string) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); };
 
+      // Fetch all attendance records for the period (for monthly attendance-based calculation)
+      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const attendanceRecords = workerIdList.length
+        ? await db.select().from(factoryAttendance).where(
+            and(
+              eq(factoryAttendance.companyId, companyId),
+              gte(factoryAttendance.attendanceDate, periodStart),
+              lte(factoryAttendance.attendanceDate, periodEnd),
+              inArray(factoryAttendance.workerId, workerIdList)
+            )
+          )
+        : [];
+      const attendanceByWorker = new Map<number, any[]>();
+      for (const att of attendanceRecords) {
+        const list = attendanceByWorker.get(att.workerId) || [];
+        list.push(att);
+        attendanceByWorker.set(att.workerId, list);
+      }
+
       const allOutstandingAdvances = await db.select().from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false), eq(factoryWorkerAdvances.repaymentType, "salary_deduction")));
       const advanceByWorker: Record<number, number> = {};
@@ -1062,7 +1101,15 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
           else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
           else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
-          else base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+          else {
+            // Monthly: use attendance-based calculation if records exist
+            const workerAttRecords = attendanceByWorker.get(worker.id) || [];
+            if (workerAttRecords.length === 0) {
+              base = computeMonthlyPay(baseSal, periodStart, periodEnd);
+            } else {
+              base = computeMonthlyPayFromAttendance(baseSal, periodStart, workerAttRecords);
+            }
+          }
           const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
           const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
           const net = base + bonus - advanceDeduction;
