@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -211,6 +212,7 @@ export default function ProductionRawStock() {
   const [useTodayUsages, setUseTodayUsages] = useState<{ batchId: number; batchCode: string; totalKg: number; remainingKg: number; kgUsed: string }[]>([]);
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -275,6 +277,24 @@ export default function ProductionRawStock() {
       setUseTodayOpen(false);
       setUseTodayUsages([]);
       toast({ title: "Consumption recorded", description: "Daily usage logged. Carry-forward batches created where needed." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteBatchMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/mix-batches/${id}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to delete batch");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      setDeleteBatchId(null);
+      toast({ title: "Batch deleted", description: "Mix batch deleted. Bales have been unlinked." });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -998,6 +1018,7 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1033,6 +1054,16 @@ export default function ProductionRawStock() {
                           {batch.status === "CARRY_FORWARD" ? "Carry Fwd" : batch.status}
                         </span>
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteBatchId(batch.id)}
+                          data-testid={`button-delete-mix-batch-${batch.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -1055,6 +1086,37 @@ export default function ProductionRawStock() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={deleteBatchId !== null} onOpenChange={(open) => { if (!open) setDeleteBatchId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Mix Batch</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the batch. Linked bales will be unlinked but not deleted.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteBatchId && (() => {
+            const batch = filteredMixBatches.find((b) => b.id === deleteBatchId);
+            return batch ? (
+              <div className="space-y-1 text-sm py-1">
+                <p><span className="text-muted-foreground">Batch:</span> <span className="font-medium">{batch.name || batch.batchCode}</span></p>
+                <p><span className="text-muted-foreground">Status:</span> <span className="font-medium">{batch.status}</span></p>
+              </div>
+            ) : null;
+          })()}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteBatchId(null)} data-testid="button-cancel-delete-batch">Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteBatchId && deleteBatchMutation.mutate(deleteBatchId)}
+              disabled={deleteBatchMutation.isPending}
+              data-testid="button-confirm-delete-batch"
+            >
+              {deleteBatchMutation.isPending ? "Deleting..." : "Delete Batch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={offloadDialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="max-w-lg">

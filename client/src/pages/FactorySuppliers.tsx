@@ -1719,26 +1719,14 @@ export default function FactorySuppliers() {
                               <Pencil className="h-4 w-4" />
                             </Button>
                           )}
-                          {sup.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(sup.id); }}
-                              data-testid={`button-delete-supplier-${sup.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                          {!sup.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${sup.name}"? This cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
-                              data-testid={`button-permanent-delete-supplier-${sup.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${sup.name}"? This will remove all their records and cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
+                            data-testid={`button-delete-supplier-${sup.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                         <Button
                           variant="ghost"

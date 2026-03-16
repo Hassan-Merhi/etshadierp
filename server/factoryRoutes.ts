@@ -1441,7 +1441,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  // Hard-delete an inactive factory supplier (only if no container records reference it)
+  // Hard-delete a factory supplier (force — works even when active or has transaction records)
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -1454,15 +1454,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)));
 
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
-      if (supplier.isActive) return res.status(400).json({ message: "Supplier must be deactivated before permanent deletion" });
-
-      const [containerRef] = await db
-        .select({ id: factoryContainers.id })
-        .from(factoryContainers)
-        .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, id)))
-        .limit(1);
-
-      if (containerRef) return res.status(400).json({ message: "Cannot delete: supplier has container records. Remove or reassign containers first." });
 
       await db
         .delete(factorySuppliers)
