@@ -96,7 +96,7 @@ export function CreateMixBatchDialog({
     const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
     return (
       remaining > 0.001 &&
-      b.status === "ACTIVE" &&
+      (b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD") &&
       !selectedSources.some((sel) => sel.type === "batch" && sel.sourceId === b.id)
     );
   });

@@ -14,6 +14,7 @@ import {
   factoryRawStock,
   factoryMixBatches,
   factoryMixBatchSources,
+  factoryDailyUsages,
   factoryPressingBatches,
   factoryBales,
   factoryBaleSequences,
@@ -3893,9 +3894,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
+      const reservedRows = await db
+        .select({
+          supplierId: factoryMixBatchSources.supplierId,
+          reservedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
+        })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(and(
+          eq(factoryMixBatches.companyId, companyId),
+          sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+          sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
+        ))
+        .groupBy(factoryMixBatchSources.supplierId);
+
+      const reservedBySupplierId = new Map<number, number>();
+      for (const r of reservedRows) {
+        if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
+      }
+
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
         const valueRemaining = remainingKg * s._avgCostPerKg;
+        const reservedKg = s.supplierId ? (reservedBySupplierId.get(s.supplierId) || 0) : 0;
+        const freeKg = Math.max(0, remainingKg - reservedKg);
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
@@ -3904,6 +3926,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           receivedKg: s._totalReceived.toFixed(3),
           usedKg: s._totalUsed.toFixed(3),
           remainingKg: remainingKg.toFixed(3),
+          reservedKg: reservedKg.toFixed(3),
+          freeKg: freeKg.toFixed(3),
           costPerKg: s._avgCostPerKg.toFixed(4),
           valueRemaining: valueRemaining.toFixed(2),
           lastOffloaded: s.lastOffloaded,
@@ -5111,7 +5135,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { supplierSources = [], openingBatchId, name, notes,
-              sources = [], batchSources = [] } = req.body;
+              sources = [], batchSources = [], operatorUser, batchDate } = req.body;
 
       const hasSupplierSources = supplierSources.length > 0;
       const hasOpeningBatch = openingBatchId && openingBatchId !== "none";
@@ -5311,7 +5335,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             costPerKg: String(blendedCostPerKg),
             totalCost: String(totalCost),
             notes: notes || null,
-          })
+            operatorUser: operatorUser || null,
+            batchDate: batchDate || null,
+            status: "OPEN",
+          } as any)
           .returning();
 
         for (const sr of sourceRecords) {
@@ -5438,6 +5465,151 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json(results);
     } catch (error: any) {
       console.error("Error fetching mix batch sources:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
+  // 6b. Mix Batch Daily Consumption
+  // ───────────────────────────────────────────────
+
+  app.post("/api/factory/mix-batches/consume", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { usages, operatorUser, usedDate } = req.body as {
+        usages: Array<{ batchId: number; kgUsed: number; notes?: string }>;
+        operatorUser?: string;
+        usedDate: string;
+      };
+
+      if (!Array.isArray(usages) || usages.length === 0) {
+        return res.status(400).json({ message: "usages array is required" });
+      }
+      if (!usedDate) return res.status(400).json({ message: "usedDate is required" });
+
+      const results: any[] = [];
+      await db.transaction(async (tx: any) => {
+        for (const u of usages) {
+          const { batchId, kgUsed, notes } = u;
+          if (!batchId || !(kgUsed > 0)) continue;
+
+          const [batch] = await tx
+            .select()
+            .from(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, batchId), eq(factoryMixBatches.companyId, companyId)))
+            .for("update");
+          if (!batch) throw new Error(`Batch ${batchId} not found`);
+
+          const total = parseFloat(batch.totalWeightKg) || 0;
+          const alreadyUsed = parseFloat(batch.usedKg) || 0;
+          const remaining = total - alreadyUsed;
+
+          if (kgUsed > remaining + 0.001) {
+            throw new Error(`Cannot consume ${kgUsed} kg from batch ${batch.batchCode}: only ${remaining.toFixed(3)} kg remaining`);
+          }
+
+          const now = new Date();
+          await tx.insert(factoryDailyUsages).values({
+            companyId,
+            mixBatchId: batchId,
+            kgUsed: String(kgUsed),
+            operatorUser: operatorUser || null,
+            usedDate,
+            notes: notes || null,
+          } as any);
+
+          const isFullyConsumed = kgUsed >= remaining - 0.001;
+
+          if (isFullyConsumed) {
+            await tx
+              .update(factoryMixBatches)
+              .set({ usedKg: batch.totalWeightKg, status: "CLOSED", updatedAt: now })
+              .where(eq(factoryMixBatches.id, batchId));
+            results.push({ batchId, action: "closed", carryForwardId: null });
+          } else {
+            const leftoverKg = remaining - kgUsed;
+            const costPerKg = parseFloat(batch.costPerKg) || 0;
+            const leftoverCost = leftoverKg * costPerKg;
+
+            await tx
+              .update(factoryMixBatches)
+              .set({ usedKg: String(total), status: "CLOSED", updatedAt: now })
+              .where(eq(factoryMixBatches.id, batchId));
+
+            const year = new Date().getFullYear();
+            const existingBatches = await tx
+              .select({ batchCode: factoryMixBatches.batchCode })
+              .from(factoryMixBatches)
+              .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatches.batchCode} LIKE ${"FMB-" + year + "-%"}`));
+            let nextNum = 1;
+            for (const b of existingBatches) {
+              const parts = b.batchCode.split("-");
+              const num = parseInt(parts[2]) || 0;
+              if (num >= nextNum) nextNum = num + 1;
+            }
+            const newBatchCode = `FMB-${year}-${String(nextNum).padStart(4, "0")}`;
+
+            const [cfBatch] = await tx
+              .insert(factoryMixBatches)
+              .values({
+                companyId,
+                batchCode: newBatchCode,
+                batchNumber: newBatchCode,
+                name: batch.name || null,
+                totalWeightKg: String(leftoverKg),
+                costPerKg: String(costPerKg),
+                totalCost: String(leftoverCost),
+                notes: batch.notes || null,
+                operatorUser: operatorUser || batch.operatorUser || null,
+                batchDate: usedDate || null,
+                carryForwardFromId: batchId,
+                status: "CARRY_FORWARD",
+              } as any)
+              .returning();
+
+            results.push({ batchId, action: "carry_forward", carryForwardId: cfBatch.id, carryForwardCode: cfBatch.batchCode, leftoverKg });
+          }
+        }
+      });
+
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("Error consuming mix batches:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/daily-report", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+
+      const usages = await db
+        .select({
+          id: factoryDailyUsages.id,
+          mixBatchId: factoryDailyUsages.mixBatchId,
+          kgUsed: factoryDailyUsages.kgUsed,
+          operatorUser: factoryDailyUsages.operatorUser,
+          usedDate: factoryDailyUsages.usedDate,
+          notes: factoryDailyUsages.notes,
+          createdAt: factoryDailyUsages.createdAt,
+          batchCode: factoryMixBatches.batchCode,
+          batchName: factoryMixBatches.name,
+          costPerKg: factoryMixBatches.costPerKg,
+        })
+        .from(factoryDailyUsages)
+        .innerJoin(factoryMixBatches, eq(factoryDailyUsages.mixBatchId, factoryMixBatches.id))
+        .where(and(eq(factoryDailyUsages.companyId, companyId), sql`${factoryDailyUsages.usedDate} = ${date}`))
+        .orderBy(factoryDailyUsages.createdAt);
+
+      const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
+      res.json({ date, usages, totalKgUsed: totalKgUsed.toFixed(3) });
+    } catch (error: any) {
+      console.error("Error fetching daily report:", error);
       res.status(500).json({ message: error.message });
     }
   });

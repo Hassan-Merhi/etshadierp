@@ -2476,6 +2476,9 @@ export const factoryMixBatches = pgTable("factory_mix_batches", {
   totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
   notes: text("notes"),
   status: text("status").notNull().default("ACTIVE"),
+  operatorUser: text("operator_user"),
+  batchDate: date("batch_date"),
+  carryForwardFromId: integer("carry_forward_from_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -2492,7 +2495,10 @@ export const insertFactoryMixBatchSchema = createInsertSchema(factoryMixBatches)
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
   usedKg: z.string().optional(),
-  status: z.enum(["ACTIVE", "COMPLETED"]).optional(),
+  status: z.enum(["ACTIVE", "COMPLETED", "OPEN", "CLOSED", "CARRY_FORWARD"]).optional(),
+  operatorUser: z.string().optional().nullable(),
+  batchDate: z.string().optional().nullable(),
+  carryForwardFromId: z.number().optional().nullable(),
 });
 
 export type InsertFactoryMixBatch = z.infer<typeof insertFactoryMixBatchSchema>;
@@ -2529,6 +2535,25 @@ export const insertFactoryMixBatchSourceSchema = createInsertSchema(factoryMixBa
 
 export type InsertFactoryMixBatchSource = z.infer<typeof insertFactoryMixBatchSourceSchema>;
 export type FactoryMixBatchSource = typeof factoryMixBatchSources.$inferSelect;
+
+export const factoryDailyUsages = pgTable("factory_daily_usages", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  mixBatchId: integer("mix_batch_id").notNull(),
+  kgUsed: decimal("kg_used", { precision: 15, scale: 3 }).notNull(),
+  operatorUser: text("operator_user"),
+  usedDate: date("used_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryDailyUsageSchema = createInsertSchema(factoryDailyUsages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFactoryDailyUsage = z.infer<typeof insertFactoryDailyUsageSchema>;
+export type FactoryDailyUsage = typeof factoryDailyUsages.$inferSelect;
 
 export const factoryPressingBatches = pgTable("factory_pressing_batches", {
   id: serial("id").primaryKey(),

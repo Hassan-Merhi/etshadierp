@@ -2,7 +2,9 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2 } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -123,9 +125,27 @@ interface RawStockRow {
   receivedKg: string;
   usedKg: string;
   remainingKg: string;
+  reservedKg?: string;
+  freeKg?: string;
   costPerKg: string;
   valueRemaining: string;
   lastOffloaded: string;
+}
+
+interface MixBatchRow {
+  id: number;
+  batchCode: string;
+  name: string | null;
+  totalWeightKg: string;
+  usedKg: string;
+  remainingKg: string;
+  costPerKg: string;
+  totalCost: string;
+  status: string;
+  operatorUser: string | null;
+  batchDate: string | null;
+  carryForwardFromId: number | null;
+  createdAt: string;
 }
 
 interface ContainerOption {
@@ -182,6 +202,15 @@ export default function ProductionRawStock() {
   // OB delete
   const [deleteObDialogOpen, setDeleteObDialogOpen] = useState(false);
   const [deletingObRecord, setDeletingObRecord] = useState<{ rawStockId: number; supplierName: string; containerNumber: string } | null>(null);
+  // Mix batch section state
+  const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
+  const [mixBatchStatusFilter, setMixBatchStatusFilter] = useState<string>("OPEN");
+  const [useTodayOpen, setUseTodayOpen] = useState(false);
+  const [useTodayDate, setUseTodayDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [useTodayOperator, setUseTodayOperator] = useState("");
+  const [useTodayUsages, setUseTodayUsages] = useState<{ batchId: number; batchCode: string; totalKg: number; remainingKg: number; kgUsed: string }[]>([]);
+  const [dailyReportOpen, setDailyReportOpen] = useState(false);
+  const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -215,6 +244,41 @@ export default function ProductionRawStock() {
   const { data: unlinkedBales } = useQuery<{ id: number; baleCode: string; referenceNumber: string; productName: string | null; weightKg: string; status: string; pressedAt: string | null }[]>({
     queryKey: ["/api/factory/bales/unlinked"],
     enabled: assignDialogOpen,
+  });
+
+  const { data: mixBatches, isLoading: mixBatchesLoading } = useQuery<MixBatchRow[]>({
+    queryKey: ["/api/factory/mix-batches"],
+  });
+
+  const { data: dailyReport, isLoading: dailyReportLoading } = useQuery<any>({
+    queryKey: ["/api/factory/daily-report", dailyReportDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/daily-report?date=${dailyReportDate}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: dailyReportOpen,
+  });
+
+  const consumeMutation = useMutation({
+    mutationFn: async (payload: { usages: { batchId: number; kgUsed: number }[]; operatorUser?: string; usedDate: string }) => {
+      const res = await modeApiRequest("POST", "/api/factory/mix-batches/consume", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Consumption failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      setUseTodayOpen(false);
+      setUseTodayUsages([]);
+      toast({ title: "Consumption recorded", description: "Daily usage logged. Carry-forward batches created where needed." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const assignMutation = useMutation({
@@ -516,13 +580,38 @@ export default function ProductionRawStock() {
   const totalUsed = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg), 0) || 0;
   const totalRemaining = rawStock?.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0) || 0;
   const totalValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.valueRemaining), 0) || 0;
+  const totalReserved = rawStock?.reduce((sum, r) => sum + parseFloat(r.reservedKg || "0"), 0) || 0;
+  const totalFree = rawStock?.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0) || 0;
+
+  const filteredMixBatches = useMemo(() => {
+    if (!mixBatches) return [];
+    if (mixBatchStatusFilter === "ALL") return mixBatches;
+    if (mixBatchStatusFilter === "OPEN") {
+      return mixBatches.filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
+    }
+    return mixBatches.filter((b) => b.status === mixBatchStatusFilter);
+  }, [mixBatches, mixBatchStatusFilter]);
+
+  const openBatchesForUsage = useMemo(() => {
+    if (!mixBatches) return [];
+    return mixBatches.filter((b) => {
+      const remaining = parseFloat(b.remainingKg);
+      return remaining > 0.001 && (b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
+    });
+  }, [mixBatches]);
+
+  const mixBatchKpis = useMemo(() => {
+    const active = (mixBatches || []).filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
+    const totalMixKg = active.reduce((s, b) => s + parseFloat(b.remainingKg), 0);
+    return { activeCount: active.length, totalMixKg };
+  }, [mixBatches]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Production Raw Stock</h1>
-          <p className="text-muted-foreground mt-1">Supplier-based raw material tracking for production</p>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Raw Production</h1>
+          <p className="text-muted-foreground mt-1">Raw stock inventory and daily mix batch management</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => recalcUsedMutation.mutate()} disabled={recalcUsedMutation.isPending} data-testid="button-recalc-balance">
@@ -539,11 +628,11 @@ export default function ProductionRawStock() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Received</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-received">
+            <p className="text-xl font-bold font-mono" data-testid="text-total-received">
               {formatNumber(totalReceived)} kg
             </p>
           </CardContent>
@@ -551,23 +640,39 @@ export default function ProductionRawStock() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Used</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-used">
+            <p className="text-xl font-bold font-mono" data-testid="text-total-used">
               {formatNumber(totalUsed)} kg
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Remaining</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-remaining">
+            <p className="text-sm text-muted-foreground">Remaining Stock</p>
+            <p className="text-xl font-bold font-mono" data-testid="text-total-remaining">
               {formatNumber(totalRemaining)} kg
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Value</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-total-value">
+            <p className="text-sm text-muted-foreground">Reserved in Batches</p>
+            <p className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-total-reserved">
+              {formatNumber(totalReserved)} kg
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Free Available</p>
+            <p className="text-xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-free">
+              {formatNumber(totalFree)} kg
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Stock Value</p>
+            <p className="text-xl font-bold font-mono" data-testid="text-total-value">
               ${formatNumber(totalValue)}
             </p>
           </CardContent>
@@ -594,6 +699,8 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Received (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
+                  <TableHead className="text-right">Reserved (kg)</TableHead>
+                  <TableHead className="text-right">Free (kg)</TableHead>
                   <TableHead className="text-right">Avg Cost/kg</TableHead>
                   <TableHead className="text-right">Value Remaining</TableHead>
                   <TableHead>Last Offloaded</TableHead>
@@ -625,6 +732,12 @@ export default function ProductionRawStock() {
                         <Badge variant={remaining <= 0 ? "secondary" : "default"}>
                           {formatNumber(remaining)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
+                        {formatNumber(parseFloat(row.reservedKg || "0"))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 font-medium">
+                        {formatNumber(parseFloat(row.freeKg || "0"))}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {currency !== "USD" ? `${currency} ` : "$"}{parseFloat(row.costPerKg).toFixed(4)}
@@ -742,6 +855,184 @@ export default function ProductionRawStock() {
                 <ArrowDown className="h-4 w-4 mr-2" />
                 Offload First Container
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Mix Batches Section ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5" />
+                Mix Batches
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {mixBatchKpis.activeCount} open {mixBatchKpis.activeCount === 1 ? "batch" : "batches"} · {formatNumber(mixBatchKpis.totalMixKg)} kg remaining
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={() => setDailyReportOpen(!dailyReportOpen)} data-testid="button-toggle-daily-report">
+                <BarChart3 className="h-4 w-4 mr-1" />
+                Daily Report
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setUseTodayUsages([]); setUseTodayOpen(true); }} disabled={openBatchesForUsage.length === 0} data-testid="button-use-today">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Use Today
+              </Button>
+              <Button size="sm" onClick={() => setCreateMixBatchOpen(true)} data-testid="button-create-mix-batch">
+                <Plus className="h-4 w-4 mr-1" />
+                Create Batch
+              </Button>
+            </div>
+          </div>
+          {/* Status filter */}
+          <div className="flex gap-2 flex-wrap mt-2">
+            {[
+              { key: "OPEN", label: "Open / Active" },
+              { key: "CARRY_FORWARD", label: "Carry Forward" },
+              { key: "CLOSED", label: "Closed" },
+              { key: "ALL", label: "All" },
+            ].map(({ key, label }) => (
+              <Button
+                key={key}
+                size="sm"
+                variant={mixBatchStatusFilter === key ? "default" : "outline"}
+                onClick={() => setMixBatchStatusFilter(key)}
+                data-testid={`button-mix-filter-${key.toLowerCase()}`}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Daily report panel */}
+          {dailyReportOpen && (
+            <div className="mt-4 border rounded-md p-4 space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Report date:</span>
+                <Input
+                  type="date"
+                  value={dailyReportDate}
+                  onChange={(e) => setDailyReportDate(e.target.value)}
+                  className="w-auto"
+                  data-testid="input-daily-report-date"
+                />
+              </div>
+              {dailyReportLoading ? (
+                <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
+              ) : dailyReport?.usages?.length > 0 ? (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Batch Code</TableHead>
+                        <TableHead>Batch Name</TableHead>
+                        <TableHead>Operator</TableHead>
+                        <TableHead className="text-right">KG Used</TableHead>
+                        <TableHead className="text-right">Cost/kg</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dailyReport.usages.map((u: any) => (
+                        <TableRow key={u.id} data-testid={`row-daily-usage-${u.id}`}>
+                          <TableCell className="font-mono text-sm">{u.batchCode}</TableCell>
+                          <TableCell className="text-sm">{u.batchName || "—"}</TableCell>
+                          <TableCell className="text-sm">{u.operatorUser || "—"}</TableCell>
+                          <TableCell className="text-right font-mono font-medium">{formatNumber(parseFloat(u.kgUsed))} kg</TableCell>
+                          <TableCell className="text-right font-mono">${parseFloat(u.costPerKg).toFixed(4)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{u.notes || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="text-sm text-right text-muted-foreground">
+                    Total consumed: <span className="font-mono font-medium">{formatNumber(parseFloat(dailyReport.totalKgUsed))} kg</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">No consumption recorded for {dailyReportDate}</p>
+              )}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {mixBatchesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : filteredMixBatches.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Batch Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Operator</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Total (kg)</TableHead>
+                  <TableHead className="text-right">Used (kg)</TableHead>
+                  <TableHead className="text-right">Remaining (kg)</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMixBatches.map((batch) => {
+                  const total = parseFloat(batch.totalWeightKg) || 0;
+                  const used = parseFloat(batch.usedKg) || 0;
+                  const remaining = parseFloat(batch.remainingKg) || 0;
+                  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+                  const statusColors: Record<string, string> = {
+                    OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+                    ACTIVE: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+                    CARRY_FORWARD: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+                    CLOSED: "bg-muted text-muted-foreground",
+                    COMPLETED: "bg-muted text-muted-foreground",
+                  };
+                  return (
+                    <TableRow key={batch.id} data-testid={`row-mix-batch-${batch.id}`}>
+                      <TableCell className="font-mono font-medium text-sm">{batch.batchCode}</TableCell>
+                      <TableCell className="text-sm">{batch.name || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{batch.operatorUser || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{formatNumber(used)}</TableCell>
+                      <TableCell className="text-right font-mono font-medium text-sm">{formatNumber(remaining)}</TableCell>
+                      <TableCell className="w-28">
+                        <div className="space-y-1">
+                          <Progress value={pct} className="h-2" />
+                          <p className="text-xs text-muted-foreground">{pct.toFixed(0)}%</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-md ${statusColors[batch.status] || "bg-muted text-muted-foreground"}`}>
+                          {batch.status === "CARRY_FORWARD" ? "Carry Fwd" : batch.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-10">
+              <Layers className="mx-auto h-10 w-10 text-muted-foreground" />
+              <h3 className="mt-3 text-base font-semibold">No mix batches</h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                {mixBatchStatusFilter === "OPEN" ? "No open batches. Create one to get started." : "No batches match the current filter."}
+              </p>
+              {mixBatchStatusFilter === "OPEN" && (
+                <Button className="mt-3" size="sm" onClick={() => setCreateMixBatchOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create First Batch
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -1729,6 +2020,141 @@ export default function ProductionRawStock() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Use Mix Batches Today Dialog ── */}
+      <Dialog open={useTodayOpen} onOpenChange={(open) => { setUseTodayOpen(open); if (!open) setUseTodayUsages([]); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Record Daily Consumption</DialogTitle>
+            <DialogDescription>
+              Enter how many kg were consumed from each open batch today. Partial consumption will create a carry-forward batch automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={useTodayDate}
+                  onChange={(e) => setUseTodayDate(e.target.value)}
+                  data-testid="input-use-today-date"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Operator (optional)</Label>
+                <Input
+                  placeholder="Operator name"
+                  value={useTodayOperator}
+                  onChange={(e) => setUseTodayOperator(e.target.value)}
+                  data-testid="input-use-today-operator"
+                />
+              </div>
+            </div>
+
+            {/* Batch selection for consumption */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Select batches to consume from:</Label>
+              <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
+                {openBatchesForUsage.map((batch) => {
+                  const existing = useTodayUsages.find((u) => u.batchId === batch.id);
+                  const remaining = parseFloat(batch.remainingKg);
+                  return (
+                    <div key={batch.id} className="flex items-center gap-3 p-3" data-testid={`row-use-batch-${batch.id}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-mono text-sm font-medium">{batch.batchCode}</p>
+                        <p className="text-xs text-muted-foreground">{batch.name || ""} · {formatNumber(remaining)} kg remaining</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {existing ? (
+                          <>
+                            <Input
+                              type="number"
+                              placeholder="kg used"
+                              value={existing.kgUsed}
+                              step="0.001"
+                              min="0.001"
+                              max={remaining}
+                              className="w-28 font-mono"
+                              onChange={(e) => {
+                                setUseTodayUsages((prev) =>
+                                  prev.map((u) => u.batchId === batch.id ? { ...u, kgUsed: e.target.value } : u)
+                                );
+                              }}
+                              data-testid={`input-kg-used-${batch.id}`}
+                            />
+                            <Button size="icon" variant="ghost" onClick={() => setUseTodayUsages((prev) => prev.filter((u) => u.batchId !== batch.id))}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setUseTodayUsages((prev) => [...prev, { batchId: batch.id, batchCode: batch.batchCode, totalKg: parseFloat(batch.totalWeightKg), remainingKg: remaining, kgUsed: remaining.toFixed(3) }])}
+                            data-testid={`button-add-batch-usage-${batch.id}`}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {useTodayUsages.length > 0 && (
+              <div className="bg-muted/50 rounded-md p-3 space-y-1">
+                <p className="text-sm font-medium">Summary:</p>
+                {useTodayUsages.map((u) => {
+                  const kgUsed = parseFloat(u.kgUsed) || 0;
+                  const isPartial = kgUsed < u.remainingKg - 0.001;
+                  return (
+                    <p key={u.batchId} className="text-sm text-muted-foreground">
+                      {u.batchCode}: {formatNumber(kgUsed)} kg consumed
+                      {isPartial && <span className="text-amber-600 dark:text-amber-400"> → {formatNumber(u.remainingKg - kgUsed)} kg carry-forward</span>}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 flex-wrap">
+              <Button variant="outline" onClick={() => setUseTodayOpen(false)} data-testid="button-use-today-cancel">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const validUsages = useTodayUsages
+                    .map((u) => ({ batchId: u.batchId, kgUsed: parseFloat(u.kgUsed) || 0 }))
+                    .filter((u) => u.kgUsed > 0);
+                  if (validUsages.length === 0) {
+                    toast({ title: "Nothing to record", description: "Enter kg used for at least one batch", variant: "destructive" });
+                    return;
+                  }
+                  consumeMutation.mutate({ usages: validUsages, operatorUser: useTodayOperator || undefined, usedDate: useTodayDate });
+                }}
+                disabled={consumeMutation.isPending || useTodayUsages.length === 0}
+                data-testid="button-use-today-confirm"
+              >
+                {consumeMutation.isPending ? "Recording..." : "Record Consumption"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create Mix Batch Dialog ── */}
+      <CreateMixBatchDialog
+        open={createMixBatchOpen}
+        onOpenChange={setCreateMixBatchOpen}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+        }}
+      />
     </div>
   );
 }
