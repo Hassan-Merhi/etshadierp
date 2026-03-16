@@ -598,7 +598,9 @@ function PerWorkerView() {
     const dates = generateDateRange(startDate, endDate);
     const next: Record<string, boolean> = {};
     for (const d of dates) {
-      next[d] = false; // default: absent
+      // Sunday (getDay() === 0) defaults to Present; all other days default to Absent
+      const isSunday = new Date(d + "T00:00:00").getDay() === 0;
+      next[d] = isSunday;
     }
     if (attendanceRecords) {
       for (const r of attendanceRecords) {
@@ -841,11 +843,12 @@ function PerWorkerView() {
                     const isChecked = checkedDates[date] ?? false;
                     const isFriday = new Date(date + "T00:00:00").getDay() === 5;
                     const isSaturday = new Date(date + "T00:00:00").getDay() === 6;
+                    const isSunday = new Date(date + "T00:00:00").getDay() === 0;
                     return (
                       <tr
                         key={date}
                         data-testid={`row-date-${date}`}
-                        className={`border-b last:border-0 cursor-pointer hover-elevate ${(isFriday || isSaturday) ? "bg-muted/20" : ""}`}
+                        className={`border-b last:border-0 cursor-pointer hover-elevate ${(isFriday || isSaturday) ? "bg-muted/20" : isSunday ? "bg-blue-50/40 dark:bg-blue-950/20" : ""}`}
                         onClick={() => toggleDate(date)}
                       >
                         <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
@@ -856,8 +859,8 @@ function PerWorkerView() {
                             day: "numeric",
                           })}
                         </td>
-                        <td className={`px-4 py-3 text-sm ${(isFriday || isSaturday) ? "text-muted-foreground italic" : "text-muted-foreground"}`}>
-                          {dayName}
+                        <td className={`px-4 py-3 text-sm ${(isFriday || isSaturday) ? "text-muted-foreground italic" : isSunday ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"}`}>
+                          {dayName}{isSunday ? " *" : ""}
                         </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
