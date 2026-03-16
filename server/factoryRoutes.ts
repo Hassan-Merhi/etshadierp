@@ -1765,6 +1765,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
       if (!transfer) return res.status(404).json({ message: "Transfer not found" });
 
+      // Cascade-delete allocation rows before removing the transfer
+      await db.delete(factoryFxAllocations)
+        .where(and(eq(factoryFxAllocations.fxTransferId, id), eq(factoryFxAllocations.companyId, companyId)));
+
       await db.delete(factorySupplierFxTransfers)
         .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
 
