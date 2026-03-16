@@ -420,6 +420,8 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS factory_daily_usages_batch_idx ON factory_daily_usages (mix_batch_id)`,
     `CREATE INDEX IF NOT EXISTS factory_daily_usages_company_date_idx ON factory_daily_usages (company_id, used_date)`,
+    // Wipers Re-Entry by Date (Mar 2026) — backdated stock entry date per bale
+    `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS stock_entry_date date`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
