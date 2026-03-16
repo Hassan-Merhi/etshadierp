@@ -7167,6 +7167,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
       if (!bale) return res.status(404).json({ message: "Bale not found" });
+      if (bale.stockEntryDate) return res.status(403).json({ message: "Worker assignment is locked for stock-entry bales and cannot be changed." });
       const [updated] = await db.update(factoryBales).set({ finalizedBy: parseInt(workerId), updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
       res.json(updated);
     } catch (error: any) {
@@ -7249,6 +7250,76 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     } catch (error: any) {
       console.error("Error repacking bale:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
+
+      const today = new Date().toISOString().split("T")[0];
+      const effectiveStart = startDate || today;
+      const effectiveEnd = endDate || today;
+
+      const workerFilter = workerId ? sql`AND fb.finalized_by = ${parseInt(workerId)}` : sql``;
+      const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
+      const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
+      const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
+      const searchFilter = search ? sql`AND LOWER(fb.reference_number) LIKE ${'%' + search.toLowerCase() + '%'}` : sql``;
+      const unassignedFilter = includeUnassigned === 'false' ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT
+          fb.stock_entry_date::text AS "stockEntryDate",
+          fb.erp_location_id AS "erpLocationId",
+          COALESCE(l.name, 'Unknown') AS "locationName",
+          fb.finalized_by AS "workerId",
+          fw.full_name AS "workerName",
+          fb.product_id AS "productId",
+          fbp.name AS "productName",
+          fbp.article_code AS "articleCode",
+          COUNT(*)::int AS "baleCount",
+          ROUND(SUM(CAST(fb.weight_kg AS numeric)), 3) AS "totalWeight",
+          ROUND(AVG(CAST(fb.weight_kg AS numeric)), 3) AS "avgWeight",
+          MIN(fb.finalized_at) AS "firstFinalizedAt",
+          MAX(fb.finalized_at) AS "lastFinalizedAt",
+          JSON_AGG(JSON_BUILD_OBJECT(
+            'id', fb.id,
+            'referenceNumber', fb.reference_number,
+            'weightKg', fb.weight_kg,
+            'status', fb.status,
+            'finalizedAt', fb.finalized_at,
+            'stockEntryDate', fb.stock_entry_date::text,
+            'locationName', COALESCE(l.name, 'Unknown'),
+            'workerName', fw.full_name,
+            'productName', fbp.name,
+            'articleCode', fbp.article_code
+          ) ORDER BY fb.finalized_at ASC) AS "bales"
+        FROM factory_bales fb
+        LEFT JOIN factory_workers fw ON fb.finalized_by = fw.id AND fw.company_id = ${companyId}
+        LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
+        LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
+        WHERE fb.company_id = ${companyId}
+          AND fb.stock_entry_date IS NOT NULL
+          AND fb.stock_entry_date >= ${effectiveStart}
+          AND fb.stock_entry_date <= ${effectiveEnd}
+          ${workerFilter}
+          ${productFilter}
+          ${locationFilter}
+          ${statusFilter}
+          ${searchFilter}
+          ${unassignedFilter}
+        GROUP BY fb.stock_entry_date, fb.erp_location_id, l.name, fb.finalized_by, fw.full_name, fb.product_id, fbp.name, fbp.article_code
+        ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
+      `);
+
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Error fetching stock entry history:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 

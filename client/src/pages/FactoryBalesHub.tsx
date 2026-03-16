@@ -2,11 +2,12 @@ import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BalesHistory from "./BalesHistory";
 import BarcodeLookup from "./BarcodeLookup";
+import StockEntryHistory from "./StockEntryHistory";
 
 export default function FactoryBalesHub() {
   const [location, setLocation] = useLocation();
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
-  const defaultTab = hash === "barcode" ? "barcode" : "history";
+  const defaultTab = hash === "barcode" ? "barcode" : hash === "stock-entry" ? "stock-entry" : "history";
 
   function handleTabChange(value: string) {
     window.history.replaceState(null, "", `#${value}`);
@@ -19,6 +20,7 @@ export default function FactoryBalesHub() {
           <TabsList>
             <TabsTrigger value="history" data-testid="tab-bales-history">Bales History</TabsTrigger>
             <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">Barcode Lookup</TabsTrigger>
+            <TabsTrigger value="stock-entry" data-testid="tab-stock-entry-history">Stock Entry History</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="history" className="flex-1 overflow-auto mt-0">
@@ -26,6 +28,9 @@ export default function FactoryBalesHub() {
         </TabsContent>
         <TabsContent value="barcode" className="flex-1 overflow-auto mt-0">
           <BarcodeLookup />
+        </TabsContent>
+        <TabsContent value="stock-entry" className="flex-1 overflow-auto mt-0">
+          <StockEntryHistory />
         </TabsContent>
       </Tabs>
     </div>
