@@ -596,7 +596,9 @@ function PerWorkerView() {
     }
     if (attendanceRecords) {
       for (const r of attendanceRecords) {
-        next[r.attendanceDate] = r.status === "Present" || r.status === "Late";
+        // Any status other than Absent counts as "present" (checked):
+        // Present, Late, Half Day, Leave all = checked
+        next[r.attendanceDate] = r.status !== "Absent";
       }
     }
     setCheckedDates(next);
@@ -638,11 +640,24 @@ function PerWorkerView() {
 
   const handleSave = () => {
     if (!workerIdNum) return;
-    const records = dates.map((d) => ({
-      workerId: workerIdNum,
-      attendanceDate: d,
-      status: checkedDates[d] ? "Present" : "Absent",
-    }));
+    // Build a map of existing DB statuses so we can preserve granular statuses
+    // (Late, Half Day, Leave) for dates that are checked but not newly toggled.
+    const existingStatusMap: Record<string, string> = {};
+    if (attendanceRecords) {
+      for (const r of attendanceRecords) {
+        existingStatusMap[r.attendanceDate] = r.status;
+      }
+    }
+    const records = dates.map((d) => {
+      if (checkedDates[d]) {
+        // Preserve existing granular status (Late, Half Day, Leave) if the date
+        // is checked; fall back to "Present" for new/previously-absent dates.
+        const existing = existingStatusMap[d];
+        const status = existing && existing !== "Absent" ? existing : "Present";
+        return { workerId: workerIdNum, attendanceDate: d, status };
+      }
+      return { workerId: workerIdNum, attendanceDate: d, status: "Absent" };
+    });
     saveMutation.mutate(records);
   };
 
