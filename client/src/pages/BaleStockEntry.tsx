@@ -38,6 +38,7 @@
     product: FactoryBaleProduct;
     qty: number;
     weightPerBaleKg: number;
+    finalizedBy: number | null;
   }
 
 
@@ -58,6 +59,7 @@
     });
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
     const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
+    const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
 
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
     const [quickCreateName, setQuickCreateName] = useState("");
@@ -137,7 +139,7 @@
             item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
           );
         }
-        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
+        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null }];
       });
 
       setScanInput("");
@@ -173,7 +175,7 @@
             item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
           );
         }
-        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
+        return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null }];
       });
       setScanInput("");
       setScanError("");
@@ -204,6 +206,10 @@
 
     const removeItem = (productId: number) => {
       setCart((prev) => prev.filter((item) => item.productId !== productId));
+    };
+
+    const assignWorker = (productId: number, workerId: number | null) => {
+      setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, finalizedBy: workerId } : item));
     };
 
     const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -314,6 +320,7 @@
           productId: item.productId,
           quantity: item.qty,
           weightPerBale: item.weightPerBaleKg.toString(),
+          finalizedBy: item.finalizedBy,
         }));
 
         const body: any = {
@@ -497,6 +504,7 @@
                         <TableHead className="text-center w-40">Qty</TableHead>
                         <TableHead className="text-right w-32">Wt/Bale (kg)</TableHead>
                         <TableHead className="text-right w-32">Total (kg)</TableHead>
+                        <TableHead className="w-44">Worker</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -538,6 +546,22 @@
                           </TableCell>
                           <TableCell className="text-right font-medium" data-testid={`text-total-kg-${item.productId}`}>
                             {formatNumber(item.qty * item.weightPerBaleKg)}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={item.finalizedBy !== null ? String(item.finalizedBy) : "unassigned"}
+                              onValueChange={(v) => assignWorker(item.productId, v === "unassigned" ? null : parseInt(v))}
+                            >
+                              <SelectTrigger className="w-40" data-testid={`select-worker-${item.productId}`}>
+                                <SelectValue placeholder="Unassigned" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {workers.map((w: any) => (
+                                  <SelectItem key={w.id} value={String(w.id)}>{w.fullName || w.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" onClick={() => removeItem(item.productId)} data-testid={`button-remove-${item.productId}`}>

@@ -303,6 +303,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 totalCost: String(baleTotalCost),
                 status: "IN_STOCK",
                 finalizedAt: now,
+                finalizedBy: item.finalizedBy ?? null,
               })
               .returning();
 
