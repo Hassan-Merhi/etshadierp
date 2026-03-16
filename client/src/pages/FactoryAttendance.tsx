@@ -76,8 +76,14 @@ const STATUS_COLORS: Record<string, string> = {
   Leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
 };
 
+// Format a Date as YYYY-MM-DD using local time (not UTC) to avoid
+// timezone-shift bugs where toISOString() returns the previous day in UTC+ zones.
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr(new Date());
 }
 
 function currentMonthStart() {
@@ -88,7 +94,7 @@ function currentMonthStart() {
 function currentMonthEnd() {
   const d = new Date();
   const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return last.toISOString().slice(0, 10);
+  return localDateStr(last);
 }
 
 function generateDateRange(start: string, end: string): string[] {
@@ -96,7 +102,7 @@ function generateDateRange(start: string, end: string): string[] {
   const cur = new Date(start + "T00:00:00");
   const endDate = new Date(end + "T00:00:00");
   while (cur <= endDate) {
-    dates.push(cur.toISOString().slice(0, 10));
+    dates.push(localDateStr(cur));
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
