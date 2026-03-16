@@ -111,6 +111,7 @@ interface FxTransfer {
   toAmountUsd: string;
   notes: string | null;
   sourceType: string | null;
+  containerRefs?: Array<{ containerNumber: string; allocatedAmount: string }>;
 }
 
 interface StatementResponse {
@@ -1145,6 +1146,7 @@ export default function FactorySuppliers() {
                     key: string; date: string | null; type: RowType;
                     ref: string; detail: string; amount: string; amountIsNeg: boolean;
                     status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
+                    usdImpact: number;
                   }> = [
                     ...statementData.statement.map(e => ({
                       key: `c-${e.id}`,
@@ -1156,6 +1158,7 @@ export default function FactorySuppliers() {
                       amountIsNeg: false,
                       status: e.status,
                       notes: [e.notes, (parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "")].filter(Boolean).join(" · ") || null,
+                      usdImpact: +parseFloat(e.value || "0"),
                     })),
                     ...statementData.payments.map(p => ({
                       key: `p-${p.id}`,
@@ -1167,19 +1170,22 @@ export default function FactorySuppliers() {
                       amountIsNeg: false,
                       notes: p.notes,
                       onDelete: () => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); },
+                      usdImpact: -parseFloat(p.amountUsd || "0"),
                     })),
                     ...(statementData.fxTransfers || []).map(t => {
                       const isOut = t.fromSupplierId === statementSupplierId;
                       const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
+                      const refs = !isOut && t.containerRefs?.length ? ` · Covers: ${t.containerRefs.map(r => r.containerNumber).join(", ")}` : "";
                       return {
                         key: `f-${t.id}`,
                         date: t.date,
                         type: "fx" as RowType,
                         ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
-                        detail: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)} → $${formatNum(t.toAmountUsd)}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}` : `+$${formatNum(t.toAmountUsd)} received`,
+                        detail: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)} → $${formatNum(t.toAmountUsd)}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}` : `+$${formatNum(t.toAmountUsd)} received${refs}`,
                         amount: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)}` : `$${formatNum(t.toAmountUsd)}`,
                         amountIsNeg: isOut,
                         notes: t.notes,
+                        usdImpact: isOut ? -parseFloat(t.toAmountUsd || "0") : 0,
                       };
                     }),
                     ...(statementData.obCommissions || []).map(oc => ({
@@ -1193,12 +1199,21 @@ export default function FactorySuppliers() {
                       notes: null,
                       onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
                       onDelete: () => { if (confirm("Delete this opening balance commission entry? This cannot be undone.")) deleteObCommissionMutation.mutate(oc.rawStockId); },
+                      usdImpact: -parseFloat(oc.amount || "0"),
                     })),
                   ].sort((a, b) => {
                     const da = a.date ? new Date(a.date).getTime() : 0;
                     const db = b.date ? new Date(b.date).getTime() : 0;
                     return db - da;
                   });
+
+                  // Compute per-row running balance (oldest → newest accumulation)
+                  const balanceByKey: Record<string, number> = {};
+                  let runBal = 0;
+                  for (const r of [...allRows].reverse()) {
+                    runBal += r.usdImpact;
+                    balanceByKey[r.key] = runBal;
+                  }
 
                   const typeBadge = (type: RowType) => {
                     if (type === "purchase") return <Badge variant="outline" className="text-xs font-normal">Purchase</Badge>;
@@ -1223,13 +1238,16 @@ export default function FactorySuppliers() {
                             <TableHead>Type</TableHead>
                             <TableHead>Reference</TableHead>
                             <TableHead>Detail</TableHead>
-                            <TableHead className="text-right">Amount (USD)</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                             <TableHead>Notes</TableHead>
                             <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {allRows.map(row => (
+                          {allRows.map(row => {
+                            const bal = balanceByKey[row.key] ?? 0;
+                            return (
                             <TableRow key={row.key} data-testid={row.type === "purchase" ? `row-statement-${row.key}` : undefined}>
                               <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date || "")}</TableCell>
                               <TableCell>{typeBadge(row.type)}</TableCell>
@@ -1237,11 +1255,14 @@ export default function FactorySuppliers() {
                                 <span>{row.ref}</span>
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{row.detail || "—"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
                                 {row.amountIsNeg && row.type !== "payment" ? "−" : row.type === "payment" ? "−" : ""}{row.amount}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">{row.notes || "—"}</TableCell>
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${bal < 0 ? "text-green-600 dark:text-green-400" : bal > 0 ? "" : "text-muted-foreground"}`}>
+                                ${formatNum(Math.abs(bal))}{bal < 0 ? " CR" : bal > 0 ? " DR" : ""}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   {row.onEdit && (
@@ -1257,7 +1278,7 @@ export default function FactorySuppliers() {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))}
+                          ); })}
                         </TableBody>
                       </Table>
                     </div>

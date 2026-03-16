@@ -2071,10 +2071,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .from(factorySuppliers).where(inArray(factorySuppliers.id, fxSupplierIds));
         for (const s of fxSups) fxSupplierNames[s.id] = s.name;
       }
+      // Enrich incoming FX transfers with the container numbers they cover (cross-reference)
+      const incomingFxIds = (fxTransfers as any[]).filter((t: any) => t.toSupplierId === supplierId).map((t: any) => t.id);
+      const fxContainerRefsMap: Record<number, Array<{ containerNumber: string; allocatedAmount: string }>> = {};
+      if (incomingFxIds.length > 0) {
+        const fxAllocs = await db
+          .select({
+            fxTransferId: factoryFxAllocations.fxTransferId,
+            containerId: factoryFxAllocations.containerId,
+            allocatedAmount: factoryFxAllocations.allocatedAmount,
+            containerNumber: factoryContainers.containerNumber,
+          })
+          .from(factoryFxAllocations)
+          .innerJoin(factoryContainers, eq(factoryFxAllocations.containerId, factoryContainers.id))
+          .where(inArray(factoryFxAllocations.fxTransferId, incomingFxIds));
+        for (const a of fxAllocs) {
+          if (!fxContainerRefsMap[a.fxTransferId]) fxContainerRefsMap[a.fxTransferId] = [];
+          fxContainerRefsMap[a.fxTransferId].push({ containerNumber: a.containerNumber, allocatedAmount: String(a.allocatedAmount) });
+        }
+      }
+
       const enrichedFxTransfers = (fxTransfers as any[]).map((t: any) => ({
         ...t,
         fromSupplierName: fxSupplierNames[t.fromSupplierId] || "",
         toSupplierName: fxSupplierNames[t.toSupplierId] || "",
+        containerRefs: fxContainerRefsMap[t.id] || [],
       }));
 
       // Build per-currency payment totals (using original currency amounts, not USD)
