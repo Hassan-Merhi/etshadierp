@@ -281,6 +281,11 @@ interface ViewVoucherEntry {
 }
 
 // Account Combobox Component
+function focusDaybookEditById(id: string) {
+  const el = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+  if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); }
+}
+
 function AccountCombobox({
   value,
   onChange,
@@ -291,6 +296,9 @@ function AccountCombobox({
   fixedAssets,
   rowIndex,
   testIdPrefix = "button-account",
+  onArrowUp,
+  onArrowDown,
+  onArrowRight,
 }: {
   value: { type: string; id: number; name: string } | null;
   onChange: (
@@ -305,6 +313,9 @@ function AccountCombobox({
   fixedAssets: FixedAsset[];
   rowIndex: number;
   testIdPrefix?: string;
+  onArrowUp?: () => void;
+  onArrowDown?: () => void;
+  onArrowRight?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
