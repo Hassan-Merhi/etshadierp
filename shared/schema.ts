@@ -2358,6 +2358,20 @@ export const factoryOffloadAdditionalCharges = pgTable("factory_offload_addition
 
 export type FactoryOffloadAdditionalCharge = typeof factoryOffloadAdditionalCharges.$inferSelect;
 
+export const factoryContainerOtherCharges = pgTable("factory_container_other_charges", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  ledgerAccountId: integer("ledger_account_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  containerIdx: index("factory_container_other_charges_container_idx").on(t.containerId),
+}));
+
+export type FactoryContainerOtherCharge = typeof factoryContainerOtherCharges.$inferSelect;
+
 export const factoryRawStock = pgTable("factory_raw_stock", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

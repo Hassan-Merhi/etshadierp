@@ -67,6 +67,7 @@ import {
   userPresence,
   factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
   companySettings,
   factorySettings,
   factoryWorkers,
@@ -3831,6 +3832,62 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json(deleted);
     } catch (error: any) {
       console.error("Error deleting factory container:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/containers/:id/other-charges", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const containerId = parseInt(req.params.id);
+      const charges = await db
+        .select()
+        .from(factoryContainerOtherCharges)
+        .where(and(
+          eq(factoryContainerOtherCharges.containerId, containerId),
+          eq(factoryContainerOtherCharges.companyId, companyId)
+        ))
+        .orderBy(factoryContainerOtherCharges.createdAt);
+      res.json(charges);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/containers/:id/other-charges/sync", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const containerId = parseInt(req.params.id);
+      const { charges } = req.body as { charges: { description: string; amount: string; ledgerAccountId?: number | null }[] };
+
+      await db.delete(factoryContainerOtherCharges).where(and(
+        eq(factoryContainerOtherCharges.containerId, containerId),
+        eq(factoryContainerOtherCharges.companyId, companyId)
+      ));
+
+      let newCharges: any[] = [];
+      if (charges && charges.length > 0) {
+        newCharges = await db.insert(factoryContainerOtherCharges).values(
+          charges.map(c => ({
+            companyId,
+            containerId,
+            description: c.description,
+            amount: c.amount,
+            ledgerAccountId: c.ledgerAccountId || null,
+          }))
+        ).returning();
+      }
+
+      const total = charges?.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0) ?? 0;
+      await db.update(factoryContainers)
+        .set({ otherCharges: total.toFixed(2) })
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+
+      res.json({ charges: newCharges, total: total.toFixed(2) });
+    } catch (error: any) {
+      console.error("Error syncing container other charges:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -73,6 +73,17 @@ export default function FactoryContainers() {
   const [fxRate, setFxRate] = useState("1");
   const [fxRateSource, setFxRateSource] = useState<"auto" | "manual">("auto");
   const [fxEffectiveDate, setFxEffectiveDate] = useState("");
+
+  type OtherChargeLine = { description: string; amount: string; ledgerAccountId: string };
+  const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
+
+  const updateOtherChargeLine = (idx: number, field: keyof OtherChargeLine, value: string) => {
+    setOtherChargeLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+  };
+  const removeOtherChargeLine = (idx: number) => {
+    setOtherChargeLines(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [, navigate] = useLocation();
@@ -131,6 +142,23 @@ export default function FactoryContainers() {
     queryKey: ["/api/ledger-accounts"],
   });
 
+  useEffect(() => {
+    if (!editingContainer) {
+      setOtherChargeLines([]);
+      return;
+    }
+    factoryApiRequest("GET", `/api/factory/containers/${editingContainer.id}/other-charges`)
+      .then(res => res.ok ? res.json() : [])
+      .then((charges: any[]) => {
+        setOtherChargeLines(charges.map((c: any) => ({
+          description: c.description || "",
+          amount: c.amount || "",
+          ledgerAccountId: c.ledgerAccountId ? String(c.ledgerAccountId) : "",
+        })));
+      })
+      .catch(() => setOtherChargeLines([]));
+  }, [editingContainer?.id]);
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const payload = {
@@ -146,15 +174,25 @@ export default function FactoryContainers() {
         commissionNotes: data.commissionNotes || null,
         freight: data.freight || "0",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
-        otherCharges: data.otherCharges || "0",
-        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
+        otherCharges: "0",
+        otherChargesAccountId: null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to create container");
       }
-      return res.json();
+      const container = await res.json();
+      await factoryApiRequest("POST", `/api/factory/containers/${container.id}/other-charges/sync`, {
+        charges: otherChargeLines
+          .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
+          .map(l => ({
+            description: l.description,
+            amount: l.amount,
+            ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
+          })),
+      });
+      return container;
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
@@ -186,15 +224,25 @@ export default function FactoryContainers() {
         commissionNotes: data.commissionNotes || null,
         freight: data.freight || "0",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
-        otherCharges: data.otherCharges || "0",
-        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
+        otherCharges: "0",
+        otherChargesAccountId: null,
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update container");
       }
-      return res.json();
+      const container = await res.json();
+      await factoryApiRequest("POST", `/api/factory/containers/${id}/other-charges/sync`, {
+        charges: otherChargeLines
+          .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
+          .map(l => ({
+            description: l.description,
+            amount: l.amount,
+            ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
+          })),
+      });
+      return container;
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
@@ -327,6 +375,7 @@ export default function FactoryContainers() {
       otherCharges: "",
       otherChargesAccountId: "",
     });
+    setOtherChargeLines([]);
     setCurrency("USD");
     setFxRate("1");
     setFxRateSource("auto");
@@ -931,36 +980,83 @@ export default function FactoryContainers() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <Label>Other Charges <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-                  <Input
-                    type="number"
-                    value={formData.otherCharges}
-                    onChange={(e) => setFormData({ ...formData, otherCharges: e.target.value })}
-                    placeholder="0.00"
-                    data-testid="input-container-other-charges"
-                  />
-                </div>
-                <div>
-                  <Label>Other Charges Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-                  <Select
-                    value={formData.otherChargesAccountId || "__none__"}
-                    onValueChange={(val) => setFormData({ ...formData, otherChargesAccountId: val === "__none__" ? "" : val })}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setOtherChargeLines(prev => [...prev, { description: "", amount: "", ledgerAccountId: "" }])}
+                    data-testid="button-add-other-charge"
                   >
-                    <SelectTrigger data-testid="select-other-charges-account">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {ledgerAccounts.map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>
-                          {acc.name}{acc.code ? ` (${acc.code})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Line
+                  </Button>
                 </div>
+                {otherChargeLines.length === 0 && (
+                  <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
+                )}
+                {otherChargeLines.map((line, idx) => (
+                  <div key={idx} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
+                    <div>
+                      {idx === 0 && <Label className="text-xs text-muted-foreground">Description</Label>}
+                      <Input
+                        value={line.description}
+                        onChange={(e) => updateOtherChargeLine(idx, "description", e.target.value)}
+                        placeholder="e.g. Port handling"
+                        data-testid={`input-other-charge-description-${idx}`}
+                      />
+                    </div>
+                    <div>
+                      {idx === 0 && <Label className="text-xs text-muted-foreground">Amount</Label>}
+                      <Input
+                        type="number"
+                        value={line.amount}
+                        onChange={(e) => updateOtherChargeLine(idx, "amount", e.target.value)}
+                        placeholder="0.00"
+                        data-testid={`input-other-charge-amount-${idx}`}
+                      />
+                    </div>
+                    <div>
+                      {idx === 0 && <Label className="text-xs text-muted-foreground">Account (optional)</Label>}
+                      <Select
+                        value={line.ledgerAccountId || "__none__"}
+                        onValueChange={(val) => updateOtherChargeLine(idx, "ledgerAccountId", val === "__none__" ? "" : val)}
+                      >
+                        <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {ledgerAccounts.map((acc: any) => (
+                            <SelectItem key={acc.id} value={String(acc.id)}>
+                              {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      {idx === 0 && <div className="h-4" />}
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeOtherChargeLine(idx)}
+                        data-testid={`button-remove-other-charge-${idx}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {otherChargeLines.length > 0 && (
+                  <div className="text-xs text-muted-foreground text-right pt-1">
+                    Total: {otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0).toFixed(2)}
+                  </div>
+                )}
               </div>
             </div>
           </div>
