@@ -1731,6 +1731,7 @@ export const userPreferences = pgTable("user_preferences", {
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
   preferredCurrency: varchar("preferred_currency", { length: 10 }),
+  showProfitComparisonOnPOS: boolean("show_profit_comparison_on_pos").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

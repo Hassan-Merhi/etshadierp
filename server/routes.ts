@@ -1417,7 +1417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const { dateFormat, preferredCurrency } = req.body;
+      const { dateFormat, preferredCurrency, showProfitComparisonOnPOS } = req.body;
       
       // Validate date format if provided
       if (dateFormat && !["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
@@ -1436,6 +1436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateFields: any = { updatedAt: new Date() };
       if (dateFormat) updateFields.dateFormat = dateFormat;
       if (preferredCurrency !== undefined) updateFields.preferredCurrency = preferredCurrency;
+      if (showProfitComparisonOnPOS !== undefined) updateFields.showProfitComparisonOnPOS = showProfitComparisonOnPOS;
       
       if (existing.length === 0) {
         // Create new preferences
@@ -1443,6 +1444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: req.user.id,
           dateFormat: dateFormat || "MM/DD/YYYY",
           preferredCurrency: preferredCurrency || null,
+          showProfitComparisonOnPOS: showProfitComparisonOnPOS ?? false,
         }).returning();
         return res.json(newPrefs[0]);
       }
