@@ -745,6 +745,13 @@ export default function VoucherEdit() {
     name: "entries",
   });
 
+  const focusByTestId = (testId: string, select = false) => {
+    setTimeout(() => {
+      const el = document.querySelector(`[data-testid="${testId}"]`) as HTMLInputElement;
+      if (el) { el.focus(); if (select) el.select(); }
+    }, 30);
+  };
+
   // Sales Form
   const salesForm = useForm<SalesFormData>({
     resolver: zodResolver(salesFormSchema),
@@ -3311,6 +3318,9 @@ export default function VoucherEdit() {
                                       allAccounts={allAccountsWithBalances}
                                       rowIndex={index}
                                       testId={`input-account-${index}`}
+                                      onArrowUp={() => index > 0 && focusByTestId(`input-account-${index - 1}`)}
+                                      onArrowDown={() => index < paymentFields.length - 1 && focusByTestId(`input-account-${index + 1}`)}
+                                      onArrowRight={() => focusByTestId(`input-amount-${index}`, true)}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -3332,6 +3342,11 @@ export default function VoucherEdit() {
                                       placeholder="0.00"
                                       className="font-mono"
                                       data-testid={`input-amount-${index}`}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "ArrowUp" && index > 0) { e.preventDefault(); focusByTestId(`input-amount-${index - 1}`, true); }
+                                        else if (e.key === "ArrowDown" && index < paymentFields.length - 1) { e.preventDefault(); focusByTestId(`input-amount-${index + 1}`, true); }
+                                        else if (e.key === "ArrowLeft") { e.preventDefault(); focusByTestId(`input-account-${index}`); }
+                                      }}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -3649,6 +3664,10 @@ export default function VoucherEdit() {
                                       allAccounts={allAccountsWithBalances}
                                       rowIndex={index}
                                       testId={`input-account-${index}`}
+                                      onArrowUp={() => index > 0 && focusByTestId(`input-account-${index - 1}`)}
+                                      onArrowDown={() => index < journalFields.length - 1 && focusByTestId(`input-account-${index + 1}`)}
+                                      onArrowRight={() => focusByTestId(`input-amount-${index}`, true)}
+                                      onArrowLeft={() => focusByTestId(`select-type-${index}`)}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -3670,6 +3689,11 @@ export default function VoucherEdit() {
                                       placeholder="0.00"
                                       className="font-mono"
                                       data-testid={`input-amount-${index}`}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "ArrowUp" && index > 0) { e.preventDefault(); focusByTestId(`input-amount-${index - 1}`, true); }
+                                        else if (e.key === "ArrowDown" && index < journalFields.length - 1) { e.preventDefault(); focusByTestId(`input-amount-${index + 1}`, true); }
+                                        else if (e.key === "ArrowLeft") { e.preventDefault(); focusByTestId(`input-account-${index}`); }
+                                      }}
                                     />
                                   </FormControl>
                                   <FormMessage />
