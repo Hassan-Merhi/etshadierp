@@ -293,6 +293,64 @@ export default function FactorySupplierStatement() {
               </CardContent>
             </Card>
           )}
+
+          {statement.brokerContainers && statement.brokerContainers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  Commission Earned (as Broker)
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Containers where this supplier is the commission/broker — commission owed to them.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container</TableHead>
+                        <TableHead>Purchase Supplier</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Commission</TableHead>
+                        <TableHead className="text-right">Currency</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {statement.brokerContainers.map((c: any) => (
+                        <TableRow key={c.id} data-testid={`row-broker-container-${c.id}`}>
+                          <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{c.supplierName || "—"}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {c.arrivalDate ? formatDisplayDate(c.arrivalDate) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{c.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-green-600 dark:text-green-400">
+                            {formatNumber(parseFloat(c.commissionAmount || "0"))}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground text-sm">
+                            {c.commissionCurrencyCode || "USD"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <div className="text-sm font-medium">
+                    Total Commission Owed:{" "}
+                    <span className="font-mono text-green-600 dark:text-green-400" data-testid="text-broker-commission-total">
+                      {formatNumber(parseFloat(statement.summary?.totalBrokerCommission || "0"))}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 

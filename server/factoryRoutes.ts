@@ -1881,6 +1881,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const fx = parseFloat(c.fxRateToUsd || "1");
           return sum + (kg * rate * fx);
         }, 0);
+        // Commission owed to this supplier from containers where they are the commission/broker supplier
+        // Exclude containers where this supplier is also the main purchase supplier (avoid double-counting)
+        const commissionContainers = containers.filter((c: any) =>
+          c.commissionSupplierId === s.id && c.supplierId !== s.id && parseFloat(c.commissionAmount || "0") > 0
+        );
+        const commissionValue = commissionContainers.reduce((sum: number, c: any) => {
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+          const commFx = parseFloat(c.fxRateToUsd || "1");
+          return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
+        }, 0);
         const pendingContainers = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT").length;
         const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED").length;
         const lastContainerDate = supplierContainers.length > 0
@@ -1892,7 +1903,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           : null;
         const supplierPayments = allPayments.filter((p: any) => p.supplierId === s.id);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
-        const balance = parseFloat(s.openingBalance || "0") + containerValue - totalPaid;
+        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid;
 
         // Per-currency balances (original currency, not converted)
         const byCurrency: Record<string, number> = {};
@@ -1902,6 +1913,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             ? parseFloat(c.finalPayableAmount)
             : (parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0"));
           byCurrency[cc] = (byCurrency[cc] || 0) + val;
+        }
+        // Add commission amounts (in their own currency) for containers where this supplier is the broker
+        for (const c of commissionContainers) {
+          const cc = c.commissionCurrencyCode || c.currencyCode || "USD";
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          byCurrency[cc] = (byCurrency[cc] || 0) + commAmt;
         }
         // Subtract payments by currency
         for (const p of supplierPayments) {
@@ -2020,6 +2037,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(factoryContainers.supplierId, supplierId)
         ))
         .orderBy(desc(factoryContainers.createdAt));
+
+      // Containers where this supplier earns commission as a broker (commissionSupplierId = supplierId)
+      const brokerContainerRows = await db
+        .select({
+          id: factoryContainers.id,
+          containerNumber: factoryContainers.containerNumber,
+          supplierId: factoryContainers.supplierId,
+          arrivalDate: factoryContainers.arrivalDate,
+          createdAt: factoryContainers.createdAt,
+          status: factoryContainers.status,
+          commissionAmount: factoryContainers.commissionAmount,
+          commissionCurrencyCode: factoryContainers.commissionCurrencyCode,
+          origin: factoryContainers.origin,
+          supplierName: factorySuppliers.name,
+        })
+        .from(factoryContainers)
+        .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          eq((factoryContainers as any).commissionSupplierId, supplierId),
+          sql`${factoryContainers.supplierId} != ${supplierId}`
+        ))
+        .orderBy(desc(factoryContainers.createdAt));
+      const brokerContainers = (brokerContainerRows as any[]).filter((c: any) => parseFloat(c.commissionAmount || "0") > 0);
+      const totalBrokerCommission = brokerContainers.reduce((sum: number, c: any) => sum + parseFloat(c.commissionAmount || "0"), 0);
 
       const commissions = await db
         .select()
@@ -2408,6 +2450,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         payments,
         fxTransfers: enrichedFxTransfers,
         linkedSupplierGroups,
+        brokerContainers,
         ledger,
         summary: {
           totalContainers: statement.length,
@@ -2417,6 +2460,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalDirectCommissions: totalDirectCommissions.toFixed(2),
           totalObCommissions: totalObCommissions.toFixed(2),
           totalPayments: totalPayments.toFixed(2),
+          totalBrokerCommission: totalBrokerCommission.toFixed(2),
           netPayable: (totalValue - totalCommissions - totalPayments).toFixed(2),
           totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },

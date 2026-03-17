@@ -832,13 +832,13 @@ export default function FactoryContainers() {
               </div>
 
               <div>
-                <Label>Commission Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Label>ERP Commission Account <span className="text-muted-foreground text-xs font-normal">(optional — for ERP bookkeeping only)</span></Label>
                 <Select
                   value={formData.commissionAccountId || "__none__"}
                   onValueChange={(val) => setFormData({ ...formData, commissionAccountId: val === "__none__" ? "" : val })}
                 >
                   <SelectTrigger data-testid="select-commission-account">
-                    <SelectValue placeholder="Select account..." />
+                    <SelectValue placeholder="None (leave empty)" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
@@ -849,6 +849,9 @@ export default function FactoryContainers() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Commission flows into the broker's balance automatically via the "Broker / Commission To" field above.
+                </p>
               </div>
             </div>
           </div>
