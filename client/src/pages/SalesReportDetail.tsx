@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,6 +42,7 @@ const formatNumericValue = (value: string | number): string => {
 export default function SalesReportDetail() {
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";
@@ -67,6 +69,21 @@ export default function SalesReportDetail() {
     const locB = b.locationName || "";
     return locA.localeCompare(locB);
   });
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === "s") {
+        if (selectedItemId == null) return;
+        const item = sortedItems.find((i) => i.id === selectedItemId);
+        if (item?.stockItemId) {
+          e.preventDefault();
+          navigate(`/stock-query/${item.stockItemId}`);
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedItemId, sortedItems, navigate]);
 
   const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
   const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
@@ -172,8 +189,14 @@ export default function SalesReportDetail() {
                   <TableBody>
                     {sortedItems.map((item) => {
                       const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                      const isSelected = selectedItemId === item.id;
                       return (
-                        <TableRow key={item.id} data-testid={`row-detail-${item.id}`}>
+                        <TableRow
+                          key={item.id}
+                          data-testid={`row-detail-${item.id}`}
+                          className={`cursor-pointer ${isSelected ? "bg-muted" : ""}`}
+                          onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                        >
                           <TableCell className="font-medium">
                             {(item.locationId || item.stockItemId) ? (
                               <a
@@ -242,8 +265,13 @@ export default function SalesReportDetail() {
               <div className="md:hidden space-y-3 p-3">
                 {sortedItems.map((item) => {
                   const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                  const isSelected = selectedItemId === item.id;
                   return (
-                    <Card key={item.id}>
+                    <Card
+                      key={item.id}
+                      className={`cursor-pointer ${isSelected ? "bg-muted" : ""}`}
+                      onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                    >
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           {(item.locationId || item.stockItemId) ? (

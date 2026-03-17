@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -298,6 +298,18 @@ export default function SalesReport() {
   };
 
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === "s") {
+        if (!selectedStockItem || selectedStockItem === "all") return;
+        e.preventDefault();
+        navigate(`/stock-query/${selectedStockItem}`);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedStockItem, navigate]);
 
   const handleRowClick = (summary: DailySummary) => {
     const params = new URLSearchParams();
