@@ -435,6 +435,8 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_container_other_charges_container_idx ON factory_container_other_charges (container_id)`,
     // POS profit comparison on receipt (Mar 2026)
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS show_profit_comparison_on_pos boolean NOT NULL DEFAULT false`,
+    // Store configured (Hassan's) price on each sales item so reprints are accurate (Mar 2026)
+    `ALTER TABLE sales_items ADD COLUMN IF NOT EXISTS configured_price decimal(15,6)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

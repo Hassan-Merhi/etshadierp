@@ -994,6 +994,7 @@ export const salesItems = pgTable("sales_items", {
   totalSales: decimal("total_sales", { precision: 15, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull(),
   profit: decimal("profit", { precision: 15, scale: 2 }).notNull(),
+  configuredPrice: decimal("configured_price", { precision: 15, scale: 6 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

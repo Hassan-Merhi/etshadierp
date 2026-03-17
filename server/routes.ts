@@ -9119,6 +9119,19 @@ if (asOfDate) {
 
           totalSales += itemSales;
 
+          // Look up configured price for this item/location
+          const [importCashLocPrice] = await tx
+            .select()
+            .from(stockItemLocationPrices)
+            .where(
+              and(
+                eq(stockItemLocationPrices.stockItemId, stockItem.id),
+                eq(stockItemLocationPrices.locationId, locationId)
+              )
+            )
+            .limit(1);
+          const importCashConfiguredPrice = parseFloat(importCashLocPrice?.sellingPrice || stockItem.sellingPrice || "0");
+
           // Create sales item record
           await tx.insert(salesItems).values({
             voucherId: voucher.id,
@@ -9129,6 +9142,7 @@ if (asOfDate) {
             totalSales: itemSales.toString(),
             totalCost: itemCost.toString(),
             profit: profit.toString(),
+            configuredPrice: importCashConfiguredPrice > 0 ? importCashConfiguredPrice.toFixed(6) : null,
           });
           
           // Note: COGS is tracked in sales_items table but not posted to ledger
@@ -9513,6 +9527,19 @@ if (asOfDate) {
 
           totalSales += itemSales;
 
+          // Look up configured price for this item/location
+          const [importCreditLocPrice] = await tx
+            .select()
+            .from(stockItemLocationPrices)
+            .where(
+              and(
+                eq(stockItemLocationPrices.stockItemId, stockItem.id),
+                eq(stockItemLocationPrices.locationId, locationId)
+              )
+            )
+            .limit(1);
+          const importCreditConfiguredPrice = parseFloat(importCreditLocPrice?.sellingPrice || stockItem.sellingPrice || "0");
+
           await tx.insert(salesItems).values({
             voucherId: voucher.id,
             stockItemId: stockItem.id,
@@ -9522,6 +9549,7 @@ if (asOfDate) {
             totalSales: itemSales.toString(),
             totalCost: itemCost.toString(),
             profit: profit.toString(),
+            configuredPrice: importCreditConfiguredPrice > 0 ? importCreditConfiguredPrice.toFixed(6) : null,
           });
 
           await adjustInventory(tx, locationId, stockItem.id, -item.quantity, req.session.currentCompanyId!);
@@ -15074,9 +15102,9 @@ if (asOfDate) {
                 item.stockItemId,
               );
               
-              // Get configured price from stockItemLocationPrices
-              let configuredPrice = "0";
-              if (voucher.locationId) {
+              // Use stored configured price if available, otherwise fall back to live lookup
+              let configuredPrice = item.configuredPrice || "0";
+              if ((!configuredPrice || configuredPrice === "0") && voucher.locationId) {
                 const [locationPrice] = await db
                   .select()
                   .from(stockItemLocationPrices)
@@ -15905,16 +15933,35 @@ if (asOfDate) {
             const totalCost = quantity * actualCostPrice;
             const profit = totalSales - totalCost;
 
+            // Look up configured price for this location
+            const [patchLocPrice] = await tx
+              .select()
+              .from(stockItemLocationPrices)
+              .where(
+                and(
+                  eq(stockItemLocationPrices.stockItemId, newItem.stockItemId),
+                  eq(stockItemLocationPrices.locationId, targetLocationId)
+                )
+              )
+              .limit(1);
+            const patchConfiguredPriceNum = parseFloat(patchLocPrice?.sellingPrice || "0");
+
             updatedSalesItemsData.push({
               ...newItem,
               costPrice: actualCostPrice.toFixed(2),
               totalCost: totalCost.toFixed(2),
               profit: profit.toFixed(2),
+              configuredPrice: patchConfiguredPriceNum > 0 ? patchConfiguredPriceNum.toFixed(6) : null,
             });
           }
           
           salesItemsData.length = 0;
           salesItemsData.push(...updatedSalesItemsData);
+        } else {
+          // No targetLocationId — still try to add configuredPrice if we know it
+          for (const newItem of salesItemsData) {
+            (newItem as any).configuredPrice = null;
+          }
         }
 
         // STEP 4: Insert new sales items
@@ -18731,18 +18778,7 @@ if (asOfDate) {
           const totalCost = qty * costPrice;
           const profit = totalSales - totalCost;
 
-          await tx.insert(salesItems).values({
-            voucherId: txVoucher.id,
-            stockItemId: item.stockItemId,
-            quantity: qty.toString(),
-            sellingPrice: sellingPrice.toFixed(2),
-            costPrice: costPrice.toFixed(2),
-            totalSales: totalSales.toFixed(2),
-            totalCost: totalCost.toFixed(2),
-            profit: profit.toFixed(2),
-          });
-
-          // Get configured selling price from location prices
+          // Get configured selling price from location prices BEFORE insert so we can persist it
           const [locPrice] = await tx
             .select()
             .from(stockItemLocationPrices)
@@ -18755,6 +18791,18 @@ if (asOfDate) {
             .limit(1);
           const configuredPrice = locPrice?.sellingPrice || stockItem?.sellingPrice || "0";
           const configuredPriceNum = parseFloat(configuredPrice);
+
+          await tx.insert(salesItems).values({
+            voucherId: txVoucher.id,
+            stockItemId: item.stockItemId,
+            quantity: qty.toString(),
+            sellingPrice: sellingPrice.toFixed(2),
+            costPrice: costPrice.toFixed(2),
+            totalSales: totalSales.toFixed(2),
+            totalCost: totalCost.toFixed(2),
+            profit: profit.toFixed(2),
+            configuredPrice: configuredPriceNum.toFixed(6),
+          });
           const profitPerUnit = sellingPrice - configuredPriceNum;
           const totalProfitVsConfigured = profitPerUnit * qty;
 
@@ -18963,6 +19011,19 @@ if (asOfDate) {
           const totalCost = sellQty * costPrice;
           const profit = totalSales - totalCost;
 
+          // Look up configured price for this item at this location
+          const [editLocPrice] = await tx
+            .select()
+            .from(stockItemLocationPrices)
+            .where(
+              and(
+                eq(stockItemLocationPrices.stockItemId, stockItemId),
+                eq(stockItemLocationPrices.locationId, targetLocationId)
+              )
+            )
+            .limit(1);
+          const editConfiguredPriceNum = parseFloat(editLocPrice?.sellingPrice || "0");
+
           // Create new sales item
           await tx.insert(salesItems).values({
             voucherId,
@@ -18973,6 +19034,7 @@ if (asOfDate) {
             totalSales: totalSales.toFixed(2),
             totalCost: totalCost.toFixed(2),
             profit: profit.toFixed(2),
+            configuredPrice: editConfiguredPriceNum > 0 ? editConfiguredPriceNum.toFixed(6) : null,
           });
 
           // Deduct from inventory using adjustInventory (sale = negative delta)
