@@ -188,7 +188,7 @@ export default function SalesReportDetail() {
                   </TableHeader>
                   <TableBody>
                     {sortedItems.map((item) => {
-                      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                      const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
                       const isSelected = selectedItemId === item.id;
                       return (
                         <TableRow
@@ -264,7 +264,7 @@ export default function SalesReportDetail() {
 
               <div className="md:hidden space-y-3 p-3">
                 {sortedItems.map((item) => {
-                  const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                  const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
                   const isSelected = selectedItemId === item.id;
                   return (
                     <Card
