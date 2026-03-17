@@ -11252,6 +11252,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
 
+      const csvFmtNum = (val: any): string => {
+        const n = parseFloat(val);
+        if (isNaN(n)) return val ?? "";
+        return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "");
+      };
+      const csvFmtMoney = (val: any): string => `$${csvFmtNum(val)}`;
+
       let csv = `Company: ${company?.name || ""}\n`;
       csv += `Invoice: ${order.invoiceNumber || "DRAFT"}\n`;
       csv += `Customer: ${order.customerName} (${order.customerCode})\n`;
@@ -11259,21 +11266,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       csv += `#,Article Code,Product Name,Qty,Weight/Bale,Total Weight,Price/Bale,Total Price\n`;
 
       sortedLines.forEach((line: any, idx: number) => {
-        csv += `${idx + 1},${line.articleCode},${(line.baleName || "").replace(/,/g, " ")},${line.qty},${line.weightPerBale},${line.totalWeight},${line.pricePerBale},${line.totalPrice}\n`;
+        csv += `${idx + 1},${line.articleCode},${(line.baleName || "").replace(/,/g, " ")},${csvFmtNum(line.qty)},${csvFmtNum(line.weightPerBale)},${csvFmtNum(line.totalWeight)},${csvFmtMoney(line.pricePerBale)},${csvFmtMoney(line.totalPrice)}\n`;
       });
 
       csv += `\nCharges\n`;
       csv += `Name,Type,Amount\n`;
       for (const charge of charges) {
-        csv += `${(charge.name || "").replace(/,/g, " ")},${charge.chargeType},${charge.amount}\n`;
+        csv += `${(charge.name || "").replace(/,/g, " ")},${charge.chargeType},${csvFmtMoney(charge.amount)}\n`;
       }
 
       csv += `\nSummary\n`;
-      csv += `Subtotal Bales,${order.subtotalBales}\n`;
-      csv += `Freight,${order.freightAmount}\n`;
-      csv += `Other Charges,${order.otherChargesTotal}\n`;
-      csv += `Grand Total,${order.grandTotal}\n`;
-      csv += `Total Qty Bales,${order.totalQtyBales}\n`;
+      csv += `Subtotal Bales,${csvFmtMoney(order.subtotalBales)}\n`;
+      csv += `Freight,${csvFmtMoney(order.freightAmount)}\n`;
+      csv += `Other Charges,${csvFmtMoney(order.otherChargesTotal)}\n`;
+      csv += `Grand Total,${csvFmtMoney(order.grandTotal)}\n`;
+      csv += `Total Qty Bales,${csvFmtNum(order.totalQtyBales)}\n`;
 
       const filename = `invoice_${order.invoiceNumber || orderId}.csv`;
       res.setHeader("Content-Type", "text/csv");
@@ -11321,14 +11328,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const sortedLines = lines.sort((a: any, b: any) => (a.baleName || "").localeCompare(b.baleName || ""));
 
+      const fmtNum = (val: any): string => {
+        const n = parseFloat(val);
+        if (isNaN(n)) return val ?? "";
+        return n % 1 === 0 ? n.toFixed(0) : n.toFixed(2).replace(/\.?0+$/, "");
+      };
+      const fmtMoney = (val: any): string => `$${fmtNum(val)}`;
+
       let linesHtml = "";
       sortedLines.forEach((line: any, idx: number) => {
-        linesHtml += `<tr><td>${idx + 1}</td><td>${line.articleCode}</td><td>${line.baleName || ""}</td><td style="text-align:right">${line.qty}</td><td style="text-align:right">${line.weightPerBale}</td><td style="text-align:right">${line.totalWeight}</td><td style="text-align:right">${line.pricePerBale}</td><td style="text-align:right">${line.totalPrice}</td></tr>`;
+        linesHtml += `<tr>
+          <td style="white-space:nowrap;text-align:center">${idx + 1}</td>
+          <td style="white-space:nowrap">${line.articleCode}</td>
+          <td>${line.baleName || ""}</td>
+          <td style="white-space:nowrap;text-align:right">${fmtNum(line.qty)}</td>
+          <td style="white-space:nowrap;text-align:right">${fmtNum(line.weightPerBale)}</td>
+          <td style="white-space:nowrap;text-align:right">${fmtNum(line.totalWeight)}</td>
+          <td style="white-space:nowrap;text-align:right">${fmtMoney(line.pricePerBale)}</td>
+          <td style="white-space:nowrap;text-align:right">${fmtMoney(line.totalPrice)}</td>
+        </tr>`;
       });
 
       let chargesHtml = "";
       for (const charge of charges) {
-        chargesHtml += `<tr><td>${charge.name}</td><td>${charge.chargeType}</td><td style="text-align:right">${charge.amount}</td></tr>`;
+        chargesHtml += `<tr><td>${charge.name}</td><td style="white-space:nowrap">${charge.chargeType}</td><td style="white-space:nowrap;text-align:right">${fmtMoney(charge.amount)}</td></tr>`;
       }
 
       const html = `<!DOCTYPE html>
@@ -11338,12 +11361,13 @@ body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
 h1 { margin-bottom: 5px; }
 .header-info { margin-bottom: 20px; }
 .header-info p { margin: 2px 0; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
-th { background-color: #f5f5f5; text-align: left; }
-.totals-table { width: 300px; margin-left: auto; }
-.totals-table td:last-child { text-align: right; font-weight: bold; }
-.grand-total { font-size: 16px; font-weight: bold; background: #f0f0f0; }
+table { border-collapse: collapse; margin-bottom: 20px; }
+.lines-table { width: 100%; table-layout: auto; }
+th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 13px; }
+th { background-color: #f5f5f5; white-space: nowrap; }
+.totals-table { min-width: 280px; margin-left: auto; }
+.totals-table td:last-child { text-align: right; font-weight: bold; white-space: nowrap; }
+.grand-total { font-size: 15px; font-weight: bold; background: #f0f0f0; }
 @media print { body { margin: 20px; } }
 </style></head><body>
 <h1>${company?.name || ""}</h1>
@@ -11353,17 +11377,26 @@ th { background-color: #f5f5f5; text-align: left; }
 <p><strong>Date:</strong> ${order.orderDate}</p>
 </div>
 <h3>Order Lines</h3>
-<table>
-<thead><tr><th>#</th><th>Article Code</th><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Weight/Bale</th><th style="text-align:right">Total Weight</th><th style="text-align:right">Price/Bale</th><th style="text-align:right">Total Price</th></tr></thead>
+<table class="lines-table">
+<thead><tr>
+  <th style="text-align:center">#</th>
+  <th>Article Code</th>
+  <th>Product</th>
+  <th style="text-align:right">Qty</th>
+  <th style="text-align:right">Weight/Bale</th>
+  <th style="text-align:right">Total Weight</th>
+  <th style="text-align:right">Price/Bale</th>
+  <th style="text-align:right">Total Price</th>
+</tr></thead>
 <tbody>${linesHtml}</tbody>
 </table>
 ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>${chargesHtml}</tbody></table>` : ""}
 <table class="totals-table">
-<tr><td>Subtotal Bales</td><td>${order.subtotalBales}</td></tr>
-<tr><td>Freight</td><td>${order.freightAmount}</td></tr>
-<tr><td>Other Charges</td><td>${order.otherChargesTotal}</td></tr>
-<tr class="grand-total"><td>Grand Total</td><td>${order.grandTotal}</td></tr>
-<tr><td>Total Qty Bales</td><td>${order.totalQtyBales}</td></tr>
+<tr><td>Subtotal Bales</td><td>${fmtMoney(order.subtotalBales)}</td></tr>
+<tr><td>Freight</td><td>${fmtMoney(order.freightAmount)}</td></tr>
+<tr><td>Other Charges</td><td>${fmtMoney(order.otherChargesTotal)}</td></tr>
+<tr class="grand-total"><td>Grand Total</td><td>${fmtMoney(order.grandTotal)}</td></tr>
+<tr><td>Total Qty Bales</td><td style="text-align:right;font-weight:bold">${fmtNum(order.totalQtyBales)}</td></tr>
 </table>
 </body></html>`;
 
