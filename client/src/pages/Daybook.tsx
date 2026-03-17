@@ -1449,6 +1449,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // ── Keyboard navigation (Arrow Up/Down, Ctrl+H, Ctrl+U) ─────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (viewDialogOpen || editDialogOpen || deleteDialogOpen) return;
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isEditable = document.activeElement?.getAttribute("contenteditable");
       if (["input", "textarea", "select"].includes(tag) || isEditable) return;
@@ -1522,7 +1523,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId]);
+  }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId, viewDialogOpen, editDialogOpen, deleteDialogOpen]);
 
   const clearFilters = () => {
     setPeriodFilter(getDefaultPeriodValue("today"));
