@@ -1442,7 +1442,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (!selectedRowId) return;
     const el = document.querySelector(`[data-row-id="${selectedRowId}"]`);
     if (el) {
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      el.scrollIntoView({ block: "nearest", behavior: "auto" });
     }
   }, [selectedRowId]);
 

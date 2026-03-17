@@ -110,6 +110,7 @@ export default function SalesReport() {
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
+  const [selectedRowDate, setSelectedRowDate] = useState<string | null>(null);
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
@@ -305,13 +306,36 @@ export default function SalesReport() {
         if (!selectedStockItem || selectedStockItem === "all") return;
         e.preventDefault();
         navigate(`/stock-query/${selectedStockItem}`);
+        return;
+      }
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        const tag = (document.activeElement?.tagName || "").toLowerCase();
+        if (["input", "textarea", "select"].includes(tag)) return;
+        if (filteredGroupedData.length === 0) return;
+        e.preventDefault();
+        setSelectedRowDate((prev) => {
+          const idx = prev ? filteredGroupedData.findIndex((g) => g.date === prev) : -1;
+          if (e.key === "ArrowDown") {
+            return filteredGroupedData[idx < filteredGroupedData.length - 1 ? idx + 1 : 0].date;
+          } else {
+            return filteredGroupedData[idx > 0 ? idx - 1 : filteredGroupedData.length - 1].date;
+          }
+        });
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selectedStockItem, navigate]);
+  }, [selectedStockItem, navigate, filteredGroupedData]);
+
+  useEffect(() => {
+    if (!selectedRowDate) return;
+    const el = document.querySelector(`[data-testid="row-sale-${selectedRowDate}"]`);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, [selectedRowDate]);
 
   const handleRowClick = (summary: DailySummary) => {
+    setSelectedRowDate(summary.date);
     const params = new URLSearchParams();
     params.set("displayDate", summary.displayDate);
     params.set("grouping", grouping);
@@ -713,7 +737,7 @@ export default function SalesReport() {
                     <TableRow 
                       key={group.date} 
                       data-testid={`row-sale-${group.date}`}
-                      className="cursor-pointer hover-elevate"
+                      className={`cursor-pointer hover-elevate${selectedRowDate === group.date ? " bg-muted" : ""}`}
                       onClick={() => handleRowClick(group)}
                     >
                       <TableCell className="font-medium">{group.displayDate}</TableCell>
@@ -777,7 +801,7 @@ export default function SalesReport() {
                 <Card 
                   key={group.date}
                   data-testid={`row-sale-${group.date}`}
-                  className="cursor-pointer hover-elevate"
+                  className={`cursor-pointer hover-elevate${selectedRowDate === group.date ? " bg-muted" : ""}`}
                   onClick={() => handleRowClick(group)}
                 >
                   <CardContent className="p-4 space-y-2">
