@@ -230,7 +230,7 @@ export default function FactoryInvoices() {
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
-                      {parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

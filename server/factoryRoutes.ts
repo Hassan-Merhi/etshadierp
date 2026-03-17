@@ -9499,7 +9499,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           otherChargesTotal: customerOrders.otherChargesTotal,
           grandTotal: customerOrders.grandTotal,
           totalQtyBales: customerOrders.totalQtyBales,
-          totalWeightKg: sql<string>`COALESCE((SELECT SUM(col.total_weight) FROM customer_order_lines col WHERE col.order_id = ${customerOrders.id}), 0)`,
+          totalWeightKg: sql<string>`COALESCE((SELECT SUM(cob.weight) FROM customer_order_bales cob WHERE cob.order_id = ${customerOrders.id}), 0)`,
           containerNumber: customerOrders.containerNumber,
           shippingCompany: customerOrders.shippingCompany,
           locationId: customerOrders.locationId,
