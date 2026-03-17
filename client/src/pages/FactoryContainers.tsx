@@ -475,7 +475,7 @@ export default function FactoryContainers() {
             Import Excel
           </Button>
           <Button
-            onClick={() => { resetForm(); setCreateOpen(true); }}
+            onClick={() => navigate("/factory/containers/new")}
             data-testid="button-add-factory-container"
           >
             <Plus className="h-4 w-4 mr-2" />

@@ -99,6 +99,7 @@ import FactoryLoadingsHub from "@/pages/FactoryLoadingsHub";
 import ProductionSummary from "@/pages/ProductionSummary";
 import FactorySuppliers from "@/pages/FactorySuppliers";
 import FactoryContainers from "@/pages/FactoryContainers";
+import FactoryContainerCreate from "@/pages/FactoryContainerCreate";
 import BarcodeManager from "@/pages/BarcodeManager";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
@@ -625,6 +626,7 @@ function AuthenticatedApp() {
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
+                    <Route path="/factory/containers/new" component={FactoryContainerCreate} />
                     <Route path="/factory/containers" component={FactoryContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
                     <Route path="/factory/raw-stock/opening-balance/:id/edit" component={FactoryOpeningBalanceEdit} />
