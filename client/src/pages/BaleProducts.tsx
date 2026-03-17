@@ -44,6 +44,8 @@ interface ImportPreviewRow {
   category?: string;
   description?: string;
   weightPerBaleKg?: string;
+  productionPrice?: number | string;
+  sellingPrice?: number | string;
   active?: boolean;
 }
 
@@ -363,19 +365,25 @@ export default function BaleProducts() {
 
       const preview: ImportPreviewRow[] = rows.map((row) => {
         const itemNumber = row.itemNumber || row.item_number || row.ItemNumber;
-        let articleCode = row.articleCode || row.article_code || row.ArticleCode || "";
+        let articleCode = (
+          row["Article Code"] || row.articleCode || row.article_code || row.ArticleCode || ""
+        ).toString().trim();
         if (!articleCode && itemNumber) {
           const num = parseInt(String(itemNumber));
           if (!isNaN(num) && num >= 1 && num <= 99) {
             articleCode = `HMD${String(num).padStart(2, "0")}000`;
           }
         }
+        const rawProdPrice = row["Production Price"] ?? row["production price"] ?? row.productionPrice ?? row.production_price ?? row["Cost Price"] ?? row.costPrice ?? null;
+        const rawSellPrice = row["Selling Price"] ?? row["selling price"] ?? row.sellingPrice ?? row.selling_price ?? null;
         return {
           articleCode: articleCode || "",
-          name: row.name || row.Name || row.product_name || "",
+          name: (row["Name"] || row.name || row.Name || row["Product Name"] || row.product_name || "").toString().trim(),
           category: (row.category || row.Category || row.category_name || "").toString().trim(),
-          description: row.description || row.Description || "",
-          weightPerBaleKg: row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || undefined,
+          description: (row.description || row.Description || "").toString().trim(),
+          weightPerBaleKg: (row["Weight Per Bale"] || row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || "").toString() || undefined,
+          productionPrice: rawProdPrice !== null && rawProdPrice !== "" ? parseFloat(String(rawProdPrice)) || undefined : undefined,
+          sellingPrice: rawSellPrice !== null && rawSellPrice !== "" ? parseFloat(String(rawSellPrice)) || undefined : undefined,
           active: row.active === undefined ? true : Boolean(row.active),
         };
       });
@@ -906,6 +914,8 @@ export default function BaleProducts() {
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Weight/Bale</TableHead>
+                <TableHead>Cost Price</TableHead>
+                <TableHead>Sell Price</TableHead>
                 <TableHead>Description</TableHead>
               </TableRow>
             </TableHeader>
@@ -916,6 +926,8 @@ export default function BaleProducts() {
                   <TableCell>{row.name}</TableCell>
                   <TableCell className="text-muted-foreground">{row.category || "Uncategorized"}</TableCell>
                   <TableCell>{row.weightPerBaleKg || "-"}</TableCell>
+                  <TableCell>{row.productionPrice != null ? Number(row.productionPrice).toLocaleString() : "-"}</TableCell>
+                  <TableCell>{row.sellingPrice != null ? Number(row.sellingPrice).toLocaleString() : "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{row.description || "-"}</TableCell>
                 </TableRow>
               ))}
