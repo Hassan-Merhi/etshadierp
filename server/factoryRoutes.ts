@@ -181,6 +181,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   }
 
+  async function getOrCreateLedgerAccount(
+    companyId: number,
+    code: string,
+    name: string,
+    accountType: string = "EXPENSE"
+  ): Promise<number> {
+    const safeCode = code.slice(0, 50);
+    const [existing] = await db
+      .select({ id: ledgerAccounts.id })
+      .from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, safeCode)))
+      .limit(1);
+    if (existing) return existing.id;
+    const [created] = await db.insert(ledgerAccounts).values({
+      companyId,
+      code: safeCode,
+      name,
+      accountType,
+      active: true,
+      isHidden: false,
+    }).returning({ id: ledgerAccounts.id });
+    return created.id;
+  }
+
   function isLegacySHA256Hash(hash: string): boolean {
     return /^[a-f0-9]{64}$/i.test(hash);
   }
@@ -3747,6 +3771,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (sup?.parentId) values.commissionSupplierId = sup.parentId;
       }
 
+      // Auto-create freight ledger account if freight > 0 and no account selected
+      if (!values.freightAccountId && parseFloat(values.freight || "0") > 0) {
+        values.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
+      }
+
       const [container] = await db.insert(factoryContainers).values(values).returning();
       await writeDaybookEntry(db, {
         companyId,
@@ -3801,6 +3830,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           updateData.fxRateSource = "manual";
           updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
         }
+      }
+
+      // Auto-create freight ledger account if freight > 0 and no account selected
+      if (!updateData.freightAccountId && parseFloat(updateData.freight || "0") > 0) {
+        updateData.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
       const [updated] = await db
@@ -3869,15 +3903,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let newCharges: any[] = [];
       if (charges && charges.length > 0) {
-        newCharges = await db.insert(factoryContainerOtherCharges).values(
-          charges.map(c => ({
-            companyId,
-            containerId,
-            description: c.description,
-            amount: c.amount,
-            ledgerAccountId: c.ledgerAccountId || null,
-          }))
-        ).returning();
+        const resolvedCharges = await Promise.all(
+          charges.map(async (c) => {
+            let ledgerAccountId = c.ledgerAccountId || null;
+            if (!ledgerAccountId && c.description?.trim()) {
+              const code = ("OC_" + c.description.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 50);
+              ledgerAccountId = await getOrCreateLedgerAccount(companyId, code, c.description);
+            }
+            return { companyId, containerId, description: c.description, amount: c.amount, ledgerAccountId };
+          })
+        );
+        newCharges = await db.insert(factoryContainerOtherCharges).values(resolvedCharges).returning();
       }
 
       const total = charges?.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0) ?? 0;
