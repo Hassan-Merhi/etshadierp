@@ -179,11 +179,6 @@ export default function POSDaybook() {
   // Backward compatibility alias
   const salesVouchers = filteredVouchers;
 
-  // Fetch user preferences for showing profit comparison
-  const { data: userPrefs } = useQuery({
-    queryKey: ["/api/user-preferences"],
-  });
-
   // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
     queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}`] : [],
@@ -883,16 +878,12 @@ export default function POSDaybook() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
                       <thead>
                         <tr style={{ borderBottom: '2px solid black' }}>
-                          <th style={{ textAlign: 'left', padding: '4px 3px', width: userPrefs?.showProfitComparisonOnPOS ? '32%' : '48%', fontWeight: '900' }}>Description</th>
+                          <th style={{ textAlign: 'left', padding: '4px 3px', width: '32%', fontWeight: '900' }}>Description</th>
                           <th style={{ textAlign: 'right', padding: '4px 3px', width: '8%', fontWeight: '900' }}>Qty</th>
                           <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Rate</th>
                           <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Amt</th>
-                          {userPrefs?.showProfitComparisonOnPOS && (
-                            <>
-                              <th style={{ textAlign: 'right', padding: '4px 3px', width: '15%', fontWeight: '900', fontSize: '10pt' }}>P/L Bale</th>
-                              <th style={{ textAlign: 'right', padding: '4px 3px', width: '15%', fontWeight: '900', fontSize: '10pt' }}>Total P/L</th>
-                            </>
-                          )}
+                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '15%', fontWeight: '900', fontSize: '10pt' }}>P/L Bale</th>
+                          <th style={{ textAlign: 'right', padding: '4px 3px', width: '15%', fontWeight: '900', fontSize: '10pt' }}>Total P/L</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -908,16 +899,12 @@ export default function POSDaybook() {
                               <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
                               <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, "$")}</td>
                               <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, "$")}</td>
-                              {userPrefs?.showProfitComparisonOnPOS && (
-                                <>
-                                  <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600', color: profitPerBale >= 0 ? '#0a7e1f' : '#c2272d', fontSize: '10pt' }}>
-                                    {profitPerBale >= 0 ? '+' : ''}{fmtPrint(profitPerBale, "$")}
-                                  </td>
-                                  <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600', color: totalProfit >= 0 ? '#0a7e1f' : '#c2272d', fontSize: '10pt' }}>
-                                    {totalProfit >= 0 ? '+' : ''}{fmtPrint(totalProfit, "$")}
-                                  </td>
-                                </>
-                              )}
+                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600', color: profitPerBale >= 0 ? '#0a7e1f' : '#c2272d', fontSize: '10pt' }}>
+                                {profitPerBale >= 0 ? '+' : ''}{fmtPrint(profitPerBale, "$")}
+                              </td>
+                              <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600', color: totalProfit >= 0 ? '#0a7e1f' : '#c2272d', fontSize: '10pt' }}>
+                                {totalProfit >= 0 ? '+' : ''}{fmtPrint(totalProfit, "$")}
+                              </td>
                             </tr>
                           );
                         })}
@@ -928,17 +915,13 @@ export default function POSDaybook() {
                           <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
                           <td style={{ padding: '5px 3px' }}></td>
                           <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
-                          {userPrefs?.showProfitComparisonOnPOS && (
-                            <>
-                              <td style={{ padding: '5px 3px' }}></td>
-                              <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900', fontSize: '10pt', color: (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.hassansProfit || "0"), 0) >= 0 ? '#0a7e1f' : '#c2272d' }}>
-                                {(() => {
-                                  const totalGainLoss = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.hassansProfit || "0"), 0);
-                                  return totalGainLoss >= 0 ? `Gain: +${fmtPrint(totalGainLoss, "$")}` : `Loss: ${fmtPrint(totalGainLoss, "$")}`;
-                                })()}
-                              </td>
-                            </>
-                          )}
+                          <td style={{ padding: '5px 3px' }}></td>
+                          <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900', fontSize: '10pt', color: (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.hassansProfit || "0"), 0) >= 0 ? '#0a7e1f' : '#c2272d' }}>
+                            {(() => {
+                              const totalGainLoss = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.hassansProfit || "0"), 0);
+                              return totalGainLoss >= 0 ? `Gain: +${fmtPrint(totalGainLoss, "$")}` : `Loss: ${fmtPrint(totalGainLoss, "$")}`;
+                            })()}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>

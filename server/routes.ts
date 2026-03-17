@@ -18742,11 +18742,30 @@ if (asOfDate) {
             profit: profit.toFixed(2),
           });
 
+          // Get configured selling price from location prices
+          const [locPrice] = await tx
+            .select()
+            .from(stockItemLocationPrices)
+            .where(
+              and(
+                eq(stockItemLocationPrices.stockItemId, item.stockItemId),
+                eq(stockItemLocationPrices.locationId, locationId)
+              )
+            )
+            .limit(1);
+          const configuredPrice = locPrice?.sellingPrice || stockItem?.sellingPrice || "0";
+          const configuredPriceNum = parseFloat(configuredPrice);
+          const profitPerUnit = sellingPrice - configuredPriceNum;
+          const totalProfitVsConfigured = profitPerUnit * qty;
+
           txSaleItems.push({
             ...item,
             stockItemName: stockItem?.name || "",
             stockItemCode: stockItem?.code || "",
             amount: totalSales.toFixed(2),
+            configuredPrice: configuredPriceNum.toFixed(2),
+            profitPerUnit: profitPerUnit.toFixed(2),
+            totalProfitVsConfigured: totalProfitVsConfigured.toFixed(2),
           });
         }
 

@@ -1961,56 +1961,17 @@ function LoginHistoryTab() {
 }
 
 function POSReceiptSettings() {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { data: userPrefs } = useQuery({
-    queryKey: ["/api/user-preferences"],
-  });
-
-  const updatePrefsMutation = useMutation({
-    mutationFn: async (updates: any) => {
-      const res = await apiRequest("PUT", "/api/user-preferences", updates);
-      return res;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences"] });
-      toast({ title: "Saved", description: "Receipt settings updated" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const toggleProfitComparison = async () => {
-    const newValue = !userPrefs?.showProfitComparisonOnPOS;
-    setIsLoading(true);
-    try {
-      await updatePrefsMutation.mutateAsync({
-        showProfitComparisonOnPOS: newValue,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between p-3 rounded-md border border-border">
+      <div className="flex items-center gap-3 p-3 rounded-md border border-border bg-muted/30">
         <div className="flex-1">
-          <div className="font-medium text-sm">Show Profit/Loss Comparison on POS Receipts</div>
+          <div className="font-medium text-sm">Profit/Loss Comparison on POS Receipts</div>
           <div className="text-xs text-muted-foreground mt-1">
-            Display configured price and profit/loss per item on printed receipts
+            All POS invoices automatically include P/L Bale and Total P/L columns showing profit or loss vs. configured price per item.
           </div>
         </div>
-        <Switch
-          checked={userPrefs?.showProfitComparisonOnPOS ?? false}
-          onCheckedChange={toggleProfitComparison}
-          disabled={isLoading || updatePrefsMutation.isPending}
-          data-testid="toggle-pos-profit-comparison"
-        />
+        <Badge variant="secondary" className="shrink-0">Always On</Badge>
       </div>
-      {updatePrefsMutation.isPending && <p className="text-xs text-muted-foreground">Saving…</p>}
     </div>
   );
 }
