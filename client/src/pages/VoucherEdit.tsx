@@ -1040,6 +1040,8 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      // Invalidate factory daybook so date/amount changes are reflected immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       // Invalidate ledger transaction queries so balances refresh in Accounts page
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0];

@@ -14032,6 +14032,7 @@ if (asOfDate) {
                 supplierId: entry.supplierId || null,
                 employeeId: entry.employeeId || null,
                 customerId: entry.customerId || null,
+                factorySupplierId: entry.factorySupplierId || null,
                 debitAmount: entry.debitAmount || "0",
                 creditAmount: entry.creditAmount || "0",
                 narration: entry.narration || null,
@@ -16759,6 +16760,7 @@ if (asOfDate) {
               fixedAssetId: entry.fixedAssetId || null,
               supplierId: entry.supplierId || null,
               employeeId: entry.employeeId || null,
+              factorySupplierId: entry.factorySupplierId || null,
               debitAmount: entry.debitAmount || "0",
               creditAmount: entry.creditAmount || "0",
               narration: entry.narration || null,
@@ -16766,6 +16768,16 @@ if (asOfDate) {
             .returning();
           createdEntries.push(createdEntry);
         }
+
+        // Resync factory daybook entry amounts for this voucher
+        const newTotal = Math.max(totalDebits, totalCredits).toFixed(2);
+        const { factoryDaybookEntries: fdeAmt } = await import("@shared/schema");
+        await db.update(fdeAmt)
+          .set({ amountCurrency: newTotal, amountUsd: newTotal })
+          .where(and(
+            eq(fdeAmt.referenceTable, "vouchers"),
+            eq(fdeAmt.referenceId, id)
+          ));
       } catch (error: any) {
         // Cleanup: Restore old entries if update failed after deletion
         if (oldEntries.length > 0 && createdEntries.length === 0) {
