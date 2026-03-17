@@ -10250,7 +10250,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const baleIds = orderBales.map((b: any) => b.baleId);
       const baleRows = await db.select({
         id: factoryBales.id,
-        baleReference: factoryBales.baleReference,
+        referenceNumber: factoryBales.referenceNumber,
         productName: factoryBales.productName,
         weightKg: factoryBales.weightKg,
         status: factoryBales.status,
@@ -10272,7 +10272,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalBalesInOrder: orderBales.length,
         bales: availableBales.map((b: any) => ({
           id: b.id,
-          baleReference: b.baleReference,
+          baleReference: b.referenceNumber,
           productName: b.productName,
           weightKg: parseFloat(b.weightKg || "0"),
           locationName: locationMap.get(b.erpLocationId) || "Unknown",
