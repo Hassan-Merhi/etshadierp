@@ -398,7 +398,7 @@ export default function SalesReport() {
     });
 
     salesData.forEach((item) => {
-      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+      const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
       const row = worksheet.addRow({
         location: item.locationName || "N/A",
         itemCode: item.stockItemCode || "",
