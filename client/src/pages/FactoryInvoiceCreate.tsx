@@ -12,7 +12,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
-import { Trash2, ScanLine, Plus, PackageCheck, MapPin } from "lucide-react";
+import { Trash2, ScanLine, Plus, PackageCheck, MapPin, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Customer {
@@ -207,6 +207,24 @@ export default function FactoryInvoiceCreate() {
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
+    },
+  });
+
+  const repriceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to apply prices");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -540,6 +558,19 @@ export default function FactoryInvoiceCreate() {
               <span data-testid="text-total-bales">{bales.length}</span>
             </div>
           </Card>
+
+          {orderId && bales.length > 0 && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => repriceMutation.mutate()}
+              disabled={repriceMutation.isPending}
+              data-testid="button-apply-prices"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
+              Apply Current Prices
+            </Button>
+          )}
 
           <Button
             className="w-full"

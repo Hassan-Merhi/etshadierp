@@ -10537,6 +10537,76 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.post("/api/factory/customer-orders/:id/reprice", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) {
+        return res.status(400).json({ message: "Can only reprice DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+      }
+
+      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales to reprice" });
+
+      let proformaLines: any[] = [];
+      if (order.proformaIdUsed) {
+        proformaLines = await db.select().from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+      }
+
+      const proformaMap = new Map<string, string>();
+      for (const pl of proformaLines) {
+        if (pl.articleCode) proformaMap.set(pl.articleCode.toLowerCase(), pl.pricePerBale);
+      }
+
+      let updated = 0;
+      for (const bale of orderBales) {
+        let newPrice: string | null = null;
+
+        if (bale.articleCode && proformaMap.has(bale.articleCode.toLowerCase())) {
+          newPrice = proformaMap.get(bale.articleCode.toLowerCase())!;
+        }
+
+        if (!newPrice) {
+          const [factoryBale] = await db.select({ productId: factoryBales.productId })
+            .from(factoryBales)
+            .where(eq(factoryBales.id, bale.baleId));
+          if (factoryBale?.productId) {
+            const [product] = await db.select({ sellingPrice: factoryBaleProducts.sellingPrice })
+              .from(factoryBaleProducts)
+              .where(eq(factoryBaleProducts.id, factoryBale.productId));
+            if (product?.sellingPrice) newPrice = product.sellingPrice;
+          }
+        }
+
+        if (newPrice !== null) {
+          await db.update(customerOrderBales)
+            .set({ priceUsed: newPrice })
+            .where(eq(customerOrderBales.id, bale.id));
+          updated++;
+        }
+      }
+
+      await recalculateOrderTotals(db, orderId);
+
+      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+
+      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges, repriced: updated });
+    } catch (error: any) {
+      console.error("Error repricing order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders/:id/force-sync-bale-status", requireAuth, async (req: any, res: any) => {
     try {
       const session = req.session as any;
