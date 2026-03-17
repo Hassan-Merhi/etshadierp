@@ -2178,11 +2178,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid black' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 3px', width: '40%', fontWeight: '900' }}>Description</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '16%', fontWeight: '900' }}>Rate</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '16%', fontWeight: '900' }}>Amt</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '16%', fontWeight: '900' }}>Config</th>
+                    <th style={{ textAlign: 'left', padding: '3px 2px', width: '22%', fontWeight: '900', fontSize: '9pt' }}>Description</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '6%', fontWeight: '900', fontSize: '9pt' }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '10%', fontWeight: '900', fontSize: '9pt' }}>Rate</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '12%', fontWeight: '900', fontSize: '9pt' }}>Amt</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '12%', fontWeight: '900', fontSize: '9pt' }}>Config</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>P/L Bale</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>Total P/L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2190,13 +2192,23 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     const itemRateUSD = parseFloat(item.rateUSD || item.rate);
                     const itemAmountUSD = parseFloat(item.quantity) * itemRateUSD;
                     const configuredPrice = parseFloat(item.configuredPrice || "0");
+                    const plPerBale = itemRateUSD - configuredPrice;
+                    const totalPL = plPerBale * parseFloat(item.quantity);
+                    const plBaleColor = plPerBale > 0 ? '#0a7e1f' : plPerBale < 0 ? '#c2272d' : undefined;
+                    const totalPLColor = totalPL > 0 ? '#0a7e1f' : totalPL < 0 ? '#c2272d' : undefined;
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
-                        <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(parseFloat(item.quantity))}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrintCurrency(itemRateUSD)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrintCurrency(itemAmountUSD)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrintCurrency(configuredPrice)}</td>
+                        <td style={{ padding: '3px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.2', fontSize: '9pt' }}>{item.stockItemName}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(parseFloat(item.quantity))}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrintCurrency(itemRateUSD)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrintCurrency(itemAmountUSD)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrintCurrency(configuredPrice)}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: plBaleColor }}>
+                          {plPerBale > 0 ? '+' : ''}{fmtPrint(plPerBale, "$")}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: totalPLColor }}>
+                          {totalPL > 0 ? '+' : ''}{fmtPrint(totalPL, "$")}
+                        </td>
                       </tr>
                     );
                   })}
@@ -2204,16 +2216,23 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 {/* Totals Row */}
                 <tfoot>
                   <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
-                    <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
-                    <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
-                    <td style={{ padding: '5px 3px' }}></td>
-                    <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
+                    <td style={{ padding: '4px 2px', fontWeight: '900', fontSize: '9pt' }}>TOTAL</td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px', fontSize: '9pt' }}>{fmtPrint((savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px', fontWeight: '900', fontSize: '9pt' }}>
                       {fmtPrintCurrency((savedSale?.items ?? []).reduce((sum: number, item: any) => {
                         const rateUSD = parseFloat(item.rateUSD || item.rate);
                         return sum + (parseFloat(item.quantity) * rateUSD);
                       }, 0))}
                     </td>
-                    <td style={{ padding: '5px 3px' }}></td>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px', fontWeight: '900', fontSize: '9pt', color: (() => { const t = (savedSale?.items ?? []).reduce((s: number, i: any) => s + (parseFloat(i.rateUSD || i.rate) - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
+                      {(() => {
+                        const t = (savedSale?.items ?? []).reduce((s: number, i: any) => s + (parseFloat(i.rateUSD || i.rate) - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity), 0);
+                        return t !== 0 ? `${t > 0 ? '+' : ''}${fmtPrint(t, "$")}` : fmtPrint(0, "$");
+                      })()}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
