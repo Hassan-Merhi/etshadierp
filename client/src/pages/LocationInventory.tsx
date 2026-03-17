@@ -736,6 +736,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     writeFile(wb, "negative_stock_all_locations.xlsx");
   };
 
+  const handleExportInventory = async () => {
+    if (!selectedLocationLocal) return;
+    try {
+      const response = await fetch(
+        `/api/locations/${selectedLocationLocal.id}/inventory/export`,
+        { credentials: 'include' }
+      );
+      if (!response.ok) throw new Error('Failed to export inventory');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({
+        title: "Export Successful",
+        description: `Inventory for ${selectedLocationLocal.name} exported to Excel`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export inventory",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6 w-full min-w-0">
       <PageHeader 
@@ -1046,6 +1076,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {selectedLocationLocal.name} - Stock Groups
             </h1>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+              <Button
+                onClick={() => handleExportInventory()}
+                data-testid="button-export-inventory"
+                variant="outline"
+                className="gap-2 flex-1 md:flex-none"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export to Excel</span>
+                <span className="sm:hidden">Export</span>
+              </Button>
               <Button
                 onClick={() => {
                   setViewAllItems(true);

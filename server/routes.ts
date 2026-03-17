@@ -1994,6 +1994,94 @@ if (asOfDate) {
     },
   );
 
+  // Location Inventory Export - Export full inventory details to Excel
+  app.get(
+    "/api/locations/:locationId/inventory/export",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const locationId = parseInt(req.params.locationId);
+        if (isNaN(locationId)) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
+
+        const location = await storage.getLocationById(locationId);
+        if (!location) {
+          return res.status(404).json({ message: "Location not found" });
+        }
+
+        if (location.companyId !== req.session.currentCompanyId) {
+          return res
+            .status(403)
+            .json({
+              message: "Access denied: Location belongs to a different company",
+            });
+        }
+
+        const inventory = await storage.getLocationInventory(locationId);
+
+        // Filter out zero-quantity items
+        const filteredInventory = inventory.filter(
+          (item: any) => parseFloat(item.quantity || "0") !== 0
+        );
+
+        // Build Excel workbook data
+        const workbookData = filteredInventory.map((item: any) => ({
+          "Item Code": item.stockItemCode || "",
+          "Item Name": item.stockItemName || "",
+          "Group Code": item.stockGroupCode || "",
+          "Group Name": item.stockGroupName || "Unassigned",
+          "UOM": item.stockItemUom || "",
+          "Quantity": parseFloat(item.quantity || "0"),
+          "Cost/Unit": parseFloat(item.averageRate || "0"),
+          "Total Value": parseFloat(item.totalValue || "0"),
+        }));
+
+        // Use XLSX to create workbook (via ExcelJS if available, else JSON export)
+        const XLSX = await import("xlsx");
+        const worksheet = XLSX.utils.json_to_sheet(workbookData);
+
+        // Set column widths
+        const colWidths = [
+          { wch: 15 },
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 25 },
+          { wch: 10 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 15 },
+        ];
+        worksheet["!cols"] = colWidths;
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(
+          workbook,
+          worksheet,
+          `${location.name} Inventory`
+        );
+
+        // Generate Excel file as buffer
+        const excelBuffer = XLSX.write(workbook, {
+          bookType: "xlsx",
+          type: "buffer",
+        });
+
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${location.name}_inventory_${new Date().toISOString().split("T")[0]}.xlsx"`
+        );
+        res.send(excelBuffer);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Company Inventory - Get all inventory across all locations for current company
   app.get("/api/inventory", requireAuth, async (req, res) => {
     try {
