@@ -64,6 +64,10 @@ export default function FactoryContainers() {
     commissionAccountId: "",
     commissionSupplierId: "",
     commissionNotes: "",
+    freight: "",
+    freightAccountId: "",
+    otherCharges: "",
+    otherChargesAccountId: "",
   });
   const [currency, setCurrency] = useState("USD");
   const [fxRate, setFxRate] = useState("1");
@@ -140,6 +144,10 @@ export default function FactoryContainers() {
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
+        freight: data.freight || "0",
+        freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
+        otherCharges: data.otherCharges || "0",
+        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/containers", payload);
       if (!res.ok) {
@@ -176,6 +184,10 @@ export default function FactoryContainers() {
         commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : null,
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
+        freight: data.freight || "0",
+        freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
+        otherCharges: data.otherCharges || "0",
+        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -310,6 +322,10 @@ export default function FactoryContainers() {
       commissionAccountId: "",
       commissionSupplierId: "",
       commissionNotes: "",
+      freight: "",
+      freightAccountId: "",
+      otherCharges: "",
+      otherChargesAccountId: "",
     });
     setCurrency("USD");
     setFxRate("1");
@@ -333,6 +349,10 @@ export default function FactoryContainers() {
       commissionAccountId: (c as any).commissionAccountId ? String((c as any).commissionAccountId) : "",
       commissionSupplierId: (c as any).commissionSupplierId ? String((c as any).commissionSupplierId) : "",
       commissionNotes: (c as any).commissionNotes || "",
+      freight: (c as any).freight || "",
+      freightAccountId: (c as any).freightAccountId ? String((c as any).freightAccountId) : "",
+      otherCharges: (c as any).otherCharges || "",
+      otherChargesAccountId: (c as any).otherChargesAccountId ? String((c as any).otherChargesAccountId) : "",
     });
     setCurrency((c as any).currencyCode || "USD");
     setFxRate((c as any).fxRateToUsd || "1");
@@ -458,6 +478,9 @@ export default function FactoryContainers() {
                   <TableHead>Container #</TableHead>
                   <TableHead>Supplier / Broker</TableHead>
                   <TableHead>Commission</TableHead>
+                  <TableHead>Freight</TableHead>
+                  <TableHead>Other Charges</TableHead>
+                  <TableHead>Total Value</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Arrival</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
@@ -471,6 +494,11 @@ export default function FactoryContainers() {
                   const brokerName = brokerSupId
                     ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null
                     : null;
+                  const ccy = (c as any).currencyCode || "USD";
+                  const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+                  const freightAmt = parseFloat((c as any).freight || "0");
+                  const otherAmt = parseFloat((c as any).otherCharges || "0");
+                  const totalValue = baseValue + freightAmt + otherAmt;
                   return (
                     <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
                       <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
@@ -484,6 +512,15 @@ export default function FactoryContainers() {
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {freightAmt > 0 ? `${ccy} ${formatNumber(freightAmt)}` : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {otherAmt > 0 ? `${ccy} ${formatNumber(otherAmt)}` : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium">
+                        {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
                         <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
@@ -852,6 +889,78 @@ export default function FactoryContainers() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Commission flows into the broker's balance automatically via the "Broker / Commission To" field above.
                 </p>
+              </div>
+            </div>
+
+            {/* ── Section 4: Freight & Other Charges ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">Freight &amp; Other Charges</p>
+                <Separator className="flex-1" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.freight}
+                    onChange={(e) => setFormData({ ...formData, freight: e.target.value })}
+                    placeholder="0.00"
+                    data-testid="input-container-freight"
+                  />
+                </div>
+                <div>
+                  <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                  <Select
+                    value={formData.freightAccountId || "__none__"}
+                    onValueChange={(val) => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
+                  >
+                    <SelectTrigger data-testid="select-freight-account">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {ledgerAccounts.map((acc: any) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Other Charges <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.otherCharges}
+                    onChange={(e) => setFormData({ ...formData, otherCharges: e.target.value })}
+                    placeholder="0.00"
+                    data-testid="input-container-other-charges"
+                  />
+                </div>
+                <div>
+                  <Label>Other Charges Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                  <Select
+                    value={formData.otherChargesAccountId || "__none__"}
+                    onValueChange={(val) => setFormData({ ...formData, otherChargesAccountId: val === "__none__" ? "" : val })}
+                  >
+                    <SelectTrigger data-testid="select-other-charges-account">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {ledgerAccounts.map((acc: any) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
