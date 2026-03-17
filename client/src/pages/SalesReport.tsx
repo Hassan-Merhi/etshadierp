@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -310,6 +311,7 @@ export default function SalesReport() {
       }
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (hasAnyOpenDialog()) return;
         const tag = (document.activeElement?.tagName || "").toLowerCase();
         if (["input", "textarea", "select"].includes(tag)) return;
         if (filteredGroupedData.length === 0) return;

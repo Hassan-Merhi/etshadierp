@@ -201,6 +201,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
       return;
     }
     
+    if (hasAnyOpenDialog()) return;
     const rows = getNavigableRows();
     if (rows.length === 0) return;
     

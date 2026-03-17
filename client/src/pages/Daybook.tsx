@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1449,7 +1450,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // ── Keyboard navigation (Arrow Up/Down, Ctrl+H, Ctrl+U) ─────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (viewDialogOpen || editDialogOpen || deleteDialogOpen) return;
+      if (hasAnyOpenDialog()) return;
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isEditable = document.activeElement?.getAttribute("contenteditable");
       if (["input", "textarea", "select"].includes(tag) || isEditable) return;
@@ -1523,7 +1524,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId, viewDialogOpen, editDialogOpen, deleteDialogOpen]);
+  }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId]);
 
   const clearFilters = () => {
     setPeriodFilter(getDefaultPeriodValue("today"));

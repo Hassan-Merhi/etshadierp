@@ -114,7 +114,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
       window.history.back();
       return;
     }
-    
+    if (hasAnyOpenDialog()) return;
     if (!data?.monthlyData?.length) return;
     
     const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
@@ -147,7 +147,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
         window.history.back();
         return;
       }
-      
+      if (hasAnyOpenDialog()) return;
       if (!data?.monthlyData?.length) return;
       
       const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);

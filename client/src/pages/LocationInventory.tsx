@@ -38,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
-import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useEscapeBack, hasAnyOpenDialog } from "@/hooks/use-escape-back";
 
 interface Location {
   id: number;
@@ -304,6 +304,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     if (!selectedGroup) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog()) return;
       const itemCount = selectedGroup.items.length;
       if (itemCount === 0) return;
 
