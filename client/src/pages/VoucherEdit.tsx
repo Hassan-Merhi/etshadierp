@@ -101,6 +101,7 @@ interface VoucherEntry {
   ledgerAccountId: number | null;
   bankAccountId: number | null;
   supplierId: number | null;
+  factorySupplierId?: number | null;
   employeeId?: number | null;
   debitAmount: string;
   creditAmount: string;
@@ -210,7 +211,7 @@ interface VoucherData {
 // Form entry schemas
 const voucherEntrySchema = z.object({
   id: z.number().optional(),
-  accountType: z.enum(["ledger", "bank", "supplier", "employee"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -223,7 +224,7 @@ const voucherEntrySchema = z.object({
 const journalEntrySchema = z.object({
   id: z.number().optional(),
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier", "employee"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -299,7 +300,7 @@ const transferLineItemSchema = z.object({
 
 // Form schemas
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "factorySupplier"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -430,7 +431,7 @@ function AccountCombobox({
   testIdPrefix = "button-account",
 }: {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "factorySupplier", id: number, name: string) => void;
   ledgerAccounts: LedgerAccount[];
   bankAccounts: BankAccount[];
   suppliers: Supplier[];
@@ -637,7 +638,7 @@ export default function VoucherEdit() {
       });
     });
 
-    // Add suppliers
+    // Add ERP suppliers
     suppliers.forEach(supplier => {
       const accountData = allAccountsData.find(a => a.id === `supplier-${supplier.id}`);
       const baseBalance = parseFloat(accountData?.balance || "0");
@@ -649,6 +650,19 @@ export default function VoucherEdit() {
         id: supplier.id,
         name: supplier.legalName,
         code: supplier.code,
+        balance: formatNumber(adjustedBalance),
+      });
+    });
+
+    // Add factory suppliers (returned by /api/accounts/all with type "factorySupplier")
+    (allAccountsData as any[]).filter(a => a.type === "factorySupplier").forEach(fs => {
+      const adjustment = balanceAdjustments[`factorySupplier-${fs.id}`] || 0;
+      const adjustedBalance = (typeof fs.balance === "number" ? fs.balance : parseFloat(fs.balance || "0")) + adjustment;
+      accounts.push({
+        type: "factorySupplier" as const,
+        id: Number(fs.id),
+        name: fs.name,
+        code: fs.code || String(fs.id),
         balance: formatNumber(adjustedBalance),
       });
     });
@@ -823,6 +837,13 @@ export default function VoucherEdit() {
         id: entry.bankAccountId,
         name: `Bank #${entry.bankAccountId}`,
       };
+    } else if (entry.factorySupplierId) {
+      const fs = (allAccountsData as any[]).find(a => a.type === "factorySupplier" && Number(a.id) === entry.factorySupplierId);
+      return {
+        type: "factorySupplier" as const,
+        id: entry.factorySupplierId,
+        name: fs?.name || `Supplier #${entry.factorySupplierId}`,
+      };
     } else if (entry.supplierId) {
       const supplier = suppliers.find(s => s.id === entry.supplierId);
       return supplier ? {
@@ -859,7 +880,7 @@ export default function VoucherEdit() {
         voucher.entries.find((e: any) => {
           const cr = parseFloat(e.creditAmount || "0");
           const dr = parseFloat(e.debitAmount || "0");
-          const isLiability = !!(e.supplierId || e.employeeId);
+          const isLiability = !!(e.supplierId || e.factorySupplierId || e.employeeId);
           if (isLiability) return false;
           return voucherType === "Payment" ? cr > 0 : dr > 0;
         }) ||
@@ -867,7 +888,7 @@ export default function VoucherEdit() {
           // Fallback: liability account as the primary (e.g. advance payments)
           const cr = parseFloat(e.creditAmount || "0");
           const dr = parseFloat(e.debitAmount || "0");
-          const isLiability = !!(e.supplierId || e.employeeId);
+          const isLiability = !!(e.supplierId || e.factorySupplierId || e.employeeId);
           if (!isLiability) return false;
           return voucherType === "Payment" ? dr > 0 : cr > 0;
         });
@@ -879,7 +900,7 @@ export default function VoucherEdit() {
       // Destination entries are all other entries with the opposite direction
       // For Payment: entries with debit amounts (money going TO these accounts)
       // For Receipt: entries with credit amounts (money coming FROM these accounts)
-      const isLiabilityPayment = !!(sourceEntry.supplierId || sourceEntry.employeeId);
+      const isLiabilityPayment = !!(sourceEntry.supplierId || sourceEntry.factorySupplierId || sourceEntry.employeeId);
       const voucherEntries = voucher.entries.filter(entry => {
         if (entry.id === sourceEntry.id) return false;
         const amount = voucherType === "Payment"
@@ -1254,7 +1275,7 @@ export default function VoucherEdit() {
       return sum + usdAmt;
     }, 0).toFixed(2);
     
-    const isLiabilityPayment = data.paymentAccountType === "supplier" || data.paymentAccountType === "employee";
+    const isLiabilityPayment = data.paymentAccountType === "supplier" || data.paymentAccountType === "factorySupplier" || data.paymentAccountType === "employee";
 
     // For liability payment accounts (supplier/employee), flip DR/CR
     // Payment from liability: DR payment (reduce liability), CR contra
@@ -1263,6 +1284,7 @@ export default function VoucherEdit() {
       ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
       bankAccountId: data.paymentAccountType === "bank" ? data.paymentAccountId : null,
       supplierId: data.paymentAccountType === "supplier" ? data.paymentAccountId : null,
+      factorySupplierId: data.paymentAccountType === "factorySupplier" ? data.paymentAccountId : null,
       employeeId: data.paymentAccountType === "employee" ? data.paymentAccountId : null,
       debitAmount: (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment) ? total : "0",
       creditAmount: (voucherType === "Payment" && !isLiabilityPayment) || (voucherType === "Receipt" && isLiabilityPayment) ? total : "0",
@@ -1274,6 +1296,7 @@ export default function VoucherEdit() {
         ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
         bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
         supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        factorySupplierId: entry.accountType === "factorySupplier" ? entry.accountId : null,
         employeeId: entry.accountType === "employee" ? entry.accountId : null,
         debitAmount: (voucherType === "Payment" && !isLiabilityPayment) || (voucherType === "Receipt" && isLiabilityPayment) ? usdAmount : "0",
         creditAmount: (voucherType === "Receipt" && !isLiabilityPayment) || (voucherType === "Payment" && isLiabilityPayment) ? usdAmount : "0",
@@ -1298,6 +1321,7 @@ export default function VoucherEdit() {
         ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
         bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
         supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        factorySupplierId: entry.accountType === "factorySupplier" ? entry.accountId : null,
         debitAmount: entry.type === "DR" ? usdAmount : "0",
         creditAmount: entry.type === "CR" ? usdAmount : "0",
       };
@@ -3108,8 +3132,8 @@ export default function VoucherEdit() {
                                 : null
                             }
                             onChange={(type, id, name) => {
-                              // Only ledger, bank, supplier are allowed in payment forms
-                              if (type === "ledger" || type === "bank" || type === "supplier") {
+                              // ledger, bank, supplier, and factorySupplier are allowed in payment forms
+                              if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
                                 paymentForm.setValue("paymentAccountType", type);
                                 paymentForm.setValue("paymentAccountId", id);
                                 paymentForm.setValue("paymentAccountName", name);
@@ -3203,7 +3227,7 @@ export default function VoucherEdit() {
                               <AccountAutocomplete
                                 value={paymentForm.watch(`entries.${index}.accountId`) > 0 ? { type: paymentForm.watch(`entries.${index}.accountType`), id: paymentForm.watch(`entries.${index}.accountId`), name: paymentForm.watch(`entries.${index}.accountName`) } : null}
                                 onChange={(type, id, name) => {
-                                  if (type === "ledger" || type === "bank" || type === "supplier") {
+                                  if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
                                     paymentForm.setValue(`entries.${index}.accountType`, type);
                                     paymentForm.setValue(`entries.${index}.accountId`, id);
                                     paymentForm.setValue(`entries.${index}.accountName`, name);
@@ -3276,7 +3300,7 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        if (type === "ledger" || type === "bank" || type === "supplier") {
+                                        if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
                                           paymentForm.setValue(`entries.${index}.accountType`, type);
                                           paymentForm.setValue(`entries.${index}.accountId`, id);
                                           paymentForm.setValue(`entries.${index}.accountName`, name);
@@ -3528,7 +3552,7 @@ export default function VoucherEdit() {
                               <AccountAutocomplete
                                 value={journalForm.watch(`entries.${index}.accountId`) > 0 ? { type: journalForm.watch(`entries.${index}.accountType`), id: journalForm.watch(`entries.${index}.accountId`), name: journalForm.watch(`entries.${index}.accountName`) } : null}
                                 onChange={(type, id, name) => {
-                                  if (type === "ledger" || type === "bank" || type === "supplier") {
+                                  if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
                                     journalForm.setValue(`entries.${index}.accountType`, type);
                                     journalForm.setValue(`entries.${index}.accountId`, id);
                                     journalForm.setValue(`entries.${index}.accountName`, name);
@@ -3614,7 +3638,7 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        if (type === "ledger" || type === "bank" || type === "supplier") {
+                                        if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
                                           journalForm.setValue(`entries.${index}.accountType`, type);
                                           journalForm.setValue(`entries.${index}.accountId`, id);
                                           journalForm.setValue(`entries.${index}.accountName`, name);
