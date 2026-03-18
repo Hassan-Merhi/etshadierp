@@ -493,8 +493,13 @@ export default function FactoryWorkerDetail() {
 
   const payrollBalance = endResult ? parseFloat(endResult.balance) : 0;
   const totalEarned = payrolls?.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
-  const totalPaid = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
+  const totalPaidSalary = payrolls?.filter((p) => p.status === "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
+  const totalAdvancesGiven = workerAdvances?.reduce((s, a) => s + parseFloat(a.amount || "0"), 0) ?? 0;
+  const totalPaid = totalPaidSalary + totalAdvancesGiven;
   const totalPending = payrolls?.filter((p) => p.status !== "PAID").reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0) ?? 0;
+  const outstandingAdvanceBalance = (workerAdvances || []).filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+  // Net balance: positive = company owes worker; negative = worker owes company
+  const netBalance = totalPending - outstandingAdvanceBalance;
 
   if (!workerId) return <div className="flex items-center justify-center py-20 text-muted-foreground">Invalid worker ID</div>;
 
@@ -720,7 +725,7 @@ export default function FactoryWorkerDetail() {
             </TabsContent>
 
             <TabsContent value="statement" className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card>
                   <CardContent className="p-4 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Total on Record</p>
@@ -729,14 +734,26 @@ export default function FactoryWorkerDetail() {
                 </Card>
                 <Card>
                   <CardContent className="p-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Total Paid</p>
+                    <p className="text-xs text-muted-foreground mb-1">Total Paid Out</p>
                     <p className="text-xl font-bold text-green-700 dark:text-green-400" data-testid="stat-total-paid">${fmtNum(totalPaid)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Salary + Advances</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Pending</p>
+                    <p className="text-xs text-muted-foreground mb-1">Pending Salary</p>
                     <p className="text-xl font-bold text-amber-700 dark:text-amber-400" data-testid="stat-total-pending">${fmtNum(totalPending)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Net Balance</p>
+                    <p className={`text-xl font-bold ${netBalance > 0 ? "text-green-700 dark:text-green-400" : netBalance < 0 ? "text-red-700 dark:text-red-400" : "text-muted-foreground"}`} data-testid="stat-net-balance">
+                      ${Math.abs(netBalance).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {netBalance > 0 ? "Owed to worker" : netBalance < 0 ? "Worker owes company" : "Settled"}
+                    </p>
                   </CardContent>
                 </Card>
               </div>

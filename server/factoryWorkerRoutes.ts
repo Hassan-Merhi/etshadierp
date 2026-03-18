@@ -1141,6 +1141,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
             status: "DRAFT", notes: notes || null,
             cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
           } as any);
+          // Settle advances immediately at generate time so remaining balance updates right away
+          await settleAdvancesForPayroll(tx, companyId, worker.id, advanceDeduction);
           totalNet += net;
           count++;
         }
@@ -1198,8 +1200,6 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
           .returning();
         if (!payroll) throw new Error("Payroll record not found");
-
-        await settleAdvancesForPayroll(tx, companyId, payroll.workerId, parseFloat(payroll.advances || "0"));
 
         const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
           .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
@@ -1320,9 +1320,6 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
 
         for (const pr of payrollsToMark) {
-          const advAmt = parseFloat(pr.advances || "0");
-          await settleAdvancesForPayroll(tx, companyId, pr.workerId, advAmt);
-
           if (cashId && payableAcc) {
             const netAmt = parseFloat(pr.netSalary || "0");
             const workerName = (workerMap.get(pr.workerId) as string)?.trim() || `Worker #${pr.workerId}`;

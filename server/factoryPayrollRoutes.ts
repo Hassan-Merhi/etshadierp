@@ -409,7 +409,36 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
       if (existing.status !== "DRAFT") return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
-      await db.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
+      await db.transaction(async (tx: any) => {
+        // Restore advance balances that were settled at generate time
+        const advDeducted = parseFloat(existing.advances || "0");
+        if (advDeducted > 0) {
+          // Get all salary-deduction advances for this worker (oldest first, including fully paid ones that might have been settled)
+          const workerAdvances = await tx.select().from(factoryWorkerAdvances)
+            .where(and(
+              eq(factoryWorkerAdvances.companyId, companyId),
+              eq(factoryWorkerAdvances.workerId, existing.workerId),
+              eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
+            ))
+            .orderBy(desc(factoryWorkerAdvances.advanceDate));
+          let toRestore = advDeducted;
+          for (const adv of workerAdvances) {
+            if (toRestore <= 0) break;
+            const orig = parseFloat(adv.amount || "0");
+            const curr = parseFloat(adv.remainingBalance || "0");
+            const canRestore = Math.min(toRestore, orig - curr);
+            if (canRestore > 0) {
+              const newBal = curr + canRestore;
+              await tx.update(factoryWorkerAdvances).set({
+                remainingBalance: newBal.toFixed(2),
+                fullyPaid: false,
+              }).where(eq(factoryWorkerAdvances.id, adv.id));
+              toRestore -= canRestore;
+            }
+          }
+        }
+        await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
+      });
 
       await writeDaybookEntry(db, {
         companyId,
