@@ -4550,10 +4550,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         })
         .where(eq(factoryContainers.id, containerId));
 
+      const insertedAdditionalCharges: any[] = [];
       if (additionalChargesArr.length > 0) {
         for (const charge of additionalChargesArr) {
           if (charge.description && parseFloat(charge.amount || "0") > 0) {
-            await db
+            const [inserted] = await db
               .insert(factoryOffloadAdditionalCharges)
               .values({
                 companyId,
@@ -4561,7 +4562,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 description: charge.description,
                 amount: String(charge.amount),
                 ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
-              });
+              })
+              .returning();
+            insertedAdditionalCharges.push(inserted);
           }
         }
       }
@@ -4636,6 +4639,43 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             currencyCode,
             amountCurrency: chargeAmount,
             fxRateToUsd: fxRate,
+          });
+        }
+      }
+
+      // Double-entry accounting vouchers for each offload additional charge
+      // (Dr Charge Account / Cr Supplier Payable) — mirrors the other-charges/sync endpoint
+      for (const inserted of insertedAdditionalCharges) {
+        const chargeAmount = parseFloat(inserted.amount || "0");
+        if (chargeAmount <= 0 || !inserted.ledgerAccountId) continue;
+        const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
+        const [ocVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherType: "Journal",
+          voucherNumber: ocVoucherNum,
+          voucherDate: container.arrivalDate || today,
+          description: `${inserted.description} - container ${container.containerNumber}`,
+          totalAmount: String(chargeAmount),
+          currency: currencyCode,
+          exchangeRate: String(fxRate),
+          sourceModule: "FACTORY",
+        }).returning();
+        // Dr Charge Expense account
+        await db.insert(voucherEntries).values({
+          voucherId: ocVoucher.id,
+          ledgerAccountId: inserted.ledgerAccountId,
+          debitAmount: String(chargeAmount),
+          creditAmount: "0",
+          narration: `${inserted.description} - container ${container.containerNumber}`,
+        });
+        // Cr Supplier Payable
+        if (container.supplierId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocVoucher.id,
+            factorySupplierId: container.supplierId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmount),
+            narration: `${inserted.description} payable to supplier - container ${container.containerNumber}`,
           });
         }
       }
