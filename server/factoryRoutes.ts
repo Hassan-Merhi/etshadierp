@@ -4325,14 +4325,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const used = parseFloat(r.usedKg as string) || 0;
         const costPerKg = parseFloat(r.costPerKg as string) || 0;
 
+        const costPerKgUsd = parseFloat(r.costPerKgUsd as string) || costPerKg;
         if (supplierMap.has(key)) {
           const existing = supplierMap.get(key)!;
           const prevTotalCost = existing._totalReceived * existing._avgCostPerKg;
           const newTotalCost = received * costPerKg;
+          const prevTotalCostUsd = existing._totalReceived * existing._avgCostPerKgUsd;
+          const newTotalCostUsd = received * costPerKgUsd;
           existing._totalReceived += received;
           existing._totalUsed += used;
           existing._avgCostPerKg = existing._totalReceived > 0
             ? (prevTotalCost + newTotalCost) / existing._totalReceived
+            : 0;
+          existing._avgCostPerKgUsd = existing._totalReceived > 0
+            ? (prevTotalCostUsd + newTotalCostUsd) / existing._totalReceived
             : 0;
           if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
             existing.lastOffloaded = r.offloadedAt;
@@ -4346,6 +4352,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             _totalReceived: received,
             _totalUsed: used,
             _avgCostPerKg: costPerKg,
+            _avgCostPerKgUsd: costPerKgUsd,
             lastOffloaded: r.offloadedAt,
           });
         }
@@ -4373,6 +4380,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
         const valueRemaining = remainingKg * s._avgCostPerKg;
+        const valueRemainingUsd = remainingKg * s._avgCostPerKgUsd;
         const reservedKg = s.supplierId ? (reservedBySupplierId.get(s.supplierId) || 0) : 0;
         const freeKg = Math.max(0, remainingKg - reservedKg);
         return {
@@ -4387,6 +4395,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           freeKg: freeKg.toFixed(3),
           costPerKg: s._avgCostPerKg.toFixed(4),
           valueRemaining: valueRemaining.toFixed(2),
+          valueRemainingUsd: valueRemainingUsd.toFixed(2),
           lastOffloaded: s.lastOffloaded,
         };
       });

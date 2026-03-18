@@ -157,6 +157,7 @@ interface RawStockRow {
   freeKg?: string;
   costPerKg: string;
   valueRemaining: string;
+  valueRemainingUsd: string;
   lastOffloaded: string;
 }
 
@@ -647,7 +648,7 @@ export default function ProductionRawStock() {
   const totalReceived = rawStock?.reduce((sum, r) => sum + parseFloat(r.receivedKg), 0) || 0;
   const totalUsed = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg), 0) || 0;
   const totalRemaining = rawStock?.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0) || 0;
-  const totalValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.valueRemaining), 0) || 0;
+  const totalValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0) || 0;
   const totalReserved = rawStock?.reduce((sum, r) => sum + parseFloat(r.reservedKg || "0"), 0) || 0;
   const totalFree = rawStock?.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0) || 0;
 
@@ -811,7 +812,7 @@ export default function ProductionRawStock() {
                         {currency !== "USD" ? `${currency} ` : "$"}{parseFloat(row.costPerKg).toFixed(4)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${formatNumber(parseFloat(row.valueRemaining))}
+                        ${formatNumber(parseFloat(row.valueRemainingUsd || row.valueRemaining))}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDisplayDate(row.lastOffloaded)}
@@ -1581,52 +1582,52 @@ export default function ProductionRawStock() {
                   <Separator className="my-1" />
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Base Payable ({actualKg} kg x {rate.toFixed(4)})</span>
-                    <span className="font-mono">${formatNumber(totalPayable)}</span>
+                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(totalPayable)}</span>
                   </div>
                   {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Freight</span>
-                      <span className="font-mono">${formatNumber(freightVal)}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(freightVal)}</span>
                     </div>
                   )}
                   {otherChargesVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Other Charges</span>
-                      <span className="font-mono">${formatNumber(otherChargesVal)}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(otherChargesVal)}</span>
                     </div>
                   )}
                   {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
                     <div key={c.id} className="flex justify-between text-muted-foreground">
                       <span>{c.description || `Additional #${i + 1}`}</span>
-                      <span className="font-mono">${formatNumber(parseFloat(c.amount))}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(parseFloat(c.amount))}</span>
                     </div>
                   ))}
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Commission ({commissionPersonName})</span>
-                      <span className="font-mono">${formatNumber(commissionTotal)}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(commissionTotal)}</span>
                     </div>
                   )}
                   {dutyVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Duty</span>
-                      <span className="font-mono">${formatNumber(dutyVal)}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(dutyVal)}</span>
                     </div>
                   )}
                   {dutyPending && parseFloat(dutyAmount || "0") > 0 && (
                     <div className="flex justify-between text-amber-600">
                       <span>Duty (Pending)</span>
-                      <span className="font-mono">${formatNumber(parseFloat(dutyAmount))}</span>
+                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(parseFloat(dutyAmount))}</span>
                     </div>
                   )}
                   <Separator className="my-1" />
                   <div className="flex justify-between font-medium">
                     <span>Grand Total (Inclusive)</span>
-                    <span className="font-mono text-base">${formatNumber(grandTotal)}</span>
+                    <span className="font-mono text-base">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(grandTotal)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Inclusive Cost/KG</span>
-                    <span className="font-mono">${inclusiveCostPerKg.toFixed(4)}/kg</span>
+                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{inclusiveCostPerKg.toFixed(4)}/kg</span>
                   </div>
                   {currencyCode !== "USD" && (
                     <div className="flex justify-between text-muted-foreground">
