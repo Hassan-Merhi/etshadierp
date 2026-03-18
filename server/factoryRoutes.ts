@@ -10597,6 +10597,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       await recalculateOrderTotals(db, orderId);
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+      // Sync the customerBalances ledger entry so the customer's balance reflects the new grand total.
+      // The entry is inserted at finalization time; repricing must keep it in sync.
+      const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+      const [existingLedgerEntry] = await db
+        .select({ id: customerBalances.id })
+        .from(customerBalances)
+        .where(and(
+          eq(customerBalances.companyId, companyId),
+          eq(customerBalances.referenceType, "INVOICE"),
+          eq(customerBalances.referenceId, orderId)
+        ));
+      if (existingLedgerEntry) {
+        await db
+          .update(customerBalances)
+          .set({
+            debitAmount: String(newGrandTotal),
+            balance: String(newGrandTotal),
+          })
+          .where(eq(customerBalances.id, existingLedgerEntry.id));
+      }
+
       const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
