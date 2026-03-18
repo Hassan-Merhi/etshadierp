@@ -177,13 +177,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const isBaleRemoval = entry.txType === "BALE_REMOVAL";
   const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
 
-  const { data: voucherData } = useQuery<any>({
-    queryKey: ["/api/vouchers", entry.referenceId],
-    queryFn: async () => {
-      const res = await fetch(`/api/vouchers/${entry.referenceId}`, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
+  // Use the view-entries endpoint — same as ERP Daybook — which returns
+  // normalized { id, accountName, debitAmount, creditAmount } shape.
+  const { data: viewEntries = [] } = useQuery<any[]>({
+    queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
     enabled: isVoucherBacked && !!entry.referenceId,
   });
 
@@ -191,6 +188,90 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const amt = parseFloat(entry.amountCurrency || "0");
   const sym = currencySymbol(entry.currencyCode);
 
+  // Derived totals from actual entry amounts
+  const totalDebit = viewEntries.reduce((s, e) => s + parseFloat(e.debitAmount || "0"), 0);
+  const totalCredit = viewEntries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
+
+  if (isVoucherBacked) {
+    // ── Voucher-backed: match ERP "Voucher Details" experience exactly ──
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>Voucher Details</DialogTitle>
+          <DialogDescription>View voucher information</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 md:space-y-6">
+          {/* Date + Type metadata grid */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="font-medium">{formatDisplayDate(entry.txDate + "T00:00:00")}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Type</p>
+              <Badge variant="default">{formatTxType(entry.txType)}</Badge>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Description</p>
+            <p className="text-sm">{formatDaybookDescription(entry)}</p>
+          </div>
+
+          {/* Entries table — same structure as ERP Journal rendering */}
+          <div>
+            <h3 className="font-semibold mb-3">Entries</h3>
+            {viewEntries.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No entries found</p>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40">
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Credit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewEntries.map((e: any, i: number) => (
+                      <tr key={e.id ?? i} className="border-b last:border-0">
+                        <td className="px-3 py-2">
+                          <p className="font-medium">{e.accountName || "—"}</p>
+                          {e.balance !== undefined && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Balance: {sym}{formatNumber(parseFloat(e.balance || "0"))}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {parseFloat(e.debitAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.debitAmount))}` : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {parseFloat(e.creditAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.creditAmount))}` : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/50 font-bold">
+                      <td className="px-3 py-2">Total</td>
+                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalDebit)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalCredit)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Non-voucher entry (bale stock, removals, etc.): keep original layout ──
   return (
     <>
       <DialogHeader>
@@ -221,42 +302,6 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             </div>
           )}
         </div>
-
-        {/* Voucher entries */}
-        {isVoucherBacked && voucherData && Array.isArray(voucherData.entries) && voucherData.entries.length > 0 && (
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Entries</p>
-            <div className="rounded-md border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {voucherData.entries.map((e: any, i: number) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        <p className="font-medium">{e.accountName || e.account_name || "—"}</p>
-                        {e.accountBalance !== undefined && (
-                          <p className="text-xs text-muted-foreground">Balance: {sym}{formatNumber(parseFloat(e.accountBalance || "0"))}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(parseFloat(e.amount || e.debit || e.credit || "0"))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/20">
-                    <td className="px-3 py-2 font-semibold">Total</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold">{sym}{formatNumber(amt)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Fallback for old bale removal entries without saved bale details */}
         {isBaleRemoval && bales.length === 0 && (
