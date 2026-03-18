@@ -4459,26 +4459,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factoryRawStock)
         .where(eq(factoryRawStock.companyId, companyId));
 
-      const offloadedIds = offloaded.map((o: any) => o.containerId);
+      const offloadedIds = offloaded.map((o: any) => o.containerId).filter(Boolean);
 
-      let query = db
-        .select()
-        .from(factoryContainers)
-        .where(eq(factoryContainers.companyId, companyId));
+      const baseConditions = [
+        eq(factoryContainers.companyId, companyId),
+        sql`${factoryContainers.status} NOT IN ('DELETED', 'OPENING_BALANCE')`,
+      ];
 
       if (offloadedIds.length > 0) {
-        query = db
-          .select()
-          .from(factoryContainers)
-          .where(
-            and(
-              eq(factoryContainers.companyId, companyId),
-              sql`${factoryContainers.id} NOT IN (${sql.join(offloadedIds.map((id: number) => sql`${id}`), sql`, `)})`
-            )
-          );
+        baseConditions.push(
+          sql`${factoryContainers.id} NOT IN (${sql.join(offloadedIds.map((id: number) => sql`${id}`), sql`, `)})`
+        );
       }
 
-      const results = await query;
+      const results = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(...baseConditions));
+
       res.json(results);
     } catch (error: any) {
       console.error("Error fetching available containers:", error);
@@ -4551,6 +4549,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let commissionRecord = null;
       let commTotalVal = 0;
+      let commCurrencyForUsd = currencyCode;
+      let commFxRateForUsd = fxRate;
       if (commission && commission.personName && commission.commissionRate) {
         const commType = commission.commissionType || "PER_KG";
         const commRate = parseFloat(commission.commissionRate) || 0;
@@ -4560,6 +4560,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         const commCurrency = commission.currencyCode || currencyCode;
         const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
+        commCurrencyForUsd = commCurrency;
+        commFxRateForUsd = commFxRate;
         const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * commFxRate;
 
         [commissionRecord] = await db
@@ -4583,8 +4585,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
       const finalPayableAmount = String(totalCost);
 
-      const costPerKgUsd = currencyCode === "USD" ? inclusiveCostPerKg : inclusiveCostPerKg * fxRate;
-      const finalPayableAmountUsd = String(parseFloat(actualKg) * costPerKgUsd);
+      // Compute USD landed cost by converting each component from its own currency
+      const freightCcy = reqFreightCurrencyCode || currencyCode;
+      const freightFxRateVal = parseFloat(reqFreightFxRate || String(fxRate));
+      const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxRateVal;
+
+      const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
+      const ocFxRateVal = parseFloat(reqOtherChargesFxRate || String(fxRate));
+      const ocUsd = ocCcy === "USD" ? otherChargesVal : otherChargesVal * ocFxRateVal;
+
+      const commUsd = commCurrencyForUsd === "USD" ? commTotalVal : commTotalVal * commFxRateForUsd;
+
+      const baseMaterialUsd = currencyCode === "USD" ? basePayable : basePayable * fxRate;
+      const addlUsd = currencyCode === "USD" ? additionalChargesTotal : additionalChargesTotal * fxRate;
+      const dutyUsd = currencyCode === "USD" ? dutyVal : dutyVal * fxRate;
+
+      const totalUsd = baseMaterialUsd + freightUsd + commUsd + ocUsd + addlUsd + dutyUsd;
+      const costPerKgUsd = parseFloat(actualKg) > 0 ? totalUsd / parseFloat(actualKg) : 0;
+      const finalPayableAmountUsd = String(totalUsd);
 
       const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
 

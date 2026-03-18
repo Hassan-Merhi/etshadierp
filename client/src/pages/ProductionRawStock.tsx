@@ -184,6 +184,10 @@ interface ContainerOption {
   ratePerKg: string | null;
   currencyCode?: string;
   fxRateToUsd?: string;
+  freight?: string | null;
+  otherCharges?: string | null;
+  commissionAmount?: string | null;
+  commissionCurrencyCode?: string | null;
 }
 
 export default function ProductionRawStock() {
@@ -439,11 +443,10 @@ export default function ProductionRawStock() {
     setCostPerKg(container?.ratePerKg || "");
     setCurrencyCode(container?.currencyCode || "USD");
     setFxRateToUsd(container?.fxRateToUsd || "1");
-    if (container && parseFloat((container as any).freight || "0") > 0) {
-      setFreight(String(parseFloat((container as any).freight)));
-    } else {
-      setFreight("");
-    }
+    const freightVal = parseFloat(container?.freight || "0");
+    setFreight(freightVal > 0 ? String(freightVal) : "");
+    const ocVal = parseFloat(container?.otherCharges || "0");
+    setOtherCharges(ocVal > 0 ? String(ocVal) : "");
   };
 
   const handleOffload = () => {
@@ -1036,7 +1039,7 @@ export default function ProductionRawStock() {
                           <TableCell className="text-sm">{u.batchName || "—"}</TableCell>
                           <TableCell className="text-sm">{u.operatorUser || "—"}</TableCell>
                           <TableCell className="text-right font-mono font-medium">{formatNumber(parseFloat(u.kgUsed))} kg</TableCell>
-                          <TableCell className="text-right font-mono">${parseFloat(u.costPerKg).toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono">{parseFloat(u.costPerKg).toFixed(4)}/kg</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{u.notes || "—"}</TableCell>
                         </TableRow>
                       ))}
