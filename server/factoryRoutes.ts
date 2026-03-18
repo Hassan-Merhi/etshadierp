@@ -4487,8 +4487,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
         freight: reqFreight, freightAccountId: reqFreightAccountId,
         freightSupplierId: reqFreightSupplierId,
+        freightCurrencyCode: reqFreightCurrencyCode,
+        freightFxRate: reqFreightFxRate,
         otherCharges: reqOtherCharges, otherChargesAccountId: reqOtherChargesAccountId,
         otherChargesSupplierId: reqOtherChargesSupplierId,
+        otherChargesCurrencyCode: reqOtherChargesCurrencyCode,
+        otherChargesFxRate: reqOtherChargesFxRate,
         dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
         dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
         additionalCharges: reqAdditionalCharges,
@@ -4725,9 +4729,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      // Double-entry accounting vouchers for Freight (Dr Freight / Cr Supplier Payable)
+      // Double-entry accounting vouchers for Freight
       if (freightVal > 0 && reqFreightAccountId) {
         const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
+        const freightCcy = reqFreightCurrencyCode || currencyCode;
+        const freightFx = parseFloat(reqFreightFxRate || String(fxRate));
         const [freightVoucher] = await db.insert(vouchers).values({
           companyId,
           voucherType: "Journal",
@@ -4735,32 +4741,51 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: offloadDate,
           description: `Freight on container ${container.containerNumber}`,
           totalAmount: String(freightVal),
-          currency: currencyCode,
-          exchangeRate: String(fxRate),
+          currency: freightCcy,
+          exchangeRate: String(freightFx),
           sourceModule: "FACTORY",
         }).returning();
-        // Dr Factory Charges Payable
-        const freightPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-        await db.insert(voucherEntries).values({
-          voucherId: freightVoucher.id,
-          ledgerAccountId: freightPayableAccountId,
-          debitAmount: String(freightVal),
-          creditAmount: "0",
-          narration: `Freight payable - container ${container.containerNumber}`,
-        });
-        // Cr chosen freight account
-        await db.insert(voucherEntries).values({
-          voucherId: freightVoucher.id,
-          ledgerAccountId: parseInt(reqFreightAccountId),
-          debitAmount: "0",
-          creditAmount: String(freightVal),
-          narration: `Freight - container ${container.containerNumber}`,
-        });
+        if (reqFreightSupplierId) {
+          // Supplier selected: Dr Freight Expense / Cr Supplier Balance
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            ledgerAccountId: parseInt(reqFreightAccountId),
+            debitAmount: String(freightVal),
+            creditAmount: "0",
+            narration: `Freight expense - container ${container.containerNumber}`,
+          });
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            factorySupplierId: parseInt(reqFreightSupplierId),
+            debitAmount: "0",
+            creditAmount: String(freightVal),
+            narration: `Freight payable to supplier - container ${container.containerNumber}`,
+          });
+        } else {
+          // No supplier: Dr Factory Charges Payable / Cr chosen account
+          const freightPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            ledgerAccountId: freightPayableAccountId,
+            debitAmount: String(freightVal),
+            creditAmount: "0",
+            narration: `Freight payable - container ${container.containerNumber}`,
+          });
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            ledgerAccountId: parseInt(reqFreightAccountId),
+            debitAmount: "0",
+            creditAmount: String(freightVal),
+            narration: `Freight - container ${container.containerNumber}`,
+          });
+        }
       }
 
-      // Double-entry accounting vouchers for Other Charges (Dr Payable / Cr Chosen Account)
+      // Double-entry accounting vouchers for Other Charges
       if (otherChargesVal > 0 && reqOtherChargesAccountId) {
         const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
+        const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
+        const ocFx = parseFloat(reqOtherChargesFxRate || String(fxRate));
         const [ocMainVoucher] = await db.insert(vouchers).values({
           companyId,
           voucherType: "Journal",
@@ -4768,27 +4793,44 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: offloadDate,
           description: `Other charges on container ${container.containerNumber}`,
           totalAmount: String(otherChargesVal),
-          currency: currencyCode,
-          exchangeRate: String(fxRate),
+          currency: ocCcy,
+          exchangeRate: String(ocFx),
           sourceModule: "FACTORY",
         }).returning();
-        // Dr Factory Charges Payable
-        const ocPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-        await db.insert(voucherEntries).values({
-          voucherId: ocMainVoucher.id,
-          ledgerAccountId: ocPayableAccountId,
-          debitAmount: String(otherChargesVal),
-          creditAmount: "0",
-          narration: `Other charges payable - container ${container.containerNumber}`,
-        });
-        // Cr chosen OC account
-        await db.insert(voucherEntries).values({
-          voucherId: ocMainVoucher.id,
-          ledgerAccountId: parseInt(reqOtherChargesAccountId),
-          debitAmount: "0",
-          creditAmount: String(otherChargesVal),
-          narration: `Other charges - container ${container.containerNumber}`,
-        });
+        if (reqOtherChargesSupplierId) {
+          // Supplier selected: Dr OC Expense / Cr Supplier Balance
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            ledgerAccountId: parseInt(reqOtherChargesAccountId),
+            debitAmount: String(otherChargesVal),
+            creditAmount: "0",
+            narration: `Other charges expense - container ${container.containerNumber}`,
+          });
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            factorySupplierId: parseInt(reqOtherChargesSupplierId),
+            debitAmount: "0",
+            creditAmount: String(otherChargesVal),
+            narration: `Other charges payable to supplier - container ${container.containerNumber}`,
+          });
+        } else {
+          // No supplier: Dr Factory Charges Payable / Cr chosen account
+          const ocPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            ledgerAccountId: ocPayableAccountId,
+            debitAmount: String(otherChargesVal),
+            creditAmount: "0",
+            narration: `Other charges payable - container ${container.containerNumber}`,
+          });
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            ledgerAccountId: parseInt(reqOtherChargesAccountId),
+            debitAmount: "0",
+            creditAmount: String(otherChargesVal),
+            narration: `Other charges - container ${container.containerNumber}`,
+          });
+        }
       }
 
       // Double-entry accounting vouchers for each offload additional charge

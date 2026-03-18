@@ -175,9 +175,13 @@ export default function ProductionRawStock() {
   const [freight, setFreight] = useState("");
   const [freightAccountId, setFreightAccountId] = useState("");
   const [freightSupplierId, setFreightSupplierId] = useState("");
+  const [freightCurrencyCode, setFreightCurrencyCode] = useState("USD");
+  const [freightFxRate, setFreightFxRate] = useState("1");
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
   const [otherChargesSupplierId, setOtherChargesSupplierId] = useState("");
+  const [otherChargesCurrencyCode, setOtherChargesCurrencyCode] = useState("USD");
+  const [otherChargesFxRate, setOtherChargesFxRate] = useState("1");
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
@@ -437,10 +441,14 @@ export default function ProductionRawStock() {
       fxRateToUsd,
       freight: freight || "0",
       freightAccountId: freightAccountId ? parseInt(freightAccountId) : null,
-      freightSupplierId: freightSupplierId ? parseInt(freightSupplierId) : null,
+      freightSupplierId: freightSupplierId && freightSupplierId !== "none" ? parseInt(freightSupplierId) : null,
+      freightCurrencyCode: freightSupplierId && freightSupplierId !== "none" ? freightCurrencyCode : undefined,
+      freightFxRate: freightSupplierId && freightSupplierId !== "none" ? freightFxRate : undefined,
       otherCharges: otherCharges || "0",
       otherChargesAccountId: otherChargesAccountId ? parseInt(otherChargesAccountId) : null,
-      otherChargesSupplierId: otherChargesSupplierId ? parseInt(otherChargesSupplierId) : null,
+      otherChargesSupplierId: otherChargesSupplierId && otherChargesSupplierId !== "none" ? parseInt(otherChargesSupplierId) : null,
+      otherChargesCurrencyCode: otherChargesSupplierId && otherChargesSupplierId !== "none" ? otherChargesCurrencyCode : undefined,
+      otherChargesFxRate: otherChargesSupplierId && otherChargesSupplierId !== "none" ? otherChargesFxRate : undefined,
       dutyAmount: dutyAmount || "0",
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
@@ -484,9 +492,13 @@ export default function ProductionRawStock() {
     setFreight("");
     setFreightAccountId("");
     setFreightSupplierId("");
+    setFreightCurrencyCode("USD");
+    setFreightFxRate("1");
     setOtherCharges("");
     setOtherChargesAccountId("");
     setOtherChargesSupplierId("");
+    setOtherChargesCurrencyCode("USD");
+    setOtherChargesFxRate("1");
     setDutyAmount("");
     setDutyAccountId("");
     setDutyPending(false);
@@ -1274,79 +1286,137 @@ export default function ProductionRawStock() {
                 <div>
                   <Label className="text-sm font-semibold">Offload Charges</Label>
                   <div className="space-y-3 mt-2">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Freight ($)</Label>
-                        <Input
-                          type="number"
-                          value={freight}
-                          onChange={(e) => setFreight(e.target.value)}
-                          placeholder="0.00"
-                          step="0.01"
-                          data-testid="input-freight"
-                        />
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Freight Amount</Label>
+                          <Input
+                            type="number"
+                            value={freight}
+                            onChange={(e) => setFreight(e.target.value)}
+                            placeholder="0.00"
+                            step="0.01"
+                            data-testid="input-freight"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Freight Account</Label>
+                          <AccountCombobox
+                            value={freightAccountId}
+                            onValueChange={setFreightAccountId}
+                            accounts={ledgerAccounts || []}
+                            placeholder="Select account"
+                            testId="select-freight-account"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
+                          <Select value={freightSupplierId} onValueChange={v => { setFreightSupplierId(v); if (v === "none") { setFreightCurrencyCode("USD"); setFreightFxRate("1"); } }}>
+                            <SelectTrigger data-testid="select-freight-supplier">
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {(factorySuppliers || []).map(s => (
+                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Freight Account</Label>
-                        <AccountCombobox
-                          value={freightAccountId}
-                          onValueChange={setFreightAccountId}
-                          accounts={ledgerAccounts || []}
-                          placeholder="Select account"
-                          testId="select-freight-account"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
-                        <Select value={freightSupplierId} onValueChange={setFreightSupplierId}>
-                          <SelectTrigger data-testid="select-freight-supplier">
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {(factorySuppliers || []).map(s => (
-                              <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {freightSupplierId && freightSupplierId !== "none" && (
+                        <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Balance Currency</Label>
+                            <Select value={freightCurrencyCode} onValueChange={v => { setFreightCurrencyCode(v); setFreightFxRate(v === "USD" ? "1" : ""); }}>
+                              <SelectTrigger data-testid="select-freight-currency">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                            <Input
+                              type="number"
+                              value={freightFxRate}
+                              onChange={(e) => setFreightFxRate(e.target.value)}
+                              placeholder="1.0"
+                              step="0.0001"
+                              disabled={freightCurrencyCode === "USD"}
+                              data-testid="input-freight-fx-rate"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Other Charges ($)</Label>
-                        <Input
-                          type="number"
-                          value={otherCharges}
-                          onChange={(e) => setOtherCharges(e.target.value)}
-                          placeholder="0.00"
-                          step="0.01"
-                          data-testid="input-other-charges"
-                        />
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Other Charges Amount</Label>
+                          <Input
+                            type="number"
+                            value={otherCharges}
+                            onChange={(e) => setOtherCharges(e.target.value)}
+                            placeholder="0.00"
+                            step="0.01"
+                            data-testid="input-other-charges"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Other Charges Account</Label>
+                          <AccountCombobox
+                            value={otherChargesAccountId}
+                            onValueChange={setOtherChargesAccountId}
+                            accounts={ledgerAccounts || []}
+                            placeholder="Select account"
+                            testId="select-other-charges-account"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
+                          <Select value={otherChargesSupplierId} onValueChange={v => { setOtherChargesSupplierId(v); if (v === "none") { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}>
+                            <SelectTrigger data-testid="select-oc-supplier">
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {(factorySuppliers || []).map(s => (
+                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Other Charges Account</Label>
-                        <AccountCombobox
-                          value={otherChargesAccountId}
-                          onValueChange={setOtherChargesAccountId}
-                          accounts={ledgerAccounts || []}
-                          placeholder="Select account"
-                          testId="select-other-charges-account"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
-                        <Select value={otherChargesSupplierId} onValueChange={setOtherChargesSupplierId}>
-                          <SelectTrigger data-testid="select-oc-supplier">
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {(factorySuppliers || []).map(s => (
-                              <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {otherChargesSupplierId && otherChargesSupplierId !== "none" && (
+                        <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Balance Currency</Label>
+                            <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
+                              <SelectTrigger data-testid="select-oc-currency">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                            <Input
+                              type="number"
+                              value={otherChargesFxRate}
+                              onChange={(e) => setOtherChargesFxRate(e.target.value)}
+                              placeholder="1.0"
+                              step="0.0001"
+                              disabled={otherChargesCurrencyCode === "USD"}
+                              data-testid="input-oc-fx-rate"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
