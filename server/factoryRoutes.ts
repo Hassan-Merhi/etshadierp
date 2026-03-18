@@ -4487,7 +4487,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
         freight: reqFreight, freightAccountId: reqFreightAccountId,
         otherCharges: reqOtherCharges, otherChargesAccountId: reqOtherChargesAccountId,
-        chargesPayableAccountId: reqChargesPayableAccountId,
         dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
         dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
         additionalCharges: reqAdditionalCharges,
@@ -4742,24 +4741,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `Freight expense - container ${container.containerNumber}`,
         });
-        const freightCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
-        if (freightCreditAccountId) {
-          await db.insert(voucherEntries).values({
-            voucherId: freightVoucher.id,
-            ledgerAccountId: freightCreditAccountId,
-            debitAmount: "0",
-            creditAmount: String(freightVal),
-            narration: `Freight payable - container ${container.containerNumber}`,
-          });
-        } else if (container.supplierId) {
-          await db.insert(voucherEntries).values({
-            voucherId: freightVoucher.id,
-            factorySupplierId: container.supplierId,
-            debitAmount: "0",
-            creditAmount: String(freightVal),
-            narration: `Freight payable to supplier - container ${container.containerNumber}`,
-          });
-        }
+        // Auto-create/find the charges payable ledger account for the credit side
+        const freightCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: freightVoucher.id,
+          ledgerAccountId: freightCreditAccountId,
+          debitAmount: "0",
+          creditAmount: String(freightVal),
+          narration: `Freight payable - container ${container.containerNumber}`,
+        });
       }
 
       // Double-entry accounting vouchers for Other Charges (Dr OtherChargesAccount / Cr Payable)
@@ -4783,28 +4773,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `Other charges expense - container ${container.containerNumber}`,
         });
-        const ocCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
-        if (ocCreditAccountId) {
-          await db.insert(voucherEntries).values({
-            voucherId: ocMainVoucher.id,
-            ledgerAccountId: ocCreditAccountId,
-            debitAmount: "0",
-            creditAmount: String(otherChargesVal),
-            narration: `Other charges payable - container ${container.containerNumber}`,
-          });
-        } else if (container.supplierId) {
-          await db.insert(voucherEntries).values({
-            voucherId: ocMainVoucher.id,
-            factorySupplierId: container.supplierId,
-            debitAmount: "0",
-            creditAmount: String(otherChargesVal),
-            narration: `Other charges payable to supplier - container ${container.containerNumber}`,
-          });
-        }
+        const ocCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: ocMainVoucher.id,
+          ledgerAccountId: ocCreditAccountId,
+          debitAmount: "0",
+          creditAmount: String(otherChargesVal),
+          narration: `Other charges payable - container ${container.containerNumber}`,
+        });
       }
 
       // Double-entry accounting vouchers for each offload additional charge
-      // (Dr Charge Account / Cr Payable Account)
+      // (Dr Charge Account / Cr Factory Charges Payable)
       for (const inserted of insertedAdditionalCharges) {
         const chargeAmount = parseFloat(inserted.amount || "0");
         if (chargeAmount <= 0 || !inserted.ledgerAccountId) continue;
@@ -4828,25 +4808,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `${inserted.description} - container ${container.containerNumber}`,
         });
-        // Cr Payable account
-        const addlCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
-        if (addlCreditAccountId) {
-          await db.insert(voucherEntries).values({
-            voucherId: ocVoucher.id,
-            ledgerAccountId: addlCreditAccountId,
-            debitAmount: "0",
-            creditAmount: String(chargeAmount),
-            narration: `${inserted.description} payable - container ${container.containerNumber}`,
-          });
-        } else if (container.supplierId) {
-          await db.insert(voucherEntries).values({
-            voucherId: ocVoucher.id,
-            factorySupplierId: container.supplierId,
-            debitAmount: "0",
-            creditAmount: String(chargeAmount),
-            narration: `${inserted.description} payable to supplier - container ${container.containerNumber}`,
-          });
-        }
+        // Cr Factory Charges Payable (auto-created)
+        const addlCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: ocVoucher.id,
+          ledgerAccountId: addlCreditAccountId,
+          debitAmount: "0",
+          creditAmount: String(chargeAmount),
+          narration: `${inserted.description} payable - container ${container.containerNumber}`,
+        });
       }
 
       res.json({ rawStock, commission: commissionRecord });
