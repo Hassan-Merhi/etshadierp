@@ -4487,6 +4487,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
         freight: reqFreight, freightAccountId: reqFreightAccountId,
         otherCharges: reqOtherCharges, otherChargesAccountId: reqOtherChargesAccountId,
+        chargesPayableAccountId: reqChargesPayableAccountId,
         dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
         dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
         additionalCharges: reqAdditionalCharges,
@@ -4741,7 +4742,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `Freight expense - container ${container.containerNumber}`,
         });
-        if (container.supplierId) {
+        const freightCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
+        if (freightCreditAccountId) {
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            ledgerAccountId: freightCreditAccountId,
+            debitAmount: "0",
+            creditAmount: String(freightVal),
+            narration: `Freight payable - container ${container.containerNumber}`,
+          });
+        } else if (container.supplierId) {
           await db.insert(voucherEntries).values({
             voucherId: freightVoucher.id,
             factorySupplierId: container.supplierId,
@@ -4752,7 +4762,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      // Double-entry accounting vouchers for Other Charges (Dr OtherChargesAccount / Cr Supplier Payable)
+      // Double-entry accounting vouchers for Other Charges (Dr OtherChargesAccount / Cr Payable)
       if (otherChargesVal > 0 && reqOtherChargesAccountId) {
         const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
         const [ocMainVoucher] = await db.insert(vouchers).values({
@@ -4773,7 +4783,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `Other charges expense - container ${container.containerNumber}`,
         });
-        if (container.supplierId) {
+        const ocCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
+        if (ocCreditAccountId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            ledgerAccountId: ocCreditAccountId,
+            debitAmount: "0",
+            creditAmount: String(otherChargesVal),
+            narration: `Other charges payable - container ${container.containerNumber}`,
+          });
+        } else if (container.supplierId) {
           await db.insert(voucherEntries).values({
             voucherId: ocMainVoucher.id,
             factorySupplierId: container.supplierId,
@@ -4785,7 +4804,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry accounting vouchers for each offload additional charge
-      // (Dr Charge Account / Cr Supplier Payable) — mirrors the other-charges/sync endpoint
+      // (Dr Charge Account / Cr Payable Account)
       for (const inserted of insertedAdditionalCharges) {
         const chargeAmount = parseFloat(inserted.amount || "0");
         if (chargeAmount <= 0 || !inserted.ledgerAccountId) continue;
@@ -4809,8 +4828,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `${inserted.description} - container ${container.containerNumber}`,
         });
-        // Cr Supplier Payable
-        if (container.supplierId) {
+        // Cr Payable account
+        const addlCreditAccountId = reqChargesPayableAccountId ? parseInt(reqChargesPayableAccountId) : null;
+        if (addlCreditAccountId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocVoucher.id,
+            ledgerAccountId: addlCreditAccountId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmount),
+            narration: `${inserted.description} payable - container ${container.containerNumber}`,
+          });
+        } else if (container.supplierId) {
           await db.insert(voucherEntries).values({
             voucherId: ocVoucher.id,
             factorySupplierId: container.supplierId,

@@ -175,6 +175,7 @@ export default function ProductionRawStock() {
   const [freightAccountId, setFreightAccountId] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
+  const [chargesPayableAccountId, setChargesPayableAccountId] = useState("");
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
@@ -436,6 +437,7 @@ export default function ProductionRawStock() {
       freightAccountId: freightAccountId ? parseInt(freightAccountId) : null,
       otherCharges: otherCharges || "0",
       otherChargesAccountId: otherChargesAccountId ? parseInt(otherChargesAccountId) : null,
+      chargesPayableAccountId: chargesPayableAccountId ? parseInt(chargesPayableAccountId) : null,
       dutyAmount: dutyAmount || "0",
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
@@ -1311,6 +1313,16 @@ export default function ProductionRawStock() {
                           testId="select-other-charges-account"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Charges Payable Account (Credit)</Label>
+                      <AccountCombobox
+                        value={chargesPayableAccountId}
+                        onValueChange={setChargesPayableAccountId}
+                        accounts={ledgerAccounts || []}
+                        placeholder="Select payable account"
+                        testId="select-charges-payable-account"
+                      />
                     </div>
                   </div>
                 </div>
