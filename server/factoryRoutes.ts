@@ -4709,7 +4709,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           )
         );
 
-        // 4. Delete raw stock, commission records, and additional charges
+        // 4. Delete all double-entry accounting vouchers for this container
+        //    Patterns: FACTORY-COMM-{id}-*, FACTORY-FREIGHT-{id}-*, FACTORY-OC-{id}-*
+        const containerVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              or(
+                ilike(vouchers.voucherNumber, `FACTORY-COMM-${containerId}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-OC-${containerId}-%`)
+              )
+            )
+          );
+        if (containerVouchers.length > 0) {
+          const vIds = containerVouchers.map((v: any) => v.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+        }
+
+        // 5a. Delete raw stock, commission records, and additional charges
         await tx.delete(factoryRawStock).where(
           and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId))
         );

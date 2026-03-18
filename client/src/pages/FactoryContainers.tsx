@@ -289,8 +289,10 @@ export default function FactoryContainers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       setReversingContainer(null);
-      toast({ title: "Offload Reversed", description: "Container is back to RECEIVED status. Raw stock entry and offload charges have been removed." });
+      toast({ title: "Offload Reversed", description: "Container is back to RECEIVED status. Raw stock, accounting vouchers, and daybook entries have all been removed." });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1240,14 +1242,15 @@ export default function FactoryContainers() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2 text-sm text-muted-foreground">
-            <p>The following will be removed:</p>
+            <p>The following will be permanently removed:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>Raw stock entry from Raw Production</li>
               <li>All offload charges (freight, duty, other charges, commission)</li>
-              <li>Related daybook entries</li>
+              <li>All accounting journal vouchers (commission, freight, other charges)</li>
+              <li>All related daybook entries</li>
             </ul>
             <p className="text-foreground font-medium pt-1">
-              The container will return to <strong>RECEIVED</strong> status and can be offloaded again.
+              The container will return to <strong>RECEIVED</strong> status and can be offloaded again from scratch.
             </p>
           </div>
           <DialogFooter className="gap-2">
