@@ -833,6 +833,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
       if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
+      // Wait for factorySuppliersList to load if any entry references one
+      const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
+      if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
       // Identify the payment account entry.
       // For asset-type payment accounts: Payment=CR, Receipt=DR
       // For liability-type payment accounts (supplier/employee): Payment=DR, Receipt=CR
@@ -1029,7 +1032,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         setTransactionRate(parseFloat(voucherToEdit.exchangeRate));
       }
     }
-  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, form]);
+  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, factorySuppliersList, form]);
 
   // Get selected payment account - moved up to use in filtered accounts
   const paymentAccountType = form.watch("paymentAccountType");
@@ -1758,8 +1761,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
       if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
+      // Wait for factorySuppliersList to load if any entry references one
+      const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
+      if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
       const formEntries = voucherToEdit.entries.map((entry: any) => {
-        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "factorySupplier" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" = "ledger";
         let accountId = 0;
         let accountName = "";
         let type: "DR" | "CR" = "DR";
@@ -1796,6 +1802,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId = entry.fixedAssetId;
           const asset = fixedAssets.find(f => f.id === accountId);
           accountName = asset?.name || "";
+        } else if (entry.customerId) {
+          accountType = "customer";
+          accountId = entry.customerId;
+          const customer = customers.find(c => c.id === accountId);
+          accountName = customer?.name || "";
         }
 
         // Determine DR/CR and amount
@@ -1833,7 +1844,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
       hydratedVoucherIdRef.current = voucherToEdit.id;
     }
-  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, journalForm]);
+  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, factorySuppliersList, journalForm]);
 
   // Journal save mutation (handles both create and update) - OPTIMIZED to use batch endpoint
   const journalMutation = useMutation({
