@@ -4394,6 +4394,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           reservedKg: reservedKg.toFixed(3),
           freeKg: freeKg.toFixed(3),
           costPerKg: s._avgCostPerKg.toFixed(4),
+          costPerKgUsd: s._avgCostPerKgUsd.toFixed(4),
           valueRemaining: valueRemaining.toFixed(2),
           valueRemainingUsd: valueRemainingUsd.toFixed(2),
           lastOffloaded: s.lastOffloaded,

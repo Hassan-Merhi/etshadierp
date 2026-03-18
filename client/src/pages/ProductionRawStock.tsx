@@ -156,6 +156,7 @@ interface RawStockRow {
   reservedKg?: string;
   freeKg?: string;
   costPerKg: string;
+  costPerKgUsd?: string;
   valueRemaining: string;
   valueRemainingUsd: string;
   lastOffloaded: string;
@@ -778,8 +779,8 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Reserved (kg)</TableHead>
                   <TableHead className="text-right">Free (kg)</TableHead>
-                  <TableHead className="text-right">Avg Cost/kg</TableHead>
-                  <TableHead className="text-right">Value Remaining</TableHead>
+                  <TableHead className="text-right">Avg Cost/kg ($)</TableHead>
+                  <TableHead className="text-right">Value Remaining ($)</TableHead>
                   <TableHead>Last Offloaded</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -817,7 +818,7 @@ export default function ProductionRawStock() {
                         {formatNumber(parseFloat(row.freeKg || "0"))}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {currency !== "USD" ? `${currency} ` : "$"}{parseFloat(row.costPerKg).toFixed(4)}
+                        ${parseFloat(row.costPerKgUsd || row.costPerKg).toFixed(4)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${formatNumber(parseFloat(row.valueRemainingUsd || row.valueRemaining))}
