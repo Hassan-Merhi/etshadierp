@@ -4734,25 +4734,26 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           exchangeRate: String(fxRate),
           sourceModule: "FACTORY",
         }).returning();
+        // Dr Factory Charges Payable
+        const freightPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: freightVoucher.id,
+          ledgerAccountId: freightPayableAccountId,
+          debitAmount: String(freightVal),
+          creditAmount: "0",
+          narration: `Freight payable - container ${container.containerNumber}`,
+        });
+        // Cr chosen freight account
         await db.insert(voucherEntries).values({
           voucherId: freightVoucher.id,
           ledgerAccountId: parseInt(reqFreightAccountId),
-          debitAmount: String(freightVal),
-          creditAmount: "0",
-          narration: `Freight expense - container ${container.containerNumber}`,
-        });
-        // Auto-create/find the charges payable ledger account for the credit side
-        const freightCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-        await db.insert(voucherEntries).values({
-          voucherId: freightVoucher.id,
-          ledgerAccountId: freightCreditAccountId,
           debitAmount: "0",
           creditAmount: String(freightVal),
-          narration: `Freight payable - container ${container.containerNumber}`,
+          narration: `Freight - container ${container.containerNumber}`,
         });
       }
 
-      // Double-entry accounting vouchers for Other Charges (Dr OtherChargesAccount / Cr Payable)
+      // Double-entry accounting vouchers for Other Charges (Dr Payable / Cr Chosen Account)
       if (otherChargesVal > 0 && reqOtherChargesAccountId) {
         const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
         const [ocMainVoucher] = await db.insert(vouchers).values({
@@ -4766,25 +4767,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           exchangeRate: String(fxRate),
           sourceModule: "FACTORY",
         }).returning();
+        // Dr Factory Charges Payable
+        const ocPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: ocMainVoucher.id,
+          ledgerAccountId: ocPayableAccountId,
+          debitAmount: String(otherChargesVal),
+          creditAmount: "0",
+          narration: `Other charges payable - container ${container.containerNumber}`,
+        });
+        // Cr chosen OC account
         await db.insert(voucherEntries).values({
           voucherId: ocMainVoucher.id,
           ledgerAccountId: parseInt(reqOtherChargesAccountId),
-          debitAmount: String(otherChargesVal),
-          creditAmount: "0",
-          narration: `Other charges expense - container ${container.containerNumber}`,
-        });
-        const ocCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-        await db.insert(voucherEntries).values({
-          voucherId: ocMainVoucher.id,
-          ledgerAccountId: ocCreditAccountId,
           debitAmount: "0",
           creditAmount: String(otherChargesVal),
-          narration: `Other charges payable - container ${container.containerNumber}`,
+          narration: `Other charges - container ${container.containerNumber}`,
         });
       }
 
       // Double-entry accounting vouchers for each offload additional charge
-      // (Dr Charge Account / Cr Factory Charges Payable)
+      // (Dr Factory Charges Payable / Cr chosen account)
       for (const inserted of insertedAdditionalCharges) {
         const chargeAmount = parseFloat(inserted.amount || "0");
         if (chargeAmount <= 0 || !inserted.ledgerAccountId) continue;
@@ -4800,22 +4803,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           exchangeRate: String(fxRate),
           sourceModule: "FACTORY",
         }).returning();
-        // Dr Charge Expense account
+        // Dr Factory Charges Payable
+        const addlPayableAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+        await db.insert(voucherEntries).values({
+          voucherId: ocVoucher.id,
+          ledgerAccountId: addlPayableAccountId,
+          debitAmount: String(chargeAmount),
+          creditAmount: "0",
+          narration: `${inserted.description} payable - container ${container.containerNumber}`,
+        });
+        // Cr chosen account
         await db.insert(voucherEntries).values({
           voucherId: ocVoucher.id,
           ledgerAccountId: inserted.ledgerAccountId,
-          debitAmount: String(chargeAmount),
-          creditAmount: "0",
-          narration: `${inserted.description} - container ${container.containerNumber}`,
-        });
-        // Cr Factory Charges Payable (auto-created)
-        const addlCreditAccountId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-        await db.insert(voucherEntries).values({
-          voucherId: ocVoucher.id,
-          ledgerAccountId: addlCreditAccountId,
           debitAmount: "0",
           creditAmount: String(chargeAmount),
-          narration: `${inserted.description} payable - container ${container.containerNumber}`,
+          narration: `${inserted.description} - container ${container.containerNumber}`,
         });
       }
 
