@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +95,7 @@ export default function FactoryPayrollTab() {
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [bulkCashAccountId, setBulkCashAccountId] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Post-pay PDF state
@@ -285,6 +286,23 @@ export default function FactoryPayrollTab() {
       setDeleteTargetId(null);
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const undoMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/factory/payroll/${id}/undo`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to undo"); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      const msg = data.previousStatus === "PAID"
+        ? "Payroll reverted to Draft — payment and accounting entries removed"
+        : "Payroll deleted and advances restored";
+      toast({ title: "Undo successful", description: msg });
+      setUndoTargetId(null);
+    },
+    onError: (err: Error) => toast({ title: "Undo failed", description: err.message, variant: "destructive" }),
   });
 
   const printSummaryPDF = async () => {
@@ -493,16 +511,15 @@ export default function FactoryPayrollTab() {
                                           Pay
                                         </Button>
                                       )}
-                                      {p.status === "DRAFT" && (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => setDeleteTargetId(p.id)}
-                                          data-testid={`button-delete-payroll-${p.id}`}
-                                        >
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                      )}
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => setUndoTargetId(p.id)}
+                                        data-testid={`button-undo-payroll-${p.id}`}
+                                        title="Undo — reverses all accounting entries"
+                                      >
+                                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                                      </Button>
                                     </div>
                                   </TableCell>
                                 </TableRow>
@@ -891,6 +908,37 @@ export default function FactoryPayrollTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Undo Confirmation */}
+      {(() => {
+        const undoTarget = undoTargetId ? (payrolls || []).find((p) => p.id === undoTargetId) : null;
+        const isPaid = undoTarget?.status === "PAID";
+        return (
+          <Dialog open={undoTargetId !== null} onOpenChange={(open) => !open && setUndoTargetId(null)}>
+            <DialogContent data-testid="dialog-undo">
+              <DialogHeader>
+                <DialogTitle>Undo Payroll</DialogTitle>
+                <DialogDescription>
+                  {isPaid
+                    ? "This will revert the payroll back to Draft, remove the payment record, and delete all related accounting entries. Advance deductions will also be restored."
+                    : "This will delete the draft payroll and restore any advance deductions made at generation time."}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setUndoTargetId(null)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => undoTargetId && undoMutation.mutate(undoTargetId)}
+                  disabled={undoMutation.isPending}
+                  data-testid="button-confirm-undo"
+                >
+                  {undoMutation.isPending ? "Undoing..." : "Undo"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Delete Confirmation */}
       <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>

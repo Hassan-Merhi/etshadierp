@@ -395,6 +395,77 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     }
   });
 
+  app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [existing] = await db
+        .select()
+        .from(factoryPayrolls)
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
+
+      if (!existing) return res.status(404).json({ message: "Payroll record not found" });
+
+      await db.transaction(async (tx: any) => {
+        // 1. Restore advance balances that were settled at generate time
+        const advDeducted = parseFloat(existing.advances || "0");
+        if (advDeducted > 0) {
+          const workerAdvances = await tx.select().from(factoryWorkerAdvances)
+            .where(and(
+              eq(factoryWorkerAdvances.companyId, companyId),
+              eq(factoryWorkerAdvances.workerId, existing.workerId),
+              eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
+            ))
+            .orderBy(desc(factoryWorkerAdvances.advanceDate));
+          let toRestore = advDeducted;
+          for (const adv of workerAdvances) {
+            if (toRestore <= 0) break;
+            const orig = parseFloat(adv.amount || "0");
+            const curr = parseFloat(adv.remainingBalance || "0");
+            const canRestore = Math.min(toRestore, orig - curr);
+            if (canRestore > 0) {
+              const newBal = curr + canRestore;
+              await tx.update(factoryWorkerAdvances).set({
+                remainingBalance: newBal.toFixed(2),
+                fullyPaid: false,
+              }).where(eq(factoryWorkerAdvances.id, adv.id));
+              toRestore -= canRestore;
+            }
+          }
+        }
+
+        // 2. Delete all accounting/daybook entries linked to this payroll
+        await tx.delete(factoryDaybookEntries).where(
+          and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.referenceId, id),
+            eq(factoryDaybookEntries.referenceTable, "factory_payrolls"),
+          )
+        );
+
+        // 3. If PAID → revert to DRAFT. If DRAFT → delete entirely.
+        if (existing.status === "PAID") {
+          await tx.update(factoryPayrolls).set({
+            status: "DRAFT",
+            paidAt: null,
+            paymentSource: null,
+            paymentReference: null,
+            approvedAt: null,
+          }).where(eq(factoryPayrolls.id, id));
+        } else {
+          await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
+        }
+      });
+
+      res.json({ message: "Payroll undone successfully", previousStatus: existing.status });
+    } catch (error: any) {
+      console.error("Error undoing payroll:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
