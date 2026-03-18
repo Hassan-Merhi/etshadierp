@@ -4639,6 +4639,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 description: charge.description,
                 amount: String(charge.amount),
                 ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
+                supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
               })
               .returning();
             insertedAdditionalCharges.push(inserted);

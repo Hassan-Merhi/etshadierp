@@ -116,6 +116,7 @@ interface AdditionalChargeRow {
   description: string;
   amount: string;
   ledgerAccountId: string;
+  supplierId: string;
 }
 
 interface RawStockRow {
@@ -444,6 +445,7 @@ export default function ProductionRawStock() {
         description: c.description.trim(),
         amount: c.amount,
         ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
+        supplierId: c.supplierId && c.supplierId !== "none" ? parseInt(c.supplierId) : null,
       })),
       mixBatchAllocations: mixBatchAllocations.filter(a => a.mixBatchId && parseFloat(a.weightKg || "0") > 0).map(a => ({
         mixBatchId: parseInt(a.mixBatchId),
@@ -1323,7 +1325,7 @@ export default function ProductionRawStock() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "" }])}
+                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "", supplierId: "" }])}
                       data-testid="button-add-additional-charge"
                     >
                       <Plus className="h-3 w-3 mr-1" /> Add Row
@@ -1332,7 +1334,7 @@ export default function ProductionRawStock() {
                   {additionalCharges.length > 0 && (
                     <div className="space-y-2 mt-2">
                       {additionalCharges.map((charge, idx) => (
-                        <div key={charge.id} className="grid grid-cols-[1fr_100px_1fr_auto] gap-2 items-end">
+                        <div key={charge.id} className="grid grid-cols-[1fr_100px_1fr_1fr_auto] gap-2 items-end">
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">Description</Label>
                             <Input
@@ -1362,6 +1364,23 @@ export default function ProductionRawStock() {
                               placeholder="Select"
                               testId={`select-addl-account-${idx}`}
                             />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
+                            <Select
+                              value={charge.supplierId}
+                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, supplierId: v } : c))}
+                            >
+                              <SelectTrigger data-testid={`select-addl-supplier-${idx}`}>
+                                <SelectValue placeholder="None" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {(factorySuppliers || []).map((s) => (
+                                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <Button
                             variant="ghost"
