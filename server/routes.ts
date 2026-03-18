@@ -20232,6 +20232,14 @@ if (asOfDate) {
         }
       }
 
+      // Exclude Production/Consumption stock adjustment auto-accounts
+      // Their inventory effect is already captured in stockOnFloor — showing them double-counts
+      for (const acc of companyAccounts) {
+        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") {
+          excludedFromExpenses.add(acc.id);
+        }
+      }
+
       // Categorize accounts
       const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
       const isExpenseAccount = (acc: typeof companyAccounts[0]) => 
@@ -20268,6 +20276,9 @@ if (asOfDate) {
       const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) => {
         // First check excluded account types
         if (excludedAccountTypes.includes(acc.accountType || "")) return true;
+
+        // Exclude stock adjustment auto-accounts — their effect is already in stockOnFloor
+        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
         
         // Exclude Supplier-type ledger accounts for subsidiary companies
         // Suppliers are only tracked for the parent company (Lubumbashi)
@@ -25273,8 +25284,12 @@ if (asOfDate) {
       const grossProfit = tradingCreditSide - tradingDebitSide;
 
       // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
+      // Exclude PRODUCTION_ADJUSTMENT and CONSUMPTION_EXPENSE — their inventory effect
+      // is already captured in stockOnFloor (closing stock), showing them would double-count.
       const indirectExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Indirect Expense"
+        (acc) => acc.accountType === "Indirect Expense" &&
+                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
+                 acc.code !== "CONSUMPTION_EXPENSE"
       );
       let indirectExpensesTotal = 0;
       const indirectExpensesDetails = indirectExpenseAccounts.map((acc) => {
@@ -26253,7 +26268,9 @@ if (asOfDate) {
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       const indirectExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Indirect Expense"
+        (acc) => acc.accountType === "Indirect Expense" &&
+                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
+                 acc.code !== "CONSUMPTION_EXPENSE"
       );
 
       const companyVouchers = await db
