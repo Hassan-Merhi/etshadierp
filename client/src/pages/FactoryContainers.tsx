@@ -570,7 +570,9 @@ export default function FactoryContainers() {
                   const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
                   const freightAmt = parseFloat((c as any).freight || "0");
                   const otherAmt = parseFloat((c as any).otherCharges || "0");
-                  const totalValue = baseValue + freightAmt + otherAmt;
+                  const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                  const totalOtherAmt = otherAmt + additionalAmt;
+                  const totalValue = baseValue + freightAmt + otherAmt + additionalAmt;
                   return (
                     <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
                       <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
@@ -589,7 +591,17 @@ export default function FactoryContainers() {
                         {freightAmt > 0 ? `${ccy} ${formatNumber(freightAmt)}` : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {otherAmt > 0 ? `${ccy} ${formatNumber(otherAmt)}` : <span className="text-muted-foreground">—</span>}
+                        {totalOtherAmt > 0 ? (
+                          <div>
+                            <span>{ccy} {formatNumber(totalOtherAmt)}</span>
+                            {additionalAmt > 0 && otherAmt > 0 && (
+                              <div className="text-xs text-muted-foreground">{ccy} {formatNumber(otherAmt)} + {formatNumber(additionalAmt)} addl</div>
+                            )}
+                            {additionalAmt > 0 && otherAmt === 0 && (
+                              <div className="text-xs text-muted-foreground">addl charges</div>
+                            )}
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">
                         {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}

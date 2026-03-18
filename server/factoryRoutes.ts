@@ -3770,6 +3770,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           createdAt: factoryContainers.createdAt,
           updatedAt: factoryContainers.updatedAt,
           supplierName: factorySuppliers.name,
+          additionalChargesSum: sql<string>`COALESCE((
+            SELECT SUM(foac.amount::numeric)
+            FROM factory_offload_additional_charges foac
+            WHERE foac.container_id = ${factoryContainers.id}
+            AND foac.company_id = ${factoryContainers.companyId}
+          ), 0)`,
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
@@ -4710,6 +4716,70 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             currencyCode,
             amountCurrency: chargeAmount,
             fxRateToUsd: fxRate,
+          });
+        }
+      }
+
+      // Double-entry accounting vouchers for Freight (Dr Freight / Cr Supplier Payable)
+      if (freightVal > 0 && reqFreightAccountId) {
+        const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
+        const [freightVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherType: "Journal",
+          voucherNumber: freightVoucherNum,
+          voucherDate: offloadDate,
+          description: `Freight on container ${container.containerNumber}`,
+          totalAmount: String(freightVal),
+          currency: currencyCode,
+          exchangeRate: String(fxRate),
+          sourceModule: "FACTORY",
+        }).returning();
+        await db.insert(voucherEntries).values({
+          voucherId: freightVoucher.id,
+          ledgerAccountId: parseInt(reqFreightAccountId),
+          debitAmount: String(freightVal),
+          creditAmount: "0",
+          narration: `Freight expense - container ${container.containerNumber}`,
+        });
+        if (container.supplierId) {
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            factorySupplierId: container.supplierId,
+            debitAmount: "0",
+            creditAmount: String(freightVal),
+            narration: `Freight payable to supplier - container ${container.containerNumber}`,
+          });
+        }
+      }
+
+      // Double-entry accounting vouchers for Other Charges (Dr OtherChargesAccount / Cr Supplier Payable)
+      if (otherChargesVal > 0 && reqOtherChargesAccountId) {
+        const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
+        const [ocMainVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherType: "Journal",
+          voucherNumber: ocMainVoucherNum,
+          voucherDate: offloadDate,
+          description: `Other charges on container ${container.containerNumber}`,
+          totalAmount: String(otherChargesVal),
+          currency: currencyCode,
+          exchangeRate: String(fxRate),
+          sourceModule: "FACTORY",
+        }).returning();
+        await db.insert(voucherEntries).values({
+          voucherId: ocMainVoucher.id,
+          ledgerAccountId: parseInt(reqOtherChargesAccountId),
+          debitAmount: String(otherChargesVal),
+          creditAmount: "0",
+          narration: `Other charges expense - container ${container.containerNumber}`,
+        });
+        if (container.supplierId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocMainVoucher.id,
+            factorySupplierId: container.supplierId,
+            debitAmount: "0",
+            creditAmount: String(otherChargesVal),
+            narration: `Other charges payable to supplier - container ${container.containerNumber}`,
           });
         }
       }
