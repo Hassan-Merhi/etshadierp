@@ -1514,6 +1514,19 @@
       }
     }, [activeLocations, selectedLocationId]);
 
+    const downloadTemplate = () => {
+      const headers = ["ITEM NAME", "WEIGHT", "ITEM BARCODE", "QUANTITY", "PRODUCTION DATE"];
+      const sampleRows = [
+        ["Cotton Bale A1", 25, "ART001", 10, "2026-03-14"],
+        ["Cotton Bale B2", 30, "ART002", 5, "2026-03-14"],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+      ws["!cols"] = headers.map(() => ({ wch: 20 }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Bale Import Template");
+      XLSX.writeFile(wb, "bale_import_template.xlsx");
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -1623,7 +1636,7 @@
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-1.5">Upload Excel File</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1639,6 +1652,14 @@
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {fileName || "Choose File..."}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={downloadTemplate}
+                data-testid="button-download-template"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
               </Button>
               {fileName && (
                 <Badge variant="secondary" data-testid="badge-file-name">
