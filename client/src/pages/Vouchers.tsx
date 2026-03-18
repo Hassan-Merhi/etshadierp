@@ -1218,6 +1218,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const isEditMode = !!voucherIdToEdit;
 
       // Prepare request payload - include exchange rate for rate-locking
+      const autoDesc = data.notes?.trim()
+        ? data.notes.trim()
+        : `${voucherType} (${data.paymentAccountName || "—"})`;
+
       const payload = {
         voucherType,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
@@ -1225,7 +1229,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentAccountId: data.paymentAccountId,
         paymentAccountName: data.paymentAccountName,
         entries: data.entries,
-        notes: data.notes,
+        notes: autoDesc,
         optional: data.optional,
         currency: selectedCurrency,
         exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
@@ -4356,18 +4360,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <h3 className="text-sm font-semibold">Search Accounts</h3>
                       <div className="flex items-center gap-2">
-                        {!isFactoryCompany && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
-                            data-testid="button-journal-create-account"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            New
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
+                          data-testid="button-journal-create-account"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          New
+                        </Button>
                         <button 
                           onClick={() => setShowAccountSidebar(false)} 
                           className="text-xs text-muted-foreground hover:text-foreground" 
@@ -4384,38 +4386,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       )}
                       <Input
-                        placeholder={isFactoryCompany ? "Type expense name & Enter..." : "Search by name or code..."}
+                        placeholder="Search by name or code..."
                         value={journalAccountSearchTerm}
                         onChange={(e) => {
                           setJournalAccountSearchTerm(e.target.value);
                           setJournalAccountHighlightedIndex(0);
                         }}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter" && isFactoryCompany) {
-                            e.preventDefault();
-                            const trimmedName = journalAccountSearchTerm.trim();
-                            if (!trimmedName) return;
-
-                            // Check for EXACT match (case-insensitive) - only select if name matches exactly
-                            const exactMatch = filteredJournalAccounts.find(
-                              (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
-                            );
-                            
-                            if (exactMatch) {
-                              handleJournalAccountSelect(exactMatch);
-                              return;
-                            }
-
-                            // No exact match - auto-create for factory (even if there are partial matches)
-                            const newAccount = await handleAutoCreateAccount(trimmedName);
-                            if (newAccount) {
-                              // Convert Account to CombinedAccount format
-                              handleJournalAccountSelect({
-                                ...newAccount,
-                                balance: newAccount.balance?.toString(),
-                              });
-                            }
-                          } else if (e.key === "ArrowDown") {
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowDown") {
                             e.preventDefault();
                             if (filteredJournalAccounts.length > 0) {
                               setJournalAccountHighlightedIndex(Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1));
@@ -4425,8 +4403,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             if (filteredJournalAccounts.length > 0) {
                               setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
                             }
-                          } else if (e.key === "Enter" && !isFactoryCompany) {
-                            // For non-factory: select highlighted account on Enter
+                          } else if (e.key === "Enter") {
                             if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
                               e.preventDefault();
                               handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
@@ -4443,11 +4420,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <div className="space-y-1">
                       {filteredJournalAccounts.length === 0 ? (
                         <div className="text-center py-8 text-sm text-muted-foreground">
-                          {isFactoryCompany && journalAccountSearchTerm.trim() ? (
-                            <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
-                          ) : (
-                            "No accounts found"
-                          )}
+                          No accounts found
                         </div>
                       ) : (
                         filteredJournalAccounts.map((account, idx) => {

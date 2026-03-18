@@ -2092,7 +2092,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const supplierId = parseInt(req.params.id);
@@ -2203,7 +2203,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .orderBy(desc(factorySupplierPayments.date));
 
-      const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+      // Also fetch voucher-based payments (payment/receipt vouchers where factory supplier is debited)
+      const voucherPaymentRows = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          voucherType: vouchers.voucherType,
+          voucherNumber: vouchers.voucherNumber,
+          currency: vouchers.currency,
+          exchangeRate: vouchers.exchangeRate,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(
+          eq(voucherEntries.factorySupplierId, supplierId),
+          sql`${voucherEntries.debitAmount}::numeric > 0`
+        ))
+        .orderBy(desc(vouchers.voucherDate));
+
+      // Convert voucher payments to USD for total calculation
+      const voucherPaymentsTotal = (voucherPaymentRows as any[]).reduce((sum: number, p: any) => {
+        const amt = parseFloat(p.debitAmount || "0");
+        const fx = parseFloat(p.exchangeRate || "1") || 1;
+        const currency = p.currency || "USD";
+        const usdAmt = currency === "USD" ? amt : amt / fx;
+        return sum + usdAmt;
+      }, 0);
+
+      const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
       const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number }> = {};
@@ -2486,6 +2517,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amount: fmtAmt(p.amount, p.currencyCode || "USD", true),
           amountIsNeg: true,
           notes: p.notes,
+        })),
+        ...(voucherPaymentRows as any[]).map((p: any) => ({
+          key: `vp-${p.id}`,
+          date: p.voucherDate,
+          type: "payment",
+          ref: p.voucherNumber || null,
+          detail: p.description || `${p.voucherType || "Payment"} voucher`,
+          amount: fmtAmt(p.debitAmount, p.currency || "USD", true),
+          amountIsNeg: true,
+          notes: null,
         })),
         ...enrichedFxTransfers.map((t: any) => {
           const isOut = t.fromSupplierId === supplierId;
