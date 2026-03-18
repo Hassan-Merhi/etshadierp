@@ -57,18 +57,33 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { cn } from "@/lib/utils";
 
+function parseAccountValue(val: string): { type: "ledger" | "supplier"; id: number } | null {
+  if (!val) return null;
+  if (val.startsWith("SUP:")) return { type: "supplier", id: parseInt(val.slice(4)) };
+  const n = parseInt(val);
+  return isNaN(n) ? null : { type: "ledger", id: n };
+}
+
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
   accounts: { id: number; name: string; code?: string }[];
+  suppliers?: { id: number; name: string }[];
   placeholder?: string;
   disabled?: boolean;
   testId?: string;
 }
 
-function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
+function AccountCombobox({ value, onValueChange, accounts, suppliers, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
   const [open, setOpen] = useState(false);
-  const selectedAccount = accounts.find((a) => a.id.toString() === value);
+  const parsed = parseAccountValue(value);
+  const selectedAccount = parsed?.type === "ledger" ? accounts.find((a) => a.id === parsed.id) : null;
+  const selectedSupplier = parsed?.type === "supplier" ? (suppliers || []).find((s) => s.id === parsed.id) : null;
+  const displayLabel = selectedSupplier
+    ? selectedSupplier.name
+    : selectedAccount
+      ? (selectedAccount.code ? `${selectedAccount.code} - ${selectedAccount.name}` : selectedAccount.name)
+      : placeholder;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -80,24 +95,35 @@ function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select
           disabled={disabled}
           data-testid={testId}
         >
-          <span className="truncate">{selectedAccount ? (selectedAccount.code ? `${selectedAccount.code} - ${selectedAccount.name}` : selectedAccount.name) : placeholder}</span>
+          <span className="truncate">{displayLabel}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search accounts..." />
+          <CommandInput placeholder="Search..." />
           <CommandList>
-            <CommandEmpty>No account found.</CommandEmpty>
-            <CommandGroup>
+            <CommandEmpty>Nothing found.</CommandEmpty>
+            {suppliers && suppliers.length > 0 && (
+              <CommandGroup heading="Brokers & Suppliers">
+                {suppliers.map((s) => (
+                  <CommandItem
+                    key={`sup-${s.id}`}
+                    value={`supplier ${s.name}`}
+                    onSelect={() => { onValueChange(`SUP:${s.id}`); setOpen(false); }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", value === `SUP:${s.id}` ? "opacity-100" : "opacity-0")} />
+                    {s.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            <CommandGroup heading="Ledger Accounts">
               {accounts.map((account) => (
                 <CommandItem
-                  key={account.id}
+                  key={`acc-${account.id}`}
                   value={account.code ? `${account.code} ${account.name}` : account.name}
-                  onSelect={() => {
-                    onValueChange(account.id.toString());
-                    setOpen(false);
-                  }}
+                  onSelect={() => { onValueChange(account.id.toString()); setOpen(false); }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")} />
                   {account.code ? `${account.code} - ${account.name}` : account.name}
@@ -174,12 +200,10 @@ export default function ProductionRawStock() {
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
   const [freight, setFreight] = useState("");
   const [freightAccountId, setFreightAccountId] = useState("");
-  const [freightSupplierId, setFreightSupplierId] = useState("");
   const [freightCurrencyCode, setFreightCurrencyCode] = useState("USD");
   const [freightFxRate, setFreightFxRate] = useState("1");
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
-  const [otherChargesSupplierId, setOtherChargesSupplierId] = useState("");
   const [otherChargesCurrencyCode, setOtherChargesCurrencyCode] = useState("USD");
   const [otherChargesFxRate, setOtherChargesFxRate] = useState("1");
   const [dutyAmount, setDutyAmount] = useState("");
@@ -440,25 +464,22 @@ export default function ProductionRawStock() {
       currencyCode,
       fxRateToUsd,
       freight: freight || "0",
-      freightAccountId: freightAccountId ? parseInt(freightAccountId) : null,
-      freightSupplierId: freightSupplierId && freightSupplierId !== "none" ? parseInt(freightSupplierId) : null,
-      freightCurrencyCode: freightSupplierId && freightSupplierId !== "none" ? freightCurrencyCode : undefined,
-      freightFxRate: freightSupplierId && freightSupplierId !== "none" ? freightFxRate : undefined,
+      ...((() => { const p = parseAccountValue(freightAccountId); return p?.type === "supplier" ? { freightSupplierId: p.id, freightCurrencyCode, freightFxRate } : { freightAccountId: p?.id ?? null }; })()),
       otherCharges: otherCharges || "0",
-      otherChargesAccountId: otherChargesAccountId ? parseInt(otherChargesAccountId) : null,
-      otherChargesSupplierId: otherChargesSupplierId && otherChargesSupplierId !== "none" ? parseInt(otherChargesSupplierId) : null,
-      otherChargesCurrencyCode: otherChargesSupplierId && otherChargesSupplierId !== "none" ? otherChargesCurrencyCode : undefined,
-      otherChargesFxRate: otherChargesSupplierId && otherChargesSupplierId !== "none" ? otherChargesFxRate : undefined,
+      ...((() => { const p = parseAccountValue(otherChargesAccountId); return p?.type === "supplier" ? { otherChargesSupplierId: p.id, otherChargesCurrencyCode, otherChargesFxRate } : { otherChargesAccountId: p?.id ?? null }; })()),
       dutyAmount: dutyAmount || "0",
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
       dutyNotes: dutyNotes || null,
-      additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => ({
-        description: c.description.trim(),
-        amount: c.amount,
-        ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
-        supplierId: c.supplierId && c.supplierId !== "none" ? parseInt(c.supplierId) : null,
-      })),
+      additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => {
+        const p = parseAccountValue(c.ledgerAccountId);
+        return {
+          description: c.description.trim(),
+          amount: c.amount,
+          ledgerAccountId: p?.type === "ledger" ? p.id : null,
+          supplierId: p?.type === "supplier" ? p.id : null,
+        };
+      }),
       mixBatchAllocations: mixBatchAllocations.filter(a => a.mixBatchId && parseFloat(a.weightKg || "0") > 0).map(a => ({
         mixBatchId: parseInt(a.mixBatchId),
         weightKg: a.weightKg,
@@ -491,12 +512,10 @@ export default function ProductionRawStock() {
     setFxRateToUsd("1");
     setFreight("");
     setFreightAccountId("");
-    setFreightSupplierId("");
     setFreightCurrencyCode("USD");
     setFreightFxRate("1");
     setOtherCharges("");
     setOtherChargesAccountId("");
-    setOtherChargesSupplierId("");
     setOtherChargesCurrencyCode("USD");
     setOtherChargesFxRate("1");
     setDutyAmount("");
@@ -1287,133 +1306,69 @@ export default function ProductionRawStock() {
                   <Label className="text-sm font-semibold">Offload Charges</Label>
                   <div className="space-y-3 mt-2">
                     <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-muted-foreground text-xs">Freight Amount</Label>
-                          <Input
-                            type="number"
-                            value={freight}
-                            onChange={(e) => setFreight(e.target.value)}
-                            placeholder="0.00"
-                            step="0.01"
-                            data-testid="input-freight"
-                          />
+                          <Input type="number" value={freight} onChange={(e) => setFreight(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-freight" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Freight Account</Label>
+                          <Label className="text-muted-foreground text-xs">Freight Account / Broker</Label>
                           <AccountCombobox
                             value={freightAccountId}
-                            onValueChange={setFreightAccountId}
+                            onValueChange={v => { setFreightAccountId(v); if (!v.startsWith("SUP:")) { setFreightCurrencyCode("USD"); setFreightFxRate("1"); } }}
                             accounts={ledgerAccounts || []}
-                            placeholder="Select account"
+                            suppliers={factorySuppliers || []}
+                            placeholder="Select account or broker"
                             testId="select-freight-account"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
-                          <Select value={freightSupplierId} onValueChange={v => { setFreightSupplierId(v); if (v === "none") { setFreightCurrencyCode("USD"); setFreightFxRate("1"); } }}>
-                            <SelectTrigger data-testid="select-freight-supplier">
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {(factorySuppliers || []).map(s => (
-                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
                       </div>
-                      {freightSupplierId && freightSupplierId !== "none" && (
+                      {parseAccountValue(freightAccountId)?.type === "supplier" && (
                         <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">Balance Currency</Label>
                             <Select value={freightCurrencyCode} onValueChange={v => { setFreightCurrencyCode(v); setFreightFxRate(v === "USD" ? "1" : ""); }}>
-                              <SelectTrigger data-testid="select-freight-currency">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                              </SelectContent>
+                              <SelectTrigger data-testid="select-freight-currency"><SelectValue /></SelectTrigger>
+                              <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                            <Input
-                              type="number"
-                              value={freightFxRate}
-                              onChange={(e) => setFreightFxRate(e.target.value)}
-                              placeholder="1.0"
-                              step="0.0001"
-                              disabled={freightCurrencyCode === "USD"}
-                              data-testid="input-freight-fx-rate"
-                            />
+                            <Input type="number" value={freightFxRate} onChange={(e) => setFreightFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={freightCurrencyCode === "USD"} data-testid="input-freight-fx-rate" />
                           </div>
                         </div>
                       )}
                     </div>
                     <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-muted-foreground text-xs">Other Charges Amount</Label>
-                          <Input
-                            type="number"
-                            value={otherCharges}
-                            onChange={(e) => setOtherCharges(e.target.value)}
-                            placeholder="0.00"
-                            step="0.01"
-                            data-testid="input-other-charges"
-                          />
+                          <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Other Charges Account</Label>
+                          <Label className="text-muted-foreground text-xs">Other Charges Account / Broker</Label>
                           <AccountCombobox
                             value={otherChargesAccountId}
-                            onValueChange={setOtherChargesAccountId}
+                            onValueChange={v => { setOtherChargesAccountId(v); if (!v.startsWith("SUP:")) { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}
                             accounts={ledgerAccounts || []}
-                            placeholder="Select account"
+                            suppliers={factorySuppliers || []}
+                            placeholder="Select account or broker"
                             testId="select-other-charges-account"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
-                          <Select value={otherChargesSupplierId} onValueChange={v => { setOtherChargesSupplierId(v); if (v === "none") { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}>
-                            <SelectTrigger data-testid="select-oc-supplier">
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {(factorySuppliers || []).map(s => (
-                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
                       </div>
-                      {otherChargesSupplierId && otherChargesSupplierId !== "none" && (
+                      {parseAccountValue(otherChargesAccountId)?.type === "supplier" && (
                         <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">Balance Currency</Label>
                             <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
-                              <SelectTrigger data-testid="select-oc-currency">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                              </SelectContent>
+                              <SelectTrigger data-testid="select-oc-currency"><SelectValue /></SelectTrigger>
+                              <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                            <Input
-                              type="number"
-                              value={otherChargesFxRate}
-                              onChange={(e) => setOtherChargesFxRate(e.target.value)}
-                              placeholder="1.0"
-                              step="0.0001"
-                              disabled={otherChargesCurrencyCode === "USD"}
-                              data-testid="input-oc-fx-rate"
-                            />
+                            <Input type="number" value={otherChargesFxRate} onChange={(e) => setOtherChargesFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={otherChargesCurrencyCode === "USD"} data-testid="input-oc-fx-rate" />
                           </div>
                         </div>
                       )}
@@ -1438,7 +1393,7 @@ export default function ProductionRawStock() {
                   {additionalCharges.length > 0 && (
                     <div className="space-y-2 mt-2">
                       {additionalCharges.map((charge, idx) => (
-                        <div key={charge.id} className="grid grid-cols-[1fr_100px_1fr_1fr_auto] gap-2 items-end">
+                        <div key={charge.id} className="grid grid-cols-[1fr_100px_1fr_auto] gap-2 items-end">
                           <div className="space-y-1">
                             <Label className="text-muted-foreground text-xs">Description</Label>
                             <Input
@@ -1460,31 +1415,15 @@ export default function ProductionRawStock() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Account</Label>
+                            <Label className="text-muted-foreground text-xs">Account / Broker</Label>
                             <AccountCombobox
                               value={charge.ledgerAccountId}
                               onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))}
                               accounts={ledgerAccounts || []}
-                              placeholder="Select"
+                              suppliers={factorySuppliers || []}
+                              placeholder="Select account or broker"
                               testId={`select-addl-account-${idx}`}
                             />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
-                            <Select
-                              value={charge.supplierId}
-                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, supplierId: v } : c))}
-                            >
-                              <SelectTrigger data-testid={`select-addl-supplier-${idx}`}>
-                                <SelectValue placeholder="None" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                {(factorySuppliers || []).map((s) => (
-                                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                           </div>
                           <Button
                             variant="ghost"
