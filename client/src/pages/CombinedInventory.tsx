@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen } from "lucide-react";
+import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 
 interface Container {
@@ -26,6 +26,14 @@ interface InventoryRow {
   totalValue: string;
   stockGroupId: number | null;
   stockGroupName: string;
+}
+
+interface StockItem {
+  id: number;
+  name: string;
+  code?: string;
+  stockGroupId?: number | null;
+  stockGroupName?: string;
 }
 
 interface CombinedRow {
@@ -55,6 +63,7 @@ export default function CombinedInventory() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("groups");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null | undefined>(undefined);
+  const [includeZero, setIncludeZero] = useState(false);
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -79,7 +88,12 @@ export default function CombinedInventory() {
     queryKey: ["/api/inventory"],
   });
 
-  const isLoading = loadingContainers || loadingInventory || containerDetailsQueries.some((q) => q.isLoading);
+  const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
+    queryKey: ["/api/stock-items"],
+    enabled: includeZero,
+  });
+
+  const isLoading = loadingContainers || loadingInventory || containerDetailsQueries.some((q) => q.isLoading) || (includeZero && loadingStockItems);
 
   const combinedData = useMemo((): CombinedRow[] => {
     const map = new Map<number, CombinedRow>();
@@ -136,10 +150,27 @@ export default function CombinedInventory() {
       }
     });
 
+    if (includeZero) {
+      allStockItems.forEach((item) => {
+        if (!map.has(item.id)) {
+          map.set(item.id, {
+            stockItemId: item.id,
+            stockItemName: item.name,
+            stockGroupId: item.stockGroupId ?? null,
+            stockGroupName: (item as any).stockGroupName || "",
+            otwQty: 0,
+            inHandQty: 0,
+            totalQty: 0,
+            inHandValue: 0,
+          });
+        }
+      });
+    }
+
     return Array.from(map.values()).sort((a, b) =>
       a.stockItemName.localeCompare(b.stockItemName)
     );
-  }, [containerDetailsQueries, inventoryRows]);
+  }, [containerDetailsQueries, inventoryRows, allStockItems, includeZero]);
 
   const searchLower = search.trim().toLowerCase();
 
@@ -198,6 +229,30 @@ export default function CombinedInventory() {
 
   const isDrillMode = viewMode === "groups" && selectedGroupId !== undefined;
 
+  const handleExport = async () => {
+    const XLSX = await import("xlsx");
+    const exportRows = isDrillMode ? groupItems : filteredAll;
+    const wsData = [
+      ["Item Name", "Stock Group", "OTW Qty", "In-Hand Qty", "Total Qty", "In-Hand Value"],
+      ...exportRows.map((r) => [
+        r.stockItemName,
+        r.stockGroupName || "Uncategorized",
+        r.otwQty,
+        r.inHandQty,
+        r.totalQty,
+        r.inHandValue,
+      ]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [{ wch: 35 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Combined Inventory");
+    const filename = isDrillMode
+      ? `combined_inventory_${(drillGroup?.stockGroupName || "group").replace(/\s+/g, "_")}.xlsx`
+      : "combined_inventory.xlsx";
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
@@ -247,28 +302,64 @@ export default function CombinedInventory() {
           </div>
         </div>
 
-        {!isDrillMode && (
-          <div className="flex items-center gap-1 rounded-md border p-1">
-            <Button
-              size="sm"
-              variant={viewMode === "groups" ? "secondary" : "ghost"}
-              onClick={() => { setViewMode("groups"); setSelectedGroupId(undefined); }}
-              data-testid="button-view-groups"
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isDrillMode && (
+            <div className="flex items-center gap-1 rounded-md border p-1">
+              <Button
+                size="sm"
+                variant={viewMode === "groups" ? "secondary" : "ghost"}
+                onClick={() => { setViewMode("groups"); setSelectedGroupId(undefined); }}
+                data-testid="button-view-groups"
+              >
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+                By Group
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === "all" ? "secondary" : "ghost"}
+                onClick={() => setViewMode("all")}
+                data-testid="button-view-all"
+              >
+                <List className="h-3.5 w-3.5 mr-1.5" />
+                View All
+              </Button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setIncludeZero((v) => !v)}
+            data-testid="toggle-include-zero"
+            className={`flex items-center gap-2 rounded-md border px-3 h-9 text-sm font-medium transition-colors ${
+              includeZero
+                ? "bg-secondary text-secondary-foreground border-border"
+                : "bg-background text-muted-foreground border-border hover:text-foreground"
+            }`}
+          >
+            <span
+              className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${
+                includeZero ? "bg-primary border-primary" : "border-muted-foreground"
+              }`}
             >
-              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-              By Group
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === "all" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("all")}
-              data-testid="button-view-all"
-            >
-              <List className="h-3.5 w-3.5 mr-1.5" />
-              View All
-            </Button>
-          </div>
-        )}
+              {includeZero && (
+                <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-primary-foreground" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="1,4 4,7 9,1" />
+                </svg>
+              )}
+            </span>
+            Include zero stock
+          </button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isLoading}
+            data-testid="button-export-excel"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export Excel
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
