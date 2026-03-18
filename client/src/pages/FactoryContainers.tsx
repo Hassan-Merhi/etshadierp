@@ -582,10 +582,11 @@ export default function FactoryContainers() {
                   const ccy = (c as any).currencyCode || "USD";
                   const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
                   const freightAmt = parseFloat((c as any).freight || "0");
-                  const otherAmt = parseFloat((c as any).otherCharges || "0");
+                  const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                  const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
                   const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
-                  const totalOtherAmt = otherAmt + additionalAmt;
-                  const totalValue = baseValue + freightAmt + otherAmt + additionalAmt;
+                  const totalOtherAmt = legacyOtherAmt + preRegisteredAmt + additionalAmt;
+                  const totalValue = baseValue + freightAmt + totalOtherAmt;
                   return (
                     <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
                       <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
@@ -607,10 +608,12 @@ export default function FactoryContainers() {
                         {totalOtherAmt > 0 ? (
                           <div>
                             <span>{ccy} {formatNumber(totalOtherAmt)}</span>
-                            {additionalAmt > 0 && otherAmt > 0 && (
-                              <div className="text-xs text-muted-foreground">{ccy} {formatNumber(otherAmt)} + {formatNumber(additionalAmt)} addl</div>
+                            {(preRegisteredAmt > 0 || legacyOtherAmt > 0) && additionalAmt > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {ccy} {formatNumber(preRegisteredAmt + legacyOtherAmt)} + {formatNumber(additionalAmt)} addl
+                              </div>
                             )}
-                            {additionalAmt > 0 && otherAmt === 0 && (
+                            {additionalAmt > 0 && preRegisteredAmt === 0 && legacyOtherAmt === 0 && (
                               <div className="text-xs text-muted-foreground">addl charges</div>
                             )}
                           </div>

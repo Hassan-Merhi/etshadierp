@@ -3776,6 +3776,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             WHERE foac.container_id = ${factoryContainers.id}
             AND foac.company_id = ${factoryContainers.companyId}
           ), 0)`,
+          preRegisteredChargesSum: sql<string>`COALESCE((
+            SELECT SUM(fcoc.amount::numeric)
+            FROM factory_container_other_charges fcoc
+            WHERE fcoc.container_id = ${factoryContainers.id}
+            AND fcoc.company_id = ${factoryContainers.companyId}
+          ), 0)`,
+          preRegisteredChargesCount: sql<number>`COALESCE((
+            SELECT COUNT(*)
+            FROM factory_container_other_charges fcoc
+            WHERE fcoc.container_id = ${factoryContainers.id}
+            AND fcoc.company_id = ${factoryContainers.companyId}
+          ), 0)`,
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
