@@ -1699,10 +1699,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ));
 
       const containerIds = contRows.map((c: any) => c.id);
+      // Use kg * ratePerKg (original contracted amount) so offload charges don't inflate balance.
       const totalValue = contRows.reduce((s: number, c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
-        return s + (c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate);
+        return s + (kg * rate);
       }, 0);
 
       // 2. Commissions from factoryContainerCommissions for these containers
@@ -1795,7 +1796,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (rem <= 0.001) break;
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          const val = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+          // Use kg * ratePerKg for allocation ceiling so offload charges don't over-inflate.
+          const val = kg * rate;
           const used = allocatedPerContainer[c.id] || 0;
           const avail = Math.max(0, val - used);
           if (avail <= 0.001) continue;
@@ -1894,14 +1896,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
-        // Always sum in USD for consistent approximate balance
+        // Always sum in USD for consistent approximate balance.
+        // Use (actualReceivedKg || totalKg) * ratePerKg — the original contracted amount — so
+        // that raw-stock offload charges (freight, duty, other) never inflate supplier payable.
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
-          if (c.finalPayableAmountUsd) return sum + parseFloat(c.finalPayableAmountUsd);
-          if (c.finalPayableAmount) {
-            const fx = parseFloat(c.fxRateToUsd || "1");
-            return sum + parseFloat(c.finalPayableAmount) * fx;
-          }
-          const kg = parseFloat(c.totalKg || "0");
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
           return sum + (kg * rate * fx);
@@ -1930,13 +1929,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid;
 
-        // Per-currency balances (original currency, not converted)
+        // Per-currency balances (original currency, not converted).
+        // Use kg * ratePerKg so offload charges never inflate supplier payable.
         const byCurrency: Record<string, number> = {};
         for (const c of supplierContainers) {
           const cc = c.currencyCode || "USD";
-          const val = c.finalPayableAmount
-            ? parseFloat(c.finalPayableAmount)
-            : (parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0"));
+          const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           byCurrency[cc] = (byCurrency[cc] || 0) + val;
         }
         // Add commission amounts (in their own currency) for containers where this supplier is the broker
@@ -2107,7 +2105,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const statement = containers.map((c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
-        const value = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+        // Always use kg * ratePerKg (original contracted amount) — offload charges must not
+        // inflate supplier payable. finalPayableAmount holds inclusive cost for stock costing only.
+        const value = kg * rate;
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce((sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"), 0);
 
@@ -2322,7 +2322,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         for (const c of linkedContainers) {
           const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          const value = c.finalPayableAmount ? parseFloat(c.finalPayableAmount) : kg * rate;
+          // Use kg * ratePerKg — offload charges must not inflate supplier payable.
+          const value = kg * rate;
           const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
           const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
           const cc = c.currencyCode || "USD";
