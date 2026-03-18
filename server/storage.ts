@@ -3111,6 +3111,7 @@ export class DbStorage implements IStorage {
         fixedAssetId: schema.voucherEntries.fixedAssetId,
         supplierId: schema.voucherEntries.supplierId,
         employeeId: schema.voucherEntries.employeeId,
+        factorySupplierId: schema.voucherEntries.factorySupplierId,
         debitAmount: schema.voucherEntries.debitAmount,
         creditAmount: schema.voucherEntries.creditAmount,
         narration: schema.voucherEntries.narration,
@@ -3126,6 +3127,7 @@ export class DbStorage implements IStorage {
         employeeFirstName: schema.employees.firstName,
         employeeLastName: schema.employees.lastName,
         employeeCode: schema.employees.code,
+        factorySupplierName: schema.factorySuppliers.name,
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.ledgerAccounts, eq(schema.voucherEntries.ledgerAccountId, schema.ledgerAccounts.id))
@@ -3133,6 +3135,7 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.fixedAssets, eq(schema.voucherEntries.fixedAssetId, schema.fixedAssets.id))
       .leftJoin(schema.suppliers, eq(schema.voucherEntries.supplierId, schema.suppliers.id))
       .leftJoin(schema.employees, eq(schema.voucherEntries.employeeId, schema.employees.id))
+      .leftJoin(schema.factorySuppliers, eq(schema.voucherEntries.factorySupplierId, schema.factorySuppliers.id))
       .where(eq(schema.voucherEntries.voucherId, voucherId));
 
     return entries.map(entry => {
@@ -3142,7 +3145,7 @@ export class DbStorage implements IStorage {
       
       return {
         ...entry,
-        accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || employeeName || 'Unknown Account',
+        accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || entry.factorySupplierName || employeeName || 'Unknown Account',
         accountCode: entry.accountCode || entry.bankAccountCode || entry.fixedAssetCode || entry.supplierCode || entry.employeeCode || '-',
       };
     });

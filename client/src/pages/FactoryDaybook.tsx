@@ -954,7 +954,7 @@ export default function FactoryDaybook() {
 
       {/* View Details Modal */}
       <Dialog open={viewEntry !== null} onOpenChange={(open) => { if (!open) setViewEntry(null); }}>
-        <DialogContent className="max-w-lg" data-testid="dialog-view-entry">
+        <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-view-entry">
           {viewEntry && <ViewEntryModal entry={viewEntry} onClose={() => setViewEntry(null)} onNavigate={navigate} formatDisplayDate={formatDisplayDate} />}
         </DialogContent>
       </Dialog>
