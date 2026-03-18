@@ -962,6 +962,19 @@ export default function Accounts() {
     },
   });
 
+  const deleteFactorySupplierMutation = useMutation({
+    mutationFn: async (supplierId: number) => {
+      return await modeApiRequest("DELETE", `/api/factory/suppliers/${supplierId}/permanent`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Supplier deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete supplier", variant: "destructive" });
+    },
+  });
+
   const createBankMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!selectedCompany?.id) {
@@ -2329,6 +2342,8 @@ export default function Accounts() {
                           customerToEdit?.accountId === account.accountId && isCustomer;
                         const isSelected = isLedgerSelected || isBankSelected || isSupplierSelected || isCustomerSelected;
 
+                        const isFactorySupplier = account.type === "factorySupplier";
+
                         return (
                           <button
                             key={account.id}
@@ -2408,13 +2423,28 @@ export default function Accounts() {
                             } ${!isEditable ? "opacity-60" : ""}`}
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
+                            <div className="flex items-center gap-2 w-full">
+                              <Badge variant="outline" className="text-xs shrink-0">
                                 {account.type}
                               </Badge>
-                              <span className="text-sm">{account.name}</span>
-                              {!isEditable && (
-                                <span className="ml-auto text-xs text-muted-foreground italic">
+                              <span className="text-sm flex-1 text-left">{account.name}</span>
+                              {isFactorySupplier && (
+                                <span
+                                  role="button"
+                                  className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`Permanently delete "${account.name}" and all related records? This cannot be undone.`)) {
+                                      deleteFactorySupplierMutation.mutate(account.accountId as number);
+                                    }
+                                  }}
+                                  data-testid={`button-delete-factory-supplier-${account.accountId}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </span>
+                              )}
+                              {!isEditable && !isFactorySupplier && (
+                                <span className="ml-auto text-xs text-muted-foreground italic shrink-0">
                                   (View only)
                                 </span>
                               )}
