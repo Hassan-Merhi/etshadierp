@@ -441,10 +441,8 @@ export default function ProductionRawStock() {
     setFxRateToUsd(container?.fxRateToUsd || "1");
     if (container && parseFloat((container as any).freight || "0") > 0) {
       setFreight(String(parseFloat((container as any).freight)));
-      setFreightCurrencyCode((container as any).freightCurrencyCode || "USD");
     } else {
       setFreight("");
-      setFreightCurrencyCode("USD");
     }
   };
 

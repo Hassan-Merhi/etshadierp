@@ -580,7 +580,6 @@ export default function FactoryContainers() {
                     ? suppliers?.find(s => s.id === brokerSupId)?.name ?? null
                     : null;
                   const ccy = (c as any).currencyCode || "USD";
-                  const freightCcy = (c as any).freightCurrencyCode || "USD";
                   const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
                   const freightAmt = parseFloat((c as any).freight || "0");
                   const otherAmt = parseFloat((c as any).otherCharges || "0");
@@ -602,7 +601,7 @@ export default function FactoryContainers() {
                         {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {freightAmt > 0 ? `${freightCcy} ${formatNumber(freightAmt)}` : <span className="text-muted-foreground">—</span>}
+                        {freightAmt > 0 ? `${ccy} ${formatNumber(freightAmt)}` : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {totalOtherAmt > 0 ? (
