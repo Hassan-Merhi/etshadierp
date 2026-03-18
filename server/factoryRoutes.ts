@@ -4659,7 +4659,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (commissionRecord) {
         await writeDaybookEntry(db, {
           companyId,
-          txDate: today,
+          txDate: offloadDate,
           txType: "COMMISSION",
           referenceId: commissionRecord.id,
           description: `Commission for ${commissionRecord.personName} on container ${container.containerNumber}`,
@@ -4671,7 +4671,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (freightVal > 0) {
         await writeDaybookEntry(db, {
           companyId,
-          txDate: today,
+          txDate: offloadDate,
           txType: "FREIGHT",
           referenceId: containerId,
           description: `Freight on container ${container.containerNumber}`,
@@ -4683,7 +4683,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (otherChargesVal > 0) {
         await writeDaybookEntry(db, {
           companyId,
-          txDate: today,
+          txDate: offloadDate,
           txType: "OTHER_CHARGE",
           referenceId: containerId,
           description: `Other charges on container ${container.containerNumber}`,
@@ -4695,7 +4695,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (dutyVal > 0) {
         await writeDaybookEntry(db, {
           companyId,
-          txDate: today,
+          txDate: offloadDate,
           txType: "DUTY",
           referenceId: containerId,
           description: `Duty on container ${container.containerNumber}`,
@@ -4709,7 +4709,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (charge.description && chargeAmount > 0) {
           await writeDaybookEntry(db, {
             companyId,
-            txDate: today,
+            txDate: offloadDate,
             txType: "OTHER_CHARGE",
             referenceId: containerId,
             description: `${charge.description} on container ${container.containerNumber}`,
@@ -4794,7 +4794,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           companyId,
           voucherType: "Journal",
           voucherNumber: ocVoucherNum,
-          voucherDate: container.arrivalDate || today,
+          voucherDate: offloadDate,
           description: `${inserted.description} - container ${container.containerNumber}`,
           totalAmount: String(chargeAmount),
           currency: currencyCode,
