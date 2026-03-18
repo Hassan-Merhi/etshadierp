@@ -174,8 +174,10 @@ export default function ProductionRawStock() {
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
   const [freight, setFreight] = useState("");
   const [freightAccountId, setFreightAccountId] = useState("");
+  const [freightSupplierId, setFreightSupplierId] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
+  const [otherChargesSupplierId, setOtherChargesSupplierId] = useState("");
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
@@ -237,7 +239,7 @@ export default function ProductionRawStock() {
 
   const { data: factorySuppliers } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/factory/suppliers"],
-    enabled: obDialogOpen,
+    enabled: offloadDialogOpen || obDialogOpen,
   });
 
   // Raw stock by individual container (always fetched so it's available when "Assign to Bales" is clicked)
@@ -435,8 +437,10 @@ export default function ProductionRawStock() {
       fxRateToUsd,
       freight: freight || "0",
       freightAccountId: freightAccountId ? parseInt(freightAccountId) : null,
+      freightSupplierId: freightSupplierId ? parseInt(freightSupplierId) : null,
       otherCharges: otherCharges || "0",
       otherChargesAccountId: otherChargesAccountId ? parseInt(otherChargesAccountId) : null,
+      otherChargesSupplierId: otherChargesSupplierId ? parseInt(otherChargesSupplierId) : null,
       dutyAmount: dutyAmount || "0",
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
@@ -479,8 +483,10 @@ export default function ProductionRawStock() {
     setFxRateToUsd("1");
     setFreight("");
     setFreightAccountId("");
+    setFreightSupplierId("");
     setOtherCharges("");
     setOtherChargesAccountId("");
+    setOtherChargesSupplierId("");
     setDutyAmount("");
     setDutyAccountId("");
     setDutyPending(false);
@@ -1268,7 +1274,7 @@ export default function ProductionRawStock() {
                 <div>
                   <Label className="text-sm font-semibold">Offload Charges</Label>
                   <div className="space-y-3 mt-2">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Freight ($)</Label>
                         <Input
@@ -1290,8 +1296,22 @@ export default function ProductionRawStock() {
                           testId="select-freight-account"
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
+                        <Select value={freightSupplierId} onValueChange={setFreightSupplierId}>
+                          <SelectTrigger data-testid="select-freight-supplier">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {(factorySuppliers || []).map(s => (
+                              <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Other Charges ($)</Label>
                         <Input
@@ -1312,6 +1332,20 @@ export default function ProductionRawStock() {
                           placeholder="Select account"
                           testId="select-other-charges-account"
                         />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Broker / Supplier</Label>
+                        <Select value={otherChargesSupplierId} onValueChange={setOtherChargesSupplierId}>
+                          <SelectTrigger data-testid="select-oc-supplier">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {(factorySuppliers || []).map(s => (
+                              <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
