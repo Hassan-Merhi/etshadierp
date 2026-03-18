@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, ilike, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -1862,6 +1862,58 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ───────────────────────────────────────────────
   // 1b. Factory Suppliers - Balances & Statement
   // ───────────────────────────────────────────────
+
+  // Get outstanding balance for a single factory supplier (used by voucher payment balance display)
+  app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = parseInt(req.params.id);
+      if (isNaN(supplierId)) return res.status(400).json({ message: "Invalid supplier ID" });
+
+      const [supplier] = await db.select().from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+      const openingBalance = parseFloat(supplier.openingBalance || "0");
+
+      const supplierContainers = await db.select().from(factoryContainers)
+        .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId)));
+
+      const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
+        const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+        const rate = parseFloat(c.ratePerKg || "0");
+        const fx = parseFloat(c.fxRateToUsd || "1");
+        return sum + kg * rate * fx;
+      }, 0);
+
+      const brokerContainers = await db.select().from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          eq(factoryContainers.commissionSupplierId, supplierId),
+          ne(factoryContainers.supplierId, supplierId)
+        ));
+
+      const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
+        const commAmt = parseFloat(c.commissionAmount || "0");
+        if (commAmt <= 0) return sum;
+        const fx = parseFloat(c.fxRateToUsd || "1");
+        const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+        return sum + (commCurr === "USD" ? commAmt : commAmt * fx);
+      }, 0);
+
+      const payments = await db.select().from(factorySupplierPayments)
+        .where(and(eq(factorySupplierPayments.companyId, companyId), eq(factorySupplierPayments.supplierId, supplierId)));
+
+      const totalPaidUsd = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
+      const outstandingUsd = openingBalance + containerValueUsd + commissionValueUsd - totalPaidUsd;
+
+      res.json({ balance: outstandingUsd, outstandingUsd });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   app.get("/api/factory/suppliers/with-balances", requireAuth, async (req: any, res: any) => {
     try {

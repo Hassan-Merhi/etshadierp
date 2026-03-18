@@ -100,6 +100,8 @@ import {
   userCompanyRoles,
   factoryBales,
   factorySuppliers,
+  factoryContainers,
+  factorySupplierPayments,
   loginHistory,
   storedFiles,
   liveSpreadsheets,
@@ -12995,6 +12997,14 @@ if (asOfDate) {
         ? await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
         : [];
 
+      // For factory companies: fetch containers and payments to compute accurate supplier balances
+      const fContainers = isFactoryCompany
+        ? await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
+        : [];
+      const fPayments = isFactoryCompany
+        ? await db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
+        : [];
+
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
         .select({ id: vouchers.id })
@@ -13179,10 +13189,37 @@ if (asOfDate) {
           };
         }),
         // Factory Suppliers — only included for factory companies
+        // Balance computed from factory tables (containers + payments) for accuracy
         ...fSuppliers.map((supplier) => {
-          const transactionBalance = factorySupplierBalances.get(supplier.id) || 0;
           const openingBalance = parseFloat(supplier.openingBalance || "0");
-          const balance = -(openingBalance + transactionBalance);
+
+          // Container value: sum(actualReceivedKg || totalKg) * ratePerKg * fxRateToUsd
+          const supplierContainers = fContainers.filter((c: any) => c.supplierId === supplier.id);
+          const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
+            const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+            const rate = parseFloat(c.ratePerKg || "0");
+            const fx = parseFloat(c.fxRateToUsd || "1");
+            return sum + kg * rate * fx;
+          }, 0);
+
+          // Commission owed to this supplier as broker (exclude containers where they're also the main supplier)
+          const brokerContainers = fContainers.filter((c: any) =>
+            c.commissionSupplierId === supplier.id && c.supplierId !== supplier.id && parseFloat(c.commissionAmount || "0") > 0
+          );
+          const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
+            const commAmt = parseFloat(c.commissionAmount || "0");
+            const fx = parseFloat(c.fxRateToUsd || "1");
+            const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+            return sum + (commCurr === "USD" ? commAmt : commAmt * fx);
+          }, 0);
+
+          // Total paid via factorySupplierPayments (in USD)
+          const supplierPayments = fPayments.filter((p: any) => p.supplierId === supplier.id);
+          const totalPaidUsd = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+
+          // Outstanding balance (positive = we owe them). Negate for sidebar convention (negative = payable/red)
+          const outstandingUsd = openingBalance + containerValueUsd + commissionValueUsd - totalPaidUsd;
+          const balance = -outstandingUsd;
 
           return {
             id: supplier.id,

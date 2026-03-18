@@ -1196,6 +1196,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return sum + debit - credit;
         }, openingBalance);
         return balance;
+      } else if (paymentAccountType === "factorySupplier") {
+        const res = await fetch(`/api/factory/suppliers/${paymentAccountId}/balance`);
+        const data = await res.json();
+        // outstandingUsd is positive when we owe them (payable). Return as positive so it
+        // shows as a positive balance that gets reduced when making a payment.
+        return parseFloat(data.outstandingUsd || "0");
       }
       return 0;
     },
