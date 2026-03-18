@@ -7949,7 +7949,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;

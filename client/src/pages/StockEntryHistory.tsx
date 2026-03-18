@@ -80,10 +80,11 @@ export default function StockEntryHistory() {
   if (search.trim()) params.set("search", search.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
 
-  const { data: groups = [], isLoading } = useQuery<GroupRow[]>({
+  const { data: rawGroups, isLoading } = useQuery<GroupRow[]>({
     queryKey: ["/api/factory/bales/stock-entry-history", params.toString()],
     queryFn: () => fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`).then(r => r.json()),
   });
+  const groups: GroupRow[] = Array.isArray(rawGroups) ? rawGroups : [];
 
   const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
