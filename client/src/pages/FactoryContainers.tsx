@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -277,10 +277,31 @@ export default function FactoryContainers() {
     },
   });
 
+  const reverseOffloadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("POST", `/api/factory/containers/${id}/reverse-offload`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to reverse offload");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      setReversingContainer(null);
+      toast({ title: "Offload Reversed", description: "Container is back to RECEIVED status. Raw stock entry and offload charges have been removed." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [reversingContainer, setReversingContainer] = useState<ContainerWithSupplier | null>(null);
 
   const importMutation = useMutation({
     mutationFn: async (rows: any[]) => {
@@ -594,6 +615,21 @@ export default function FactoryContainers() {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Offload to Production</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setReversingContainer(c)}
+                                  data-testid={`button-reverse-offload-${c.id}`}
+                                >
+                                  <RotateCcw className="h-4 w-4 text-amber-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Reverse Offload</TooltipContent>
                             </Tooltip>
                           )}
                           <Button
@@ -1189,6 +1225,43 @@ export default function FactoryContainers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setImportOpen(false); setImportPreview([]); setImportResult(null); }}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reverse Offload Confirmation */}
+      <Dialog open={!!reversingContainer} onOpenChange={(open) => { if (!open) setReversingContainer(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reverse Offload</DialogTitle>
+            <DialogDescription>
+              This will permanently undo the offload for container <strong>{reversingContainer?.containerNumber}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2 text-sm text-muted-foreground">
+            <p>The following will be removed:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Raw stock entry from Raw Production</li>
+              <li>All offload charges (freight, duty, other charges, commission)</li>
+              <li>Related daybook entries</li>
+            </ul>
+            <p className="text-foreground font-medium pt-1">
+              The container will return to <strong>RECEIVED</strong> status and can be offloaded again.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setReversingContainer(null)} data-testid="button-cancel-reverse-offload">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => reversingContainer && reverseOffloadMutation.mutate(reversingContainer.id)}
+              disabled={reverseOffloadMutation.isPending}
+              data-testid="button-confirm-reverse-offload"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              {reverseOffloadMutation.isPending ? "Reversing..." : "Reverse Offload"}
             </Button>
           </DialogFooter>
         </DialogContent>

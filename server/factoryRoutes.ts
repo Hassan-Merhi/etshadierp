@@ -4647,6 +4647,112 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Reverse Offload ──────────────────────────────────────────────────────────
+  app.post("/api/factory/containers/:id/reverse-offload", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const containerId = parseInt(req.params.id);
+
+      const [container] = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+
+      if (!container) return res.status(404).json({ message: "Container not found" });
+      if (container.status !== "OFFLOADED" && container.status !== "PARTIALLY_RECEIVED") {
+        return res.status(400).json({ message: "Only OFFLOADED or PARTIALLY_RECEIVED containers can be reversed" });
+      }
+
+      await db.transaction(async (tx) => {
+        // 1. Find the raw stock entry for this container
+        const [rawStockRow] = await tx
+          .select({ id: factoryRawStock.id })
+          .from(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+
+        // 2. Find commission records for this container
+        const commissionRows = await tx
+          .select({ id: factoryContainerCommissions.id })
+          .from(factoryContainerCommissions)
+          .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId)));
+        const commissionIds = commissionRows.map((r: any) => r.id);
+
+        // 3. Delete daybook entries tied to this offload
+        //    - OFFLOAD_RAW_STOCK referencing the raw stock row id
+        //    - COMMISSION referencing each commission record id
+        //    - FREIGHT / OTHER_CHARGE / DUTY referencing the container id
+        if (rawStockRow) {
+          await tx.delete(factoryDaybookEntries).where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+              eq(factoryDaybookEntries.referenceId, rawStockRow.id)
+            )
+          );
+        }
+        if (commissionIds.length > 0) {
+          await tx.delete(factoryDaybookEntries).where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "COMMISSION"),
+              inArray(factoryDaybookEntries.referenceId, commissionIds)
+            )
+          );
+        }
+        await tx.delete(factoryDaybookEntries).where(
+          and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY"]),
+            eq(factoryDaybookEntries.referenceId, containerId)
+          )
+        );
+
+        // 4. Delete raw stock, commission records, and additional charges
+        await tx.delete(factoryRawStock).where(
+          and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId))
+        );
+        await tx.delete(factoryContainerCommissions).where(
+          and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId))
+        );
+        await tx.delete(factoryOffloadAdditionalCharges).where(
+          and(eq(factoryOffloadAdditionalCharges.companyId, companyId), eq(factoryOffloadAdditionalCharges.containerId, containerId))
+        );
+
+        // 5. Reset container back to RECEIVED state, clearing all offload-specific fields
+        await tx.update(factoryContainers).set({
+          status: "RECEIVED",
+          actualReceivedKg: null,
+          differenceKg: null,
+          freight: "0",
+          freightAccountId: null,
+          otherCharges: "0",
+          otherChargesAccountId: null,
+          commissionAmount: "0",
+          commissionCurrencyCode: "USD",
+          commissionSupplierId: null,
+          commissionNotes: null,
+          dutyAmount: null,
+          dutyAccountId: null,
+          dutyStatus: "NONE",
+          dutyNotes: null,
+          finalPayableAmount: null,
+          finalPayableAmountUsd: null,
+          ratePerKgUsd: null,
+          fxRateToUsdOffload: null,
+          fxRateDateOffload: null,
+          updatedAt: new Date(),
+        }).where(eq(factoryContainers.id, containerId));
+      });
+
+      res.json({ message: "Offload reversed successfully. Container is back to RECEIVED status." });
+    } catch (error: any) {
+      console.error("Error reversing offload:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
