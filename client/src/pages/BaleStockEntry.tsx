@@ -1561,6 +1561,31 @@
           const qtyIdx = headers.findIndex((h) => h.includes("QUANTITY"));
           const dateIdx = headers.findIndex((h) => h.includes("PRODUCTION DATE"));
 
+          // Convert Excel serial date number (e.g. 46096) to YYYY-MM-DD string
+          const parseExcelDate = (val: any): string => {
+            if (!val && val !== 0) return "";
+            const raw = String(val).trim();
+            // Already looks like a date string (YYYY-MM-DD or DD/MM/YYYY etc.)
+            if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+            if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(raw)) {
+              const parts = raw.split(/[\/\-]/);
+              return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+            }
+            // Excel serial number: days since 1899-12-30 (accounting for Excel's leap year bug)
+            const serial = parseFloat(raw);
+            if (!isNaN(serial) && serial > 0) {
+              const ms = (serial - 25569) * 86400000; // 25569 = days between 1900-01-01 and 1970-01-01
+              const d = new Date(ms);
+              if (!isNaN(d.getTime())) {
+                const y = d.getUTCFullYear();
+                const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+                const day = String(d.getUTCDate()).padStart(2, "0");
+                return `${y}-${m}-${day}`;
+              }
+            }
+            return raw;
+          };
+
           const rows: ImportBaleRow[] = [];
           for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
@@ -1572,7 +1597,7 @@
               weight: String(row[weightIdx] || "").trim(),
               barcode: String(row[barcodeIdx] || "").trim(),
               quantity: parseInt(String(row[qtyIdx] || "1")) || 1,
-              productionDate: String(row[dateIdx] || "").trim(),
+              productionDate: dateIdx >= 0 ? parseExcelDate(row[dateIdx]) : "",
             });
           }
 
