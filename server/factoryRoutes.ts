@@ -10547,8 +10547,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION"].includes(order.status)) {
-        return res.status(400).json({ message: "Can only reprice DRAFT, LOADING, or PENDING_VERIFICATION orders" });
+      if (!["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status)) {
+        return res.status(400).json({ message: "Cannot reprice a cancelled order" });
       }
 
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));

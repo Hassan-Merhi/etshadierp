@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -118,6 +118,24 @@ export default function FactoryInvoiceDetail() {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
       navigate("/factory/sales/invoices");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const repriceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to reprice");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -242,6 +260,17 @@ export default function FactoryInvoiceDetail() {
                   View Loading
                 </>
               )}
+            </Button>
+          )}
+          {(order.status === "VERIFIED" || order.status === "FINALIZED") && (
+            <Button
+              variant="outline"
+              onClick={() => repriceMutation.mutate()}
+              disabled={repriceMutation.isPending}
+              data-testid="button-apply-prices"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${repriceMutation.isPending ? "animate-spin" : ""}`} />
+              Apply Current Prices
             </Button>
           )}
           <Button
