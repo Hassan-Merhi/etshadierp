@@ -35,6 +35,13 @@ interface PayrollRecord {
 interface CashAccount { id: number; name: string; code: string; }
 
 interface AttendanceEntry { date: string; status: string; }
+interface PendingAdvance {
+  id: number;
+  advanceDate: string;
+  amount: string;
+  remainingBalance: string;
+  notes: string | null;
+}
 interface PreviewWorkerRow {
   id: number;
   name: string;
@@ -42,6 +49,8 @@ interface PreviewWorkerRow {
   base: number;
   bonus: number;
   advanceDeduction: number;
+  totalAdvanceBalance: number;
+  pendingAdvances: PendingAdvance[];
   net: number;
   totalWorkingDays: number;
   presentDays: number;
@@ -106,6 +115,9 @@ export default function FactoryPayrollTab() {
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRows, setPreviewRows] = useState<PreviewWorkerRow[]>([]);
+  // advanceOverrides: workerId → approved deduction amount (string for input binding)
+  const [advanceOverrides, setAdvanceOverrides] = useState<Record<number, string>>({});
+  const [expandedAdvanceWorkers, setExpandedAdvanceWorkers] = useState<Set<number>>(new Set());
   const [attendanceDetail, setAttendanceDetail] = useState<{
     name: string;
     presentDates: AttendanceEntry[];
@@ -176,6 +188,13 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: (data) => {
       setPreviewRows(data);
+      // Initialize overrides: default to full advance balance for each worker
+      const overrides: Record<number, string> = {};
+      for (const row of data) {
+        overrides[row.id] = row.totalAdvanceBalance.toFixed(2);
+      }
+      setAdvanceOverrides(overrides);
+      setExpandedAdvanceWorkers(new Set());
       setPreviewOpen(true);
     },
     onError: (err: Error) => toast({ title: "Preview failed", description: err.message, variant: "destructive" }),
@@ -183,10 +202,16 @@ export default function FactoryPayrollTab() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
+      // Convert advanceOverrides to numeric values keyed by workerId string
+      const numericOverrides: Record<string, number> = {};
+      for (const [wid, amt] of Object.entries(advanceOverrides)) {
+        numericOverrides[wid] = parseFloat(amt) || 0;
+      }
       const body: any = {
         periodStart: runForm.periodStart, periodEnd: runForm.periodEnd,
         bonusPerWorker: runForm.bonusPerWorker, notes: runForm.notes,
         cashAccountId: runForm.cashAccountId || undefined,
+        advanceOverrides: numericOverrides,
       };
       if (!runForm.targetAll) body.workerIds = runForm.pickedWorkerIds;
       if (runForm.daysCount) body.daysCount = runForm.daysCount;
@@ -592,75 +617,113 @@ export default function FactoryPayrollTab() {
 
       {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl" data-testid="dialog-preview-payroll">
+        <DialogContent className="max-w-4xl" data-testid="dialog-preview-payroll">
           <DialogHeader>
             <DialogTitle>Payroll Preview</DialogTitle>
             <DialogDescription>
-              {previewRows.length} workers · Period: {runForm.periodStart} to {runForm.periodEnd} · Total: ${previewRows.reduce((s, r) => s + r.net, 0).toFixed(2)}
+              {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: ${previewRows.reduce((s, r) => s + r.base + r.bonus - parseFloat(advanceOverrides[r.id] || "0"), 0).toFixed(2)}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[55vh] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Worker</TableHead>
-                  <TableHead className="text-center">Present</TableHead>
-                  <TableHead className="text-center">Absent</TableHead>
-                  <TableHead className="text-right">Base</TableHead>
-                  <TableHead className="text-right">Bonus</TableHead>
-                  <TableHead className="text-right">Net</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {previewRows.map((r) => {
-                  const hasAtt = r.totalWorkingDays > 0 || r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
-                  return (
-                    <TableRow key={r.id} data-testid={`row-preview-${r.id}`}>
-                      <TableCell>
-                        <p className="text-sm font-medium">{r.name}</p>
-                        {r.position && <p className="text-xs text-muted-foreground">{r.position}</p>}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {hasAtt ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto py-0.5 px-2 font-mono text-green-700 dark:text-green-400"
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {previewRows.map((r) => {
+              const hasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+              const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
+              const computedNet = r.base + r.bonus - deductAmt;
+              const isExpanded = expandedAdvanceWorkers.has(r.id);
+              return (
+                <div key={r.id} className="border rounded-md" data-testid={`row-preview-${r.id}`}>
+                  {/* Main worker row */}
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.name}</p>
+                      {r.position && <p className="text-xs text-muted-foreground">{r.position}</p>}
+                    </div>
+                    {/* Attendance */}
+                    <div className="flex items-center gap-2 text-xs">
+                      {hasAtt ? (
+                        <>
+                          <Button variant="ghost" size="sm" className="h-auto py-0.5 px-2 font-mono text-green-700 dark:text-green-400"
                             onClick={() => setAttendanceDetail({ name: r.name, presentDates: r.presentDates, absentDates: r.absentDates, halfDayDates: r.halfDayDates })}
-                            data-testid={`button-present-${r.id}`}
-                          >
-                            {r.presentDays % 1 === 0 ? r.presentDays.toFixed(0) : r.presentDays}
-                            {r.halfDayDates.length > 0 && (
-                              <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">½</Badge>
-                            )}
+                            data-testid={`button-present-${r.id}`}>
+                            {r.presentDays % 1 === 0 ? r.presentDays.toFixed(0) : r.presentDays}d present
                           </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {hasAtt ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto py-0.5 px-2 font-mono text-red-700 dark:text-red-400"
-                            onClick={() => setAttendanceDetail({ name: r.name, presentDates: r.presentDates, absentDates: r.absentDates, halfDayDates: r.halfDayDates })}
-                            data-testid={`button-absent-${r.id}`}
-                          >
-                            {r.absentDays % 1 === 0 ? r.absentDays.toFixed(0) : r.absentDays}
+                          {r.absentDays > 0 && (
+                            <Button variant="ghost" size="sm" className="h-auto py-0.5 px-2 font-mono text-red-700 dark:text-red-400"
+                              onClick={() => setAttendanceDetail({ name: r.name, presentDates: r.presentDates, absentDates: r.absentDates, halfDayDates: r.halfDayDates })}
+                              data-testid={`button-absent-${r.id}`}>
+                              {r.absentDays % 1 === 0 ? r.absentDays.toFixed(0) : r.absentDays}d absent
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">No attendance</span>
+                      )}
+                    </div>
+                    {/* Salary breakdown */}
+                    <div className="flex items-center gap-3 text-sm font-mono ml-auto">
+                      <span className="text-muted-foreground">Base: ${r.base.toFixed(2)}</span>
+                      {r.bonus > 0 && <span className="text-muted-foreground">Bonus: ${r.bonus.toFixed(2)}</span>}
+                      <span className="font-semibold">Net: ${computedNet.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Advances section */}
+                  {r.totalAdvanceBalance > 0 && (
+                    <div className="border-t bg-muted/30 px-3 py-2 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1 gap-1 text-xs"
+                          onClick={() => setExpandedAdvanceWorkers((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                            return next;
+                          })}
+                          data-testid={`button-expand-advances-${r.id}`}>
+                          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          {r.pendingAdvances.length} outstanding advance{r.pendingAdvances.length !== 1 ? "s" : ""} · Total: ${r.totalAdvanceBalance.toFixed(2)}
+                        </Button>
+                        <div className="flex items-center gap-2 ml-auto">
+                          <span className="text-xs text-muted-foreground">Deduct:</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={r.totalAdvanceBalance}
+                            value={advanceOverrides[r.id] ?? r.totalAdvanceBalance.toFixed(2)}
+                            onChange={(e) => setAdvanceOverrides((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                            className="w-28 h-7 text-xs font-mono"
+                            data-testid={`input-advance-deduct-${r.id}`}
+                          />
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => setAdvanceOverrides((prev) => ({ ...prev, [r.id]: r.totalAdvanceBalance.toFixed(2) }))}
+                            data-testid={`button-deduct-all-${r.id}`}>
+                            All
                           </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">${r.base.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">${r.bonus.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm font-semibold">${r.net.toFixed(2)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => setAdvanceOverrides((prev) => ({ ...prev, [r.id]: "0" }))}
+                            data-testid={`button-deduct-none-${r.id}`}>
+                            None
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Advance records breakdown */}
+                      {isExpanded && (
+                        <div className="space-y-1 pt-1">
+                          {r.pendingAdvances.map((adv) => (
+                            <div key={adv.id} className="flex flex-wrap items-center gap-2 text-xs py-1 border-t border-border/50">
+                              <span className="font-mono text-muted-foreground">{adv.advanceDate}</span>
+                              <span className="text-muted-foreground">Original: <span className="font-mono">${parseFloat(adv.amount).toFixed(2)}</span></span>
+                              <span>Remaining: <span className="font-mono font-medium">${parseFloat(adv.remainingBalance).toFixed(2)}</span></span>
+                              {adv.notes && <span className="text-muted-foreground italic truncate max-w-[200px]">{adv.notes}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Back</Button>

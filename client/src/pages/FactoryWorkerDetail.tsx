@@ -866,6 +866,51 @@ export default function FactoryWorkerDetail() {
             </TabsContent>
 
             <TabsContent value="advances" className="space-y-4">
+              {/* Advance balance KPIs */}
+              {(() => {
+                const allOutstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
+                const salaryDeductionBal = allOutstanding.filter((a) => a.repaymentType !== "manual_repayment").reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                const loanBal = allOutstanding.filter((a) => a.repaymentType === "manual_repayment").reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+                const totalOwed = salaryDeductionBal + loanBal;
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Card>
+                      <CardHeader className="pb-1 pt-3 px-4">
+                        <CardTitle className="text-xs font-medium text-muted-foreground">Salary Advance Remaining</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-3">
+                        <p className={`text-xl font-bold font-mono ${salaryDeductionBal > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`} data-testid="kpi-salary-advance-balance">
+                          ${salaryDeductionBal.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{salaryDeductionBal > 0 ? "Worker owes company" : "No outstanding"}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-1 pt-3 px-4">
+                        <CardTitle className="text-xs font-medium text-muted-foreground">Loan Remaining</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-3">
+                        <p className={`text-xl font-bold font-mono ${loanBal > 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`} data-testid="kpi-loan-balance">
+                          ${loanBal.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{loanBal > 0 ? "Worker owes company" : "No outstanding"}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-1 pt-3 px-4">
+                        <CardTitle className="text-xs font-medium text-muted-foreground">Total Balance</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-3">
+                        <p className={`text-xl font-bold font-mono ${totalOwed > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="kpi-total-advance-balance">
+                          ${totalOwed.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{totalOwed > 0 ? "Worker owes company" : "All settled"}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+
               <Card>
                 <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="text-sm">Advance History</CardTitle>

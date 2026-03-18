@@ -947,16 +947,20 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         attendanceByWorker.set(att.workerId, list);
       }
 
-      // Outstanding advances
+      // Outstanding advances (salary deduction type)
       const allAdvances = await db.select().from(factoryWorkerAdvances)
         .where(and(
           eq(factoryWorkerAdvances.companyId, companyId),
           eq(factoryWorkerAdvances.fullyPaid, false),
           eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
-        ));
+        ))
+        .orderBy(factoryWorkerAdvances.advanceDate);
       const advanceByWorker: Record<number, number> = {};
+      const advanceListByWorker: Record<number, typeof allAdvances> = {};
       for (const adv of allAdvances) {
         advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
+        if (!advanceListByWorker[adv.workerId]) advanceListByWorker[adv.workerId] = [];
+        advanceListByWorker[adv.workerId].push(adv);
       }
 
       // Count weekdays in period for totalWorkingDays
@@ -986,8 +990,16 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           }
         }
 
-        const advanceDeduction = Math.min(advanceByWorker[worker.id] || 0, base + bonus);
+        const totalAdvanceBalance = advanceByWorker[worker.id] || 0;
+        const advanceDeduction = Math.min(totalAdvanceBalance, base + bonus);
         const net = base + bonus - advanceDeduction;
+        const pendingAdvances = (advanceListByWorker[worker.id] || []).map((a) => ({
+          id: a.id,
+          advanceDate: a.advanceDate,
+          amount: a.amount,
+          remainingBalance: a.remainingBalance,
+          notes: a.notes,
+        }));
 
         const workerAtt = attendanceByWorker.get(worker.id) || [];
         let presentDays = 0;
@@ -1023,6 +1035,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           base,
           bonus,
           advanceDeduction,
+          totalAdvanceBalance,
+          pendingAdvances,
           net,
           totalWorkingDays,
           presentDays,
@@ -1044,8 +1058,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes } = req.body;
+      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes, advanceOverrides } = req.body;
       if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
+      // advanceOverrides: { [workerId: string]: number } — user-approved deduction per worker
 
       const days = daysCount ? parseInt(daysCount) : Math.floor((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const bonus = parseFloat(bonusPerWorker || "0");
@@ -1111,7 +1126,11 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
             }
           }
           const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
-          const advanceDeduction = Math.min(workerAdvanceBalance, base + bonus);
+          // Use user-approved override if provided, otherwise auto-deduct full balance
+          const overrideAmt = advanceOverrides ? parseFloat(advanceOverrides[String(worker.id)] ?? "-1") : -1;
+          const advanceDeduction = overrideAmt >= 0
+            ? Math.min(overrideAmt, base + bonus, workerAdvanceBalance)
+            : Math.min(workerAdvanceBalance, base + bonus);
           const net = base + bonus - advanceDeduction;
           await tx.insert(factoryPayrolls).values({
             companyId, workerId: worker.id, periodStart, periodEnd,
