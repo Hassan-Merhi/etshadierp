@@ -161,6 +161,7 @@ interface ContainerOption {
 export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
+  const [offloadDate, setOffloadDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
   const [costPerKg, setCostPerKg] = useState("");
@@ -179,6 +180,7 @@ export default function ProductionRawStock() {
   const [dutyPending, setDutyPending] = useState(false);
   const [dutyNotes, setDutyNotes] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalChargeRow[]>([]);
+  const [mixBatchAllocations, setMixBatchAllocations] = useState<{ id: string; mixBatchId: string; weightKg: string }[]>([]);
   const [confirmDutyDialogOpen, setConfirmDutyDialogOpen] = useState(false);
   const [confirmDutyContainerId, setConfirmDutyContainerId] = useState<number | null>(null);
   const [confirmDutyAmount, setConfirmDutyAmount] = useState("");
@@ -425,6 +427,7 @@ export default function ProductionRawStock() {
 
     const payload: any = {
       containerId: selectedContainerId,
+      offloadDate,
       receivedKg: actualReceivedKg,
       costPerKg,
       currencyCode,
@@ -442,6 +445,10 @@ export default function ProductionRawStock() {
         amount: c.amount,
         ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
       })),
+      mixBatchAllocations: mixBatchAllocations.filter(a => a.mixBatchId && parseFloat(a.weightKg || "0") > 0).map(a => ({
+        mixBatchId: parseInt(a.mixBatchId),
+        weightKg: a.weightKg,
+      })),
     };
 
     if (commissionPersonName.trim() && commRateNum > 0) {
@@ -458,6 +465,7 @@ export default function ProductionRawStock() {
 
   const handleCloseDialog = () => {
     setOffloadDialogOpen(false);
+    setOffloadDate(new Date().toISOString().slice(0, 10));
     setSelectedContainerId("");
     setActualReceivedKg("");
     setCostPerKg("");
@@ -476,6 +484,7 @@ export default function ProductionRawStock() {
     setDutyPending(false);
     setDutyNotes("");
     setAdditionalCharges([]);
+    setMixBatchAllocations([]);
   };
 
   const confirmDutyMutation = useMutation({
@@ -1128,20 +1137,31 @@ export default function ProductionRawStock() {
           </DialogHeader>
 
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-            <div className="space-y-2">
-              <Label>Container</Label>
-              <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
-                <SelectTrigger data-testid="select-offload-container">
-                  <SelectValue placeholder="Select container to offload" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableContainers?.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.containerNumber} {c.totalKg ? `(${parseFloat(c.totalKg).toLocaleString()} kg)` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Container</Label>
+                <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
+                  <SelectTrigger data-testid="select-offload-container">
+                    <SelectValue placeholder="Select container to offload" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableContainers?.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.containerNumber} {c.totalKg ? `(${parseFloat(c.totalKg).toLocaleString()} kg)` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Offload Date</Label>
+                <Input
+                  type="date"
+                  value={offloadDate}
+                  onChange={(e) => setOffloadDate(e.target.value)}
+                  data-testid="input-offload-date"
+                />
+              </div>
             </div>
 
             {selectedContainer && (
@@ -1550,6 +1570,80 @@ export default function ProductionRawStock() {
                     <div className="flex justify-between text-muted-foreground">
                       <span>Grand Total (USD)</span>
                       <span className="font-mono">${formatNumber(grandTotalUsd)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <Label className="text-sm font-semibold">Mix Batch Allocations (optional)</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMixBatchAllocations(prev => [...prev, { id: Date.now().toString(), mixBatchId: "", weightKg: "" }])}
+                      data-testid="button-add-mix-batch-allocation"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add Batch
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Record which open mix batches this container's material was allocated to.</p>
+                  {mixBatchAllocations.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {(() => {
+                        const openBatches = (mixBatches || []).filter(b => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
+                        const totalAllocated = mixBatchAllocations.reduce((sum, a) => sum + parseFloat(a.weightKg || "0"), 0);
+                        return (
+                          <>
+                            {mixBatchAllocations.map((alloc, idx) => (
+                              <div key={alloc.id} className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
+                                <div className="space-y-1">
+                                  <Label className="text-muted-foreground text-xs">Mix Batch</Label>
+                                  <Select value={alloc.mixBatchId} onValueChange={(v) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, mixBatchId: v } : a))}>
+                                    <SelectTrigger data-testid={`select-mix-batch-alloc-${idx}`}>
+                                      <SelectValue placeholder="Select batch" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {openBatches.map(b => (
+                                        <SelectItem key={b.id} value={b.id.toString()}>
+                                          {b.batchCode}{b.name ? ` — ${b.name}` : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-muted-foreground text-xs">KG</Label>
+                                  <Input
+                                    type="number"
+                                    value={alloc.weightKg}
+                                    onChange={(e) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, weightKg: e.target.value } : a))}
+                                    placeholder="0.000"
+                                    step="0.001"
+                                    data-testid={`input-mix-batch-kg-${idx}`}
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setMixBatchAllocations(prev => prev.filter(a => a.id !== alloc.id))}
+                                  data-testid={`button-remove-mix-batch-${idx}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            {actualKg > 0 && (
+                              <div className={`text-xs mt-1 ${totalAllocated > actualKg ? "text-amber-600" : "text-muted-foreground"}`}>
+                                Total allocated: <span className="font-mono font-medium">{formatNumber(totalAllocated)} kg</span>
+                                {" / "}{formatNumber(actualKg)} kg received
+                                {totalAllocated > actualKg && " — exceeds received weight"}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

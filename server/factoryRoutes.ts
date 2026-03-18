@@ -4484,6 +4484,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
         dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
         additionalCharges: reqAdditionalCharges,
+        offloadDate: reqOffloadDate,
+        mixBatchAllocations: reqMixBatchAllocations,
       } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
 
@@ -4503,7 +4505,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const currencyCode = reqCurrencyCode || container.currencyCode || "USD";
       const today = new Date().toISOString().split("T")[0];
-      const offloadDate = today;
+      const offloadDate = reqOffloadDate || today;
+      const mixBatchAllocationsArr = Array.isArray(reqMixBatchAllocations) ? reqMixBatchAllocations : [];
 
       let fxRate: number;
       try {
@@ -4574,6 +4577,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           costPerKgUsd: String(costPerKgUsd),
         })
         .returning();
+
+      // Insert mix batch source records for each allocation specified during offload
+      for (const alloc of mixBatchAllocationsArr) {
+        const allocKg = parseFloat(alloc.weightKg || "0");
+        if (!alloc.mixBatchId || allocKg <= 0) continue;
+        const allocCost = inclusiveCostPerKg * allocKg;
+        await db.insert(factoryMixBatchSources).values({
+          mixBatchId: parseInt(alloc.mixBatchId),
+          containerId,
+          supplierId: container.supplierId || null,
+          sourceType: "container",
+          weightKg: String(allocKg),
+          costPerKg: String(inclusiveCostPerKg),
+          totalCost: String(allocCost),
+        });
+      }
 
       await db
         .update(factoryContainers)
