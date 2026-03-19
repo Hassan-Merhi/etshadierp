@@ -187,6 +187,7 @@ export default function Payroll() {
   const [bulkPaymentDialogOpen, setBulkPaymentDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [advanceWorkerComboOpen, setAdvanceWorkerComboOpen] = useState(false);
+  const [advanceToDelete, setAdvanceToDelete] = useState<number | null>(null);
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
@@ -978,6 +979,19 @@ export default function Payroll() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const deleteAdvanceMutation = useMutation({
+    mutationFn: async (advanceId: number) => {
+      return await modeApiRequest("DELETE", `/api/salary-advances/${advanceId}`, undefined);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Salary advance deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2396,12 +2410,14 @@ export default function Payroll() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {workerAdvancesList.map((advance) => (
+                            {workerAdvancesList.map((advance) => {
+                              const worker = workerStaff.find(w => w.id === advance.employeeId);
+                              return (
                               <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
                                 <TableCell data-testid={`cell-employee-${advance.id}`}>
                                   <div>
-                                    <div className="font-medium">{advance.employeeName}</div>
-                                    <div className="text-sm text-muted-foreground">{advance.employeeCode}</div>
+                                    <div className="font-medium">{worker ? `${worker.firstName} ${worker.lastName}` : `Worker #${advance.employeeId}`}</div>
+                                    <div className="text-sm text-muted-foreground">{worker?.code}</div>
                                   </div>
                                 </TableCell>
                                 <TableCell data-testid={`cell-date-${advance.id}`}>
@@ -2429,21 +2445,32 @@ export default function Payroll() {
                                     >
                                       Record Deduction
                                     </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setAdvanceToDelete(advance.id)}
+                                      data-testid={`button-delete-advance-${advance.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
                       <div className="md:hidden space-y-3">
-                        {workerAdvancesList.map((advance) => (
+                        {workerAdvancesList.map((advance) => {
+                          const worker = workerStaff.find(w => w.id === advance.employeeId);
+                          return (
                           <Card key={advance.id} data-testid={`card-advance-${advance.id}`}>
                             <CardContent className="p-4 space-y-2">
                               <div className="flex items-start justify-between gap-2">
                                 <div>
-                                  <div className="font-medium">{advance.employeeName}</div>
-                                  <div className="text-sm text-muted-foreground">{advance.employeeCode} - {formatDisplayDate(new Date(advance.advanceDate))}</div>
+                                  <div className="font-medium">{worker ? `${worker.firstName} ${worker.lastName}` : `Worker #${advance.employeeId}`}</div>
+                                  <div className="text-sm text-muted-foreground">{worker?.code} - {formatDisplayDate(new Date(advance.advanceDate))}</div>
                                 </div>
                                 <Badge variant={advance.fullyPaid ? "default" : "secondary"}>
                                   {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
@@ -2453,14 +2480,20 @@ export default function Payroll() {
                                 <span className="text-muted-foreground">Amount: <span className="font-mono text-foreground">{formatAmount(parseFloat(advance.amount))}</span></span>
                                 <span className="text-muted-foreground">Remaining: <span className="font-mono font-semibold text-foreground">{formatAmount(parseFloat(advance.remainingBalance))}</span></span>
                               </div>
-                              {!advance.fullyPaid && (
-                                <Button size="sm" variant="outline" className="w-full" onClick={() => handleRecordDeduction(advance)} data-testid={`button-record-deduction-mobile-${advance.id}`}>
-                                  Record Deduction
+                              <div className="flex gap-2">
+                                {!advance.fullyPaid && (
+                                  <Button size="sm" variant="outline" className="flex-1" onClick={() => handleRecordDeduction(advance)} data-testid={`button-record-deduction-mobile-${advance.id}`}>
+                                    Record Deduction
+                                  </Button>
+                                )}
+                                <Button size="icon" variant="ghost" onClick={() => setAdvanceToDelete(advance.id)} data-testid={`button-delete-advance-mobile-${advance.id}`}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
-                              )}
+                              </div>
                             </CardContent>
                           </Card>
-                        ))}
+                          );
+                        })}
                       </div>
                       </>
                     )}
@@ -3504,6 +3537,33 @@ export default function Payroll() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Salary Advance Confirmation */}
+      <AlertDialog open={advanceToDelete !== null} onOpenChange={(open) => !open && setAdvanceToDelete(null)}>
+        <AlertDialogContent data-testid="dialog-delete-advance">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Salary Advance</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the advance and all associated deduction records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (advanceToDelete !== null) {
+                  deleteAdvanceMutation.mutate(advanceToDelete);
+                  setAdvanceToDelete(null);
+                }
+              }}
+              data-testid="button-confirm-delete-advance"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Worker Balance Conflict Dialog */}
       <AlertDialog open={!!deleteWorkerConflict} onOpenChange={(open) => !open && setDeleteWorkerConflict(null)}>

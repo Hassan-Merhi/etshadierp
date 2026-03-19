@@ -302,6 +302,7 @@ export interface IStorage {
   getUnpaidSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]>;
   createSalaryAdvance(advance: schema.InsertSalaryAdvance): Promise<schema.SalaryAdvance>;
   updateSalaryAdvance(id: number, updates: Partial<schema.InsertSalaryAdvance>): Promise<schema.SalaryAdvance>;
+  deleteSalaryAdvance(id: number): Promise<void>;
 
   // Salary Advance Deductions
   getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
@@ -5327,6 +5328,11 @@ export class DbStorage implements IStorage {
     const [advance] = await db.update(schema.salaryAdvances).set(updates)
       .where(eq(schema.salaryAdvances.id, id)).returning();
     return advance;
+  }
+
+  async deleteSalaryAdvance(id: number): Promise<void> {
+    await db.delete(schema.salaryAdvanceDeductions).where(eq(schema.salaryAdvanceDeductions.salaryAdvanceId, id));
+    await db.delete(schema.salaryAdvances).where(eq(schema.salaryAdvances.id, id));
   }
 
   // Salary Advance Deduction Methods

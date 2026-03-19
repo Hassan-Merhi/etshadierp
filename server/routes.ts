@@ -6335,6 +6335,27 @@ if (asOfDate) {
     },
   );
 
+  app.delete("/api/salary-advances/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const advanceId = parseInt(req.params.id);
+      if (isNaN(advanceId)) return res.status(400).json({ message: "Invalid salary advance ID" });
+
+      const advance = await storage.getSalaryAdvanceById(advanceId);
+      if (!advance) return res.status(404).json({ message: "Salary advance not found" });
+      if (advance.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Salary advance belongs to a different company" });
+      }
+
+      await storage.deleteSalaryAdvance(advanceId);
+      res.json({ message: "Salary advance deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Groups
   app.get("/api/stock-groups", requireAuth, async (req, res) => {
     try {
