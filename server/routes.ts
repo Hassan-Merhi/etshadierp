@@ -13769,6 +13769,37 @@ if (asOfDate) {
       const boldFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica-Bold";
       const normalFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica";
 
+      // Arabic text processing helpers
+      // bidi-js is a factory function; arabic-reshaper provides convertArabic()
+      let convertArabic: ((t: string) => string) | null = null;
+      let bidiInst: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      if (isRTL) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
+          convertArabic = reshaperMod.convertArabic;
+          // bidi-js exports a factory function — call it to get the instance
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const bidiFactory = require("bidi-js") as () => typeof bidiInst;
+          bidiInst = (bidiFactory as any)();
+        } catch { /* if packages fail, text renders as-is */ }
+      }
+      const shapeText = (text: string): string => {
+        if (!isRTL || !text || !convertArabic) return text;
+        try {
+          // 1. Reshape Arabic characters into their proper contextual (connected) forms
+          const reshaped = convertArabic(text);
+          // 2. Apply Unicode Bidi Algorithm to get the correct visual (LTR canvas) order
+          if (bidiInst) {
+            const levels = bidiInst.getEmbeddingLevels(reshaped, "rtl");
+            return bidiInst.getReorderedString(reshaped, levels);
+          }
+          return reshaped;
+        } catch {
+          return text;
+        }
+      };
+
       res.setHeader("Content-Type", "application/pdf");
       const safeAccName = accountName.replace(/[^a-zA-Z0-9_-]/g, "_");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
@@ -13787,9 +13818,9 @@ if (asOfDate) {
         try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
       }
       doc.fontSize(18).font(boldFont).fillColor("#000000")
-        .text(companyName, 40 + logoWidth, headerY, txtOpts(515 - logoWidth));
+        .text(shapeText(companyName), 40 + logoWidth, headerY, txtOpts(515 - logoWidth));
       doc.fontSize(10).font(normalFont).fillColor("#555555")
-        .text(`${t.accountStatement}: ${accountName}`, 40 + logoWidth, headerY + 22, txtOpts(515 - logoWidth));
+        .text(shapeText(`${t.accountStatement}: ${accountName}`), 40 + logoWidth, headerY + 22, txtOpts(515 - logoWidth));
 
       const headerBottom = Math.max(doc.y, headerY + 52);
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
@@ -13798,8 +13829,8 @@ if (asOfDate) {
       // Meta
       const metaY = headerBottom + 10;
       doc.fillColor("#444444").fontSize(8).font(normalFont);
-      doc.text(`${t.period}: ${periodStr}`, 40, metaY, txtOpts(515));
-      doc.text(`${t.generated}: ${generatedStr}`, 40, doc.y + 2, txtOpts(515));
+      doc.text(shapeText(`${t.period}: ${periodStr}`), 40, metaY, txtOpts(515));
+      doc.text(shapeText(`${t.generated}: ${generatedStr}`), 40, doc.y + 2, txtOpts(515));
       doc.moveDown(0.5);
 
       // Table columns: Date | Type | Particulars | Debit | Credit | Balance
@@ -13813,29 +13844,45 @@ if (asOfDate) {
       const colAln: Array<"left"|"right"> = isRTL
         ? ["right","right","right","left","left","left"]
         : ["left","left","left","right","right","right"];
-      const ROW_H = 14;
+      const MIN_ROW_H = 14;
       const HDR_H = 15;
+      const FONT_SIZE = 7.5;
 
       const drawTableHeader = (y: number) => {
         doc.rect(40, y, 515, HDR_H).fill("#1F3864");
-        doc.fillColor("#ffffff").font(boldFont).fontSize(7.5);
+        doc.fillColor("#ffffff").font(boldFont).fontSize(FONT_SIZE);
         colHdr.forEach((h, i) => {
-          doc.text(h, colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] });
+          doc.text(shapeText(h), colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] });
         });
-        doc.fillColor("#000000").font(normalFont).fontSize(7.5);
+        doc.fillColor("#000000").font(normalFont).fontSize(FONT_SIZE);
       };
 
       let tableY = doc.y + 4;
       drawTableHeader(tableY);
       let y = tableY + HDR_H;
 
-      const drawRow = (vals: string[], rowIdx: number, bg?: string) => {
+      // Calculate how tall a row needs to be given its cell values
+      const calcRowH = (vals: string[]): number => {
+        doc.font(normalFont).fontSize(FONT_SIZE);
+        let maxH = MIN_ROW_H;
+        vals.forEach((v, i) => {
+          if (!v) return;
+          const h = doc.heightOfString(v, { width: colW[i] - 4 }) + 6;
+          if (h > maxH) maxH = h;
+        });
+        return maxH;
+      };
+
+      const drawRow = (vals: string[], rowH: number, bg?: string) => {
         if (bg) {
-          doc.rect(40, y, 515, ROW_H).fill(bg);
+          doc.rect(40, y, 515, rowH).fill(bg);
           doc.fillColor("#000000");
         }
         vals.forEach((v, i) => {
-          if (v) doc.font(normalFont).fontSize(7.5).text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
+          if (v) {
+            doc.font(normalFont).fontSize(FONT_SIZE)
+              .text(shapeText(v), colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
+          }
         });
       };
 
@@ -13845,18 +13892,12 @@ if (asOfDate) {
       const obRowVals = isRTL
         ? [obDisplay, "-", "-", "", t.openingBalance, ""]
         : ["", t.openingBalance, "", "-", "-", obDisplay];
-      drawRow(obRowVals, 0, "#F0F4FF");
-      y += ROW_H;
+      const obRowH = calcRowH(obRowVals);
+      drawRow(obRowVals, obRowH, "#F0F4FF");
+      y += obRowH;
 
       // Transaction rows
       rowsWithBalance.forEach((row, idx) => {
-        if (y + ROW_H > PAGE_H - MARGIN_BOTTOM) {
-          doc.addPage();
-          y = 40;
-          drawTableHeader(y);
-          y += HDR_H;
-        }
-        const bg = idx % 2 === 1 ? "#F8F8F8" : undefined;
         const particulars = row.narration || row.description || "";
         const debitStr = row.totalDebit > 0 ? fmtAmt(row.totalDebit) : "-";
         const creditStr = row.totalCredit > 0 ? fmtAmt(row.totalCredit) : "-";
@@ -13866,8 +13907,17 @@ if (asOfDate) {
         const txVals = isRTL
           ? [balStr, creditStr, debitStr, particulars, row.voucherType, fmtDate(row.voucherDate)]
           : [fmtDate(row.voucherDate), row.voucherType, particulars, debitStr, creditStr, balStr];
-        drawRow(txVals, idx, bg);
-        y += ROW_H;
+        const rowH = calcRowH(txVals);
+
+        if (y + rowH > PAGE_H - MARGIN_BOTTOM) {
+          doc.addPage();
+          y = 40;
+          drawTableHeader(y);
+          y += HDR_H;
+        }
+        const bg = idx % 2 === 1 ? "#F8F8F8" : undefined;
+        drawRow(txVals, rowH, bg);
+        y += rowH;
       });
 
       // Footer summary
@@ -13889,11 +13939,11 @@ if (asOfDate) {
           .font(isBold ? boldFont : normalFont).fontSize(8);
         const labelX = isRTL ? colX[1] + 2 : colX[2] + 2;
         const labelW = isRTL ? colW[1] - 4 : colW[2] - 4;
-        doc.text(label, labelX, y + 4, { width: labelW, align: isRTL ? "right" : "left" });
+        doc.text(shapeText(label), labelX, y + 4, { width: labelW, align: isRTL ? "right" : "left" });
         if (isRTL) {
-          if (balance) doc.text(balance, colX[0] + 2, y + 4, { width: colW[0] - 4, align: "right" });
-          if (credit) doc.text(credit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "left" });
-          if (debit) doc.text(debit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "left" });
+          if (balance) doc.text(shapeText(balance), colX[0] + 2, y + 4, { width: colW[0] - 4, align: "right" });
+          if (credit) doc.text(shapeText(credit), colX[3] + 2, y + 4, { width: colW[3] - 4, align: "left" });
+          if (debit) doc.text(shapeText(debit), colX[4] + 2, y + 4, { width: colW[4] - 4, align: "left" });
         } else {
           if (debit) doc.text(debit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
           if (credit) doc.text(credit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
