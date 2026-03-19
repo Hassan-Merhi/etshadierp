@@ -5582,7 +5582,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           otherCharges: String(otherChargesVal),
           otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
           otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
-          commissionAmount: String(commTotalVal),
+          commissionAmount: commTotalVal > 0 ? String(commTotalVal) : (container.commissionAmount || "0"),
           dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
           dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
           dutyStatus,
@@ -5945,19 +5945,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           and(eq(factoryOffloadAdditionalCharges.companyId, companyId), eq(factoryOffloadAdditionalCharges.containerId, containerId))
         );
 
-        // 5. Reset container back to RECEIVED state, clearing all offload-specific fields
+        // 5. Reset container back to RECEIVED state, clearing offload-computed fields only.
+        //    Pre-registered fields (freight, otherCharges, commission) are kept as-is so
+        //    they remain visible on the containers list after the reverse.
         await tx.update(factoryContainers).set({
           status: "RECEIVED",
           actualReceivedKg: null,
           differenceKg: null,
-          freight: "0",
-          freightAccountId: null,
-          otherCharges: "0",
-          otherChargesAccountId: null,
-          commissionAmount: "0",
-          commissionCurrencyCode: "USD",
-          commissionSupplierId: null,
-          commissionNotes: null,
           dutyAmount: null,
           dutyAccountId: null,
           dutyStatus: "NONE",

@@ -466,8 +466,21 @@ export default function ProductionRawStock() {
     setFxRateToUsd(container?.fxRateToUsd || "1");
     const freightVal = parseFloat(container?.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
-    const ocVal = parseFloat(container?.otherCharges || "0");
+    const ocVal = parseFloat((container as any)?.otherCharges || "0");
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
+    // Pre-populate commission from the container's pre-registered data
+    const commAmt = parseFloat((container as any)?.commissionAmount || "0");
+    if (commAmt > 0) {
+      setCommissionType("FIXED");
+      setCommissionRate(String(commAmt));
+      const commSupplierId = (container as any)?.commissionSupplierId;
+      const broker = commSupplierId ? factorySuppliers?.find((s: any) => s.id === commSupplierId) : null;
+      setCommissionPersonName(broker?.name || "Commission");
+    } else {
+      setCommissionPersonName("");
+      setCommissionRate("");
+      setCommissionType("PER_KG");
+    }
   };
 
   const handleOffload = () => {
