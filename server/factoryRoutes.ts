@@ -233,9 +233,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return res.status(400).json({ message: "Location is required" });
       }
 
-      // Parse optional backdated entry date
+      // Parse optional backdated entry date; default to today so history is always populated
       let effectiveEntryDate: Date | null = null;
-      let effectiveDateStr: string | null = null;
+      let effectiveDateStr: string = new Date().toISOString().split("T")[0];
       if (entryDate && typeof entryDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
         effectiveEntryDate = new Date(entryDate + "T00:00:00.000Z");
         effectiveDateStr = entryDate;
