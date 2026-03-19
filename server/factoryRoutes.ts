@@ -2730,7 +2730,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const [dupCode] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
-          .where(eq(factoryBaleProducts.code, candidateCodeClean));
+          .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
         if (!dupArticle && !dupCode) break;
         nextNum++;
         candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
@@ -2948,7 +2948,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const [dupCode] = await db
             .select({ id: factoryBaleProducts.id })
             .from(factoryBaleProducts)
-            .where(eq(factoryBaleProducts.code, candidateCodeClean));
+            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
           if (!dupArticle && !dupCode) break;
           nextNum++;
           candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
@@ -3015,7 +3015,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               const [dupCode] = await db
                 .select({ id: factoryBaleProducts.id })
                 .from(factoryBaleProducts)
-                .where(eq(factoryBaleProducts.code, candidateCodeClean));
+                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
               if (!dupArticle && !dupCode) break;
               nextNum++;
               candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
