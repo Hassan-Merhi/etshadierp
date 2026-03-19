@@ -4135,7 +4135,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .set({ otherCharges: total.toFixed(2) })
         .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
-      // Double-entry for each other charge: Dr Charge Account / Cr Supplier Payable
+      // Double-entry for each other charge: Dr Factory Charges Payable / Cr chosen account
       if (newCharges.length > 0) {
         const [container] = await db
           .select({ supplierId: factoryContainers.supplierId, containerNumber: factoryContainers.containerNumber, currencyCode: factoryContainers.currencyCode, fxRateToUsd: factoryContainers.fxRateToUsd, arrivalDate: factoryContainers.arrivalDate })
@@ -4159,24 +4159,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
               sourceModule: "FACTORY",
             }).returning();
-            // Dr Charge Expense account
+            // Dr Factory Charges Payable
+            const payableAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+            await db.insert(voucherEntries).values({
+              voucherId: ocVoucher.id,
+              ledgerAccountId: payableAccId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: `${charge.description} payable - container ${container.containerNumber}`,
+            });
+            // Cr chosen account (credit = I owe this person)
             await db.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               ledgerAccountId: charge.ledgerAccountId,
-              debitAmount: String(chargeAmt),
-              creditAmount: "0",
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
               narration: `${charge.description} - container ${container.containerNumber}`,
             });
-            // Cr Supplier Payable
-            if (container.supplierId) {
-              await db.insert(voucherEntries).values({
-                voucherId: ocVoucher.id,
-                factorySupplierId: container.supplierId,
-                debitAmount: "0",
-                creditAmount: String(chargeAmt),
-                narration: `${charge.description} payable to supplier - container ${container.containerNumber}`,
-              });
-            }
           }
         }
       }
@@ -4913,10 +4912,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry accounting vouchers for each offload additional charge
-      // (Dr Factory Charges Payable / Cr chosen account)
+      // Dr Factory Charges Payable / Cr chosen account (ledger or supplier)
       for (const inserted of insertedAdditionalCharges) {
         const chargeAmount = parseFloat(inserted.amount || "0");
-        if (chargeAmount <= 0 || !inserted.ledgerAccountId) continue;
+        if (chargeAmount <= 0) continue;
+        // Must have either a ledger account or a supplier selected
+        if (!inserted.ledgerAccountId && !inserted.supplierId) continue;
         const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
         const [ocVoucher] = await db.insert(vouchers).values({
           companyId,
@@ -4938,14 +4939,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           creditAmount: "0",
           narration: `${inserted.description} payable - container ${container.containerNumber}`,
         });
-        // Cr chosen account
-        await db.insert(voucherEntries).values({
-          voucherId: ocVoucher.id,
-          ledgerAccountId: inserted.ledgerAccountId,
-          debitAmount: "0",
-          creditAmount: String(chargeAmount),
-          narration: `${inserted.description} - container ${container.containerNumber}`,
-        });
+        // Cr chosen account — ledger account OR factory supplier
+        if (inserted.ledgerAccountId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocVoucher.id,
+            ledgerAccountId: inserted.ledgerAccountId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmount),
+            narration: `${inserted.description} - container ${container.containerNumber}`,
+          });
+        } else if (inserted.supplierId) {
+          await db.insert(voucherEntries).values({
+            voucherId: ocVoucher.id,
+            factorySupplierId: inserted.supplierId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmount),
+            narration: `${inserted.description} - container ${container.containerNumber}`,
+          });
+        }
       }
 
       res.json({ rawStock, commission: commissionRecord });
