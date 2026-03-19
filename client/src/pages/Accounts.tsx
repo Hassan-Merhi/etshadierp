@@ -1786,31 +1786,62 @@ export default function Accounts() {
                           </div>
                         </div>
                         {(() => {
-                          const paymentEntries = (factorySupplierStatement.ledger || []).filter((e: any) => e.type === "payment");
-                          if (paymentEntries.length === 0) {
-                            return <p className="text-sm text-muted-foreground text-center py-4">No payments recorded yet</p>;
+                          const allLedgerEntries = factorySupplierStatement.ledger || [];
+                          const paymentEntries = allLedgerEntries.filter((e: any) => e.type === "payment");
+                          const purchaseEntries = allLedgerEntries.filter((e: any) => e.type === "purchase");
+                          const allEntries = [...purchaseEntries, ...paymentEntries].sort((a: any, b: any) => {
+                            const da = a.date ? new Date(a.date).getTime() : 0;
+                            const db2 = b.date ? new Date(b.date).getTime() : 0;
+                            return da - db2;
+                          });
+                          if (allEntries.length === 0) {
+                            return <p className="text-sm text-muted-foreground text-center py-4">No activity recorded yet</p>;
                           }
+                          let runBal = 0;
+                          const rowsWithBal = allEntries.map((e: any) => {
+                            const rawNum = parseFloat(String(e.amount || "0").replace(/[^0-9.]/g, "")) || 0;
+                            if (e.type === "purchase") runBal += rawNum;
+                            else if (e.type === "payment") runBal -= rawNum;
+                            return { ...e, runBal };
+                          });
                           return (
                             <div>
-                              <div className="text-sm font-medium mb-2">Recent Payments</div>
+                              <div className="text-sm font-medium mb-2">Transaction Ledger</div>
                               <Table>
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>Date</TableHead>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>Reference</TableHead>
-                                    <TableHead>Detail</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">Debit</TableHead>
+                                    <TableHead className="text-right">Credit</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {paymentEntries.slice(0, 20).map((p: any) => (
-                                    <TableRow key={p.key}>
-                                      <TableCell className="text-sm whitespace-nowrap">{p.date ? new Date(p.date).toLocaleDateString() : "-"}</TableCell>
-                                      <TableCell className="text-sm text-muted-foreground">{p.ref || "-"}</TableCell>
-                                      <TableCell className="text-sm text-muted-foreground">{p.detail || "-"}</TableCell>
-                                      <TableCell className="text-right text-sm tabular-nums text-green-600 dark:text-green-400">{p.amount}</TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {rowsWithBal.slice(0, 50).map((e: any) => {
+                                    const cleanAmt = String(e.amount || "0").replace(/^[-−+]/, "");
+                                    return (
+                                      <TableRow key={e.key}>
+                                        <TableCell className="text-sm whitespace-nowrap">{e.date ? new Date(e.date).toLocaleDateString() : "-"}</TableCell>
+                                        <TableCell className="text-sm">
+                                          <span className={`text-xs font-medium ${e.type === "payment" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                            {e.type === "payment" ? "Payment" : "Purchase"}
+                                          </span>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{e.ref || (e.type === "payment" ? "Payment" : e.detail) || "-"}</TableCell>
+                                        <TableCell className="text-right text-sm tabular-nums text-red-600 dark:text-red-400">
+                                          {e.type === "purchase" ? cleanAmt : ""}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm tabular-nums text-green-600 dark:text-green-400">
+                                          {e.type === "payment" ? cleanAmt : ""}
+                                        </TableCell>
+                                        <TableCell className={`text-right text-sm tabular-nums font-medium ${e.runBal > 0 ? "text-red-600 dark:text-red-400" : e.runBal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                          ${Math.abs(e.runBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{e.runBal > 0 ? " Dr" : e.runBal < 0 ? " Cr" : ""}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
                                 </TableBody>
                               </Table>
                             </div>

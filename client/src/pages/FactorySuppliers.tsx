@@ -891,50 +891,54 @@ export default function FactorySuppliers() {
           </Card>
         ) : statementData ? (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Total Containers</div>
-                  <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
-                    {statementData.summary.totalContainers}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Total Weight</div>
-                  <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
-                    {formatKg(statementData.summary.totalKg)}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Gross Value</div>
-                  <div className="text-xl font-bold mt-1" data-testid="text-statement-total-value">
-                    ${formatNum(statementData.summary.totalValue)}
-                  </div>
-                </CardContent>
-              </Card>
-              {parseFloat(statementData.summary.totalDirectCommissions || "0") > 0 && (
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Commission Owed</div>
-                    <div className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400" data-testid="text-statement-direct-commissions">
-                      ${formatNum(statementData.summary.totalDirectCommissions)}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Total Owed</div>
-                  <div className="text-xl font-bold mt-1" data-testid="text-statement-total-owed">
-                    ${formatNum(statementData.summary.totalOwed || statementData.summary.totalValue)}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {(() => {
+              const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
+              const activeContainerCount = activeSt.length;
+              const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
+              const netPayableAmt = parseFloat(statementData.summary.netPayable || "0");
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground">Active Containers</div>
+                      <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
+                        {activeContainerCount}
+                        {statementData.summary.totalContainers > activeContainerCount && (
+                          <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground">Active Weight</div>
+                      <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
+                        {formatKg(String(activeKg.toFixed(3)))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {parseFloat(statementData.summary.totalDirectCommissions || "0") > 0 && (
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-xs text-muted-foreground">Commission Owed</div>
+                        <div className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400" data-testid="text-statement-direct-commissions">
+                          ${formatNum(statementData.summary.totalDirectCommissions)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground">Net Balance</div>
+                      <div className={`text-xl font-bold mt-1 ${netPayableAmt > 0 ? "text-red-600 dark:text-red-400" : netPayableAmt < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} data-testid="text-statement-total-owed">
+                        {netPayableAmt < 0 ? "-" : ""}${formatNum(String(Math.abs(netPayableAmt)))}
+                        <span className="text-sm font-normal ml-1">{netPayableAmt > 0 ? "DR" : netPayableAmt < 0 ? "CR" : ""}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
 
             {statementData.supplier && (
               <Card>
@@ -1172,6 +1176,23 @@ export default function FactorySuppliers() {
                       onDelete: () => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); },
                       usdImpact: -parseFloat(p.amountUsd || "0"),
                     })),
+                    ...(statementData.ledger || [])
+                      .filter((e: any) => e.type === "payment" && typeof e.key === "string" && e.key.startsWith("vp-"))
+                      .map((vp: any) => {
+                        const rawAmt = String(vp.amount || "0").replace(/[^0-9.]/g, "");
+                        const usdAmt = parseFloat(rawAmt) || 0;
+                        return {
+                          key: vp.key,
+                          date: vp.date,
+                          type: "payment" as RowType,
+                          ref: vp.ref || "Voucher Payment",
+                          detail: vp.detail || "Payment Voucher",
+                          amount: `$${formatNum(String(usdAmt))}`,
+                          amountIsNeg: false,
+                          notes: vp.notes || null,
+                          usdImpact: -usdAmt,
+                        };
+                      }),
                     ...(statementData.fxTransfers || []).map(t => {
                       const isOut = t.fromSupplierId === statementSupplierId;
                       const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
@@ -1256,11 +1277,11 @@ export default function FactorySuppliers() {
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
-                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
-                                {row.amountIsNeg && row.type !== "payment" ? "−" : row.type === "payment" ? "−" : ""}{row.amount}
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                                {row.type === "payment" ? "−" : row.type === "purchase" ? "+" : row.amountIsNeg ? "−" : ""}{row.amount}
                               </TableCell>
-                              <TableCell className={`text-right text-sm tabular-nums font-medium ${bal < 0 ? "text-green-600 dark:text-green-400" : bal > 0 ? "" : "text-muted-foreground"}`}>
-                                ${formatNum(Math.abs(bal))}{bal < 0 ? " CR" : bal > 0 ? " DR" : ""}
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                ${formatNum(String(Math.abs(bal)))}{bal > 0 ? " DR" : bal < 0 ? " CR" : ""}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
@@ -1287,18 +1308,6 @@ export default function FactorySuppliers() {
               </CardContent>
             </Card>
 
-            {parseFloat(statementData.summary.totalPayments || "0") > 0 && (
-              <Card className="border-primary/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Net Balance (after payments)</span>
-                    <span className="text-xl font-bold tabular-nums text-primary" data-testid="text-statement-net-balance">
-                      ${formatNum(statementData.summary.netPayable)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </>
         ) : null}
 
