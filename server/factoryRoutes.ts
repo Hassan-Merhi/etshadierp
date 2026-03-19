@@ -2161,6 +2161,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ───────────────────────────────────────────────
 
   // Get outstanding balance for a single factory supplier (used by voucher payment balance display)
+  // Uses the SAME logic as computeStats in with-balances (including freight, FX transfers,
+  // voucher-based payments, and broker aggregation across linked suppliers).
   app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -2168,43 +2170,81 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) return res.status(400).json({ message: "Invalid supplier ID" });
 
-      const [supplier] = await db.select().from(factorySuppliers)
-        .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
+      // Load the supplier + any children (for broker aggregation)
+      const allSuppliers = await db.select().from(factorySuppliers)
+        .where(eq(factorySuppliers.companyId, companyId));
+      const supplier = allSuppliers.find((s: any) => s.id === supplierId);
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+      const children = allSuppliers.filter((s: any) => (s as any).parentId === supplierId);
+      const supplierIds = [supplierId, ...children.map((c: any) => c.id)];
 
-      const openingBalance = parseFloat(supplier.openingBalance || "0");
+      // Load all containers, payments, and FX transfers for the relevant supplier IDs
+      const allContainers = await db.select().from(factoryContainers)
+        .where(eq(factoryContainers.companyId, companyId));
 
-      const supplierContainers = await db.select().from(factoryContainers)
-        .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId)));
+      const allPayments = await db.select().from(factorySupplierPayments)
+        .where(and(eq(factorySupplierPayments.companyId, companyId), inArray(factorySupplierPayments.supplierId, supplierIds)));
 
-      const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
-        const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
-        const rate = parseFloat(c.ratePerKg || "0");
-        const fx = parseFloat(c.fxRateToUsd || "1");
-        return sum + kg * rate * fx;
-      }, 0);
-
-      const brokerContainers = await db.select().from(factoryContainers)
+      // Voucher-based payments (ERP vouchers that debit a factory supplier account).
+      // Exclude FACTORY-PAY-* vouchers — those are auto-generated from factorySupplierPayments
+      // and already counted in allPayments to avoid double-counting.
+      const voucherPaidBySupplier: Record<number, number> = {};
+      const voucherPaymentRows = await db
+        .select({
+          factorySupplierId: voucherEntries.factorySupplierId,
+          debitAmount: voucherEntries.debitAmount,
+          currency: vouchers.currency,
+          exchangeRate: vouchers.exchangeRate,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(
-          eq(factoryContainers.companyId, companyId),
-          eq(factoryContainers.commissionSupplierId, supplierId),
-          ne(factoryContainers.supplierId, supplierId)
+          inArray(voucherEntries.factorySupplierId, supplierIds),
+          sql`${voucherEntries.debitAmount}::numeric > 0`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
         ));
+      for (const row of voucherPaymentRows as any[]) {
+        const sid = row.factorySupplierId;
+        if (!sid) continue;
+        const amt = parseFloat(row.debitAmount || "0");
+        const fx = parseFloat(row.exchangeRate || "1") || 1;
+        const curr = row.currency || "USD";
+        const usdAmt = curr === "USD" ? amt : amt / fx;
+        voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usdAmt;
+      }
 
-      const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
-        const commAmt = parseFloat(c.commissionAmount || "0");
-        if (commAmt <= 0) return sum;
-        const fx = parseFloat(c.fxRateToUsd || "1");
-        const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
-        return sum + (commCurr === "USD" ? commAmt : commAmt * fx);
+      // computeBalance: IDENTICAL formula to computeStats in the with-balances endpoint.
+      // Includes freight, commission, and voucher-based payments; excludes FX transfers
+      // from the USD total (FX transfers are per-currency conversions, not USD settlements).
+      const computeBalance = (sid: number, openingBal: number) => {
+        const supplierContainers = allContainers.filter((c: any) => c.supplierId === sid);
+        const containerValue = supplierContainers.reduce((sum: number, c: any) => {
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const freight = parseFloat(c.freight || "0");
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          return sum + (kg * rate + freight) * fx;
+        }, 0);
+        const commissionContainers = allContainers.filter((c: any) =>
+          c.commissionSupplierId === sid && c.supplierId !== sid && parseFloat(c.commissionAmount || "0") > 0
+        );
+        const commissionValue = commissionContainers.reduce((sum: number, c: any) => {
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+          const commFx = parseFloat(c.fxRateToUsd || "1");
+          return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
+        }, 0);
+        const supplierPayments = allPayments.filter((p: any) => p.supplierId === sid);
+        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const voucherPaid = voucherPaidBySupplier[sid] || 0;
+        return openingBal + containerValue + commissionValue - totalPaid - voucherPaid;
+      };
+
+      // Aggregate: broker's own balance + all children
+      const suppliersToAggregate = [{ id: supplierId, openingBalance: supplier.openingBalance }, ...children.map((c: any) => ({ id: c.id, openingBalance: c.openingBalance }))];
+      const outstandingUsd = suppliersToAggregate.reduce((sum: number, s: any) => {
+        return sum + computeBalance(s.id, parseFloat(s.openingBalance || "0"));
       }, 0);
-
-      const payments = await db.select().from(factorySupplierPayments)
-        .where(and(eq(factorySupplierPayments.companyId, companyId), eq(factorySupplierPayments.supplierId, supplierId)));
-
-      const totalPaidUsd = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
-
-      const outstandingUsd = openingBalance + containerValueUsd + commissionValueUsd - totalPaidUsd;
 
       res.json({ balance: outstandingUsd, outstandingUsd });
     } catch (error: any) {
