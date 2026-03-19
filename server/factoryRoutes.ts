@@ -1931,7 +1931,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const brokerId = parseInt(req.params.brokerId);
       if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
 
-      const { fromCurrencyCode, totalAmount, fxRateToUsd, date, notes, order = "oldest" } = req.body;
+      const { fromCurrencyCode, totalAmount, fxRateToUsd, date, notes, order = "oldest", dryRun = false } = req.body;
       if (!fromCurrencyCode || !totalAmount || !fxRateToUsd)
         return res.status(400).json({ message: "fromCurrencyCode, totalAmount, and fxRateToUsd are required" });
 
@@ -2071,12 +2071,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (rem <= 0.001) break;
         const toAllocate = Math.min(rem, sd.available);
         if (toAllocate < 0.001) continue;
-        allocations.push({ supplierId: sd.supplierId, name: sd.name, allocated: toAllocate, toAmountUsd: toAllocate / fxRate, containers: sd.containers });
+        allocations.push({ supplierId: sd.supplierId, name: sd.name, allocated: toAllocate, toAmountUsd: toAllocate * fxRate, containers: sd.containers });
         rem -= toAllocate;
       }
 
       if (allocations.length === 0)
         return res.status(400).json({ message: "Could not allocate any amount" });
+
+      // Dry-run: return preview without saving
+      if (dryRun) {
+        const totalAllocated = allocations.reduce((s, a) => s + a.allocated, 0);
+        const totalUsd = allocations.reduce((s, a) => s + a.toAmountUsd, 0);
+        return res.json({
+          dryRun: true,
+          totalRequested: total.toFixed(4),
+          totalAllocated: totalAllocated.toFixed(4),
+          remaining: (total - totalAllocated).toFixed(4),
+          totalUsd: totalUsd.toFixed(4),
+          transfers: allocations.map(a => ({
+            supplierId: a.supplierId,
+            supplierName: a.name,
+            allocated: a.allocated.toFixed(4),
+            toAmountUsd: a.toAmountUsd.toFixed(4),
+          })),
+        });
+      }
 
       // Create FX transfers and allocation rows in a transaction
       const settlementDate = date || new Date().toISOString().split("T")[0];

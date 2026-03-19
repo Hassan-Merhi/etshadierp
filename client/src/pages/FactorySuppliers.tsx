@@ -255,7 +255,13 @@ export default function FactorySuppliers() {
     notes: "",
     order: "oldest" as "oldest" | "newest",
   });
-  const [bulkFxPreview, setBulkFxPreview] = useState<null | { transfers: Array<{ supplierId: number; supplierName: string; allocated: string; toAmountUsd: string }>; totalAllocated: string; remaining: string }>(null);
+  type BulkFxPreview = {
+    transfers: Array<{ supplierId: number; supplierName: string; allocated: string; toAmountUsd: string }>;
+    totalAllocated: string;
+    totalUsd: string;
+    remaining: string;
+  };
+  const [bulkFxPreview, setBulkFxPreview] = useState<null | BulkFxPreview>(null);
 
   const openBulkFxDialog = (brokerId: number, brokerName: string) => {
     setBulkFxBrokerId(brokerId);
@@ -264,6 +270,25 @@ export default function FactorySuppliers() {
     setBulkFxPreview(null);
     setBulkFxOpen(true);
   };
+
+  const bulkFxPreviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!bulkFxBrokerId) throw new Error("No broker selected");
+      const res = await factoryApiRequest("POST", `/api/factory/suppliers/${bulkFxBrokerId}/bulk-fx-settlement`, {
+        fromCurrencyCode: bulkFxForm.fromCurrencyCode,
+        totalAmount: bulkFxForm.totalAmount,
+        fxRateToUsd: bulkFxForm.fxRateToUsd,
+        date: bulkFxForm.date,
+        notes: bulkFxForm.notes || null,
+        order: bulkFxForm.order,
+        dryRun: true,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Preview failed"); }
+      return res.json() as Promise<BulkFxPreview>;
+    },
+    onSuccess: (data) => { setBulkFxPreview(data); },
+    onError: (err: Error) => { toast({ title: "Preview failed", description: err.message, variant: "destructive" }); },
+  });
 
   const bulkFxMutation = useMutation({
     mutationFn: async () => {
@@ -283,7 +308,8 @@ export default function FactorySuppliers() {
       return res.json();
     },
     onSuccess: (data) => {
-      setBulkFxPreview(data);
+      setBulkFxOpen(false);
+      setBulkFxPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       if (statementSupplierId) {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
@@ -2462,40 +2488,60 @@ export default function FactorySuppliers() {
               Bulk FX Settlement — {bulkFxBrokerName}
             </DialogTitle>
             <DialogDescription>
-              Enter a total amount in a foreign currency. It will be split automatically across all linked suppliers, oldest containers first, capped at each supplier's outstanding balance.
+              {bulkFxPreview
+                ? "Review the breakdown below. Each supplier's account will be debited by the amount shown."
+                : "Enter a total amount in a foreign currency. It will be split across all linked suppliers, capped at each supplier's outstanding balance."}
             </DialogDescription>
           </DialogHeader>
+
           {bulkFxPreview ? (
+            /* ── Preview step (before committing) ── */
             <div className="space-y-4">
-              <div className="rounded-md border p-4 space-y-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span>Total settled</span>
-                  <span className="text-green-600 dark:text-green-400">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <div className="rounded-md border p-3 space-y-2 bg-muted/40">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total to settle</span>
+                  <span className="font-semibold tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">≈ USD equivalent</span>
+                  <span className="font-semibold tabular-nums text-green-600 dark:text-green-400">${parseFloat(bulkFxPreview.totalUsd || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 {parseFloat(bulkFxPreview.remaining) > 0.01 && (
                   <div className="flex justify-between text-sm text-amber-600 dark:text-amber-400">
-                    <span>Unallocated (exceeded all balances)</span>
-                    <span>{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>Unallocated (exceeds all balances)</span>
+                    <span className="tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Transfers created:</p>
-                <div className="rounded-md border divide-y text-sm">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
+                <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
                   {bulkFxPreview.transfers.map((t) => (
-                    <div key={t.supplierId} className="flex justify-between px-3 py-2">
+                    <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
                       <span className="font-medium">{t.supplierName}</span>
-                      <div className="text-right">
-                        <span className="tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        <span className="text-muted-foreground ml-2 text-xs">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="text-right space-y-0.5">
+                        <div className="tabular-nums font-medium">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs text-muted-foreground">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              <Button className="w-full" onClick={() => { setBulkFxOpen(false); setBulkFxPreview(null); }}>Done</Button>
+              <DialogFooter className="gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setBulkFxPreview(null)} disabled={bulkFxMutation.isPending}>
+                  Back to Edit
+                </Button>
+                <Button
+                  onClick={() => bulkFxMutation.mutate()}
+                  disabled={bulkFxMutation.isPending}
+                  data-testid="button-bulk-fx-confirm"
+                >
+                  {bulkFxMutation.isPending ? "Recording..." : "Confirm & Record Settlement"}
+                </Button>
+              </DialogFooter>
             </div>
           ) : (
+            /* ── Form step ── */
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -2522,17 +2568,19 @@ export default function FactorySuppliers() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>{bulkFxForm.fromCurrencyCode || "Currency"} per USD (rate)</Label>
+                  <Label>1 {bulkFxForm.fromCurrencyCode || "CCY"} = X USD (rate)</Label>
                   <Input
                     type="number"
                     step="0.0001"
                     value={bulkFxForm.fxRateToUsd}
-                    onChange={(e) => setBulkFxForm((f) => ({ ...f, fxRateToUsd: e.target.value }))}
-                    placeholder="e.g. 0.92"
+                    onChange={(e) => { setBulkFxForm((f) => ({ ...f, fxRateToUsd: e.target.value })); }}
+                    placeholder="e.g. 1.08"
                     data-testid="input-bulk-fx-rate"
                   />
-                  {bulkFxForm.totalAmount && bulkFxForm.fxRateToUsd && parseFloat(bulkFxForm.fxRateToUsd) > 0 && (
-                    <p className="text-xs text-muted-foreground">≈ ${(parseFloat(bulkFxForm.totalAmount) / parseFloat(bulkFxForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</p>
+                  {bulkFxForm.totalAmount && bulkFxForm.fxRateToUsd && parseFloat(bulkFxForm.fxRateToUsd) > 0 && parseFloat(bulkFxForm.totalAmount) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ ${(parseFloat(bulkFxForm.totalAmount) * parseFloat(bulkFxForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </p>
                   )}
                 </div>
                 <div className="space-y-1">
@@ -2569,18 +2617,18 @@ export default function FactorySuppliers() {
               <DialogFooter className="gap-2 flex-wrap">
                 <Button variant="outline" onClick={() => setBulkFxOpen(false)}>Cancel</Button>
                 <Button
-                  onClick={() => bulkFxMutation.mutate()}
+                  onClick={() => bulkFxPreviewMutation.mutate()}
                   disabled={
-                    bulkFxMutation.isPending ||
+                    bulkFxPreviewMutation.isPending ||
                     !bulkFxForm.fromCurrencyCode ||
                     !bulkFxForm.totalAmount ||
                     parseFloat(bulkFxForm.totalAmount) <= 0 ||
                     !bulkFxForm.fxRateToUsd ||
                     parseFloat(bulkFxForm.fxRateToUsd) <= 0
                   }
-                  data-testid="button-bulk-fx-submit"
+                  data-testid="button-bulk-fx-preview"
                 >
-                  {bulkFxMutation.isPending ? "Processing..." : "Record Settlement"}
+                  {bulkFxPreviewMutation.isPending ? "Loading preview..." : "Preview Settlement"}
                 </Button>
               </DialogFooter>
             </div>
