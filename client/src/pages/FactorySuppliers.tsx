@@ -1146,6 +1146,161 @@ export default function FactorySuppliers() {
               </Card>
             )}
 
+            {/* ── Broker Consolidated Statement ── */}
+            {isBrokerStatement && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
+                    <span className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Consolidated Broker Statement
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const url = `/api/factory/suppliers/${statementSupplierId}/broker-statement/export`;
+                        window.open(url, "_blank");
+                      }}
+                      data-testid="button-export-broker-statement"
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1.5" />
+                      Export Excel
+                    </Button>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    All containers from this broker and its linked suppliers, grouped by currency.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-0">
+                  {brokerStatementLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : brokerStatement?.currencyLedgers?.length > 0 ? (
+                    brokerStatement.currencyLedgers.map((section: any) => {
+                      const typeLabel: Record<string, string> = {
+                        container: "Container", payment: "Payment",
+                        fx_out: "FX Out", fx_in: "FX In", commission: "Commission",
+                      };
+                      const typeBadgeVariant = (t: string): "outline"|"secondary"|"default"|"destructive" => {
+                        if (t === "payment") return "secondary";
+                        if (t === "fx_out" || t === "fx_in") return "default";
+                        if (t === "commission") return "destructive";
+                        return "outline";
+                      };
+                      const typeColor = (t: string) => {
+                        if (t === "payment") return "text-green-600 dark:text-green-400";
+                        if (t === "fx_out") return "text-amber-600 dark:text-amber-400";
+                        if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
+                        if (t === "commission") return "text-destructive";
+                        return "";
+                      };
+                      return (
+                        <div key={section.currencyCode} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-sm px-3 py-1 font-bold">
+                              {section.currencyCode}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="overflow-x-auto rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="text-xs h-8">Date</TableHead>
+                                  <TableHead className="text-xs h-8">Type</TableHead>
+                                  <TableHead className="text-xs h-8">Description</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">Amount ({section.currencyCode})</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">Commission</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">Balance</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {section.rows.map((row: any, idx: number) => (
+                                  <TableRow key={`${row.ref}-${idx}`} className="text-xs">
+                                    <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
+                                      {row.date ? formatDate(row.date) : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-1.5">
+                                      <Badge variant={typeBadgeVariant(row.type)} className="text-xs py-0 font-normal">
+                                        {typeLabel[row.type] || row.type}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-1.5 max-w-[220px] truncate font-medium">
+                                      {row.description}
+                                    </TableCell>
+                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium ${typeColor(row.type)}`}>
+                                      {row.amount < 0 ? "−" : ""}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.amount).toFixed(2)))}
+                                    </TableCell>
+                                    <TableCell className="py-1.5 text-right tabular-nums text-xs text-muted-foreground">
+                                      {row.commissionAmount != null && row.commissionAmount > 0
+                                        ? `${row.commissionCurrency || section.currencyCode} ${formatNum(String(parseFloat(row.commissionAmount).toFixed(2)))}`
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium text-xs ${row.runningBalance > 0 ? "text-red-600 dark:text-red-400" : row.runningBalance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                      {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.runningBalance).toFixed(2)))}
+                                      <span className="ml-1 opacity-70">{row.runningBalance > 0 ? "CR" : row.runningBalance < 0 ? "DR" : ""}</span>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          {/* Section totals */}
+                          <div className="flex justify-end">
+                            <div className="text-xs space-y-0.5 text-right min-w-56 pr-1">
+                              <div className="flex justify-between gap-6 text-muted-foreground">
+                                <span>Gross Value</span>
+                                <span className="tabular-nums font-medium text-foreground">
+                                  {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalValue)}
+                                </span>
+                              </div>
+                              {parseFloat(section.totalCommission) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Commission</span>
+                                  <span className="tabular-nums text-destructive">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalCommission)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalPaid) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Paid</span>
+                                  <span className="tabular-nums text-green-600 dark:text-green-400">
+                                    − {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalPaid)}
+                                  </span>
+                                </div>
+                              )}
+                              {(parseFloat(section.totalFxOut) > 0 || parseFloat(section.totalFxIn) > 0) && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>FX {parseFloat(section.totalFxOut) > 0 ? "Out" : "In"}</span>
+                                  <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                                    {parseFloat(section.totalFxOut) > 0 ? "− " : "+ "}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(parseFloat(section.totalFxOut) > 0 ? section.totalFxOut : section.totalFxIn)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-6 border-t pt-1">
+                                <span className="font-semibold">Net Balance</span>
+                                <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-red-600 dark:text-red-400" : parseFloat(section.netBalance) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                  {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
+                                  <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "CR" : parseFloat(section.netBalance) < 0 ? "DR" : ""}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No data found for this broker.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
             <Card>
               <CardHeader className="pb-3">

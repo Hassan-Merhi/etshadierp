@@ -2803,12 +2803,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         currencyCode: cc,
         rows: rowsWithBal,
         totalContainers,
-        totalValue: fmtN(totalValue),
-        totalCommission: fmtN(totalCommission),
-        totalPaid: fmtN(totalPaid),
-        totalFxOut: fmtN(totalFxOut),
-        totalFxIn: fmtN(totalFxIn),
-        netBalance: fmtN(runBal),
+        totalValue: totalValue.toFixed(2),
+        totalCommission: totalCommission.toFixed(2),
+        totalPaid: totalPaid.toFixed(2),
+        totalFxOut: totalFxOut.toFixed(2),
+        totalFxIn: totalFxIn.toFixed(2),
+        netBalance: runBal.toFixed(2),
       };
     }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
 
