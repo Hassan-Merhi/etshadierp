@@ -932,7 +932,7 @@ export default function FactorySuppliers() {
                       <div className="text-xs text-muted-foreground">Net Balance</div>
                       <div className={`text-xl font-bold mt-1 ${netPayableAmt > 0 ? "text-red-600 dark:text-red-400" : netPayableAmt < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} data-testid="text-statement-total-owed">
                         {netPayableAmt < 0 ? "-" : ""}${formatNum(String(Math.abs(netPayableAmt)))}
-                        <span className="text-sm font-normal ml-1">{netPayableAmt > 0 ? "DR" : netPayableAmt < 0 ? "CR" : ""}</span>
+                        <span className="text-sm font-normal ml-1">{netPayableAmt > 0 ? "CR" : netPayableAmt < 0 ? "DR" : ""}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1281,7 +1281,7 @@ export default function FactorySuppliers() {
                                 {row.type === "payment" ? "−" : row.type === "purchase" ? "+" : row.amountIsNeg ? "−" : ""}{row.amount}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                ${formatNum(String(Math.abs(bal)))}{bal > 0 ? " DR" : bal < 0 ? " CR" : ""}
+                                ${formatNum(String(Math.abs(bal)))}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>

@@ -1837,7 +1837,7 @@ export default function Accounts() {
                                           {e.type === "payment" ? cleanAmt : ""}
                                         </TableCell>
                                         <TableCell className={`text-right text-sm tabular-nums font-medium ${e.runBal > 0 ? "text-red-600 dark:text-red-400" : e.runBal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                          ${Math.abs(e.runBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{e.runBal > 0 ? " Dr" : e.runBal < 0 ? " Cr" : ""}
+                                          ${Math.abs(e.runBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{e.runBal > 0 ? " Cr" : e.runBal < 0 ? " Dr" : ""}
                                         </TableCell>
                                       </TableRow>
                                     );
