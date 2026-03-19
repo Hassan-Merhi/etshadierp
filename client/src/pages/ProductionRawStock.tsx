@@ -403,18 +403,38 @@ export default function ProductionRawStock() {
     ? commRateNum * actualKg
     : commRateNum;
 
+  const fxRate = parseFloat(fxRateToUsd || "1");
+
   const freightVal = parseFloat(freight || "0");
   const otherChargesVal = parseFloat(otherCharges || "0");
   const additionalChargesTotal = additionalCharges.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
   const dutyVal = dutyPending ? 0 : parseFloat(dutyAmount || "0");
-  const totalCharges = freightVal + otherChargesVal + additionalChargesTotal + commissionTotal + dutyVal;
+
+  // Convert freight to container currency when it uses its own currency via a supplier
+  const isFreightSupplier = parseAccountValue(freightAccountId)?.type === "supplier";
+  const freightFxRateNum = parseFloat(freightFxRate || "1");
+  const freightInContainerCcy = (isFreightSupplier && freightCurrencyCode !== currencyCode && fxRate > 0)
+    ? (freightVal * freightFxRateNum) / fxRate
+    : freightVal;
+
+  // Convert other charges to container currency when it uses its own currency via a supplier
+  const isOcSupplier = parseAccountValue(otherChargesAccountId)?.type === "supplier";
+  const ocFxRateNum = parseFloat(otherChargesFxRate || "1");
+  const otherChargesInContainerCcy = (isOcSupplier && otherChargesCurrencyCode !== currencyCode && fxRate > 0)
+    ? (otherChargesVal * ocFxRateNum) / fxRate
+    : otherChargesVal;
+
+  const totalCharges = freightInContainerCcy + otherChargesInContainerCcy + additionalChargesTotal + commissionTotal + dutyVal;
   const grandTotal = totalPayable + totalCharges;
   const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
 
-  const fxRate = parseFloat(fxRateToUsd || "1");
   const rateUsd = currencyCode === "USD" ? rate : rate * fxRate;
   const totalPayableUsd = actualKg * rateUsd;
-  const grandTotalUsd = currencyCode === "USD" ? grandTotal : grandTotal * fxRate;
+  // Each component converted to USD individually (handles cross-currency)
+  const freightUsdFe = isFreightSupplier ? freightVal * freightFxRateNum : freightVal * (currencyCode === "USD" ? 1 : fxRate);
+  const ocUsdFe = isOcSupplier ? otherChargesVal * ocFxRateNum : otherChargesVal * (currencyCode === "USD" ? 1 : fxRate);
+  const restUsdFe = (additionalChargesTotal + commissionTotal + dutyVal) * (currencyCode === "USD" ? 1 : fxRate);
+  const grandTotalUsd = totalPayableUsd + freightUsdFe + ocUsdFe + restUsdFe;
 
   const offloadMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1601,14 +1621,22 @@ export default function ProductionRawStock() {
                   </div>
                   {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight</span>
-                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(freightVal)}</span>
+                      <span>Freight{isFreightSupplier && freightCurrencyCode !== currencyCode ? ` (${freightCurrencyCode})` : ""}</span>
+                      <span className="font-mono">
+                        {isFreightSupplier && freightCurrencyCode !== currencyCode
+                          ? `${freightCurrencyCode === "USD" ? "$" : freightCurrencyCode + " "}${formatNumber(freightVal)}`
+                          : `${currencyCode === "USD" ? "$" : currencyCode + " "}${formatNumber(freightVal)}`}
+                      </span>
                     </div>
                   )}
                   {otherChargesVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Other Charges</span>
-                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(otherChargesVal)}</span>
+                      <span>Other Charges{isOcSupplier && otherChargesCurrencyCode !== currencyCode ? ` (${otherChargesCurrencyCode})` : ""}</span>
+                      <span className="font-mono">
+                        {isOcSupplier && otherChargesCurrencyCode !== currencyCode
+                          ? `${otherChargesCurrencyCode === "USD" ? "$" : otherChargesCurrencyCode + " "}${formatNumber(otherChargesVal)}`
+                          : `${currencyCode === "USD" ? "$" : currencyCode + " "}${formatNumber(otherChargesVal)}`}
+                      </span>
                     </div>
                   )}
                   {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (

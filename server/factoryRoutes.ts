@@ -5506,18 +5506,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .returning();
       }
 
-      const totalCost = basePayable + freightVal + otherChargesVal + additionalChargesTotal + commTotalVal + dutyVal;
-      const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
-      const finalPayableAmount = String(totalCost);
-
-      // Compute USD landed cost by converting each component from its own currency
+      // Compute per-component USD values (each charge may be in its own currency)
       const freightCcy = reqFreightCurrencyCode || currencyCode;
       const freightFxRateVal = parseFloat(reqFreightFxRate || String(fxRate));
       const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxRateVal;
+      // Convert freight to container currency for totalCost
+      const freightInContainerCcy = (freightCcy === currencyCode) ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
 
       const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
       const ocFxRateVal = parseFloat(reqOtherChargesFxRate || String(fxRate));
       const ocUsd = ocCcy === "USD" ? otherChargesVal : otherChargesVal * ocFxRateVal;
+      // Convert OC to container currency for totalCost
+      const ocInContainerCcy = (ocCcy === currencyCode) ? otherChargesVal : (fxRate > 0 ? ocUsd / fxRate : otherChargesVal);
+
+      const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commTotalVal + dutyVal;
+      const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
+      const finalPayableAmount = String(totalCost);
 
       const commUsd = commCurrencyForUsd === "USD" ? commTotalVal : commTotalVal * commFxRateForUsd;
 
@@ -5682,9 +5686,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry accounting vouchers for Freight
-      if (freightVal > 0 && reqFreightAccountId) {
+      if (freightVal > 0 && (reqFreightAccountId || reqFreightSupplierId)) {
         const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
-        const freightCcy = reqFreightCurrencyCode || currencyCode;
+        const freightVoucherCcy = reqFreightCurrencyCode || currencyCode;
         const freightFx = parseFloat(reqFreightFxRate || String(fxRate));
         const [freightVoucher] = await db.insert(vouchers).values({
           companyId,
@@ -5693,15 +5697,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: offloadDate,
           description: `Freight on container ${container.containerNumber}`,
           totalAmount: String(freightVal),
-          currency: freightCcy,
+          currency: freightVoucherCcy,
           exchangeRate: String(freightFx),
           sourceModule: "FACTORY",
         }).returning();
         if (reqFreightSupplierId) {
           // Supplier selected: Dr Freight Expense / Cr Supplier Balance
+          const freightExpenseAccountId = reqFreightAccountId
+            ? parseInt(reqFreightAccountId)
+            : await getOrCreateLedgerAccount(companyId, "FACTORY_FREIGHT_EXPENSE", "Freight Expense");
           await db.insert(voucherEntries).values({
             voucherId: freightVoucher.id,
-            ledgerAccountId: parseInt(reqFreightAccountId),
+            ledgerAccountId: freightExpenseAccountId,
             debitAmount: String(freightVal),
             creditAmount: "0",
             narration: `Freight expense - container ${container.containerNumber}`,
@@ -5734,9 +5741,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry accounting vouchers for Other Charges
-      if (otherChargesVal > 0 && reqOtherChargesAccountId) {
+      if (otherChargesVal > 0 && (reqOtherChargesAccountId || reqOtherChargesSupplierId)) {
         const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
-        const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
+        const ocVoucherCcy = reqOtherChargesCurrencyCode || currencyCode;
         const ocFx = parseFloat(reqOtherChargesFxRate || String(fxRate));
         const [ocMainVoucher] = await db.insert(vouchers).values({
           companyId,
@@ -5745,15 +5752,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: offloadDate,
           description: `Other charges on container ${container.containerNumber}`,
           totalAmount: String(otherChargesVal),
-          currency: ocCcy,
+          currency: ocVoucherCcy,
           exchangeRate: String(ocFx),
           sourceModule: "FACTORY",
         }).returning();
         if (reqOtherChargesSupplierId) {
           // Supplier selected: Dr OC Expense / Cr Supplier Balance
+          const ocExpenseAccountId = reqOtherChargesAccountId
+            ? parseInt(reqOtherChargesAccountId)
+            : await getOrCreateLedgerAccount(companyId, "FACTORY_OC_EXPENSE", "Other Charges Expense");
           await db.insert(voucherEntries).values({
             voucherId: ocMainVoucher.id,
-            ledgerAccountId: parseInt(reqOtherChargesAccountId),
+            ledgerAccountId: ocExpenseAccountId,
             debitAmount: String(otherChargesVal),
             creditAmount: "0",
             narration: `Other charges expense - container ${container.containerNumber}`,
