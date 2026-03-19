@@ -192,6 +192,18 @@ export default function FactorySuppliers() {
     retry: 1,
   });
 
+  // Broker consolidated statement query (fires when viewing a broker's own statement)
+  const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
+  const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
+    queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement"],
+    queryFn: async () => {
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/broker-statement`);
+      if (!res.ok) throw new Error("Failed to load broker statement");
+      return res.json();
+    },
+    enabled: !!statementSupplierId && isBrokerStatement,
+  });
+
   // Payment state
   const today = new Date().toISOString().slice(0, 10);
   const [paymentDialogSupplier, setPaymentDialogSupplier] = useState<SupplierWithBalance | null>(null);

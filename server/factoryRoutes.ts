@@ -2629,6 +2629,335 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Broker Consolidated Statement  (aggregates broker + all linked suppliers)
+  // GET /api/factory/suppliers/:id/broker-statement[/export?format=excel]
+  // ─────────────────────────────────────────────────────────────────────────
+  async function buildBrokerStatement(brokerId: number, companyId: number) {
+    // Fetch broker
+    const [broker] = await db.select().from(factorySuppliers)
+      .where(and(eq(factorySuppliers.id, brokerId), eq(factorySuppliers.companyId, companyId)));
+    if (!broker) return null;
+
+    // Linked suppliers
+    const linkedRaw = await db.select().from(factorySuppliers)
+      .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId)));
+
+    const allSuppliers = [broker, ...linkedRaw];
+    const allSupplierIds = allSuppliers.map((s: any) => s.id);
+    const supplierNameMap: Record<number, string> = {};
+    for (const s of allSuppliers) supplierNameMap[(s as any).id] = (s as any).name;
+
+    // Containers
+    const allContainers = allSupplierIds.length > 0
+      ? await db.select().from(factoryContainers)
+          .where(and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds)))
+          .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
+      : [];
+
+    // Payments (direct)
+    const allPayments = allSupplierIds.length > 0
+      ? await db.select().from(factorySupplierPayments)
+          .where(and(eq(factorySupplierPayments.companyId, companyId), inArray(factorySupplierPayments.supplierId, allSupplierIds)))
+          .orderBy(factorySupplierPayments.date)
+      : [];
+
+    // FX transfers (involving any of the suppliers)
+    const allFx = allSupplierIds.length > 0
+      ? await db.select().from(factorySupplierFxTransfers)
+          .where(and(
+            eq(factorySupplierFxTransfers.companyId, companyId),
+            sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)}))`
+          ))
+          .orderBy(factorySupplierFxTransfers.date)
+      : [];
+
+    type LedgerRow = {
+      date: string | null;
+      type: "container" | "payment" | "fx_out" | "fx_in" | "commission";
+      description: string;
+      ref: string;
+      amount: number;
+      commissionAmount: number | null;
+      commissionCurrency: string | null;
+    };
+
+    const ledgerByCurrency: Record<string, LedgerRow[]> = {};
+    const addRow = (cc: string, row: LedgerRow) => {
+      if (!ledgerByCurrency[cc]) ledgerByCurrency[cc] = [];
+      ledgerByCurrency[cc].push(row);
+    };
+
+    // Container rows
+    for (const c of allContainers as any[]) {
+      const supplierName = supplierNameMap[c.supplierId] || "Unknown";
+      const cc = c.currencyCode || "USD";
+      const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+      const rate = parseFloat(c.ratePerKg || "0");
+      const freight = parseFloat(c.freight || "0");
+      const mainAmt = kg * rate + freight;
+      const commAmt = parseFloat(c.commissionAmount || "0");
+      const commCc = c.commissionCurrencyCode || "USD";
+      const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
+
+      addRow(cc, {
+        date: dateVal,
+        type: "container",
+        description: `${c.containerNumber} - ${supplierName}`,
+        ref: c.containerNumber,
+        amount: mainAmt,
+        commissionAmount: commAmt > 0 && commCc === cc ? commAmt : null,
+        commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
+      });
+
+      // Commission row in different currency section
+      if (commAmt > 0 && commCc !== cc) {
+        addRow(commCc, {
+          date: dateVal,
+          type: "commission",
+          description: `Commission — ${c.containerNumber} - ${supplierName}`,
+          ref: c.containerNumber,
+          amount: commAmt,
+          commissionAmount: null,
+          commissionCurrency: commCc,
+        });
+      }
+    }
+
+    // Payment rows
+    for (const p of allPayments as any[]) {
+      const supplierName = supplierNameMap[p.supplierId] || "Unknown";
+      const cc = p.currencyCode || "USD";
+      addRow(cc, {
+        date: p.date ? String(p.date) : null,
+        type: "payment",
+        description: `Payment — ${supplierName}`,
+        ref: p.notes || "Payment",
+        amount: -parseFloat(p.amount || "0"),
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
+    // FX transfer rows — deduplicate by id to avoid counting same transfer twice
+    const seenFxIds = new Set<number>();
+    for (const t of allFx as any[]) {
+      if (seenFxIds.has(t.id)) continue;
+      seenFxIds.add(t.id);
+      const fromCc = t.fromCurrencyCode || "USD";
+      const fromAmt = parseFloat(t.fromAmount || "0");
+      const toUsd = parseFloat(t.toAmountUsd || "0");
+      const rate = fromAmt > 0 ? (toUsd / fromAmt).toFixed(4) : "1";
+      const dateVal = t.date ? String(t.date) : null;
+
+      // Source currency: FX Out (negative — reduces balance in that currency)
+      addRow(fromCc, {
+        date: dateVal,
+        type: "fx_out",
+        description: `FX ${fromCc}→USD @ ${rate}`,
+        ref: `FX-${t.id}`,
+        amount: -fromAmt,
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+
+      // USD: FX In (positive — adds to USD balance)
+      addRow("USD", {
+        date: dateVal,
+        type: "fx_in",
+        description: `FX In from ${fromCc} @ ${rate}`,
+        ref: `FX-${t.id}`,
+        amount: toUsd,
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
+    // Sort rows by date within each section
+    for (const cc of Object.keys(ledgerByCurrency)) {
+      ledgerByCurrency[cc].sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db2 = b.date ? new Date(b.date).getTime() : 0;
+        return da - db2;
+      });
+    }
+
+    // Build ledgers with running balance
+    const fmtN = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const currencyLedgers = Object.entries(ledgerByCurrency).map(([cc, rows]) => {
+      let runBal = 0;
+      const rowsWithBal = rows.map((row) => {
+        runBal += row.amount;
+        if (row.commissionAmount) runBal += row.commissionAmount;
+        return { ...row, runningBalance: runBal };
+      });
+      const containerRows = rows.filter(r => r.type === "container");
+      const totalContainers = containerRows.length;
+      const totalValue = containerRows.reduce((s, r) => s + r.amount, 0);
+      const totalCommission = containerRows.reduce((s, r) => s + (r.commissionAmount || 0), 0)
+        + rows.filter(r => r.type === "commission").reduce((s, r) => s + r.amount, 0);
+      const totalPaid = Math.abs(rows.filter(r => r.type === "payment").reduce((s, r) => s + r.amount, 0));
+      const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
+      const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
+      return {
+        currencyCode: cc,
+        rows: rowsWithBal,
+        totalContainers,
+        totalValue: fmtN(totalValue),
+        totalCommission: fmtN(totalCommission),
+        totalPaid: fmtN(totalPaid),
+        totalFxOut: fmtN(totalFxOut),
+        totalFxIn: fmtN(totalFxIn),
+        netBalance: fmtN(runBal),
+      };
+    }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
+
+    return { supplier: broker, linkedSuppliers: linkedRaw, currencyLedgers };
+  }
+
+  app.get("/api/factory/suppliers/:id/broker-statement", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const brokerId = parseInt(req.params.id);
+      const data = await buildBrokerStatement(brokerId, companyId);
+      if (!data) return res.status(404).json({ message: "Supplier not found" });
+      return res.json(data);
+    } catch (err: any) {
+      console.error("Broker statement error:", err);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/factory/suppliers/:id/broker-statement/export", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const brokerId = parseInt(req.params.id);
+      const data = await buildBrokerStatement(brokerId, companyId);
+      if (!data) return res.status(404).json({ message: "Supplier not found" });
+
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "ERP System";
+      wb.created = new Date();
+
+      const typeLabel: Record<string, string> = {
+        container: "Container", payment: "Payment",
+        fx_out: "FX Out", fx_in: "FX In", commission: "Commission",
+      };
+      const rowTypeFill: Record<string, string> = {
+        container: "FFFAFAFA", payment: "FFE8F5E9", fx_out: "FFFFF8E1", fx_in: "FFE3F2FD", commission: "FFFFF3E0",
+      };
+
+      for (const section of data.currencyLedgers) {
+        const ws = wb.addWorksheet(section.currencyCode);
+        ws.properties.defaultRowHeight = 15;
+
+        // Title row
+        const titleRow = ws.addRow([`Broker Statement — ${(data.supplier as any).name} — ${section.currencyCode}`]);
+        titleRow.font = { bold: true, size: 13 };
+        ws.mergeCells(`A${titleRow.number}:G${titleRow.number}`);
+        ws.addRow([]);
+
+        // Column headers
+        const hdrRow = ws.addRow(["Date", "Type", "Description", "Amount", "Commission", "Comm. Currency", "Running Balance"]);
+        hdrRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        hdrRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+        hdrRow.alignment = { horizontal: "left" };
+        ["D", "E", "G"].forEach(col => {
+          const cell = hdrRow.getCell(col);
+          cell.alignment = { horizontal: "right" };
+        });
+
+        ws.columns = [
+          { key: "date", width: 14 },
+          { key: "type", width: 14 },
+          { key: "description", width: 40 },
+          { key: "amount", width: 18 },
+          { key: "commission", width: 16 },
+          { key: "commCcy", width: 14 },
+          { key: "runBal", width: 18 },
+        ];
+
+        for (const row of section.rows) {
+          const dr = ws.addRow([
+            row.date || "",
+            typeLabel[row.type] || row.type,
+            row.description,
+            parseFloat((row.amount as any).toFixed(2)),
+            row.commissionAmount != null ? parseFloat((row.commissionAmount as any).toFixed(2)) : "",
+            row.commissionCurrency || "",
+            parseFloat((row.runningBalance as any).toFixed(2)),
+          ]);
+          dr.getCell("D").numFmt = "#,##0.00";
+          dr.getCell("E").numFmt = "#,##0.00";
+          dr.getCell("G").numFmt = "#,##0.00";
+          dr.getCell("D").alignment = { horizontal: "right" };
+          dr.getCell("E").alignment = { horizontal: "right" };
+          dr.getCell("G").alignment = { horizontal: "right" };
+          const fillArgb = rowTypeFill[row.type] || "FFFFFFFF";
+          dr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
+        }
+
+        // Spacer
+        ws.addRow([]);
+
+        // Totals
+        const totalsLabel = ws.addRow(["SECTION TOTALS"]);
+        totalsLabel.font = { bold: true };
+        const totalsData = ws.addRow([
+          "", "",
+          `Containers: ${section.totalContainers}  |  Paid: ${section.totalPaid}  |  FX Out: ${section.totalFxOut}`,
+          parseFloat(section.totalValue),
+          parseFloat(section.totalCommission),
+          "",
+          parseFloat(section.netBalance),
+        ]);
+        totalsData.font = { bold: true };
+        totalsData.getCell("D").numFmt = "#,##0.00";
+        totalsData.getCell("E").numFmt = "#,##0.00";
+        totalsData.getCell("G").numFmt = "#,##0.00";
+        ["D", "E", "G"].forEach(col => { totalsData.getCell(col).alignment = { horizontal: "right" }; });
+        totalsData.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCFD8DC" } };
+      }
+
+      // Summary sheet
+      const sumWs = wb.addWorksheet("Summary");
+      sumWs.addRow([`Broker Consolidated Statement — ${(data.supplier as any).name}`]).font = { bold: true, size: 13 };
+      sumWs.addRow([`Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]).font = { italic: true };
+      sumWs.addRow([]);
+      const sumHdr = sumWs.addRow(["Currency", "Containers", "Gross Value", "Commission", "Paid", "Net Balance"]);
+      sumHdr.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      sumHdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+      for (const section of data.currencyLedgers) {
+        const dr = sumWs.addRow([
+          section.currencyCode,
+          section.totalContainers,
+          parseFloat(section.totalValue),
+          parseFloat(section.totalCommission),
+          parseFloat(section.totalPaid),
+          parseFloat(section.netBalance),
+        ]);
+        ["C", "D", "E", "F"].forEach(col => {
+          dr.getCell(col).numFmt = "#,##0.00";
+          dr.getCell(col).alignment = { horizontal: "right" };
+        });
+      }
+      sumWs.columns = [
+        { width: 12 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 18 }
+      ];
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="broker-statement-${(data.supplier as any).name?.replace(/\s+/g, "-") || brokerId}-${new Date().toISOString().split("T")[0]}.xlsx"`);
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (err: any) {
+      console.error("Broker statement export error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 2. Factory Categories CRUD
   // ───────────────────────────────────────────────
