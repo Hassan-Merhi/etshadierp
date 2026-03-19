@@ -2591,10 +2591,48 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const generatedStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
       const PDFDocument = (await import("pdfkit")).default;
+      const pathMod = await import("path");
+
+      // Arabic font setup — always register so Arabic names render correctly
+      const fontDir = pathMod.join(process.cwd(), "server", "fonts");
+      const arabicFontPath = pathMod.join(fontDir, "Amiri-Regular.ttf");
+      const hasArabicFont = fs.existsSync(arabicFontPath);
+
       const doc = new PDFDocument({ margin: 40, size: "A4" });
+      if (hasArabicFont) doc.registerFont("Arabic", arabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${workerName.replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
+
+      // Arabic reshaping helpers — always loaded
+      let wConvertArabic: ((t: string) => string) | null = null;
+      let wBidiInst: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      try {
+        const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
+        wConvertArabic = reshaperMod.convertArabic;
+        const bidiFactory = require("bidi-js") as () => typeof wBidiInst;
+        wBidiInst = (bidiFactory as any)();
+      } catch {}
+
+      const wContainsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+      const wShapeText = (text: string): string => {
+        if (!text || !wConvertArabic) return text;
+        try {
+          const reshaped = wConvertArabic(text);
+          if (wBidiInst) {
+            const levels = wBidiInst.getEmbeddingLevels(reshaped, "rtl");
+            return wBidiInst.getReorderedString(reshaped, levels);
+          }
+          return reshaped;
+        } catch { return text; }
+      };
+
+      // Render text with automatic Arabic font switching per cell
+      const wRenderText = (text: string, x: number, yPos: number, w: number, align: "left"|"right") => {
+        const hasAr = hasArabicFont && wContainsArabic(text);
+        doc.font(hasAr ? "Arabic" : "Helvetica").fontSize(7.5)
+          .text(hasAr ? wShapeText(text) : text, x, yPos, { width: w, align: hasAr ? "right" : align });
+      };
 
       // Header
       let headerY = 40;
@@ -2602,10 +2640,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
         try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
       }
-      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
-        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
-      doc.fontSize(10).font("Helvetica").fillColor("#555555")
-        .text(`Account Statement: ${workerName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth });
+      // Company name — may contain Arabic
+      const cNameHasAr = hasArabicFont && wContainsArabic(companyName);
+      doc.fontSize(18).font(cNameHasAr ? "Arabic" : "Helvetica-Bold").fillColor("#000000")
+        .text(cNameHasAr ? wShapeText(companyName) : companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth, align: cNameHasAr ? "right" : "left" });
+      const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
+      doc.fontSize(10).font(wNameHasAr ? "Arabic" : "Helvetica").fillColor("#555555")
+        .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth, align: wNameHasAr ? "right" : "left" });
 
       const headerBottom = Math.max(doc.y, headerY + 52);
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
@@ -2626,10 +2667,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const ROW_H = 14;
       const HDR_H = 15;
 
-      const drawHdr = (y: number) => {
-        doc.rect(40, y, 515, HDR_H).fill("#1F3864");
+      const drawHdr = (yh: number) => {
+        doc.rect(40, yh, 515, HDR_H).fill("#1F3864");
         doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
-        colHdr.forEach((h, i) => doc.text(h, colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] }));
+        colHdr.forEach((h, i) => doc.text(h, colX[i] + 2, yh + 3.5, { width: colW[i] - 4, align: colAln[i] }));
         doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
       };
 
@@ -2652,10 +2693,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (idx % 2 === 1) { doc.rect(40, y, 515, ROW_H).fill("#F8F8F8"); doc.fillColor("#000000"); }
         const bal = row.runningBalance;
         const balSide = bal >= 0 ? "Dr" : "Cr";
+        wRenderText(fmtDate(row.date), colX[0] + 2, y + 3, colW[0] - 4, "left");
+        wRenderText(row.type, colX[1] + 2, y + 3, colW[1] - 4, "left");
+        wRenderText(row.description, colX[2] + 2, y + 3, colW[2] - 4, "left");
         doc.font("Helvetica").fontSize(7.5);
-        doc.text(fmtDate(row.date), colX[0] + 2, y + 3, { width: colW[0] - 4, align: "left" });
-        doc.text(row.type, colX[1] + 2, y + 3, { width: colW[1] - 4, align: "left" });
-        doc.text(row.description, colX[2] + 2, y + 3, { width: colW[2] - 4, align: "left" });
         doc.text(row.debit > 0 ? fmtAmt(row.debit) : "-", colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
         doc.text(row.credit > 0 ? fmtAmt(row.credit) : "-", colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
         doc.text(`${fmtAmt(bal)} ${balSide}`, colX[5] + 2, y + 3, { width: colW[5] - 4, align: "right" });

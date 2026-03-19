@@ -9548,16 +9548,46 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       };
 
       const PDFDocument = (await import("pdfkit")).default;
+      const pathModCust = await import("path");
       const companyName = (company as any)?.legalName || "Company";
+
+      // Arabic font + reshaper — always load
+      const custFontDir = pathModCust.join(process.cwd(), "server", "fonts");
+      const custArabicFontPath = pathModCust.join(custFontDir, "Amiri-Regular.ttf");
+      const custHasArabicFont = fs.existsSync(custArabicFontPath);
+
       const doc = new PDFDocument({ margin: 40, size: "A4" });
+      if (custHasArabicFont) doc.registerFont("Arabic", custArabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.code || customerId).toString().replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
 
+      let custConvAr: ((t: string) => string) | null = null;
+      let custBidi: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      try {
+        custConvAr = (require("arabic-reshaper") as any).convertArabic;
+        custBidi = (require("bidi-js") as any)();
+      } catch {}
+      const custHasAr = (t: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t);
+      const custShape = (t: string): string => {
+        if (!t || !custConvAr) return t;
+        try {
+          const r = custConvAr(t);
+          if (custBidi) { const lv = custBidi.getEmbeddingLevels(r, "rtl"); return custBidi.getReorderedString(r, lv); }
+          return r;
+        } catch { return t; }
+      };
+      const custRender = (text: string, x: number, yPos: number, w: number, align: "left"|"right" = "left") => {
+        const ar = custHasArabicFont && custHasAr(text);
+        doc.font(ar ? "Arabic" : "Helvetica").fontSize(8)
+          .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align });
+      };
+
       // ── Dark header bar ──
       doc.rect(40, 40, 515, 44).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(15)
-        .text(companyName, 52, 47, { width: 400 });
+      const cnHasAr = custHasArabicFont && custHasAr(companyName);
+      doc.fillColor("#FFFFFF").font(cnHasAr ? "Arabic" : "Helvetica-Bold").fontSize(15)
+        .text(cnHasAr ? custShape(companyName) : companyName, 52, 47, { width: 400, align: cnHasAr ? "right" : "left" });
       doc.font("Helvetica").fontSize(9)
         .text("Account Statement", 52, 65, { width: 300 });
       const printDate = fmtDate(new Date().toISOString().split("T")[0]);
@@ -9566,7 +9596,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // ── Customer info block ──
       const infoY = 96;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
-      doc.text("Customer:", 40, infoY).font("Helvetica-Bold").text(customer.legalName, 40, infoY + 12);
+      doc.text("Customer:", 40, infoY);
+      custRender(customer.legalName, 40, infoY + 12, 250);
       doc.font("Helvetica").text(`Code: ${customer.code || "—"}`, 40, infoY + 24);
       doc.text(`Phone: ${customer.phone || "—"}`, 40, infoY + 36);
       const obLabel = `${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`;
@@ -9607,9 +9638,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       rows.forEach((row: any, idx: number) => {
         if (y > 760) { doc.addPage(); y = 40; }
         if (idx % 2 === 1) { doc.rect(40, y, 515, 13).fill("#F8F8F8"); doc.fillColor("#000000"); }
+        doc.font("Helvetica").fontSize(8);
         doc.text(fmtDate(row.transactionDate), colX[0] + 2, y + 3, { width: colW[0] - 4 });
         doc.text(txLabel(row.transactionType), colX[1] + 2, y + 3, { width: colW[1] - 4 });
-        doc.text(row.description || "—", colX[2] + 2, y + 3, { width: colW[2] - 4, lineBreak: false });
+        custRender(row.description || "—", colX[2] + 2, y + 3, colW[2] - 4, "left");
+        doc.font("Helvetica").fontSize(8);
         if (row.debit > 0) doc.text(fmtAmt(row.debit), colX[3] + 2, y + 3, { width: colW[3] - 4, align: "right" });
         if (row.credit > 0) doc.text(fmtAmt(row.credit), colX[4] + 2, y + 3, { width: colW[4] - 4, align: "right" });
         y += 13;

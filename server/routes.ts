@@ -13758,10 +13758,10 @@ if (asOfDate) {
       const fs = await import("fs");
       const pathMod = await import("path");
 
-      // Font setup: use Amiri for Arabic (RTL), Helvetica for others
+      // Font setup: always register Amiri if available; use it for RTL mode or Arabic-containing cells
       const fontDir = pathMod.join(process.cwd(), "server", "fonts");
       const arabicFontPath = pathMod.join(fontDir, "Amiri-Regular.ttf");
-      const hasArabicFont = isRTL && fs.existsSync(arabicFontPath);
+      const hasArabicFont = fs.existsSync(arabicFontPath);
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       if (hasArabicFont) doc.registerFont("Arabic", arabicFontPath);
@@ -13769,35 +13769,43 @@ if (asOfDate) {
       const boldFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica-Bold";
       const normalFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica";
 
-      // Arabic text processing helpers
-      // bidi-js is a factory function; arabic-reshaper provides convertArabic()
+      // Arabic text processing helpers — always load so Arabic names render correctly even in EN/FR exports
       let convertArabic: ((t: string) => string) | null = null;
       let bidiInst: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
-      if (isRTL) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
+        convertArabic = reshaperMod.convertArabic;
+        // bidi-js exports a factory function — call it to get the instance
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const bidiFactory = require("bidi-js") as () => typeof bidiInst;
+        bidiInst = (bidiFactory as any)();
+      } catch { /* if packages fail, text renders as-is */ }
+
+      // Detect Arabic characters (Unicode ranges covering Arabic script)
+      const containsArabic = (text: string): boolean =>
+        /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+
+      // Reshape+reorder Arabic text for correct visual rendering in LTR PDF canvas
+      const shapeArabic = (text: string): string => {
+        if (!text || !convertArabic) return text;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
-          convertArabic = reshaperMod.convertArabic;
-          // bidi-js exports a factory function — call it to get the instance
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const bidiFactory = require("bidi-js") as () => typeof bidiInst;
-          bidiInst = (bidiFactory as any)();
-        } catch { /* if packages fail, text renders as-is */ }
-      }
-      const shapeText = (text: string): string => {
-        if (!isRTL || !text || !convertArabic) return text;
-        try {
-          // 1. Reshape Arabic characters into their proper contextual (connected) forms
           const reshaped = convertArabic(text);
-          // 2. Apply Unicode Bidi Algorithm to get the correct visual (LTR canvas) order
           if (bidiInst) {
             const levels = bidiInst.getEmbeddingLevels(reshaped, "rtl");
             return bidiInst.getReorderedString(reshaped, levels);
           }
           return reshaped;
-        } catch {
-          return text;
-        }
+        } catch { return text; }
+      };
+
+      const shapeText = (text: string): string => {
+        if (!text) return text;
+        // Full RTL mode: shape everything
+        if (isRTL) return shapeArabic(text);
+        // LTR mode: only shape cells that actually contain Arabic characters
+        if (containsArabic(text)) return shapeArabic(text);
+        return text;
       };
 
       res.setHeader("Content-Type", "application/pdf");
@@ -13880,8 +13888,12 @@ if (asOfDate) {
         }
         vals.forEach((v, i) => {
           if (v) {
-            doc.font(normalFont).fontSize(FONT_SIZE)
-              .text(shapeText(v), colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
+            // Per-cell Arabic detection: use Amiri + right-align if this cell has Arabic chars (in LTR mode)
+            const cellHasAr = !isRTL && hasArabicFont && containsArabic(v);
+            const cellFont = cellHasAr ? "Arabic" : normalFont;
+            const cellAlign = cellHasAr ? "right" : colAln[i];
+            doc.font(cellFont).fontSize(FONT_SIZE)
+              .text(shapeText(v), colX[i] + 2, y + 3, { width: colW[i] - 4, align: cellAlign });
           }
         });
       };
