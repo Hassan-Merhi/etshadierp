@@ -1762,45 +1762,55 @@
   }
 
   function DailyStockSummary() {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
     const { data: balesData } = useQuery<any[]>({
       queryKey: ["/api/factory/bales"],
     });
 
-    const todayStr = new Date().toISOString().split("T")[0];
-    const todayInStock = (balesData || []).filter((row: any) => {
+    const dayInStock = (balesData || []).filter((row: any) => {
       const bale = row.bale;
       if (bale.status !== "IN_STOCK") return false;
       const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
-      return baleDate === todayStr;
+      return baleDate === selectedDate;
     });
+
     const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
-    const todayGarbage = todayInStock.filter((row: any) => getCategory(row) === "garbage");
-    const todayWipers = todayInStock.filter((row: any) => getCategory(row) === "wipers");
-    const todayRegular = todayInStock.filter((row: any) => !["garbage", "wipers"].includes(getCategory(row)));
-    const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const garbageKg = todayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const wipersQty = todayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const wipersKg = todayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const dayGarbage = dayInStock.filter((row: any) => getCategory(row) === "garbage");
+    const dayWipers = dayInStock.filter((row: any) => getCategory(row) === "wipers");
+
+    const totalQty = dayInStock.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+    const totalKg = dayInStock.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const garbageQty = dayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+    const garbageKg = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const wipersQty = dayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+    const wipersKg = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+
+    const isToday = selectedDate === todayStr;
+    const dateLabel = isToday ? "Today's In Stock" : `${selectedDate} In Stock`;
 
     return (
       <Card className="border-dashed">
         <CardContent className="py-2 px-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">Today&apos;s In Stock</span>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value || todayStr)}
+                className="h-7 w-36 text-xs px-2 py-1 border-muted-foreground/30"
+                data-testid="input-summary-date"
+              />
+              <span className="text-xs text-muted-foreground font-medium">{dateLabel}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold" data-testid="text-entry-today-qty">{regularQty} qty</span>
-              <span className="text-sm font-semibold" data-testid="text-entry-today-kg">{formatDailyNum(regularKg)} kg</span>
+              <span className="text-sm font-semibold" data-testid="text-entry-today-qty">{totalQty} qty</span>
+              <span className="text-sm font-semibold" data-testid="text-entry-today-kg">{formatDailyNum(totalKg)} kg</span>
             </div>
             <>
               <div className="w-px h-4 bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium">Garbage</span>
-              </div>
+              <span className="text-xs text-muted-foreground font-medium">Garbage</span>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold" data-testid="text-entry-garbage-qty">{garbageQty} qty</span>
                 <span className="text-sm font-semibold" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)} kg</span>
@@ -1808,9 +1818,7 @@
             </>
             <>
               <div className="w-px h-4 bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium">Wipers</span>
-              </div>
+              <span className="text-xs text-muted-foreground font-medium">Wipers</span>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold" data-testid="text-entry-wipers-qty">{wipersQty} qty</span>
                 <span className="text-sm font-semibold" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)} kg</span>
