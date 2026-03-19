@@ -2,8 +2,9 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, Upload, Download, Calculator, X,
+  Plus, Pencil, Search, Users, UserX, Upload, Download, Calculator, X, FileDown,
 } from "lucide-react";
+import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -257,6 +258,85 @@ export default function FactoryWorkers() {
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
   const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
 
+  const handleExportSalaries = async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Factory System";
+    const ws = wb.addWorksheet("Workers Salaries");
+
+    ws.columns = [
+      { key: "no",         width: 6  },
+      { key: "code",       width: 14 },
+      { key: "name",       width: 30 },
+      { key: "position",   width: 20 },
+      { key: "department", width: 18 },
+      { key: "salaryType", width: 14 },
+      { key: "salary",     width: 16 },
+    ];
+
+    const headerRow = ws.addRow(["#", "Code", "Name", "Position", "Department", "Salary Type", "Base Salary"]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 11 };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E40AF" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin" }, bottom: { style: "thin" },
+        left: { style: "thin" }, right: { style: "thin" },
+      };
+    });
+    headerRow.height = 22;
+
+    let totalSalary = 0;
+    filteredWorkers.forEach((w, idx) => {
+      const salary = parseFloat(w.baseSalary || "0") || 0;
+      totalSalary += salary;
+      const row = ws.addRow([
+        idx + 1,
+        w.employeeCode || "",
+        w.fullName || "",
+        w.position || "",
+        w.department || "",
+        w.salaryType || "Monthly",
+        salary,
+      ]);
+      row.getCell(7).numFmt = "#,##0.00";
+      row.getCell(7).alignment = { horizontal: "right" };
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE5E7EB" } },
+          bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+          left: { style: "thin", color: { argb: "FFE5E7EB" } },
+          right: { style: "thin", color: { argb: "FFE5E7EB" } },
+        };
+      });
+      if (idx % 2 === 1) {
+        row.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+        });
+      }
+    });
+
+    const totalRow = ws.addRow([
+      "", "", `Total Workers: ${filteredWorkers.length}`, "", "", "TOTAL", totalSalary,
+    ]);
+    totalRow.getCell(6).alignment = { horizontal: "right" };
+    totalRow.getCell(7).numFmt = "#,##0.00";
+    totalRow.getCell(7).alignment = { horizontal: "right" };
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 11 };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      cell.border = {
+        top: { style: "medium" }, bottom: { style: "medium" },
+        left: { style: "thin" }, right: { style: "thin" },
+      };
+    });
+    totalRow.height = 22;
+
+    const date = new Date().toISOString().slice(0, 10);
+    await writeFile(wb, `workers-salaries-${date}.xlsx`);
+  };
+
   const renderWorkerForm = () => (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
       <div>
@@ -372,6 +452,9 @@ export default function FactoryWorkers() {
           </Button>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importLoading} data-testid="button-import-workers">
             <Upload className="h-4 w-4 mr-2" />{importLoading ? "Importing..." : "Import Excel"}
+          </Button>
+          <Button variant="outline" onClick={handleExportSalaries} disabled={!filteredWorkers.length} data-testid="button-export-salaries">
+            <FileDown className="h-4 w-4 mr-2" />Export Salaries
           </Button>
           <Button onClick={() => { resetForm(); setCreateOpen(true); }} data-testid="button-add-worker">
             <Plus className="h-4 w-4 mr-2" />Add Worker
