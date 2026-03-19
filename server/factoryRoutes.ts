@@ -1591,7 +1591,52 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
-      const [created] = await db.insert(factorySupplierPayments).values(parsed).returning();
+
+      const created = await db.transaction(async (tx: any) => {
+        const [payment] = await tx.insert(factorySupplierPayments).values(parsed).returning();
+
+        // Double-entry Payment voucher: DR Supplier Payable / CR Bank or Cash
+        const payAmt = parseFloat(payment.amount);
+        const payAmtStr = payAmt.toFixed(2);
+        const payVoucherNum = `FACTORY-PAY-${payment.id}-${Date.now()}`;
+
+        const [payVoucher] = await tx.insert(vouchers).values({
+          companyId,
+          voucherType: "Payment",
+          voucherNumber: payVoucherNum,
+          voucherDate: payment.date,
+          description: `Supplier payment – see factory payment #${payment.id}`,
+          totalAmount: payAmtStr,
+          currency: payment.currencyCode || "USD",
+          exchangeRate: String(parseFloat(payment.fxRateToUsd as string || "1")),
+          sourceModule: "FACTORY",
+        }).returning();
+
+        // DR: Factory Supplier (debit reduces the liability we owe them)
+        await tx.insert(voucherEntries).values({
+          voucherId: payVoucher.id,
+          factorySupplierId: payment.supplierId,
+          debitAmount: payAmtStr,
+          creditAmount: "0",
+          narration: `Payment to supplier – factory payment #${payment.id}`,
+        });
+
+        // CR: Bank/Cash ledger account (or auto-created "Factory Cash Payments" if not specified)
+        const crAccountId = payment.paidFromAccountId
+          ? payment.paidFromAccountId
+          : await getOrCreateLedgerAccount(companyId, "FACTORY_CASH_PAYMENTS", "Factory Cash Payments", "ASSET");
+
+        await tx.insert(voucherEntries).values({
+          voucherId: payVoucher.id,
+          ledgerAccountId: crAccountId,
+          debitAmount: "0",
+          creditAmount: payAmtStr,
+          narration: `Bank/cash outflow – factory payment #${payment.id}`,
+        });
+
+        return payment;
+      });
+
       const [spSupplier] = await db.select({ name: factorySuppliers.name })
         .from(factorySuppliers).where(eq(factorySuppliers.id, created.supplierId));
       await writeDaybookEntry(db, {
@@ -1621,9 +1666,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [spDelSupplier] = payment
         ? await db.select({ name: factorySuppliers.name }).from(factorySuppliers).where(eq(factorySuppliers.id, payment.supplierId))
         : [null];
-      await db
-        .delete(factorySupplierPayments)
-        .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
+
+      await db.transaction(async (tx: any) => {
+        // Soft-delete the auto-generated Payment voucher for this payment
+        const payVoucherPattern = `FACTORY-PAY-${id}-%`;
+        const [linkedVoucher] = await tx.select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${payVoucherPattern}`))
+          .limit(1);
+        if (linkedVoucher) {
+          await tx.update(vouchers)
+            .set({ deletedAt: new Date() })
+            .where(eq(vouchers.id, linkedVoucher.id));
+        }
+        await tx.delete(factorySupplierPayments)
+          .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));
+      });
+
       if (payment) {
         await writeDaybookEntry(db, {
           companyId,
