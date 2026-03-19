@@ -13007,12 +13007,21 @@ if (asOfDate) {
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
-        .select({ id: vouchers.id })
+        .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, currency: vouchers.currency, exchangeRate: vouchers.exchangeRate })
         .from(vouchers)
         .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
+      // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
+      // to prevent double-counting with fPayments (factorySupplierPayments).
+      const factoryPayVoucherIds = new Set(
+        (companyVouchers as any[]).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
+      );
+      // Map from voucherId -> {currency, exchangeRate} for USD conversion of factory supplier entries
+      const voucherCurrencyMap = new Map<number, { currency: string; exchangeRate: string }>(
+        (companyVouchers as any[]).map((v) => [v.id, { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" }])
+      );
 
       // Get all voucher entries for this company
       const allEntries =
@@ -13072,11 +13081,15 @@ if (asOfDate) {
 
         if ((entry as any).factorySupplierId) {
           const fsId = (entry as any).factorySupplierId as number;
-          const existing = factorySupplierBalances.get(fsId) || 0;
-          if (credit > 0 && debit === 0) {
-            factorySupplierBalances.set(fsId, existing + credit);
-          } else if (debit > 0 && credit === 0) {
-            factorySupplierBalances.set(fsId, existing - debit);
+          // Only track non-FACTORY-PAY-* debits as ERP voucher payments.
+          // FACTORY-PAY-* vouchers are already counted via fPayments.
+          if (!factoryPayVoucherIds.has(entry.voucherId) && debit > 0 && credit === 0) {
+            // Convert to USD using the voucher's exchange rate
+            const vInfo = voucherCurrencyMap.get(entry.voucherId) || { currency: "USD", exchangeRate: "1" };
+            const fx = parseFloat(vInfo.exchangeRate) || 1;
+            const debitUsd = vInfo.currency === "USD" ? debit : debit / fx;
+            const existing = factorySupplierBalances.get(fsId) || 0;
+            factorySupplierBalances.set(fsId, existing + debitUsd);
           }
         }
 
@@ -13189,22 +13202,30 @@ if (asOfDate) {
           };
         }),
         // Factory Suppliers — only included for factory companies
-        // Balance computed from factory tables (containers + payments) for accuracy
+        // Balance computed from factory tables (containers + payments) for accuracy,
+        // matching the computeStats formula: includes freight, voucher payments, broker aggregation.
         ...fSuppliers.map((supplier) => {
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
-          // Container value: sum(actualReceivedKg || totalKg) * ratePerKg * fxRateToUsd
-          const supplierContainers = fContainers.filter((c: any) => c.supplierId === supplier.id);
+          // Collect all supplier IDs to aggregate (the supplier itself + any children brokered through it)
+          const linkedChildIds = (fSuppliers as any[])
+            .filter((s: any) => s.parentId === supplier.id)
+            .map((s: any) => s.id);
+          const aggregateIds = [supplier.id, ...linkedChildIds];
+
+          // Container value: sum((actualReceivedKg || totalKg) * ratePerKg + freight) * fxRateToUsd
+          const supplierContainers = fContainers.filter((c: any) => aggregateIds.includes(c.supplierId));
           const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
             const rate = parseFloat(c.ratePerKg || "0");
+            const freight = parseFloat(c.freight || "0");
             const fx = parseFloat(c.fxRateToUsd || "1");
-            return sum + kg * rate * fx;
+            return sum + (kg * rate + freight) * fx;
           }, 0);
 
           // Commission owed to this supplier as broker (exclude containers where they're also the main supplier)
           const brokerContainers = fContainers.filter((c: any) =>
-            c.commissionSupplierId === supplier.id && c.supplierId !== supplier.id && parseFloat(c.commissionAmount || "0") > 0
+            c.commissionSupplierId === supplier.id && !aggregateIds.includes(c.supplierId) && parseFloat(c.commissionAmount || "0") > 0
           );
           const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
             const commAmt = parseFloat(c.commissionAmount || "0");
@@ -13213,12 +13234,15 @@ if (asOfDate) {
             return sum + (commCurr === "USD" ? commAmt : commAmt * fx);
           }, 0);
 
-          // Total paid via factorySupplierPayments (in USD)
-          const supplierPayments = fPayments.filter((p: any) => p.supplierId === supplier.id);
+          // Total paid via factorySupplierPayments (in USD) — aggregated across all linked IDs
+          const supplierPayments = fPayments.filter((p: any) => aggregateIds.includes(p.supplierId));
           const totalPaidUsd = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
 
+          // Total paid via non-FACTORY-PAY-* ERP voucher entries (aggregated across linked IDs)
+          const voucherPaidUsd = aggregateIds.reduce((sum, sid) => sum + (factorySupplierBalances.get(sid) || 0), 0);
+
           // Outstanding balance (positive = we owe them). Negate for sidebar convention (negative = payable/red)
-          const outstandingUsd = openingBalance + containerValueUsd + commissionValueUsd - totalPaidUsd;
+          const outstandingUsd = openingBalance + containerValueUsd + commissionValueUsd - totalPaidUsd - voucherPaidUsd;
           const balance = -outstandingUsd;
 
           return {
