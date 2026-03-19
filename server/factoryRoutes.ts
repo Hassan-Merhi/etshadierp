@@ -2332,7 +2332,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
 
-        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances };
+        // Due containers: offloaded >30 days ago and supplier still has a positive balance
+        const now = new Date();
+        const dueContainers = balance > 0.01 ? supplierContainers
+          .filter((c: any) => {
+            if (!c.offloadDate) return false;
+            const offloadMs = new Date(c.offloadDate).getTime();
+            return (now.getTime() - offloadMs) >= 30 * 24 * 60 * 60 * 1000;
+          })
+          .map((c: any) => ({
+            id: c.id,
+            containerNumber: c.containerNumber,
+            offloadDate: c.offloadDate,
+            currencyCode: c.currencyCode || "USD",
+            value: (parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0")).toFixed(2),
+            daysPastDue: Math.floor((now.getTime() - new Date(c.offloadDate).getTime()) / (24 * 60 * 60 * 1000)) - 30,
+          })) : [];
+
+        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers };
       };
 
       // First pass: compute each supplier's own stats
@@ -2358,6 +2375,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             receivedContainers: own.receivedContainers,
             lastContainerDate: own.lastContainerDate,
             currencyBalances: own.currencyBalances,
+            dueContainers: own.dueContainers,
+            dueContainersCount: own.dueContainers.length,
           };
         }
 
@@ -2371,6 +2390,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const aggReceived = own.receivedContainers + childStats.reduce((n: number, cs: any) => n + cs.receivedContainers, 0);
         const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
+        const aggDueContainers = [...own.dueContainers, ...childStats.flatMap((cs: any) => cs.dueContainers)];
 
         // Aggregate currency balances across own + children
         const aggCurrencyMap: Record<string, number> = {};
@@ -2397,6 +2417,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,
           currencyBalances: aggCurrencyBalances,
+          dueContainers: aggDueContainers,
+          dueContainersCount: aggDueContainers.length,
         };
       });
 

@@ -675,23 +675,8 @@ export default function FactorySuppliers() {
     }
   });
 
-  // Auto-expand all broker (parent) suppliers when data loads
-  useEffect(() => {
-    if (allSuppliers.length > 0) {
-      const parentIds = new Set<number>();
-      for (const s of allSuppliers) {
-        const pid = (s as any).parentId;
-        if (pid) parentIds.add(pid);
-      }
-      if (parentIds.size > 0) {
-        setExpandedSupplierIds(prev => {
-          const next = new Set(prev);
-          parentIds.forEach(id => next.add(id));
-          return next;
-        });
-      }
-    }
-  }, [suppliers]);
+  // Due containers dialog
+  const [dueDialogSupplier, setDueDialogSupplier] = useState<{ name: string; containers: any[] } | null>(null);
 
   const activeTopLevel = topLevelSuppliers.filter((s) => s.isActive);
   const brokerCount = activeTopLevel.filter(isBroker).length;
@@ -1879,6 +1864,16 @@ export default function FactorySuppliers() {
                               {sup.pendingContainers} OTW
                             </span>
                           )}
+                          {(sup as any).dueContainersCount > 0 && (
+                            <button
+                              className="flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold hover:underline"
+                              onClick={(e) => { e.stopPropagation(); setDueDialogSupplier({ name: sup.name, containers: (sup as any).dueContainers || [] }); }}
+                              data-testid={`text-supplier-due-${sup.id}`}
+                            >
+                              <Clock className="h-3.5 w-3.5" />
+                              {(sup as any).dueContainersCount} due
+                            </button>
+                          )}
                           <span className="flex items-center gap-1" data-testid={`text-supplier-kg-${sup.id}`}>
                             <Weight className="h-3.5 w-3.5 text-muted-foreground" />
                             {formatKg(sup.totalKg)}
@@ -2411,6 +2406,49 @@ export default function FactorySuppliers() {
             >
               {obEditMutation.isPending ? "Saving..." : "Save"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Due Containers Dialog ── */}
+      <Dialog open={!!dueDialogSupplier} onOpenChange={(open) => { if (!open) setDueDialogSupplier(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Clock className="h-5 w-5" />
+              Payment Due — {dueDialogSupplier?.name}
+            </DialogTitle>
+            <DialogDescription>
+              These containers were offloaded more than 30 days ago and still have an outstanding balance.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {dueDialogSupplier?.containers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No due containers</p>
+            ) : (
+              <div className="rounded-md border divide-y text-sm">
+                {(dueDialogSupplier?.containers || [])
+                  .slice()
+                  .sort((a: any, b: any) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
+                  .map((c: any) => (
+                    <div key={c.id} className="flex items-center justify-between px-3 py-2.5 gap-3">
+                      <div>
+                        <div className="font-medium">{c.containerNumber}</div>
+                        <div className="text-xs text-muted-foreground">Offloaded: {formatDate(c.offloadDate)}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="tabular-nums font-medium">{c.currencyCode} {parseFloat(c.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs text-red-600 dark:text-red-400 font-medium">
+                          {c.daysPastDue > 0 ? `${c.daysPastDue}d overdue` : "Due today"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setDueDialogSupplier(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
