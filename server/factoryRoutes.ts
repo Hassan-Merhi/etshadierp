@@ -2979,20 +2979,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      if (!code) {
-        code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
-      }
-
       if (articleCode) {
-        const [existing] = await db
-          .select()
-          .from(factoryBaleProducts)
+        // Helper: check both articleCode AND code uniqueness within the company
+        const codeClean = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+        const [existingArticle] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
-        if (existing) {
-          // If this is an auto-generated code (grade prefix) that collided, regenerate a fresh unique one
+        const [existingCode] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, codeClean)));
+
+        if (existingArticle || existingCode) {
+          // Either articleCode or code is already taken — try to regenerate from the grade prefix
           const knownPrefixes = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16"];
           const matchedPrefix = knownPrefixes.find(p => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length)));
-          if (matchedPrefix && grade) {
+          if (matchedPrefix) {
             const prefix = matchedPrefix;
             const prefixLen = prefix.length;
             const [maxResult] = await db
@@ -3006,17 +3005,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             let nextNum = (maxResult?.maxNum || 0) + 1;
             let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
             let attempts = 0;
-            while (attempts < 100) {
+            while (attempts < 200) {
               const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
-              const [dupArticle] = await db
-                .select({ id: factoryBaleProducts.id })
-                .from(factoryBaleProducts)
+              const [dupA] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
                 .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
-              const [dupCode] = await db
-                .select({ id: factoryBaleProducts.id })
-                .from(factoryBaleProducts)
+              const [dupC] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
                 .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
-              if (!dupArticle && !dupCode) break;
+              if (!dupA && !dupC) break;
               nextNum++;
               candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
               attempts++;
@@ -3026,6 +3021,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           } else {
             return res.status(400).json({ message: "A product with this article code already exists" });
           }
+        } else {
+          // Both are free — use the cleaned code
+          code = codeClean;
         }
       }
 
