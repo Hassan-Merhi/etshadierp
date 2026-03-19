@@ -3917,6 +3917,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         fxRateToUsd: parseFloat(container.fxRateToUsd || "1"),
       });
 
+      // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable
+      const goodsValue = parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0");
+      if (goodsValue > 0 && container.supplierId) {
+        const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
+        const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
+        const [importVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherType: "Journal",
+          voucherNumber: importVoucherNum,
+          voucherDate: container.arrivalDate || today,
+          description: `Goods import - container ${container.containerNumber}`,
+          totalAmount: String(goodsValue),
+          currency: container.currencyCode || "USD",
+          exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+          sourceModule: "FACTORY",
+        }).returning();
+        await db.insert(voucherEntries).values({
+          voucherId: importVoucher.id,
+          ledgerAccountId: importCostAccId,
+          debitAmount: String(goodsValue),
+          creditAmount: "0",
+          narration: `Goods import cost - container ${container.containerNumber}`,
+        });
+        await db.insert(voucherEntries).values({
+          voucherId: importVoucher.id,
+          factorySupplierId: container.supplierId,
+          debitAmount: "0",
+          creditAmount: String(goodsValue),
+          narration: `Goods payable to supplier - container ${container.containerNumber}`,
+        });
+      }
+
       // Double-entry: Commission (Dr Commission Expense / Cr Broker Payable)
       if (commissionAmt > 0 && container.commissionAccountId && container.commissionSupplierId) {
         const commFx = parseFloat(container.fxRateToUsd || "1");
@@ -4064,6 +4096,75 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json(deleted);
     } catch (error: any) {
       console.error("Error deleting factory container:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Backfill: create missing goods-import credits for existing containers ────
+  app.post("/api/factory/containers/backfill-import-credits", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allContainers = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.companyId, companyId)));
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const container of allContainers) {
+        if (!container.supplierId) { skipped++; continue; }
+        const goodsValue = parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0");
+        if (goodsValue <= 0) { skipped++; continue; }
+
+        // Skip if an import voucher already exists for this container
+        const existing = await db
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY"),
+            ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${container.id}-%`)
+          ))
+          .limit(1);
+        if (existing.length > 0) { skipped++; continue; }
+
+        const today = new Date().toISOString().split("T")[0];
+        const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
+        const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
+        const [importVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherType: "Journal",
+          voucherNumber: importVoucherNum,
+          voucherDate: container.arrivalDate || today,
+          description: `Goods import - container ${container.containerNumber}`,
+          totalAmount: String(goodsValue),
+          currency: container.currencyCode || "USD",
+          exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+          sourceModule: "FACTORY",
+        }).returning();
+        await db.insert(voucherEntries).values({
+          voucherId: importVoucher.id,
+          ledgerAccountId: importCostAccId,
+          debitAmount: String(goodsValue),
+          creditAmount: "0",
+          narration: `Goods import cost - container ${container.containerNumber}`,
+        });
+        await db.insert(voucherEntries).values({
+          voucherId: importVoucher.id,
+          factorySupplierId: container.supplierId,
+          debitAmount: "0",
+          creditAmount: String(goodsValue),
+          narration: `Goods payable to supplier - container ${container.containerNumber}`,
+        });
+        created++;
+      }
+
+      res.json({ created, skipped, total: allContainers.length });
+    } catch (error: any) {
+      console.error("Error backfilling import credits:", error);
       res.status(500).json({ message: error.message });
     }
   });

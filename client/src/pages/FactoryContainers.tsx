@@ -300,6 +300,27 @@ export default function FactoryContainers() {
     },
   });
 
+  const backfillMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", `/api/factory/containers/backfill-import-credits`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Backfill failed");
+      }
+      return res.json() as Promise<{ created: number; skipped: number; total: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      toast({
+        title: "Backfill complete",
+        description: `${data.created} supplier credit entries created, ${data.skipped} already had entries.`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Backfill failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
@@ -503,6 +524,16 @@ export default function FactoryContainers() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => backfillMutation.mutate()}
+            disabled={backfillMutation.isPending}
+            data-testid="button-backfill-import-credits"
+            title="Create missing supplier credit entries for all existing containers"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {backfillMutation.isPending ? "Running..." : "Backfill Supplier Credits"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
