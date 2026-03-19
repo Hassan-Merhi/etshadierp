@@ -13562,7 +13562,36 @@ if (asOfDate) {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
       const companyId = (req.session as any).currentCompanyId;
-      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const { startDate, endDate, lang = "en" } = req.query as { startDate?: string; endDate?: string; lang?: string };
+
+      // ── Language strings ──
+      const translations: Record<string, {
+        accountStatement: string; period: string; generated: string;
+        colDate: string; colType: string; colParticulars: string; colDebit: string; colCredit: string; colBalance: string;
+        openingBalance: string; periodTotal: string; closingBalance: string;
+        from: string; upTo: string; allTime: string; dr: string; cr: string;
+      }> = {
+        en: {
+          accountStatement: "Account Statement", period: "Period", generated: "Generated",
+          colDate: "DATE", colType: "TYPE", colParticulars: "PARTICULARS", colDebit: "DEBIT", colCredit: "CREDIT", colBalance: "BALANCE",
+          openingBalance: "Opening Balance", periodTotal: "Current Period Total", closingBalance: "Closing Balance",
+          from: "From", upTo: "Up to", allTime: "All Time", dr: "Dr", cr: "Cr",
+        },
+        fr: {
+          accountStatement: "Relevé de compte", period: "Période", generated: "Généré le",
+          colDate: "DATE", colType: "TYPE", colParticulars: "LIBELLÉ", colDebit: "DÉBIT", colCredit: "CRÉDIT", colBalance: "SOLDE",
+          openingBalance: "Solde d'ouverture", periodTotal: "Total de la période", closingBalance: "Solde de clôture",
+          from: "Du", upTo: "Au", allTime: "Toute la période", dr: "Dt", cr: "Ct",
+        },
+        ar: {
+          accountStatement: "كشف حساب", period: "الفترة", generated: "تاريخ الإنشاء",
+          colDate: "التاريخ", colType: "النوع", colParticulars: "البيان", colDebit: "مدين", colCredit: "دائن", colBalance: "الرصيد",
+          openingBalance: "الرصيد الافتتاحي", periodTotal: "مجموع الفترة", closingBalance: "الرصيد الختامي",
+          from: "من", upTo: "حتى", allTime: "كل الفترات", dr: "مد", cr: "دا",
+        },
+      };
+      const t = translations[lang] ?? translations["en"];
+      const isRTL = lang === "ar";
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
@@ -13721,18 +13750,35 @@ if (asOfDate) {
       };
       const periodStr = startDate && endDate
         ? `${fmtDate(startDate)} — ${fmtDate(endDate)}`
-        : startDate ? `From ${fmtDate(startDate)}` : endDate ? `Up to ${fmtDate(endDate)}` : "All Time";
+        : startDate ? `${t.from} ${fmtDate(startDate)}` : endDate ? `${t.upTo} ${fmtDate(endDate)}` : t.allTime;
       const generatedStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
       // ── 6. Generate PDF ──
       const PDFDocument = (await import("pdfkit")).default;
       const fs = await import("fs");
+      const pathMod = await import("path");
+
+      // Font setup: use Amiri for Arabic (RTL), Helvetica for others
+      const fontDir = pathMod.join(process.cwd(), "server", "fonts");
+      const arabicFontPath = pathMod.join(fontDir, "Amiri-Regular.ttf");
+      const hasArabicFont = isRTL && fs.existsSync(arabicFontPath);
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
+      if (hasArabicFont) doc.registerFont("Arabic", arabicFontPath);
+
+      const boldFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica-Bold";
+      const normalFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica";
+
       res.setHeader("Content-Type", "application/pdf");
       const safeAccName = accountName.replace(/[^a-zA-Z0-9_-]/g, "_");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
       doc.pipe(res);
+
+      // Text helper: flip alignment for RTL
+      const txtOpts = (w: number, align: "left"|"right"|"center" = "left"): PDFKit.Mixins.TextOptions => {
+        if (!isRTL) return { width: w, align };
+        return { width: w, align: align === "left" ? "right" : align === "right" ? "left" : "center" };
+      };
 
       // Header
       let headerY = 40;
@@ -13740,10 +13786,10 @@ if (asOfDate) {
       if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
         try { doc.image(`.${logoUrl}`, 40, headerY, { height: 48, fit: [80, 48] }); logoWidth = 90; } catch {}
       }
-      doc.fontSize(18).font("Helvetica-Bold").fillColor("#000000")
-        .text(companyName, 40 + logoWidth, headerY, { width: 515 - logoWidth });
-      doc.fontSize(10).font("Helvetica").fillColor("#555555")
-        .text(`Account Statement: ${accountName}`, 40 + logoWidth, headerY + 22, { width: 515 - logoWidth });
+      doc.fontSize(18).font(boldFont).fillColor("#000000")
+        .text(companyName, 40 + logoWidth, headerY, txtOpts(515 - logoWidth));
+      doc.fontSize(10).font(normalFont).fillColor("#555555")
+        .text(`${t.accountStatement}: ${accountName}`, 40 + logoWidth, headerY + 22, txtOpts(515 - logoWidth));
 
       const headerBottom = Math.max(doc.y, headerY + 52);
       doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
@@ -13751,9 +13797,9 @@ if (asOfDate) {
 
       // Meta
       const metaY = headerBottom + 10;
-      doc.fillColor("#444444").fontSize(8).font("Helvetica");
-      doc.text(`Period: ${periodStr}`, 40, metaY);
-      doc.text(`Generated: ${generatedStr}`, 40, doc.y + 2);
+      doc.fillColor("#444444").fontSize(8).font(normalFont);
+      doc.text(`${t.period}: ${periodStr}`, 40, metaY, txtOpts(515));
+      doc.text(`${t.generated}: ${generatedStr}`, 40, doc.y + 2, txtOpts(515));
       doc.moveDown(0.5);
 
       // Table columns: Date | Type | Particulars | Debit | Credit | Balance
@@ -13761,18 +13807,22 @@ if (asOfDate) {
       const MARGIN_BOTTOM = 60;
       const colX  = [40,  110, 205, 370, 435, 500];
       const colW  = [70,   95, 165,  65,  65,  55];
-      const colHdr = ["DATE", "TYPE", "PARTICULARS", "DEBIT", "CREDIT", "BALANCE"];
-      const colAln: Array<"left"|"right"> = ["left","left","left","right","right","right"];
+      const colHdrEN = [t.colDate, t.colType, t.colParticulars, t.colDebit, t.colCredit, t.colBalance];
+      // For RTL: reverse column order visually
+      const colHdr = isRTL ? [...colHdrEN].reverse() : colHdrEN;
+      const colAln: Array<"left"|"right"> = isRTL
+        ? ["right","right","right","left","left","left"]
+        : ["left","left","left","right","right","right"];
       const ROW_H = 14;
       const HDR_H = 15;
 
       const drawTableHeader = (y: number) => {
         doc.rect(40, y, 515, HDR_H).fill("#1F3864");
-        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        doc.fillColor("#ffffff").font(boldFont).fontSize(7.5);
         colHdr.forEach((h, i) => {
           doc.text(h, colX[i] + 2, y + 3.5, { width: colW[i] - 4, align: colAln[i] });
         });
-        doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
+        doc.fillColor("#000000").font(normalFont).fontSize(7.5);
       };
 
       let tableY = doc.y + 4;
@@ -13785,14 +13835,17 @@ if (asOfDate) {
           doc.fillColor("#000000");
         }
         vals.forEach((v, i) => {
-          if (v) doc.font("Helvetica").fontSize(7.5).text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
+          if (v) doc.font(normalFont).fontSize(7.5).text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAln[i] });
         });
       };
 
       // Opening balance row
-      const obSideLabel = openingBalance >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+      const obSideLabel = openingBalance >= 0 ? (isSupplier ? t.cr : t.dr) : (isSupplier ? t.dr : t.cr);
       const obDisplay = `${fmtAmt(openingBalance)} ${obSideLabel}`;
-      drawRow(["", "Opening Balance", "", "-", "-", obDisplay], 0, "#F0F4FF");
+      const obRowVals = isRTL
+        ? [obDisplay, "-", "-", "", t.openingBalance, ""]
+        : ["", t.openingBalance, "", "-", "-", obDisplay];
+      drawRow(obRowVals, 0, "#F0F4FF");
       y += ROW_H;
 
       // Transaction rows
@@ -13808,16 +13861,12 @@ if (asOfDate) {
         const debitStr = row.totalDebit > 0 ? fmtAmt(row.totalDebit) : "-";
         const creditStr = row.totalCredit > 0 ? fmtAmt(row.totalCredit) : "-";
         const bal = row.runningBalance;
-        const balSide = bal >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+        const balSide = bal >= 0 ? (isSupplier ? t.cr : t.dr) : (isSupplier ? t.dr : t.cr);
         const balStr = `${fmtAmt(bal)} ${balSide}`;
-        drawRow([
-          fmtDate(row.voucherDate),
-          row.voucherType,
-          particulars,
-          debitStr,
-          creditStr,
-          balStr,
-        ], idx, bg);
+        const txVals = isRTL
+          ? [balStr, creditStr, debitStr, particulars, row.voucherType, fmtDate(row.voucherDate)]
+          : [fmtDate(row.voucherDate), row.voucherType, particulars, debitStr, creditStr, balStr];
+        drawRow(txVals, idx, bg);
         y += ROW_H;
       });
 
@@ -13832,24 +13881,32 @@ if (asOfDate) {
       const closingBal = rowsWithBalance.length > 0
         ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance
         : openingBalance;
-      const closingSide = closingBal >= 0 ? (isSupplier ? "Cr" : "Dr") : (isSupplier ? "Dr" : "Cr");
+      const closingSide = closingBal >= 0 ? (isSupplier ? t.cr : t.dr) : (isSupplier ? t.dr : t.cr);
 
       const drawSummaryRow = (label: string, debit: string, credit: string, balance: string, isBold = false) => {
         doc.rect(40, y, 515, 16).fill(isBold ? "#1F3864" : "#EFF3FB");
         doc.fillColor(isBold ? "#ffffff" : "#000000")
-          .font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(8);
-        doc.text(label, colX[2] + 2, y + 4, { width: colW[2] - 4, align: "left" });
-        if (debit) doc.text(debit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
-        if (credit) doc.text(credit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
-        if (balance) doc.text(balance, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
+          .font(isBold ? boldFont : normalFont).fontSize(8);
+        const labelX = isRTL ? colX[1] + 2 : colX[2] + 2;
+        const labelW = isRTL ? colW[1] - 4 : colW[2] - 4;
+        doc.text(label, labelX, y + 4, { width: labelW, align: isRTL ? "right" : "left" });
+        if (isRTL) {
+          if (balance) doc.text(balance, colX[0] + 2, y + 4, { width: colW[0] - 4, align: "right" });
+          if (credit) doc.text(credit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "left" });
+          if (debit) doc.text(debit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "left" });
+        } else {
+          if (debit) doc.text(debit, colX[3] + 2, y + 4, { width: colW[3] - 4, align: "right" });
+          if (credit) doc.text(credit, colX[4] + 2, y + 4, { width: colW[4] - 4, align: "right" });
+          if (balance) doc.text(balance, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
+        }
         doc.fillColor("#000000");
       };
 
       if (y + 52 > PAGE_H - 20) { doc.addPage(); y = 40; }
 
-      drawSummaryRow("Current Period Total", fmtAmt(totD), fmtAmt(totC), "", false);
+      drawSummaryRow(t.periodTotal, fmtAmt(totD), fmtAmt(totC), "", false);
       y += 17;
-      drawSummaryRow("Closing Balance", "", "", `${fmtAmt(closingBal)} ${closingSide}`, true);
+      drawSummaryRow(t.closingBalance, "", "", `${fmtAmt(closingBal)} ${closingSide}`, true);
 
       doc.end();
     } catch (err: any) {

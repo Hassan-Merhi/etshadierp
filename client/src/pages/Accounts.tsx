@@ -44,10 +44,16 @@ import {
   ChevronDown,
   Trash2,
   ExternalLink,
-  Printer,
   FileDown,
-  FileText,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
@@ -208,6 +214,18 @@ export default function Accounts() {
     new Set(),
   );
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Export language selection
+  const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
+
+  const exportLabels: Record<string, {
+    ledger: string; type: string; debit: string; credit: string; runningBalance: string; date: string; notes: string;
+    openingBalance: string; accountStatement: string; language: string;
+  }> = {
+    en: { ledger: "Ledger", type: "Type", debit: "Debit", credit: "Credit", runningBalance: "Running Balance", date: "Date", notes: "Notes", openingBalance: "Opening Balance", accountStatement: "Account Statement", language: "English" },
+    fr: { ledger: "Compte", type: "Type", debit: "Débit", credit: "Crédit", runningBalance: "Solde courant", date: "Date", notes: "Notes", openingBalance: "Solde d'ouverture", accountStatement: "Relevé de compte", language: "Français" },
+    ar: { ledger: "الحساب", type: "النوع", debit: "مدين", credit: "دائن", runningBalance: "الرصيد", date: "التاريخ", notes: "ملاحظات", openingBalance: "الرصيد الافتتاحي", accountStatement: "كشف حساب", language: "عربي" },
+  };
 
   // Print functionality
   const printRef = useRef<HTMLDivElement>(null);
@@ -655,16 +673,17 @@ export default function Accounts() {
       return;
     }
 
+    const lbl = exportLabels[exportLang] ?? exportLabels["en"];
     const ledgerName = selectedAccount.name || "Account";
     const rows: any[][] = [];
 
-    rows.push(["Ledger", "Type", "Debit", "Credit", "Running Balance", "Date", "Notes"]);
+    rows.push([lbl.ledger, lbl.type, lbl.debit, lbl.credit, lbl.runningBalance, lbl.date, lbl.notes]);
 
     const firstDate = vouchersWithBalance[0]?.voucherDate.split("T")[0] ?? "";
     const openingDateFormatted = firstDate
       ? format(new Date(firstDate + "T00:00:00"), "dd MMM yyyy")
       : "";
-    rows.push([ledgerName, "Opening Balance", "", "", formatAmount(openingBalance), openingDateFormatted, ""]);
+    rows.push([ledgerName, lbl.openingBalance, "", "", formatAmount(openingBalance), openingDateFormatted, ""]);
 
     for (const v of vouchersWithBalance) {
       const dateKey = v.voucherDate.split("T")[0];
@@ -719,7 +738,8 @@ export default function Accounts() {
     const params = new URLSearchParams();
     if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
     if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
-    const qs = params.toString() ? `?${params.toString()}` : "";
+    params.append("lang", exportLang);
+    const qs = `?${params.toString()}`;
     if (isFactoryWorkerAccount) {
       window.open(`/api/factory/workers/${selectedAccount.accountId}/statement-pdf${qs}`, "_blank");
     } else {
@@ -1661,46 +1681,50 @@ export default function Accounts() {
                         </div>
                       </div>
                       <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportStatementToExcel()}
-                          disabled={
-                            transactionsLoading ||
-                            vouchersWithBalance.length === 0
-                          }
-                          data-testid="button-export-statement"
-                        >
-                          <FileDown className="w-4 h-4 mr-2" />
-                          Export Excel
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportStatementToPDF()}
-                          disabled={
-                            transactionsLoading ||
-                            (!isFactoryWorkerAccount && !isFactorySupplierAccount && vouchersWithBalance.length === 0) ||
-                            isFactorySupplierAccount
-                          }
-                          data-testid="button-export-pdf-statement"
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Export PDF
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePrint()}
-                          disabled={
-                            transactionsLoading ||
-                            vouchersWithBalance.length === 0
-                          }
-                          data-testid="button-print-statement"
-                        >
-                          <Printer className="w-4 h-4 mr-2" />
-                          Print
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={transactionsLoading || vouchersWithBalance.length === 0}
+                              data-testid="button-export-dropdown"
+                            >
+                              <FileDown className="w-4 h-4 mr-2" />
+                              Export
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">Language</DropdownMenuLabel>
+                            {(["en", "fr", "ar"] as const).map((lang) => (
+                              <DropdownMenuItem
+                                key={lang}
+                                onClick={() => setExportLang(lang)}
+                                className="flex items-center justify-between"
+                                data-testid={`button-lang-${lang}`}
+                              >
+                                <span>{exportLabels[lang].language}</span>
+                                {exportLang === lang && <span className="text-xs text-primary">✓</span>}
+                              </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleExportStatementToExcel()}
+                              data-testid="button-export-excel"
+                            >
+                              <FileDown className="w-4 h-4 mr-2" />
+                              Excel
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleExportStatementToPDF()}
+                              disabled={isFactorySupplierAccount}
+                              data-testid="button-export-pdf"
+                            >
+                              <FileDown className="w-4 h-4 mr-2" />
+                              PDF
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardContent>
