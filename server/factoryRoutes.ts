@@ -2986,7 +2986,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       sumWs.addRow([`Broker Consolidated Statement — ${(data.supplier as any).name}`]).font = { bold: true, size: 13 };
       sumWs.addRow([`Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]).font = { italic: true };
       sumWs.addRow([]);
-      const sumHdr = sumWs.addRow(["Currency", "Containers", "Gross Value", "Commission", "Paid", "Net Balance"]);
+      const sumHdr = sumWs.addRow(["Currency", "Containers", "Gross Value", "Commission", "FX Out", "FX In", "Paid", "Net Balance"]);
       sumHdr.font = { bold: true, color: { argb: "FFFFFFFF" } };
       sumHdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
       for (const section of data.currencyLedgers) {
@@ -2995,16 +2995,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           section.totalContainers,
           parseFloat(section.totalValue),
           parseFloat(section.totalCommission),
+          parseFloat(section.totalFxOut),
+          parseFloat(section.totalFxIn),
           parseFloat(section.totalPaid),
           parseFloat(section.netBalance),
         ]);
-        ["C", "D", "E", "F"].forEach(col => {
+        // Colour FX Out red, FX In green for clarity
+        ["C", "D", "E", "F", "G", "H"].forEach(col => {
           dr.getCell(col).numFmt = "#,##0.00";
           dr.getCell(col).alignment = { horizontal: "right" };
         });
+        const fxOutVal = parseFloat(section.totalFxOut);
+        const fxInVal  = parseFloat(section.totalFxIn);
+        if (fxOutVal > 0) {
+          dr.getCell("E").font = { color: { argb: "FFCC0000" } };
+        }
+        if (fxInVal > 0) {
+          dr.getCell("F").font = { color: { argb: "FF006600" } };
+        }
+        // Bold the Net Balance
+        dr.getCell("H").font = { bold: true };
       }
       sumWs.columns = [
-        { width: 12 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 18 }
+        { width: 12 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 18 }
       ];
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
