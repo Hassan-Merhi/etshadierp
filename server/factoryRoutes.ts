@@ -1941,6 +1941,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factorySupplierFxTransfers)
         .where(eq(factorySupplierFxTransfers.companyId, companyId));
 
+      // Voucher-based payments: debit entries on voucherEntries where factorySupplierId is set
+      // These represent payments made via payment vouchers (not factorySupplierPayments table)
+      const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
+      const voucherPaidBySupplier: Record<number, number> = {};
+      const voucherPaidBySupplierCurrency: Record<number, Record<string, number>> = {};
+      if (allSupplierIds.length > 0) {
+        const voucherPaymentRows = await db
+          .select({
+            factorySupplierId: voucherEntries.factorySupplierId,
+            debitAmount: voucherEntries.debitAmount,
+            currency: vouchers.currency,
+            exchangeRate: vouchers.exchangeRate,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            inArray(voucherEntries.factorySupplierId, allSupplierIds),
+            sql`${voucherEntries.debitAmount}::numeric > 0`
+          ));
+        for (const row of voucherPaymentRows as any[]) {
+          const suppId = row.factorySupplierId;
+          if (!suppId) continue;
+          const amt = parseFloat(row.debitAmount || "0");
+          const fx = parseFloat(row.exchangeRate || "1") || 1;
+          const curr = row.currency || "USD";
+          const usdAmt = curr === "USD" ? amt : amt / fx;
+          voucherPaidBySupplier[suppId] = (voucherPaidBySupplier[suppId] || 0) + usdAmt;
+          if (!voucherPaidBySupplierCurrency[suppId]) voucherPaidBySupplierCurrency[suppId] = {};
+          voucherPaidBySupplierCurrency[suppId][curr] = (voucherPaidBySupplierCurrency[suppId][curr] || 0) + amt;
+        }
+      }
+
       // Helper to compute stats for a single supplier record
       const computeStats = (s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
@@ -1979,7 +2011,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           : null;
         const supplierPayments = allPayments.filter((p: any) => p.supplierId === s.id);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
-        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid;
+        // Include voucher-based payments (payment vouchers) in the balance
+        const voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
+        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid - voucherPaidUsd;
 
         // Per-currency balances (original currency, not converted).
         // Use kg * ratePerKg so offload charges never inflate supplier payable.
@@ -1995,10 +2029,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const commAmt = parseFloat(c.commissionAmount || "0");
           byCurrency[cc] = (byCurrency[cc] || 0) + commAmt;
         }
-        // Subtract payments by currency
+        // Subtract regular payments by currency
         for (const p of supplierPayments) {
           const cc = p.currencyCode || "USD";
           byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(p.amount || "0");
+        }
+        // Subtract voucher-based payments by currency
+        const voucherCurrMap = voucherPaidBySupplierCurrency[s.id] || {};
+        for (const [cc, amt] of Object.entries(voucherCurrMap)) {
+          byCurrency[cc] = (byCurrency[cc] || 0) - amt;
         }
         // FX transfers: sub-supplier loses fromCurrency, parent supplier gains USD
         for (const t of allFxTransfers) {

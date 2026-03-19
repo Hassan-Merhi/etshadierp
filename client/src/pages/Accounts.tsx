@@ -1785,38 +1785,37 @@ export default function Accounts() {
                             <div className="text-lg font-bold tabular-nums text-primary">${parseFloat(factorySupplierStatement.summary?.netPayable || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           </div>
                         </div>
-                        {factorySupplierStatement.payments && factorySupplierStatement.payments.length > 0 && (
-                          <div>
-                            <div className="text-sm font-medium mb-2">Recent Payments</div>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Date</TableHead>
-                                  <TableHead>Notes</TableHead>
-                                  <TableHead className="text-right">Amount</TableHead>
-                                  <TableHead className="text-right">USD</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {factorySupplierStatement.payments.slice(0, 10).map((p: any) => (
-                                  <TableRow key={p.id}>
-                                    <TableCell className="text-sm whitespace-nowrap">{p.date}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">{p.notes || "-"}</TableCell>
-                                    <TableCell className="text-right text-sm tabular-nums">
-                                      {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}{parseFloat(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </TableCell>
-                                    <TableCell className="text-right text-sm tabular-nums">
-                                      ${parseFloat(p.amountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </TableCell>
+                        {(() => {
+                          const paymentEntries = (factorySupplierStatement.ledger || []).filter((e: any) => e.type === "payment");
+                          if (paymentEntries.length === 0) {
+                            return <p className="text-sm text-muted-foreground text-center py-4">No payments recorded yet</p>;
+                          }
+                          return (
+                            <div>
+                              <div className="text-sm font-medium mb-2">Recent Payments</div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Reference</TableHead>
+                                    <TableHead>Detail</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
                                   </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-                        {(!factorySupplierStatement.payments || factorySupplierStatement.payments.length === 0) && (
-                          <p className="text-sm text-muted-foreground text-center py-4">No payments recorded yet</p>
-                        )}
+                                </TableHeader>
+                                <TableBody>
+                                  {paymentEntries.slice(0, 20).map((p: any) => (
+                                    <TableRow key={p.key}>
+                                      <TableCell className="text-sm whitespace-nowrap">{p.date ? new Date(p.date).toLocaleDateString() : "-"}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{p.ref || "-"}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{p.detail || "-"}</TableCell>
+                                      <TableCell className="text-right text-sm tabular-nums text-green-600 dark:text-green-400">{p.amount}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">Could not load statement</p>
