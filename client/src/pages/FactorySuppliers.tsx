@@ -4,8 +4,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -238,6 +241,63 @@ export default function FactorySuppliers() {
     fxRateToUsd: "",
     date: today,
     notes: "",
+  });
+
+  // Bulk FX Settlement state (broker-level: settle all linked suppliers in one go)
+  const [bulkFxOpen, setBulkFxOpen] = useState(false);
+  const [bulkFxBrokerId, setBulkFxBrokerId] = useState<number | null>(null);
+  const [bulkFxBrokerName, setBulkFxBrokerName] = useState("");
+  const [bulkFxForm, setBulkFxForm] = useState({
+    fromCurrencyCode: "EUR",
+    totalAmount: "",
+    fxRateToUsd: "",
+    date: today,
+    notes: "",
+    order: "oldest" as "oldest" | "newest",
+  });
+  const [bulkFxPreview, setBulkFxPreview] = useState<null | { transfers: Array<{ supplierId: number; supplierName: string; allocated: string; toAmountUsd: string }>; totalAllocated: string; remaining: string }>(null);
+
+  const openBulkFxDialog = (brokerId: number, brokerName: string) => {
+    setBulkFxBrokerId(brokerId);
+    setBulkFxBrokerName(brokerName);
+    setBulkFxForm({ fromCurrencyCode: "EUR", totalAmount: "", fxRateToUsd: "", date: today, notes: "", order: "oldest" });
+    setBulkFxPreview(null);
+    setBulkFxOpen(true);
+  };
+
+  const bulkFxMutation = useMutation({
+    mutationFn: async () => {
+      if (!bulkFxBrokerId) throw new Error("No broker selected");
+      const res = await factoryApiRequest("POST", `/api/factory/suppliers/${bulkFxBrokerId}/bulk-fx-settlement`, {
+        fromCurrencyCode: bulkFxForm.fromCurrencyCode,
+        totalAmount: bulkFxForm.totalAmount,
+        fxRateToUsd: bulkFxForm.fxRateToUsd,
+        date: bulkFxForm.date,
+        notes: bulkFxForm.notes || null,
+        order: bulkFxForm.order,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to record bulk settlement");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setBulkFxPreview(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement"] });
+      }
+      if (bulkFxBrokerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", bulkFxBrokerId, "statement"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", bulkFxBrokerId, "broker-statement"] });
+      }
+      toast({ title: "Bulk FX Settlement recorded", description: `${data.transfers?.length} transfer(s) created, ${bulkFxForm.fromCurrencyCode} ${parseFloat(data.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} settled` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const openFxConversionDialog = (fromSupplierId: number, toSupplierId: number, currencyCode: string, netPayable: string, totalCommission = "0") => {
@@ -1853,63 +1913,77 @@ export default function FactorySuppliers() {
                             </>
                           )}
                         </div>
-                        <div className="flex flex-col gap-1">
-                          {sup.isActive && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={(e) => { e.stopPropagation(); openPaymentDialog(sup); }}
-                              title="Record Payment"
-                              data-testid={`button-pay-supplier-${sup.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid={`button-actions-${sup.id}`}
                             >
-                              <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                          )}
-                          {sup.isActive && !isChild && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); openCreateSubAccount(sup); }}
-                              title="Add Linked Supplier"
-                              data-testid={`button-add-subaccount-${sup.id}`}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            {sup.isActive && (
+                              <DropdownMenuItem
+                                onClick={() => openPaymentDialog(sup)}
+                                data-testid={`button-pay-supplier-${sup.id}`}
+                              >
+                                <DollarSign className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                                Record Payment
+                              </DropdownMenuItem>
+                            )}
+                            {sup.isActive && isParent && (
+                              <DropdownMenuItem
+                                onClick={() => openBulkFxDialog(sup.id, sup.name)}
+                                data-testid={`button-bulk-fx-${sup.id}`}
+                              >
+                                <Layers className="h-4 w-4 mr-2 text-blue-500" />
+                                Bulk FX Settlement
+                              </DropdownMenuItem>
+                            )}
+                            {sup.isActive && !isChild && (
+                              <DropdownMenuItem
+                                onClick={() => openCreateSubAccount(sup)}
+                                data-testid={`button-add-subaccount-${sup.id}`}
+                              >
+                                <Link2 className="h-4 w-4 mr-2" />
+                                Add Linked Supplier
+                              </DropdownMenuItem>
+                            )}
+                            {sup.isActive && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setObEditSupplier({ id: sup.id, name: sup.name, currentBalance: (sup as any).openingBalance || "0" });
+                                  setObEditValue((sup as any).openingBalance || "0");
+                                }}
+                                data-testid={`button-ob-edit-supplier-${sup.id}`}
+                              >
+                                <BookOpen className="h-4 w-4 mr-2" />
+                                Edit Opening Balance
+                              </DropdownMenuItem>
+                            )}
+                            {sup.isActive && (
+                              <DropdownMenuItem
+                                onClick={() => openEdit(sup)}
+                                data-testid={`button-edit-supplier-${sup.id}`}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Supplier
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => { if (confirm(`Permanently delete "${sup.name}"? This will remove all their records and cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
+                              data-testid={`button-delete-supplier-${sup.id}`}
                             >
-                              <Link2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {sup.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Edit Opening Balance"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setObEditSupplier({ id: sup.id, name: sup.name, currentBalance: (sup as any).openingBalance || "0" });
-                                setObEditValue((sup as any).openingBalance || "0");
-                              }}
-                              data-testid={`button-ob-edit-supplier-${sup.id}`}
-                            >
-                              <BookOpen className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {sup.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => { e.stopPropagation(); openEdit(sup); }}
-                              data-testid={`button-edit-supplier-${sup.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); if (confirm(`Permanently delete "${sup.name}"? This will remove all their records and cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
-                            data-testid={`button-delete-supplier-${sup.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -2338,6 +2412,141 @@ export default function FactorySuppliers() {
               {obEditMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bulk FX Settlement Dialog ── */}
+      <Dialog open={bulkFxOpen} onOpenChange={(open) => { if (!open) { setBulkFxOpen(false); setBulkFxPreview(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-blue-500" />
+              Bulk FX Settlement — {bulkFxBrokerName}
+            </DialogTitle>
+            <DialogDescription>
+              Enter a total amount in a foreign currency. It will be split automatically across all linked suppliers, oldest containers first, capped at each supplier's outstanding balance.
+            </DialogDescription>
+          </DialogHeader>
+          {bulkFxPreview ? (
+            <div className="space-y-4">
+              <div className="rounded-md border p-4 space-y-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Total settled</span>
+                  <span className="text-green-600 dark:text-green-400">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                {parseFloat(bulkFxPreview.remaining) > 0.01 && (
+                  <div className="flex justify-between text-sm text-amber-600 dark:text-amber-400">
+                    <span>Unallocated (exceeded all balances)</span>
+                    <span>{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Transfers created:</p>
+                <div className="rounded-md border divide-y text-sm">
+                  {bulkFxPreview.transfers.map((t) => (
+                    <div key={t.supplierId} className="flex justify-between px-3 py-2">
+                      <span className="font-medium">{t.supplierName}</span>
+                      <div className="text-right">
+                        <span className="tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Button className="w-full" onClick={() => { setBulkFxOpen(false); setBulkFxPreview(null); }}>Done</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Input
+                    value={bulkFxForm.fromCurrencyCode}
+                    onChange={(e) => setBulkFxForm((f) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))}
+                    maxLength={10}
+                    placeholder="EUR"
+                    data-testid="input-bulk-fx-currency"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Total Amount</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={bulkFxForm.totalAmount}
+                    onChange={(e) => setBulkFxForm((f) => ({ ...f, totalAmount: e.target.value }))}
+                    placeholder="e.g. 50000"
+                    data-testid="input-bulk-fx-amount"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>{bulkFxForm.fromCurrencyCode || "Currency"} per USD (rate)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={bulkFxForm.fxRateToUsd}
+                    onChange={(e) => setBulkFxForm((f) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    placeholder="e.g. 0.92"
+                    data-testid="input-bulk-fx-rate"
+                  />
+                  {bulkFxForm.totalAmount && bulkFxForm.fxRateToUsd && parseFloat(bulkFxForm.fxRateToUsd) > 0 && (
+                    <p className="text-xs text-muted-foreground">≈ ${(parseFloat(bulkFxForm.totalAmount) / parseFloat(bulkFxForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Date</Label>
+                  <Input
+                    type="date"
+                    value={bulkFxForm.date}
+                    onChange={(e) => setBulkFxForm((f) => ({ ...f, date: e.target.value }))}
+                    data-testid="input-bulk-fx-date"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Container Priority</Label>
+                <Select value={bulkFxForm.order} onValueChange={(v: "oldest" | "newest") => setBulkFxForm((f) => ({ ...f, order: v }))}>
+                  <SelectTrigger data-testid="select-bulk-fx-order">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="oldest">Oldest containers first</SelectItem>
+                    <SelectItem value="newest">Newest containers first</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Notes (optional)</Label>
+                <Input
+                  value={bulkFxForm.notes}
+                  onChange={(e) => setBulkFxForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="e.g. March 2026 batch settlement"
+                  data-testid="input-bulk-fx-notes"
+                />
+              </div>
+              <DialogFooter className="gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setBulkFxOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => bulkFxMutation.mutate()}
+                  disabled={
+                    bulkFxMutation.isPending ||
+                    !bulkFxForm.fromCurrencyCode ||
+                    !bulkFxForm.totalAmount ||
+                    parseFloat(bulkFxForm.totalAmount) <= 0 ||
+                    !bulkFxForm.fxRateToUsd ||
+                    parseFloat(bulkFxForm.fxRateToUsd) <= 0
+                  }
+                  data-testid="button-bulk-fx-submit"
+                >
+                  {bulkFxMutation.isPending ? "Processing..." : "Record Settlement"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

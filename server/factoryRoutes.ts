@@ -1918,6 +1918,224 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Bulk FX Settlement for Broker ────────────────────────────────────────
+  // POST /api/factory/suppliers/:brokerId/bulk-fx-settlement
+  // Distributes a total foreign-currency amount across all linked suppliers of
+  // a broker, creating individual FX transfer records for each, capped at each
+  // supplier's outstanding balance.
+  app.post("/api/factory/suppliers/:brokerId/bulk-fx-settlement", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const brokerId = parseInt(req.params.brokerId);
+      if (isNaN(brokerId)) return res.status(400).json({ message: "Invalid broker ID" });
+
+      const { fromCurrencyCode, totalAmount, fxRateToUsd, date, notes, order = "oldest" } = req.body;
+      if (!fromCurrencyCode || !totalAmount || !fxRateToUsd)
+        return res.status(400).json({ message: "fromCurrencyCode, totalAmount, and fxRateToUsd are required" });
+
+      const total = parseFloat(totalAmount);
+      const fxRate = parseFloat(fxRateToUsd);
+      if (total <= 0 || fxRate <= 0)
+        return res.status(400).json({ message: "Amount and rate must be greater than zero" });
+
+      // Verify broker exists
+      const [broker] = await db.select().from(factorySuppliers)
+        .where(and(eq(factorySuppliers.id, brokerId), eq(factorySuppliers.companyId, companyId)));
+      if (!broker) return res.status(404).json({ message: "Broker not found" });
+
+      // Get all active linked suppliers
+      const linkedSuppliers = await db.select().from(factorySuppliers)
+        .where(and(
+          eq(factorySuppliers.parentId, brokerId),
+          eq(factorySuppliers.companyId, companyId),
+          eq(factorySuppliers.isActive, true)
+        ));
+      if (linkedSuppliers.length === 0)
+        return res.status(400).json({ message: "No active linked suppliers found for this broker" });
+
+      const linkedIds = linkedSuppliers.map((s: any) => s.id);
+
+      // Get all containers for linked suppliers in the given currency
+      const allContainers = await db.select({
+        id: factoryContainers.id,
+        supplierId: factoryContainers.supplierId,
+        totalKg: factoryContainers.totalKg,
+        actualReceivedKg: factoryContainers.actualReceivedKg,
+        ratePerKg: factoryContainers.ratePerKg,
+        freight: factoryContainers.freight,
+        createdAt: factoryContainers.createdAt,
+        arrivalDate: factoryContainers.arrivalDate,
+      })
+        .from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          inArray(factoryContainers.supplierId, linkedIds),
+          eq(factoryContainers.currencyCode, fromCurrencyCode)
+        ))
+        .orderBy(order === "newest" ? desc(factoryContainers.createdAt) : factoryContainers.createdAt);
+
+      // Get payments in this currency for linked suppliers
+      const allPayments = await db.select({
+        supplierId: factorySupplierPayments.supplierId,
+        amount: factorySupplierPayments.amount,
+      })
+        .from(factorySupplierPayments)
+        .where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          inArray(factorySupplierPayments.supplierId, linkedIds),
+          eq(factorySupplierPayments.currencyCode, fromCurrencyCode)
+        ));
+
+      // Get existing FX transfers out for linked suppliers in this currency
+      const allFxOut = await db.select({
+        fromSupplierId: factorySupplierFxTransfers.fromSupplierId,
+        fromAmount: factorySupplierFxTransfers.fromAmount,
+      })
+        .from(factorySupplierFxTransfers)
+        .where(and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          inArray(factorySupplierFxTransfers.fromSupplierId, linkedIds),
+          eq(factorySupplierFxTransfers.fromCurrencyCode, fromCurrencyCode)
+        ));
+
+      // Aggregate payment and FX-out totals per supplier
+      const paymentsBySupplier: Record<number, number> = {};
+      for (const p of allPayments)
+        paymentsBySupplier[p.supplierId] = (paymentsBySupplier[p.supplierId] || 0) + parseFloat(p.amount || "0");
+
+      const fxOutBySupplier: Record<number, number> = {};
+      for (const f of allFxOut)
+        fxOutBySupplier[f.fromSupplierId] = (fxOutBySupplier[f.fromSupplierId] || 0) + parseFloat(f.fromAmount || "0");
+
+      // Previous container-level allocations (to avoid over-allocating)
+      const allContainerIds = allContainers.map((c: any) => c.id);
+      const prevAllocs = allContainerIds.length > 0
+        ? await db.select({
+          containerId: factoryFxAllocations.containerId,
+          allocatedAmount: factoryFxAllocations.allocatedAmount,
+        })
+          .from(factoryFxAllocations)
+          .where(and(
+            eq(factoryFxAllocations.companyId, companyId),
+            inArray(factoryFxAllocations.containerId, allContainerIds)
+          ))
+        : [];
+
+      const prevAllocByContainer: Record<number, number> = {};
+      for (const a of prevAllocs)
+        prevAllocByContainer[a.containerId] = (prevAllocByContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
+
+      // Build per-supplier data: available balance + their containers
+      const supplierData: Array<{ supplierId: number; name: string; available: number; containers: any[] }> = [];
+      for (const sup of linkedSuppliers) {
+        const supContainers = allContainers.filter((c: any) => c.supplierId === sup.id);
+        const totalValue = supContainers.reduce((s: number, c: any) => {
+          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const rate = parseFloat(c.ratePerKg || "0");
+          const freight = parseFloat(c.freight || "0");
+          return s + (kg * rate + freight);
+        }, 0);
+        const paid = paymentsBySupplier[sup.id] || 0;
+        const fxOut = fxOutBySupplier[sup.id] || 0;
+        const available = Math.max(0, totalValue - paid - fxOut);
+        if (available > 0.001 && supContainers.length > 0) {
+          supplierData.push({ supplierId: sup.id, name: sup.name, available, containers: supContainers });
+        }
+      }
+
+      if (supplierData.length === 0)
+        return res.status(400).json({ message: `No linked suppliers have an outstanding balance in ${fromCurrencyCode}` });
+
+      // Sort suppliers by their oldest (or newest) container date
+      supplierData.sort((a, b) => {
+        const dateOf = (sd: typeof a) => sd.containers.reduce((best: string | null, c: any) => {
+          const d = c.arrivalDate || c.createdAt;
+          if (!best) return d;
+          return order === "newest"
+            ? (new Date(d) > new Date(best) ? d : best)
+            : (new Date(d) < new Date(best) ? d : best);
+        }, null);
+        const da = dateOf(a), db2 = dateOf(b);
+        if (!da) return 1; if (!db2) return -1;
+        return order === "newest"
+          ? new Date(db2).getTime() - new Date(da).getTime()
+          : new Date(da).getTime() - new Date(db2).getTime();
+      });
+
+      // Greedy allocation: fill each supplier before moving to the next
+      let rem = total;
+      const allocations: Array<{ supplierId: number; name: string; allocated: number; toAmountUsd: number; containers: any[] }> = [];
+      for (const sd of supplierData) {
+        if (rem <= 0.001) break;
+        const toAllocate = Math.min(rem, sd.available);
+        if (toAllocate < 0.001) continue;
+        allocations.push({ supplierId: sd.supplierId, name: sd.name, allocated: toAllocate, toAmountUsd: toAllocate / fxRate, containers: sd.containers });
+        rem -= toAllocate;
+      }
+
+      if (allocations.length === 0)
+        return res.status(400).json({ message: "Could not allocate any amount" });
+
+      // Create FX transfers and allocation rows in a transaction
+      const settlementDate = date || new Date().toISOString().split("T")[0];
+      const results = await db.transaction(async (tx: any) => {
+        const created: any[] = [];
+        for (const alloc of allocations) {
+          const [fxTransfer] = await tx.insert(factorySupplierFxTransfers).values({
+            companyId,
+            fromSupplierId: alloc.supplierId,
+            toSupplierId: brokerId,
+            fromCurrencyCode,
+            fromAmount: alloc.allocated.toFixed(4),
+            fxRateToUsd: fxRate.toString(),
+            toAmountUsd: alloc.toAmountUsd.toFixed(4),
+            date: settlementDate,
+            notes: notes || null,
+            sourceType: "supplier",
+          }).returning();
+
+          // Container-level allocations (oldest-first within each supplier)
+          const sortedCont = [...alloc.containers].sort((a, b) =>
+            order === "newest"
+              ? new Date(b.arrivalDate || b.createdAt).getTime() - new Date(a.arrivalDate || a.createdAt).getTime()
+              : new Date(a.arrivalDate || a.createdAt).getTime() - new Date(b.arrivalDate || b.createdAt).getTime()
+          );
+          let allocRem = alloc.allocated;
+          const allocRows: any[] = [];
+          for (const c of sortedCont) {
+            if (allocRem <= 0.001) break;
+            const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+            const rate = parseFloat(c.ratePerKg || "0");
+            const freight = parseFloat(c.freight || "0");
+            const val = kg * rate + freight;
+            const used = prevAllocByContainer[c.id] || 0;
+            const avail = Math.max(0, val - used);
+            if (avail <= 0.001) continue;
+            const toAlloc2 = Math.min(allocRem, avail);
+            allocRows.push({ companyId, fxTransferId: fxTransfer.id, containerId: c.id, sourceType: "supplier", allocatedAmount: toAlloc2.toFixed(4), currencyCode: fromCurrencyCode });
+            allocRem -= toAlloc2;
+          }
+          if (allocRows.length > 0) await tx.insert(factoryFxAllocations).values(allocRows);
+
+          created.push({ id: fxTransfer.id, supplierId: alloc.supplierId, supplierName: alloc.name, allocated: alloc.allocated.toFixed(4), toAmountUsd: alloc.toAmountUsd.toFixed(4) });
+        }
+        return created;
+      });
+
+      res.json({
+        success: true,
+        totalRequested: total.toFixed(4),
+        totalAllocated: (total - rem).toFixed(4),
+        remaining: rem.toFixed(4),
+        transfers: results,
+      });
+    } catch (error: any) {
+      console.error("Bulk FX settlement error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 1b. Factory Suppliers - Balances & Statement
   // ───────────────────────────────────────────────
