@@ -57,6 +57,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -184,6 +186,7 @@ export default function Payroll() {
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [bulkPaymentDialogOpen, setBulkPaymentDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [advanceWorkerComboOpen, setAdvanceWorkerComboOpen] = useState(false);
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
@@ -2938,7 +2941,7 @@ export default function Payroll() {
           <DialogHeader>
             <DialogTitle>New Salary Advance</DialogTitle>
             <DialogDescription>
-              Record a salary advance given to an employee
+              Record a salary advance given to a worker
             </DialogDescription>
           </DialogHeader>
 
@@ -2949,31 +2952,50 @@ export default function Payroll() {
                 name="employeeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Employee</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-advance-employee">
-                          <SelectValue placeholder="Select employee" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {employeesLoading ? (
-                          <SelectItem value="loading" disabled>
-                            Loading...
-                          </SelectItem>
-                        ) : employees && employees.length > 0 ? (
-                          employees.map((employee) => (
-                            <SelectItem key={employee.id} value={employee.id.toString()}>
-                              {employee.firstName} {employee.lastName} ({employee.code})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>
-                            No employees available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Worker</FormLabel>
+                    <Popover open={advanceWorkerComboOpen} onOpenChange={setAdvanceWorkerComboOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            data-testid="select-advance-employee"
+                            className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}
+                          >
+                            {field.value
+                              ? (() => {
+                                  const w = workerStaff.find(w => w.id.toString() === field.value);
+                                  return w ? `${w.firstName} ${w.lastName} (${w.code})` : "Select worker";
+                                })()
+                              : "Select worker"}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search workers..." />
+                          <CommandList>
+                            <CommandEmpty>No workers found.</CommandEmpty>
+                            <CommandGroup>
+                              {workerStaff.map((worker) => (
+                                <CommandItem
+                                  key={worker.id}
+                                  value={`${worker.firstName} ${worker.lastName} ${worker.code}`}
+                                  onSelect={() => {
+                                    field.onChange(worker.id.toString());
+                                    setAdvanceWorkerComboOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", field.value === worker.id.toString() ? "opacity-100" : "opacity-0")} />
+                                  {worker.firstName} {worker.lastName} ({worker.code})
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
