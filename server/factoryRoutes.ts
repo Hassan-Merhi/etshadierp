@@ -2000,8 +2000,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .from(factorySupplierFxTransfers)
         .where(eq(factorySupplierFxTransfers.companyId, companyId));
 
-      // Voucher-based payments: debit entries on voucherEntries where factorySupplierId is set
-      // These represent payments made via payment vouchers (not factorySupplierPayments table)
+      // Voucher-based payments: debit entries on voucherEntries where factorySupplierId is set.
+      // Exclude FACTORY-PAY-* vouchers — those are auto-generated from factorySupplierPayments
+      // and are already counted in allPayments (would double-count otherwise).
       const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
       const voucherPaidBySupplierCurrency: Record<number, Record<string, number>> = {};
@@ -2017,7 +2018,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(and(
             inArray(voucherEntries.factorySupplierId, allSupplierIds),
-            sql`${voucherEntries.debitAmount}::numeric > 0`
+            sql`${voucherEntries.debitAmount}::numeric > 0`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
           ));
         for (const row of voucherPaymentRows as any[]) {
           const suppId = row.factorySupplierId;
@@ -2039,14 +2041,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
-        // Always sum in USD for consistent approximate balance.
-        // Use (actualReceivedKg || totalKg) * ratePerKg — the original contracted amount — so
-        // that raw-stock offload charges (freight, duty, other) never inflate supplier payable.
+        // Sum container value including freight (agreed supplier charge) in USD.
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
+          const freight = parseFloat(c.freight || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
-          return sum + (kg * rate * fx);
+          return sum + ((kg * rate + freight) * fx);
         }, 0);
         // Commission owed to this supplier from containers where they are the commission/broker supplier
         // Exclude containers where this supplier is also the main purchase supplier (avoid double-counting)
@@ -2255,9 +2256,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const statement = containers.map((c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
-        // Always use kg * ratePerKg (original contracted amount) — offload charges must not
-        // inflate supplier payable. finalPayableAmount holds inclusive cost for stock costing only.
-        const value = kg * rate;
+        const freight = parseFloat(c.freight || "0");
+        // Supplier payable = kg × rate + freight (freight is an agreed charge to the supplier).
+        const value = kg * rate + freight;
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce((sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"), 0);
 
@@ -2274,6 +2275,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalKg: c.totalKg,
           ratePerKg: c.ratePerKg,
           differenceKg: c.differenceKg,
+          freight: freight.toFixed(2),
           value: value.toFixed(2),
           finalPayableAmount: c.finalPayableAmount,
           commissionAmount: c.commissionAmount || "0",
@@ -2505,8 +2507,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         for (const c of linkedContainers) {
           const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          // Use kg * ratePerKg — offload charges must not inflate supplier payable.
-          const value = kg * rate;
+          const freight = parseFloat((c as any).freight || "0");
+          // Supplier payable = kg × rate + freight (freight is an agreed charge to the supplier).
+          const value = kg * rate + freight;
           const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
           const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
           const cc = c.currencyCode || "USD";
@@ -2515,6 +2518,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             id: c.id,
             containerNumber: c.containerNumber,
             date: (c as any).arrivalDate || c.createdAt,
+            freight: freight.toFixed(2),
             value: value.toFixed(2),
             currencyCode: cc,
             fxRateToUsd: c.fxRateToUsd || "1",
@@ -2764,7 +2768,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       addRow(cc, {
         date: dateVal,
         type: "container",
-        description: `${c.containerNumber} - ${supplierName}`,
+        description: freight > 0
+          ? `${c.containerNumber} - ${supplierName} (incl. freight ${cc !== "USD" ? cc + " " : "$"}${freight.toFixed(2)})`
+          : `${c.containerNumber} - ${supplierName}`,
         ref: c.containerNumber,
         amount: mainAmt,
         commissionAmount: commAmt > 0 && commCc === cc ? commAmt : null,
