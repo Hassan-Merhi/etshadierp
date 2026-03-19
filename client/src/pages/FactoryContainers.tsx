@@ -224,8 +224,9 @@ export default function FactoryContainers() {
         commissionNotes: data.commissionNotes || null,
         freight: data.freight || "0",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
-        otherCharges: "0",
-        otherChargesAccountId: null,
+        // Preserve offload-set values — do NOT hardcode 0/null here
+        otherCharges: data.otherCharges || "0",
+        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
       if (!res.ok) {
@@ -563,8 +564,7 @@ export default function FactoryContainers() {
                   <TableHead>Container #</TableHead>
                   <TableHead>Supplier / Broker</TableHead>
                   <TableHead>Commission</TableHead>
-                  <TableHead>Freight</TableHead>
-                  <TableHead>Other Charges</TableHead>
+                  <TableHead>Charges</TableHead>
                   <TableHead>Total Value</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Arrival</TableHead>
@@ -602,20 +602,20 @@ export default function FactoryContainers() {
                         {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {freightAmt > 0 ? `${ccy} ${formatNumber(freightAmt)}` : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {totalOtherAmt > 0 ? (
-                          <div>
-                            <span>{ccy} {formatNumber(totalOtherAmt)}</span>
-                            {(preRegisteredAmt > 0 || legacyOtherAmt > 0) && additionalAmt > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                {ccy} {formatNumber(preRegisteredAmt + legacyOtherAmt)} + {formatNumber(additionalAmt)} addl
-                              </div>
-                            )}
-                            {additionalAmt > 0 && preRegisteredAmt === 0 && legacyOtherAmt === 0 && (
-                              <div className="text-xs text-muted-foreground">addl charges</div>
-                            )}
+                        {(freightAmt > 0 || totalOtherAmt > 0) ? (
+                          <div className="space-y-0.5">
+                            <span>{ccy} {formatNumber(freightAmt + totalOtherAmt)}</span>
+                            <div className="text-xs text-muted-foreground space-y-0">
+                              {freightAmt > 0 && (
+                                <div>Freight: {formatNumber(freightAmt)}</div>
+                              )}
+                              {(legacyOtherAmt + preRegisteredAmt) > 0 && (
+                                <div>Other: {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
+                              )}
+                              {additionalAmt > 0 && (
+                                <div>Additional: {formatNumber(additionalAmt)}</div>
+                              )}
+                            </div>
                           </div>
                         ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
