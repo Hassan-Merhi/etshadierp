@@ -543,33 +543,14 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              data-testid="button-credit-note-date"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? formatDisplayDate(field.value) : "Pick date"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value ? new Date(field.value) : undefined}
-                            onSelect={(date) => {
-                              if (date) field.onChange(format(date, "yyyy-MM-dd"));
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          data-testid="input-credit-note-date"
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />

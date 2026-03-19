@@ -3941,31 +3941,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-full sm:w-[200px] justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                  data-testid="button-journal-date-picker"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? formatDisplayDate(field.value) : "Pick a date"}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="end">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
+                              className="w-full sm:w-[200px]"
+                              data-testid="input-journal-date"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -4522,31 +4506,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2 space-y-0">
                       <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">Date:</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full sm:w-[160px] justify-start text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              data-testid="button-transfer-date-picker"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? formatDisplayDate(field.value) : "Pick date"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
+                          onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
+                          className="w-full sm:w-[160px]"
+                          data-testid="input-transfer-date"
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -5375,31 +5343,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-full sm:w-[200px] justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                  data-testid="button-adjustment-date-picker"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? formatDisplayDate(field.value) : "Pick a date"}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="end">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
+                              className="w-full sm:w-[200px]"
+                              data-testid="input-adjustment-date"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

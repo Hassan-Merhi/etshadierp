@@ -1,7 +1,9 @@
 import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
+import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -171,42 +173,21 @@ export function ReceiptVoucherTab({
                     )}
                   />
 
-                  {/* Date picker (narrower) */}
+                  {/* Date input (typable) */}
                   <FormField
                     control={form.control}
                     name="voucherDate"
                     render={({ field }) => (
                       <FormItem className="min-w-0">
                         <FormLabel>Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "h-10 w-full justify-start text-left font-normal",
-                                  !field.value && "text-muted-foreground",
-                                )}
-                                data-testid="button-date-picker"
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                <span className="truncate">
-                                  {field.value
-                                    ? formatDisplayDate(field.value)
-                                    : "Pick a date"}
-                                </span>
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
+                            onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
+                            data-testid="input-date-picker"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
