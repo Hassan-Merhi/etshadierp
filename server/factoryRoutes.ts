@@ -1748,6 +1748,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           actualReceivedKg: factoryContainers.actualReceivedKg,
           totalKg: factoryContainers.totalKg,
           ratePerKg: factoryContainers.ratePerKg,
+          freight: factoryContainers.freight,
           id: factoryContainers.id,
         })
         .from(factoryContainers)
@@ -1758,11 +1759,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ));
 
       const containerIds = contRows.map((c: any) => c.id);
-      // Use kg * ratePerKg (original contracted amount) so offload charges don't inflate balance.
       const totalValue = contRows.reduce((s: number, c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
-        return s + (kg * rate);
+        const freight = parseFloat(c.freight || "0");
+        return s + (kg * rate + freight);
       }, 0);
 
       // 2. Commissions from factoryContainerCommissions for these containers
@@ -1834,7 +1835,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Allocate this FX transfer against containers ordered by creation date
       try {
         const allContainers = await db
-          .select({ id: factoryContainers.id, finalPayableAmount: factoryContainers.finalPayableAmount, actualReceivedKg: factoryContainers.actualReceivedKg, totalKg: factoryContainers.totalKg, ratePerKg: factoryContainers.ratePerKg })
+          .select({ id: factoryContainers.id, finalPayableAmount: factoryContainers.finalPayableAmount, actualReceivedKg: factoryContainers.actualReceivedKg, totalKg: factoryContainers.totalKg, ratePerKg: factoryContainers.ratePerKg, freight: factoryContainers.freight })
           .from(factoryContainers)
           .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, fromSupId), eq(factoryContainers.currencyCode, currCode)))
           .orderBy(factoryContainers.createdAt); // oldest first
@@ -1855,8 +1856,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (rem <= 0.001) break;
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          // Use kg * ratePerKg for allocation ceiling so offload charges don't over-inflate.
-          const val = kg * rate;
+          const freight = parseFloat(c.freight || "0");
+          const val = kg * rate + freight;
           const used = allocatedPerContainer[c.id] || 0;
           const avail = Math.max(0, val - used);
           if (avail <= 0.001) continue;
@@ -2294,11 +2295,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid - voucherPaidUsd;
 
         // Per-currency balances (original currency, not converted).
-        // Use kg * ratePerKg so offload charges never inflate supplier payable.
+        // Use kg * ratePerKg + freight (exclude offload charges which are our cost, not supplier's).
         const byCurrency: Record<string, number> = {};
         for (const c of supplierContainers) {
           const cc = c.currencyCode || "USD";
-          const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+          const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0");
           byCurrency[cc] = (byCurrency[cc] || 0) + val;
         }
         // Add commission amounts (in their own currency) for containers where this supplier is the broker
