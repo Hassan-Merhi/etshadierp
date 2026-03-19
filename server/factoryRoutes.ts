@@ -2409,7 +2409,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             daysPastDue: Math.floor((now.getTime() - new Date(c.offloadDate).getTime()) / (24 * 60 * 60 * 1000)) - 30,
           })) : [];
 
-        return { totalContainers, totalKg, containerValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers };
+        // Approx FX rate: weighted average rate across non-USD containers (for UI display)
+        const fxContainers = supplierContainers.filter((c: any) => (c.currencyCode || "USD") !== "USD" && parseFloat(c.fxRateToUsd || "0") > 0);
+        const fxWeightedSum = fxContainers.reduce((s: number, c: any) => {
+          const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0");
+          return s + val * parseFloat(c.fxRateToUsd || "1");
+        }, 0);
+        const fxWeightBase = fxContainers.reduce((s: number, c: any) => {
+          return s + (parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0"));
+        }, 0);
+        const approxFxRate = fxWeightBase > 0 ? fxWeightedSum / fxWeightBase : 0;
+
+        return { totalContainers, totalKg, containerValue, commissionValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers, approxFxRate };
       };
 
       // First pass: compute each supplier's own stats
@@ -2431,6 +2442,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             totalKg: own.totalKg.toFixed(3),
             totalValue: own.balance.toFixed(2),
             totalPaid: own.totalPaid.toFixed(2),
+            totalCommissionUsd: own.commissionValue.toFixed(2),
+            approxFxRate: own.approxFxRate > 0 ? own.approxFxRate.toFixed(4) : null,
             pendingContainers: own.pendingContainers,
             receivedContainers: own.receivedContainers,
             lastContainerDate: own.lastContainerDate,
@@ -2451,6 +2464,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
         const aggDueContainers = [...own.dueContainers, ...childStats.flatMap((cs: any) => cs.dueContainers)];
+        // Aggregate commission across own + all children
+        const aggCommission = own.commissionValue + childStats.reduce((n: number, cs: any) => n + cs.commissionValue, 0);
+        // Weighted average FX rate across own + children (weight by container value)
+        const allStats = [own, ...childStats];
+        const totalFxWeightedSum = allStats.reduce((s: number, cs: any) => {
+          const base = cs.approxFxRate > 0 ? (cs.containerValue > 0 ? cs.containerValue : 0) : 0;
+          return s + (cs.approxFxRate * base);
+        }, 0);
+        const totalFxWeightBase = allStats.reduce((s: number, cs: any) => s + (cs.approxFxRate > 0 ? cs.containerValue : 0), 0);
+        const aggApproxFxRate = totalFxWeightBase > 0 ? totalFxWeightedSum / totalFxWeightBase : 0;
 
         // Aggregate currency balances across own + children
         const aggCurrencyMap: Record<string, number> = {};
@@ -2473,6 +2496,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalKg: aggKg.toFixed(3),
           totalValue: aggBalance.toFixed(2),
           totalPaid: aggPaid.toFixed(2),
+          totalCommissionUsd: aggCommission.toFixed(2),
+          approxFxRate: aggApproxFxRate > 0 ? aggApproxFxRate.toFixed(4) : null,
           pendingContainers: aggPending,
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,

@@ -55,6 +55,8 @@ interface SupplierWithBalance extends FactorySupplier {
   receivedContainers: number;
   lastContainerDate: string | null;
   currencyBalances?: CurrencyBalance[];
+  totalCommissionUsd?: string;
+  approxFxRate?: string | null;
 }
 
 
@@ -762,12 +764,25 @@ export default function FactorySuppliers() {
 
         {/* Broker summary cards */}
         {parentSup && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-4">
                 <div className="text-xs text-muted-foreground">Total Owed (approx. USD)</div>
                 <div className="text-2xl font-bold mt-1 tabular-nums" data-testid="text-parent-total-balance">
                   ~${formatNum(parentSup.totalValue)}
+                </div>
+                {parentSup.approxFxRate && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    rate: 1 {[...new Set(foreignCurrencies.map(b => b.currencyCode))][0] || "EUR"} ≈ ${parseFloat(parentSup.approxFxRate).toFixed(2)} USD
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground">Total Commission (USD)</div>
+                <div className="text-2xl font-bold mt-1 tabular-nums text-amber-600 dark:text-amber-400" data-testid="text-parent-total-commission">
+                  ~${formatNum(parentSup.totalCommissionUsd || "0")}
                 </div>
               </CardContent>
             </Card>
