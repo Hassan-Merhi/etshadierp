@@ -1176,16 +1176,22 @@ export default function ProductionRawStock() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={offloadDialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Offload Container to Production</DialogTitle>
-            <DialogDescription>
-              Enter the actual received weight and verify cost details
-            </DialogDescription>
-          </DialogHeader>
+      {offloadDialogOpen && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          {/* Full-page header */}
+          <div className="sticky top-0 z-10 border-b bg-background px-6 py-3 flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="text-lg font-semibold">Offload Container to Production</h2>
+              <p className="text-sm text-muted-foreground">Enter the actual received weight and verify cost details</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={handleCloseDialog} data-testid="button-close-offload-page">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
 
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2 col-span-2">
                 <Label>Container</Label>
@@ -1722,21 +1728,24 @@ export default function ProductionRawStock() {
               </>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-offload">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleOffload}
-                disabled={offloadMutation.isPending || !selectedContainerId}
-                data-testid="button-confirm-offload"
-              >
-                {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
-              </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Sticky footer with action buttons */}
+          <div className="shrink-0 border-t bg-background px-6 py-4 flex justify-end gap-3">
+            <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-offload">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOffload}
+              disabled={offloadMutation.isPending || !selectedContainerId}
+              data-testid="button-confirm-offload"
+            >
+              {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={obDialogOpen} onOpenChange={handleCloseObDialog}>
         <DialogContent className="max-w-lg">
