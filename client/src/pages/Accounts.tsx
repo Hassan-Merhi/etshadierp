@@ -1830,11 +1830,11 @@ export default function Accounts() {
                                           </span>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{e.ref || (e.type === "payment" ? "Payment" : e.detail) || "-"}</TableCell>
-                                        <TableCell className="text-right text-sm tabular-nums text-red-600 dark:text-red-400">
-                                          {e.type === "purchase" ? cleanAmt : ""}
-                                        </TableCell>
                                         <TableCell className="text-right text-sm tabular-nums text-green-600 dark:text-green-400">
                                           {e.type === "payment" ? cleanAmt : ""}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm tabular-nums text-red-600 dark:text-red-400">
+                                          {e.type === "purchase" ? cleanAmt : ""}
                                         </TableCell>
                                         <TableCell className={`text-right text-sm tabular-nums font-medium ${e.runBal > 0 ? "text-red-600 dark:text-red-400" : e.runBal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                                           ${Math.abs(e.runBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{e.runBal > 0 ? " Cr" : e.runBal < 0 ? " Dr" : ""}

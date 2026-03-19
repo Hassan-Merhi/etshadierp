@@ -1278,7 +1278,9 @@ export default function FactorySuppliers() {
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
-                                {row.type === "payment" ? "−" : row.type === "purchase" ? "+" : row.amountIsNeg ? "−" : ""}{row.amount}
+                                {row.type !== "payment" && row.type !== "purchase" && row.amountIsNeg ? "−" : ""}{row.amount}
+                                {row.type === "purchase" && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
+                                {row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                                 ${formatNum(String(Math.abs(bal)))}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
