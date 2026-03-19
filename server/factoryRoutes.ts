@@ -2301,7 +2301,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .orderBy(desc(factorySupplierPayments.date));
 
-      // Also fetch voucher-based payments (payment/receipt vouchers where factory supplier is debited)
+      // Also fetch voucher-based payments (manually created Payment vouchers — exclude
+      // auto-generated FACTORY-PAY-* vouchers which are already reflected in the payments array)
       const voucherPaymentRows = await db
         .select({
           id: voucherEntries.id,
@@ -2319,7 +2320,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(
           eq(voucherEntries.factorySupplierId, supplierId),
-          sql`${voucherEntries.debitAmount}::numeric > 0`
+          sql`${voucherEntries.debitAmount}::numeric > 0`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
         ))
         .orderBy(desc(vouchers.voucherDate));
 

@@ -400,6 +400,21 @@ export default function Accounts() {
     enabled: !!selectedAccount && isFactorySupplierAccount,
   });
 
+  // Detect broker: has linked suppliers — then also fetch consolidated broker statement
+  const isBrokerSupplier = !!(factorySupplierStatement?.linkedSupplierGroups?.length > 0);
+  const { data: brokerStatementData, isLoading: brokerStatementLoading } = useQuery<any>({
+    queryKey: selectedAccount && isBrokerSupplier
+      ? ["/api/factory/suppliers", selectedAccount.accountId, "broker-statement"]
+      : [],
+    queryFn: async () => {
+      if (!selectedAccount || !isBrokerSupplier) return null;
+      const res = await fetch(`/api/factory/suppliers/${selectedAccount.accountId}/broker-statement`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch broker statement");
+      return res.json();
+    },
+    enabled: !!selectedAccount && isBrokerSupplier,
+  });
+
   const prePeriodAccountType = selectedAccount
     ? (selectedAccount.type || "").toLowerCase().replace(" ", "-")
     : null;
@@ -1755,17 +1770,136 @@ export default function Accounts() {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">
-                      Factory Supplier: {selectedAccount?.name}
+                      {isBrokerSupplier ? "Broker Consolidated Statement" : "Factory Supplier"}: {selectedAccount?.name}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {factoryStatementLoading ? (
+                    {factoryStatementLoading || (isBrokerSupplier && brokerStatementLoading) ? (
                       <div className="space-y-2">
                         {[1, 2, 3].map((i) => (
                           <Skeleton key={i} className="h-10 w-full" />
                         ))}
                       </div>
+                    ) : isBrokerSupplier && brokerStatementData ? (
+                      /* ── BROKER: show consolidated currency ledgers (same as Suppliers page) ── */
+                      <div className="space-y-6">
+                        {brokerStatementData.currencyLedgers?.length > 0 ? (
+                          brokerStatementData.currencyLedgers.map((section: any) => {
+                            const typeLabel: Record<string, string> = {
+                              container: "Container", payment: "Payment",
+                              fx_out: "FX Out", fx_in: "FX In", commission: "Commission",
+                            };
+                            const typeColor = (t: string) => {
+                              if (t === "payment") return "text-green-600 dark:text-green-400";
+                              if (t === "fx_out") return "text-amber-600 dark:text-amber-400";
+                              if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
+                              if (t === "commission") return "text-destructive";
+                              return "";
+                            };
+                            const fmt = (v: string | number) =>
+                              parseFloat(String(v)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            const ccPfx = (cc: string) => cc !== "USD" ? `${cc} ` : "$";
+                            return (
+                              <div key={section.currencyCode} className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-sm px-3 py-1 font-bold">
+                                    {section.currencyCode}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                                <div className="overflow-x-auto rounded-md border">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-muted/50">
+                                        <TableHead className="text-xs h-8">Date</TableHead>
+                                        <TableHead className="text-xs h-8">Type</TableHead>
+                                        <TableHead className="text-xs h-8">Description</TableHead>
+                                        <TableHead className="text-xs h-8 text-right">Amount ({section.currencyCode})</TableHead>
+                                        <TableHead className="text-xs h-8 text-right">Commission</TableHead>
+                                        <TableHead className="text-xs h-8 text-right">Balance</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {section.rows.map((row: any, idx: number) => (
+                                        <TableRow key={`${row.ref}-${idx}`} className="text-xs">
+                                          <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
+                                            {row.date ? new Date(row.date).toLocaleDateString() : "—"}
+                                          </TableCell>
+                                          <TableCell className="py-1.5">
+                                            <Badge variant={row.type === "payment" ? "secondary" : row.type === "commission" ? "destructive" : "outline"} className="text-xs py-0 font-normal">
+                                              {typeLabel[row.type] || row.type}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-1.5 max-w-[220px] truncate font-medium">
+                                            {row.description}
+                                          </TableCell>
+                                          <TableCell className={`py-1.5 text-right tabular-nums font-medium ${typeColor(row.type)}`}>
+                                            {row.amount < 0 ? "−" : ""}{ccPfx(section.currencyCode)}{fmt(Math.abs(row.amount))}
+                                          </TableCell>
+                                          <TableCell className="py-1.5 text-right tabular-nums text-xs text-muted-foreground">
+                                            {row.commissionAmount != null && row.commissionAmount > 0
+                                              ? `${row.commissionCurrency || section.currencyCode} ${fmt(row.commissionAmount)}`
+                                              : "—"}
+                                          </TableCell>
+                                          <TableCell className={`py-1.5 text-right tabular-nums font-medium text-xs ${row.runningBalance > 0 ? "text-red-600 dark:text-red-400" : row.runningBalance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                            {ccPfx(section.currencyCode)}{fmt(Math.abs(row.runningBalance))}
+                                            <span className="ml-1 opacity-70">{row.runningBalance > 0 ? "CR" : row.runningBalance < 0 ? "DR" : ""}</span>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                                <div className="flex justify-end">
+                                  <div className="text-xs space-y-0.5 text-right min-w-56 pr-1">
+                                    <div className="flex justify-between gap-6 text-muted-foreground">
+                                      <span>Gross Value</span>
+                                      <span className="tabular-nums font-medium text-foreground">{ccPfx(section.currencyCode)}{fmt(section.totalValue)}</span>
+                                    </div>
+                                    {parseFloat(section.totalCommission) > 0 && (
+                                      <div className="flex justify-between gap-6 text-muted-foreground">
+                                        <span>Commission</span>
+                                        <span className="tabular-nums text-destructive">{ccPfx(section.currencyCode)}{fmt(section.totalCommission)}</span>
+                                      </div>
+                                    )}
+                                    {parseFloat(section.totalPaid) > 0 && (
+                                      <div className="flex justify-between gap-6 text-muted-foreground">
+                                        <span>Paid</span>
+                                        <span className="tabular-nums text-green-600 dark:text-green-400">− {ccPfx(section.currencyCode)}{fmt(section.totalPaid)}</span>
+                                      </div>
+                                    )}
+                                    {parseFloat(section.totalFxOut) > 0 && (
+                                      <div className="flex justify-between gap-6 text-muted-foreground">
+                                        <span>FX Out</span>
+                                        <span className="tabular-nums text-amber-600 dark:text-amber-400">− {ccPfx(section.currencyCode)}{fmt(section.totalFxOut)}</span>
+                                      </div>
+                                    )}
+                                    {parseFloat(section.totalFxIn) > 0 && (
+                                      <div className="flex justify-between gap-6 text-muted-foreground">
+                                        <span>FX In</span>
+                                        <span className="tabular-nums text-blue-600 dark:text-blue-400">+ {ccPfx(section.currencyCode)}{fmt(section.totalFxIn)}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between gap-6 border-t pt-1">
+                                      <span className="font-semibold">Net Balance</span>
+                                      <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-red-600 dark:text-red-400" : parseFloat(section.netBalance) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                        {ccPfx(section.currencyCode)}{fmt(Math.abs(parseFloat(section.netBalance)))}
+                                        <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "CR" : parseFloat(section.netBalance) < 0 ? "DR" : ""}</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">No broker activity found.</p>
+                        )}
+                      </div>
                     ) : factorySupplierStatement ? (
+                      /* ── REGULAR SUPPLIER: show summary + transaction ledger ── */
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="p-3 rounded-md bg-muted/50">
