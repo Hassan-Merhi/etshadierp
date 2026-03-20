@@ -1040,18 +1040,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/users",
     requireAuth,
     requireRole("Admin"),
-    async (_req, res) => {
+    async (req, res) => {
       try {
         const users = await storage.getAllUsers();
+        const requesterIsDeveloper = req.user?.role === "Developer";
+
         // Collect user IDs that have the Developer role in any company
         const devRoles = await db
           .select({ userId: userCompanyRoles.userId })
           .from(userCompanyRoles)
           .where(eq(userCompanyRoles.role, "Developer"));
         const devUserIds = new Set(devRoles.map((r) => r.userId));
-        // Remove passwords from response and hide Developer accounts
+
+        // Developer accounts are invisible to everyone except other Developers
         const usersWithoutPasswords = users
-          .filter((u) => !devUserIds.has(u.id))
+          .filter((u) => requesterIsDeveloper || !devUserIds.has(u.id))
           .map(({ password, ...user }) => user);
         res.json(usersWithoutPasswords);
       } catch (error: any) {
