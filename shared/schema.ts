@@ -3857,3 +3857,34 @@ export const insertErpWorkerDocSchema = createInsertSchema(erpWorkerDocs).omit({
 
 export type InsertErpWorkerDoc = z.infer<typeof insertErpWorkerDocSchema>;
 export type ErpWorkerDoc = typeof erpWorkerDocs.$inferSelect;
+
+// ERP Payroll Runs (draft → paid workflow)
+export const erpPayrollRuns = pgTable("erp_payroll_runs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  status: text("status").notNull().default("DRAFT"), // DRAFT | PAID
+  date: text("date").notNull(),
+  notes: text("notes"),
+  paymentAccountId: integer("payment_account_id"),
+  paidAt: text("paid_at"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertErpPayrollRunSchema = createInsertSchema(erpPayrollRuns).omit({ id: true });
+export type InsertErpPayrollRun = z.infer<typeof insertErpPayrollRunSchema>;
+export type ErpPayrollRun = typeof erpPayrollRuns.$inferSelect;
+
+export const erpPayrollRunItems = pgTable("erp_payroll_run_items", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  groupName: text("group_name"),
+  baseSalary: decimal("base_salary", { precision: 18, scale: 2 }).notNull(),
+  deduction: decimal("deduction", { precision: 18, scale: 2 }).notNull().default("0"),
+  netPay: decimal("net_pay", { precision: 18, scale: 2 }).notNull(),
+});
+
+export const insertErpPayrollRunItemSchema = createInsertSchema(erpPayrollRunItems).omit({ id: true });
+export type InsertErpPayrollRunItem = z.infer<typeof insertErpPayrollRunItemSchema>;
+export type ErpPayrollRunItem = typeof erpPayrollRunItems.$inferSelect;

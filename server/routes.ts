@@ -109,6 +109,8 @@ import {
   erpWorkerDocs,
   insertErpWorkerDocSchema,
   factoryUserProfiles,
+  erpPayrollRuns,
+  erpPayrollRunItems,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -5190,6 +5192,147 @@ if (asOfDate) {
       }
     },
   );
+
+  // ── ERP Payroll Runs (draft → paid workflow) ──────────────────────────────
+
+  // Create a new payroll run (saves as DRAFT, no ledger entries yet)
+  app.post("/api/payroll/runs", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { date, notes, items } = req.body;
+      if (!date || !Array.isArray(items) || items.length === 0)
+        return res.status(400).json({ message: "date and items are required" });
+      const createdAt = new Date().toISOString();
+      const [run] = await db.insert(erpPayrollRuns).values({ companyId, status: "DRAFT", date, notes: notes || null, createdAt }).returning();
+      await db.insert(erpPayrollRunItems).values(
+        items.map((it: any) => ({
+          runId: run.id,
+          employeeId: it.employeeId,
+          employeeName: it.employeeName,
+          groupName: it.groupName || null,
+          baseSalary: parseFloat(it.baseSalary).toFixed(2),
+          deduction: parseFloat(it.deduction || 0).toFixed(2),
+          netPay: parseFloat(it.netPay).toFixed(2),
+        }))
+      );
+      res.json({ ...run, items });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // List payroll runs for current company
+  app.get("/api/payroll/runs", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const runs = await db.select().from(erpPayrollRuns)
+        .where(eq(erpPayrollRuns.companyId, companyId))
+        .orderBy(desc(erpPayrollRuns.createdAt));
+      // Attach item counts + totals
+      const result = await Promise.all(runs.map(async (run) => {
+        const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
+        const totalNet = items.reduce((s, i) => s + parseFloat(i.netPay), 0);
+        const totalBase = items.reduce((s, i) => s + parseFloat(i.baseSalary), 0);
+        return { ...run, itemCount: items.length, totalNet: totalNet.toFixed(2), totalBase: totalBase.toFixed(2), items };
+      }));
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Update a DRAFT run's items / mark as PAID
+  app.patch("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const runId = parseInt(req.params.id);
+      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      if (!run) return res.status(404).json({ message: "Payroll run not found" });
+
+      const { action, items, paymentAccountId, date, notes } = req.body;
+
+      if (action === "pay") {
+        // Mark as PAID + create ledger entries
+        if (run.status === "PAID") return res.status(400).json({ message: "Already paid" });
+        if (!paymentAccountId) return res.status(400).json({ message: "Payment account required" });
+
+        const runItems = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
+        const totalAmount = runItems.reduce((s, i) => s + parseFloat(i.netPay), 0);
+        if (totalAmount <= 0) return res.status(400).json({ message: "Total net pay must be > 0" });
+
+        const allAccounts = await storage.getAllLedgerAccounts(companyId);
+        let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+        if (!salaryExpenseAccount) {
+          salaryExpenseAccount = await storage.createLedgerAccount({
+            companyId, code: "SALARY_EXPENSE", name: "Salary Expense", accountType: "Expense", openingBalance: "0", active: true,
+          });
+        }
+        const payDate = run.date;
+        const voucherNumber = `SAL-${runId}-${Date.now()}`;
+        const [voucher] = await db.insert(vouchers).values({
+          companyId, voucherNumber, voucherType: "Payment", voucherDate: payDate,
+          description: run.notes || `Payroll run #${runId} — ${runItems.length} workers`,
+          totalAmount: totalAmount.toFixed(2),
+        }).returning();
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id, ledgerAccountId: salaryExpenseAccount.id,
+          debitAmount: totalAmount.toFixed(2), creditAmount: "0",
+          narration: `Salary expense — payroll run #${runId}`,
+        });
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id, ledgerAccountId: parseInt(paymentAccountId),
+          debitAmount: "0", creditAmount: totalAmount.toFixed(2),
+          narration: `Cash paid — payroll run #${runId}`,
+        });
+        const [updated] = await db.update(erpPayrollRuns)
+          .set({ status: "PAID", paymentAccountId: parseInt(paymentAccountId), paidAt: new Date().toISOString() })
+          .where(eq(erpPayrollRuns.id, runId)).returning();
+        return res.json({ ...updated, voucher });
+      }
+
+      if (action === "update" || !action) {
+        // Update items/notes while still DRAFT
+        if (run.status === "PAID") return res.status(400).json({ message: "Cannot edit a paid run" });
+        const updates: any = {};
+        if (notes !== undefined) updates.notes = notes;
+        if (date) updates.date = date;
+        if (Object.keys(updates).length) await db.update(erpPayrollRuns).set(updates).where(eq(erpPayrollRuns.id, runId));
+        if (Array.isArray(items) && items.length > 0) {
+          await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
+          await db.insert(erpPayrollRunItems).values(
+            items.map((it: any) => ({
+              runId, employeeId: it.employeeId, employeeName: it.employeeName,
+              groupName: it.groupName || null,
+              baseSalary: parseFloat(it.baseSalary).toFixed(2),
+              deduction: parseFloat(it.deduction || 0).toFixed(2),
+              netPay: parseFloat(it.netPay).toFixed(2),
+            }))
+          );
+        }
+        const [updated] = await db.select().from(erpPayrollRuns).where(eq(erpPayrollRuns.id, runId));
+        const updatedItems = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
+        return res.json({ ...updated, items: updatedItems });
+      }
+
+      res.status(400).json({ message: "Unknown action" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Delete a DRAFT payroll run
+  app.delete("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const runId = parseInt(req.params.id);
+      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      if (!run) return res.status(404).json({ message: "Payroll run not found" });
+      if (run.status === "PAID") return res.status(400).json({ message: "Cannot delete a paid run" });
+      await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
+      await db.delete(erpPayrollRuns).where(eq(erpPayrollRuns.id, runId));
+      res.json({ message: "Deleted" });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // ── End ERP Payroll Runs ──────────────────────────────────────────────────
 
   // Get employees with calculated balances from transactions
   app.get(
