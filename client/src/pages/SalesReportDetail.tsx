@@ -4,10 +4,12 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, LayoutList } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
+
+type PLFilter = "all" | "gain" | "loss";
 
 interface SalesReportItem {
   id: number;
@@ -43,6 +45,7 @@ export default function SalesReportDetail() {
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [plFilter, setPlFilter] = useState<PLFilter>("all");
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";
@@ -64,11 +67,13 @@ export default function SalesReportDetail() {
     enabled: !!startDate,
   });
 
-  const sortedItems = [...items].sort((a, b) => {
-    const locA = a.locationName || "";
-    const locB = b.locationName || "";
-    return locA.localeCompare(locB);
-  });
+  const sortedItems = [...items]
+    .sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""))
+    .filter((item) => {
+      if (plFilter === "gain") return item.configuredProfit > 0;
+      if (plFilter === "loss") return item.configuredProfit < 0;
+      return true;
+    });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -85,24 +90,56 @@ export default function SalesReportDetail() {
     return () => window.removeEventListener("keydown", handler);
   }, [selectedItemId, sortedItems, navigate]);
 
-  const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-  const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
-  const totalCost = items.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
-  const totalConfiguredCost = items.reduce((sum, item) => sum + (item.totalConfiguredCost || 0), 0);
+  const totalQty = sortedItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+  const totalSales = sortedItems.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
+  const totalCost = sortedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
+  const totalConfiguredCost = sortedItems.reduce((sum, item) => sum + (item.totalConfiguredCost || 0), 0);
   const costProfit = totalSales - totalCost;
   const configuredProfit = totalSales - totalConfiguredCost;
 
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/sales-report")} data-testid="button-back-to-sales-report">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold">Sales Details — {displayDate}</h1>
           <p className="text-sm text-muted-foreground">
             All items sold {grouping === "daily" ? "on this day" : grouping === "monthly" ? "this month" : "this year"}
           </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-pl-toggle">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+            onClick={() => setPlFilter("all")}
+            data-testid="button-filter-all"
+          >
+            <LayoutList className="h-3.5 w-3.5 mr-1" />
+            All
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
+            onClick={() => setPlFilter("gain")}
+            data-testid="button-filter-gaining"
+          >
+            <TrendingUp className="h-3.5 w-3.5 mr-1" />
+            Gaining
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
+            onClick={() => setPlFilter("loss")}
+            data-testid="button-filter-losing"
+          >
+            <TrendingDown className="h-3.5 w-3.5 mr-1" />
+            Losing
+          </Button>
         </div>
       </div>
 
@@ -242,7 +279,7 @@ export default function SalesReportDetail() {
                   </TableBody>
                   <TableFooter className="sticky bottom-0 bg-background border-t">
                     <TableRow className="font-semibold">
-                      <TableCell colSpan={2}>Total ({items.length} items)</TableCell>
+                      <TableCell colSpan={2}>Total ({sortedItems.length} items{plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})</TableCell>
                       <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
