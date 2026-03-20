@@ -6515,6 +6515,38 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/salary-advance-deductions", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .select({
+          id: salaryAdvanceDeductions.id,
+          salaryAdvanceId: salaryAdvanceDeductions.salaryAdvanceId,
+          payrollMonth: salaryAdvanceDeductions.payrollMonth,
+          deductionAmount: salaryAdvanceDeductions.deductionAmount,
+          createdAt: salaryAdvanceDeductions.createdAt,
+          advanceDate: salaryAdvances.advanceDate,
+          advanceAmount: salaryAdvances.amount,
+          advanceRemaining: salaryAdvances.remainingBalance,
+          employeeId: salaryAdvances.employeeId,
+          employeeFirstName: employees.firstName,
+          employeeLastName: employees.lastName,
+        })
+        .from(salaryAdvanceDeductions)
+        .innerJoin(salaryAdvances, eq(salaryAdvanceDeductions.salaryAdvanceId, salaryAdvances.id))
+        .innerJoin(employees, eq(salaryAdvances.employeeId, employees.id))
+        .where(eq(salaryAdvances.companyId, companyId))
+        .orderBy(sql`${salaryAdvanceDeductions.createdAt} DESC`);
+      res.json(rows.map((r) => ({
+        ...r,
+        workerName: `${r.employeeFirstName} ${r.employeeLastName}`.trim(),
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Groups
   app.get("/api/stock-groups", requireAuth, async (req, res) => {
     try {

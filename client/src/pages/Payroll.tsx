@@ -70,13 +70,15 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { ERPWorkerDetail } from "@/components/ERPWorkerDetail";
+import ERPRunPayroll from "@/components/ERPRunPayroll";
+import ERPAdvancesTab from "@/components/ERPAdvancesTab";
 
 const depositSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
@@ -1385,6 +1387,7 @@ export default function Payroll() {
                 { key: "employees", label: "Employees", icon: Users as LucideIcon },
                 { key: "workers", label: "Workers", icon: HardHat as LucideIcon },
                 { key: "worker-profiles", label: "Worker Profiles", icon: User as LucideIcon },
+                { key: "run-payroll", label: "Run Payroll", icon: PlayCircle as LucideIcon },
                 { key: "advances", label: "Advances", icon: Banknote as LucideIcon },
               ],
             },
@@ -2407,294 +2410,12 @@ export default function Payroll() {
           );
         })()}
 
+        {selectedTab === "run-payroll" && (
+          <ERPRunPayroll />
+        )}
+
         {selectedTab === "advances" && (
-          <>
-          {(() => {
-            // Filter advances to show only workers
-            const workerAdvancesList = salaryAdvances?.filter(adv => 
-              workerStaff.some(worker => worker.id === adv.employeeId)
-            ) || [];
-            
-            // Recalculate stats for workers only
-            const workerAdvancesStats = {
-              totalAdvances: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.amount), 0),
-              outstandingBalance: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.remainingBalance), 0),
-              unpaidCount: workerAdvancesList.filter(adv => !adv.fullyPaid).length,
-            };
-            
-            return (
-              <>
-                {/* Summary Statistics */}
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-4">
-                  <Card className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Advances Given</p>
-                        <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
-                          {formatAmount(workerAdvancesStats.totalAdvances)}
-                        </p>
-                      </div>
-                      <DollarSign className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                  </Card>
-
-                  <Card className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                        <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
-                          {formatAmount(workerAdvancesStats.outstandingBalance)}
-                        </p>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-destructive" />
-                    </div>
-                  </Card>
-
-                  <Card className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Unpaid Advances</p>
-                        <p className="text-2xl font-semibold" data-testid="text-unpaid-count">
-                          {workerAdvancesStats.unpaidCount}
-                        </p>
-                      </div>
-                      <AlertCircle className="h-8 w-8 text-orange-500" />
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Worker Management Section */}
-                <Card className="p-6 mb-4">
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div>
-                        <h2 className="text-lg font-semibold">Manage Workers</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Add, edit, or remove workers from this company
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => setNewWorkerDialogOpen(true)}
-                        data-testid="button-new-worker"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Worker
-                      </Button>
-                    </div>
-
-                    {workerStaff.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <p className="text-sm">No workers found. Click "New Worker" to add one.</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-2">
-                        {workerStaff.map((worker) => {
-                          const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
-                          const hasAdvances = advanceInfo.total > 0;
-                          const balance = parseFloat(worker.currentBalance || "0");
-                          const canDelete = !hasAdvances && balance === 0;
-                          
-                          return (
-                            <div
-                              key={worker.id}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border rounded-md hover-elevate"
-                              data-testid={`worker-row-${worker.id}`}
-                            >
-                              <div className="flex flex-wrap items-center gap-4">
-                                <div>
-                                  <div className="font-medium">
-                                    {worker.firstName} {worker.lastName}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {worker.code} • Salary: {formatAmount(parseFloat(worker.monthlySalary))}
-                                  </div>
-                                </div>
-                                {hasAdvances && (
-                                  <Badge variant="secondary" className="text-destructive">
-                                    {formatAmount(advanceInfo.total)} advance
-                                  </Badge>
-                                )}
-                                {balance !== 0 && (
-                                  <Badge variant="secondary">
-                                    Balance: {formatAmount(balance)}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedWorkerForEdit(worker);
-                                    setEditWorkerDialogOpen(true);
-                                  }}
-                                  data-testid={`button-edit-worker-${worker.id}`}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <ConfirmationDialog
-                                  trigger={
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      data-testid={`button-delete-worker-${worker.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  }
-                                  title="Delete Worker"
-                                  description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
-                                  confirmText="Delete"
-                                  variant="destructive"
-                                  onConfirm={() => handleDeleteWorker(worker)}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div>
-                        <h2 className="text-lg font-semibold">Salary Advances (Workers Only)</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Track advances given to workers and record deductions
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => setAdvanceDialogOpen(true)}
-                        data-testid="button-new-advance"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Advance
-                      </Button>
-                    </div>
-
-                    {advancesLoading ? (
-                      <Skeleton className="h-[400px] w-full" />
-                    ) : workerStaff.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <p>No workers found</p>
-                        <p className="text-sm mt-2">Create workers from the Workers tab or Create Master Data page</p>
-                      </div>
-                    ) : workerAdvancesList.length === 0 ? (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <p>No salary advances found for workers</p>
-                        <p className="text-sm mt-2">Click "New Advance" to record a salary advance for a worker</p>
-                      </div>
-                    ) : (
-                      <>
-                      <div className="hidden md:block border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead data-testid="header-employee">Worker</TableHead>
-                              <TableHead data-testid="header-advance-date">Advance Date</TableHead>
-                              <TableHead data-testid="header-amount" className="text-right">Amount</TableHead>
-                              <TableHead data-testid="header-remaining" className="text-right">Remaining Balance</TableHead>
-                              <TableHead data-testid="header-paid-status">Status</TableHead>
-                              <TableHead data-testid="header-advance-actions" className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {workerAdvancesList.map((advance) => {
-                              const worker = workerStaff.find(w => w.id === advance.employeeId);
-                              return (
-                              <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
-                                <TableCell data-testid={`cell-employee-${advance.id}`}>
-                                  <div>
-                                    <div className="font-medium">{worker ? `${worker.firstName} ${worker.lastName}` : `Worker #${advance.employeeId}`}</div>
-                                    <div className="text-sm text-muted-foreground">{worker?.code}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell data-testid={`cell-date-${advance.id}`}>
-                                  {formatDisplayDate(new Date(advance.advanceDate))}
-                                </TableCell>
-                                <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
-                                  {formatAmount(parseFloat(advance.amount))}
-                                </TableCell>
-                                <TableCell data-testid={`cell-remaining-${advance.id}`} className="text-right font-mono">
-                                  {formatAmount(parseFloat(advance.remainingBalance))}
-                                </TableCell>
-                                <TableCell data-testid={`cell-status-${advance.id}`}>
-                                  <Badge variant={advance.fullyPaid ? "default" : "secondary"} data-testid={`badge-status-${advance.id}`}>
-                                    {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell data-testid={`cell-actions-${advance.id}`} className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleRecordDeduction(advance)}
-                                      disabled={advance.fullyPaid}
-                                      data-testid={`button-record-deduction-${advance.id}`}
-                                    >
-                                      Record Deduction
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => setAdvanceToDelete(advance.id)}
-                                      data-testid={`button-delete-advance-${advance.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      <div className="md:hidden space-y-3">
-                        {workerAdvancesList.map((advance) => {
-                          const worker = workerStaff.find(w => w.id === advance.employeeId);
-                          return (
-                          <Card key={advance.id} data-testid={`card-advance-${advance.id}`}>
-                            <CardContent className="p-4 space-y-2">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <div className="font-medium">{worker ? `${worker.firstName} ${worker.lastName}` : `Worker #${advance.employeeId}`}</div>
-                                  <div className="text-sm text-muted-foreground">{worker?.code} - {formatDisplayDate(new Date(advance.advanceDate))}</div>
-                                </div>
-                                <Badge variant={advance.fullyPaid ? "default" : "secondary"}>
-                                  {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Amount: <span className="font-mono text-foreground">{formatAmount(parseFloat(advance.amount))}</span></span>
-                                <span className="text-muted-foreground">Remaining: <span className="font-mono font-semibold text-foreground">{formatAmount(parseFloat(advance.remainingBalance))}</span></span>
-                              </div>
-                              <div className="flex gap-2">
-                                {!advance.fullyPaid && (
-                                  <Button size="sm" variant="outline" className="flex-1" onClick={() => handleRecordDeduction(advance)} data-testid={`button-record-deduction-mobile-${advance.id}`}>
-                                    Record Deduction
-                                  </Button>
-                                )}
-                                <Button size="icon" variant="ghost" onClick={() => setAdvanceToDelete(advance.id)} data-testid={`button-delete-advance-mobile-${advance.id}`}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                          );
-                        })}
-                      </div>
-                      </>
-                    )}
-                  </div>
-                </Card>
-              </>
-            );
-          })()}
-        </>
+          <ERPAdvancesTab />
         )}
         </div>
       </div>
