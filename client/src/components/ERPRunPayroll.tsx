@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote } from "lucide-react";
+import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -235,6 +235,63 @@ export default function ERPRunPayroll() {
     return Array.from(selectedWorkers).reduce((s, id) => s + getNetPay(id), 0);
   }, [selectedWorkers, advanceOverrides, workerById]);
 
+  function exportCSV() {
+    const rows: string[] = [];
+    rows.push(["Group", "Worker", "Base Salary", "Advance Deduction", "Net Pay"].join(","));
+
+    function addGroup(label: string, memberIds: number[]) {
+      const members = memberIds.filter((id) => workerById[id]);
+      if (members.length === 0) return;
+      let groupBase = 0, groupDeduction = 0, groupNet = 0;
+      for (const id of members) {
+        const w = workerById[id];
+        const name = `${w.firstName} ${w.lastName}`.trim();
+        const salary = parseFloat(w.monthlySalary || "0");
+        const advanceBal = advanceBalanceByEmployee[id] || 0;
+        const deduction = Math.min(advanceBal, salary);
+        const net = Math.max(0, salary - deduction);
+        groupBase += salary; groupDeduction += deduction; groupNet += net;
+        rows.push([
+          `"${label}"`,
+          `"${name}"`,
+          salary.toFixed(2),
+          deduction.toFixed(2),
+          net.toFixed(2),
+        ].join(","));
+      }
+      rows.push([
+        `"${label} — TOTAL"`, `""`,
+        groupBase.toFixed(2),
+        groupDeduction.toFixed(2),
+        groupNet.toFixed(2),
+      ].join(","));
+      rows.push("");
+    }
+
+    for (const group of workerGroups) {
+      addGroup(group.name, (group.members || []).map((m) => m.id));
+    }
+    const ungrouped = ungroupedWorkers.map((w) => w.id);
+    if (ungrouped.length > 0) addGroup("Ungrouped", ungrouped);
+
+    const allBase = workers.reduce((s, w) => s + parseFloat(w.monthlySalary || "0"), 0);
+    const allDeduction = workers.reduce((s, w) => s + Math.min(advanceBalanceByEmployee[w.id] || 0, parseFloat(w.monthlySalary || "0")), 0);
+    const allNet = workers.reduce((s, w) => {
+      const sal = parseFloat(w.monthlySalary || "0");
+      return s + Math.max(0, sal - Math.min(advanceBalanceByEmployee[w.id] || 0, sal));
+    }, 0);
+    rows.push([`"GRAND TOTAL"`, `""`, allBase.toFixed(2), allDeduction.toFixed(2), allNet.toFixed(2)].join(","));
+
+    const csv = rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payroll-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const totalSelected = useMemo(() => {
     return Array.from(selectedWorkers).reduce((s, id) => {
       return s + parseFloat(workerById[id]?.monthlySalary || "0");
@@ -402,6 +459,15 @@ export default function ERPRunPayroll() {
               {selectedWorkers.size} selected — {formatAmount(totalSelected)}
             </span>
           )}
+          <Button
+            variant="outline"
+            onClick={exportCSV}
+            disabled={workers.length === 0}
+            data-testid="button-export-payroll"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
           <Button
             onClick={openPayDialog}
             disabled={selectedWorkers.size === 0}
