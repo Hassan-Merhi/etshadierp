@@ -877,14 +877,14 @@ export default function POSDaybook() {
                     {/* Items table */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
                       <thead>
-                        <tr style={{ borderBottom: '2px solid black' }}>
-                          <th style={{ textAlign: 'left', padding: '3px 2px', width: '22%', fontWeight: '900', fontSize: '9pt', borderRight: '2px solid black' }}>Description</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '6%', fontWeight: '900', fontSize: '9pt' }}>Qty</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '10%', fontWeight: '900', fontSize: '9pt' }}>Rate</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '12%', fontWeight: '900', fontSize: '9pt', borderRight: '2px solid black' }}>Amt</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '12%', fontWeight: '900', fontSize: '9pt' }}>Config</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>P/L Bale</th>
-                          <th style={{ textAlign: 'right', padding: '3px 2px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>Total P/L</th>
+                        <tr style={{ borderBottom: '1.5px solid #333' }}>
+                          <th style={{ textAlign: 'left', padding: '4px 6px', width: '22%', fontWeight: '900', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>Description</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '6%', fontWeight: '900', fontSize: '9pt' }}>Qty</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '10%', fontWeight: '900', fontSize: '9pt' }}>Rate</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '12%', fontWeight: '900', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>Amt</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '12%', fontWeight: '900', fontSize: '9pt' }}>Config</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>P/L Bale</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', width: '14%', fontWeight: '900', fontSize: '9pt' }}>Total P/L</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -896,18 +896,18 @@ export default function POSDaybook() {
                           const totalPL = plPerBale * qty;
                           const plBaleColor = plPerBale > 0 ? '#0a7e1f' : plPerBale < 0 ? '#c2272d' : undefined;
                           const totalPLColor = totalPL > 0 ? '#0a7e1f' : totalPL < 0 ? '#c2272d' : undefined;
-                          const rowBg = idx % 2 === 0 ? 'white' : '#f2f5f8';
+                          const rowBg = idx % 2 === 0 ? 'white' : '#f4f6f8';
                           return (
-                            <tr key={idx} style={{ borderBottom: '1px solid #b0b8c1', backgroundColor: rowBg }}>
-                              <td style={{ padding: '4px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.2', fontSize: '9pt', borderRight: '2px solid black' }}>{item.stockItemName}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(qty)}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(rate, "$")}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', borderRight: '2px solid black' }}>{fmtPrint(qty * rate, "$")}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(configPrice, "$")}</td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: plBaleColor }}>
+                            <tr key={idx} style={{ borderBottom: '1px solid #e4e8ed', backgroundColor: rowBg }}>
+                              <td style={{ padding: '5px 6px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>{item.stockItemName}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(qty)}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(rate, "$")}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>{fmtPrint(qty * rate, "$")}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt' }}>{fmtPrint(configPrice, "$")}</td>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: plBaleColor }}>
                                 {plPerBale > 0 ? '+' : ''}{fmtPrint(plPerBale, "$")}
                               </td>
-                              <td style={{ textAlign: 'right', padding: '4px 2px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: totalPLColor }}>
+                              <td style={{ textAlign: 'right', padding: '5px 6px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', color: totalPLColor }}>
                                 {totalPL > 0 ? '+' : ''}{fmtPrint(totalPL, "$")}
                               </td>
                             </tr>
@@ -915,14 +915,14 @@ export default function POSDaybook() {
                         })}
                       </tbody>
                       <tfoot>
-                        <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
-                          <td style={{ padding: '4px 2px', fontWeight: '900', fontSize: '9pt', borderRight: '2px solid black' }}>TOTAL</td>
-                          <td style={{ textAlign: 'right', padding: '4px 2px', fontSize: '9pt' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
-                          <td style={{ padding: '4px 2px' }}></td>
-                          <td style={{ textAlign: 'right', padding: '4px 2px', fontWeight: '900', fontSize: '9pt', borderRight: '2px solid black' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
-                          <td style={{ padding: '4px 2px' }}></td>
-                          <td style={{ padding: '4px 2px' }}></td>
-                          <td style={{ textAlign: 'right', padding: '4px 2px', fontWeight: '900', fontSize: '9pt', color: (() => { const t = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
+                        <tr style={{ borderTop: '1.5px solid #333', fontWeight: '900' }}>
+                          <td style={{ padding: '5px 6px', fontWeight: '900', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>TOTAL</td>
+                          <td style={{ textAlign: 'right', padding: '5px 6px', fontSize: '9pt' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
+                          <td style={{ padding: '5px 6px' }}></td>
+                          <td style={{ textAlign: 'right', padding: '5px 6px', fontWeight: '900', fontSize: '9pt', borderRight: '1px solid #c8cdd4' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
+                          <td style={{ padding: '5px 6px' }}></td>
+                          <td style={{ padding: '5px 6px' }}></td>
+                          <td style={{ textAlign: 'right', padding: '5px 6px', fontWeight: '900', fontSize: '9pt', color: (() => { const t = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
                             {(() => {
                               const t = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0);
                               return t !== 0 ? `${t > 0 ? '+' : ''}${fmtPrint(t, "$")}` : fmtPrint(0, "$");
@@ -932,7 +932,7 @@ export default function POSDaybook() {
                       </tfoot>
                     </table>
                     {/* Total Paid */}
-                    <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '1.5px solid #333', display: 'flex', justifyContent: 'space-between' }}>
                       <span>TOTAL PAID:</span>
                       <span>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
                     </div>
