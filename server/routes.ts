@@ -826,9 +826,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       })();
 
-      // Return user without password
+      // Return user without password — wait for session to be written to
+      // the PostgreSQL store before responding, so the immediately-following
+      // /api/auth/me request (triggered by window.location.href = "/") always
+      // finds an active session.
       const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Session could not be saved" });
+        }
+        res.json(userWithoutPassword);
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
