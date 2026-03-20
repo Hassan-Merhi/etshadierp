@@ -835,7 +835,7 @@ export default function POSImport() {
                     const rate = parseFloat(item.rate || 0);
                     const qty = parseFloat(item.quantity || 0);
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid #b0b8c1', backgroundColor: idx % 2 === 0 ? 'white' : '#f2f5f8' }}>
                         <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3' }}>{item.stockItemName || item.itemCode}</td>
                         <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
                         <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, printCurrPrefix)}</td>
