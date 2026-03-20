@@ -1127,6 +1127,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.user?.id === id) {
           return res.status(400).json({ message: "Cannot delete your own account" });
         }
+
+        // Prevent non-Developers from deleting Developer accounts
+        if (req.user?.role !== "Developer") {
+          const targetRoles = await db
+            .select({ role: userCompanyRoles.role })
+            .from(userCompanyRoles)
+            .where(eq(userCompanyRoles.userId, id));
+          const isTargetDeveloper = targetRoles.some((r) => r.role === "Developer");
+          if (isTargetDeveloper) {
+            return res.status(403).json({ message: "Cannot delete this account" });
+          }
+        }
         
         await storage.deleteUser(id);
         res.json({ message: "User deleted successfully" });

@@ -13418,7 +13418,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const companyId = (req.session as any).currentCompanyId;
       const currentRole = (req.session as any).currentRole;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (currentRole !== "Admin" && currentRole !== "Owner") {
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can manage users" });
       }
 
@@ -13428,6 +13428,18 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         active: users.active,
         createdAt: users.createdAt,
       }).from(users);
+
+      // Collect Developer user IDs to hide them from non-Developer viewers
+      const devRoles = await db
+        .select({ userId: userCompanyRoles.userId })
+        .from(userCompanyRoles)
+        .where(eq(userCompanyRoles.role, "Developer"));
+      const devUserIds = new Set(devRoles.map((r: any) => r.userId));
+      const requesterIsDeveloper = currentRole === "Developer";
+
+      const visibleUsers = allUsers.filter((u: any) =>
+        requesterIsDeveloper || !devUserIds.has(u.id)
+      );
 
       const profiles = await db.select()
         .from(factoryUserProfiles)
@@ -13444,7 +13456,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         accessMap.get(a.userId)!.push(a.pageKey);
       });
 
-      const result = allUsers.map((u: any) => {
+      const result = visibleUsers.map((u: any) => {
         const profile = profileMap.get(u.id);
         return {
           ...u,
