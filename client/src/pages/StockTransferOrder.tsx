@@ -221,17 +221,25 @@ export default function StockTransferOrder() {
     }
   }, [selectedLocationIds, editVoucherId]);
 
+  // Load date and optional as soon as the voucher header loads (independent of items)
+  useEffect(() => {
+    if (!editVoucherId || !existingVoucher) return;
+    if (existingVoucher.voucherDate) {
+      const parts = existingVoucher.voucherDate.split("-");
+      if (parts.length === 3) {
+        setTransferDate(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+      } else {
+        setTransferDate(new Date(existingVoucher.voucherDate));
+      }
+    }
+    setIsOptional(existingVoucher.optional === true);
+  }, [editVoucherId, existingVoucher]);
+
+  // Load items and destination once both transfer data and reference data are ready
   useEffect(() => {
     if (editVoucherId && existingTransfer && existingVoucher && locations.length > 0 && stockItems.length > 0 && !editDataLoaded) {
       const destId = existingTransfer.destinationLocationId;
       if (destId) setDestinationLocationId(destId);
-
-      if (existingVoucher.voucherDate) {
-        setTransferDate(new Date(existingVoucher.voucherDate));
-      }
-      if (existingVoucher.optional !== undefined) {
-        setIsOptional(existingVoucher.optional);
-      }
 
       if (existingTransfer.items && existingTransfer.items.length > 0) {
         setSelectedLocationIds(locations.map((l) => l.id));

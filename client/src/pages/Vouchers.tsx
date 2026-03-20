@@ -574,6 +574,14 @@ interface VouchersProps {
   posUser?: any;
 }
 
+function parseDateLocal(dateStr: string): Date {
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+  return new Date(dateStr);
+}
+
 export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -1014,7 +1022,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         paymentAccountType: paymentType as any,
         paymentAccountId: paymentId,
         paymentAccountName: paymentName,
-        voucherDate: new Date(voucherToEdit.voucherDate),
+        voucherDate: parseDateLocal(voucherToEdit.voucherDate),
         entries: formEntries.length > 0 ? formEntries : [{
           accountType: "ledger",
           accountId: 0,
@@ -1835,7 +1843,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
 
       journalForm.reset({
-        voucherDate: new Date(voucherToEdit.voucherDate),
+        voucherDate: parseDateLocal(voucherToEdit.voucherDate),
         entries: formEntries.length > 0 ? formEntries : [{
           type: "DR",
           accountType: "ledger",
@@ -2344,7 +2352,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Pre-populate stock transfer form when editing
   useEffect(() => {
-    if (stockTransferToEdit && stockTransferToEdit.items && locations.length > 0 && stockItems.length > 0) {
+    if (stockTransferToEdit && stockTransferToEdit.items && voucherToEdit && locations.length > 0 && stockItems.length > 0) {
       if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
       // Map stock transfer items to form entries
       const formEntries = stockTransferToEdit.items.map((item: any) => {
@@ -2364,7 +2372,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       // Reset form with stock transfer data
       stockTransferForm.reset({
-        voucherDate: voucherToEdit ? new Date(voucherToEdit.voucherDate) : new Date(),
+        voucherDate: voucherToEdit ? parseDateLocal(voucherToEdit.voucherDate) : new Date(),
         destinationLocationId: stockTransferToEdit.destinationLocationId || 0,
         entries: formEntries.length > 0 ? formEntries : [{
           sourceLocationId: 0,
@@ -2999,7 +3007,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Pre-populate stock adjustment form when editing
   useEffect(() => {
-    if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && stockItems.length > 0) {
+    if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && voucherToEdit && stockItems.length > 0) {
       if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
       // Map stock adjustment items to form entries
       const formEntries = stockAdjustmentToEdit.items.map((item: any) => {
@@ -3022,7 +3030,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       // Reset form with stock adjustment data
       stockAdjustmentForm.reset({
-        voucherDate: voucherToEdit ? new Date(voucherToEdit.voucherDate) : new Date(),
+        voucherDate: voucherToEdit ? parseDateLocal(voucherToEdit.voucherDate) : new Date(),
         locationId: stockAdjustmentToEdit.locationId || 0,
         entries: formEntries.length > 0 ? formEntries : [{
           type: "PRODUCE",
