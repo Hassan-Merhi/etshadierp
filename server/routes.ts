@@ -108,6 +108,7 @@ import {
   insertLiveSpreadsheetSchema,
   erpWorkerDocs,
   insertErpWorkerDocSchema,
+  factoryUserProfiles,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -1005,12 +1006,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           conditions.push(eq(auditLog.userId, userId));
         }
 
-        const logs = await db.select()
+        const rawLogs = await db.select()
           .from(auditLog)
           .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(auditLog.createdAt))
           .limit(parseInt(limit as string))
           .offset(parseInt(offset as string));
+
+        // Resolve real usernames: look up users table then factoryUserProfiles for displayName
+        const userIds = [...new Set(rawLogs.map(l => l.userId).filter(Boolean))];
+        const resolvedUsers: Record<string, { username: string; displayName?: string }> = {};
+        if (userIds.length > 0) {
+          const userRows = await db.select({ id: users.id, username: users.username })
+            .from(users)
+            .where(inArray(users.id, userIds));
+          userRows.forEach(u => { resolvedUsers[u.id] = { username: u.username }; });
+
+          if (companyId) {
+            const profileRows = await db.select({ userId: factoryUserProfiles.userId, displayName: factoryUserProfiles.displayName })
+              .from(factoryUserProfiles)
+              .where(and(eq(factoryUserProfiles.companyId, companyId), inArray(factoryUserProfiles.userId, userIds)));
+            profileRows.forEach(p => {
+              if (resolvedUsers[p.userId]) resolvedUsers[p.userId].displayName = p.displayName;
+              else resolvedUsers[p.userId] = { username: p.userId, displayName: p.displayName };
+            });
+          }
+        }
+
+        const logs = rawLogs.map(log => {
+          const resolved = resolvedUsers[log.userId];
+          const resolvedUsername = resolved?.displayName || resolved?.username || log.username;
+          return { ...log, username: resolvedUsername };
+        });
 
         res.json(logs);
       } catch (error: any) {
