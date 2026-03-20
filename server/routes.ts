@@ -864,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAuth,
     async (req, res) => {
       const userRole = req.session.currentRole;
-      if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
+      if (!userRole || !["Admin", "Owner", "Manager", "Developer"].includes(userRole)) {
         return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
       }
 
@@ -875,7 +875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const activeUsers = await db
           .select()
           .from(userPresence)
-          .where(gt(userPresence.lastSeen, twoMinutesAgo))
+          .where(and(gt(userPresence.lastSeen, twoMinutesAgo), ne(userPresence.role, "Developer")))
           .orderBy(desc(userPresence.lastSeen));
 
         res.json(activeUsers);
@@ -1034,10 +1034,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (_req, res) => {
       try {
         const users = await storage.getAllUsers();
-        // Remove passwords from response
-        const usersWithoutPasswords = users.map(
-          ({ password, ...user }) => user,
-        );
+        // Collect user IDs that have the Developer role in any company
+        const devRoles = await db
+          .select({ userId: userCompanyRoles.userId })
+          .from(userCompanyRoles)
+          .where(eq(userCompanyRoles.role, "Developer"));
+        const devUserIds = new Set(devRoles.map((r) => r.userId));
+        // Remove passwords from response and hide Developer accounts
+        const usersWithoutPasswords = users
+          .filter((u) => !devUserIds.has(u.id))
+          .map(({ password, ...user }) => user);
         res.json(usersWithoutPasswords);
       } catch (error: any) {
         res.status(500).json({ message: error.message });

@@ -344,7 +344,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 <span className="font-mono text-lg" data-testid="text-current-adjustment">
                   ${formatNumber(currentAdjustment)}
                 </span>
-                {currentUser?.role === "Admin" && (
+                {(currentUser?.role === "Admin" || currentUser?.role === "Developer") && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -359,7 +359,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 )}
               </>
             )}
-            {currentUser?.role !== "Admin" && !isEditing && (
+            {currentUser?.role !== "Admin" && currentUser?.role !== "Developer" && !isEditing && (
               <span className="text-xs text-muted-foreground">(Admin only)</span>
             )}
           </div>
@@ -2067,7 +2067,7 @@ function POSReceiptSettings() {
     // Query for containers for offload diagnostics
     const { data: containersForDiag = [] } = useQuery<any[]>({
       queryKey: ["/api/admin/containers-for-diagnostics"],
-      enabled: !!selectedCompany && currentUser?.role === "Admin",
+      enabled: !!selectedCompany && (currentUser?.role === "Admin" || currentUser?.role === "Developer"),
     });
 
     // Factory users query (used in Users section in both modes)
@@ -4612,7 +4612,7 @@ function POSReceiptSettings() {
                           const companyId = value === "none" ? null : parseInt(value, 10);
                           setParentCompanyMutation.mutate(companyId);
                         }}
-                        disabled={setParentCompanyMutation.isPending || currentUser?.role !== "Admin"}
+                        disabled={setParentCompanyMutation.isPending || (currentUser?.role !== "Admin" && currentUser?.role !== "Developer")}
                       >
                         <SelectTrigger className="w-[200px]" data-testid="select-parent-company">
                           <SelectValue placeholder="Select parent company" />
@@ -4626,7 +4626,7 @@ function POSReceiptSettings() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {currentUser?.role !== "Admin" && (
+                      {currentUser?.role !== "Admin" && currentUser?.role !== "Developer" && (
                         <span className="text-xs text-muted-foreground">(Admin only)</span>
                       )}
                     </div>

@@ -34,7 +34,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     assignedLocationId: userCompanyRole.assignedLocationId,
     posStation: userCompanyRole.posStation,
     cashAccountId: userCompanyRole.cashAccountId,
-    canSellNegativeStock: ["Admin", "Owner", "Manager"].includes(userCompanyRole.role) ? true : userCompanyRole.canSellNegativeStock,
+    canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(userCompanyRole.role) ? true : userCompanyRole.canSellNegativeStock,
     daybookEditDays: userCompanyRole.daybookEditDays,
     canAccessCustomers: userCompanyRole.canAccessCustomers,
   };
@@ -49,11 +49,11 @@ export function requireRole(...roles: string[]) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role === "Developer" || roles.includes(req.user.role)) {
+      return next();
     }
 
-    next();
+    return res.status(403).json({ message: "Forbidden" });
   };
 }
 
@@ -77,8 +77,8 @@ export function canModifyDate(dateField: string = "voucherDate") {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Admin and Owner can modify any date
-    if (req.user.role === "Admin" || req.user.role === "Owner") {
+    // Admin, Owner, and Developer can modify any date
+    if (req.user.role === "Admin" || req.user.role === "Owner" || req.user.role === "Developer") {
       return next();
     }
 

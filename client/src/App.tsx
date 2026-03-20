@@ -254,15 +254,15 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
       <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
-      {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
-      {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
-      {user?.role === "Admin" && <Route path="/deleted-items" component={DeletedItems} />}
-      {user?.role === "Admin" && <Route path="/chatbot-settings" component={ChatbotSettings} />}
-      {user?.role === "Admin" && <Route path="/test-data-import" component={TestDataImport} />}
-      {user?.role === "Admin" && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
-      {user?.role === "Admin" && <Route path="/inventory-repair" component={InventoryRepair} />}
-      {user?.role === "Admin" && <Route path="/net-profit-details" component={NetProfitDetails} />}
-      {user?.role === "Admin" && <Route path="/company-data-reset" component={CompanyDataReset} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/chatbot-settings" component={ChatbotSettings} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-profit-details" component={NetProfitDetails} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
       <Route component={NotFound} />
     </Switch>
   );
