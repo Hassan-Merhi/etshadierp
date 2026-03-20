@@ -239,7 +239,7 @@ export default function POSDaybook() {
   }, [selectedDialogRow]);
 
   // Keyboard navigation for dialog item rows
-  const getDialogItems = useCallback((): Array<{ stockItemName?: string }> => {
+  const getDialogItems = useCallback((): Array<{ stockItemId?: number; stockItemName?: string }> => {
     if (!selectedVoucher) return [];
     if (isEditMode) return editedItems;
     return (voucherDetails as any)?.salesItems || [];
@@ -272,13 +272,13 @@ export default function POSDaybook() {
         return;
       }
 
-      // Alt+S or Shift+Alt+S → open Stock Query for selected item
+      // Alt+S → open Stock Item detail directly for selected item
       if (e.altKey && (e.key === "s" || e.key === "S")) {
         e.preventDefault();
         if (selectedDialogRow !== null && items[selectedDialogRow]) {
-          const itemName = items[selectedDialogRow].stockItemName || "";
-          if (itemName) {
-            navigate(`/stock-query?q=${encodeURIComponent(itemName)}`);
+          const itemId = items[selectedDialogRow].stockItemId;
+          if (itemId) {
+            navigate(`/stock-query/${itemId}`);
             setSelectedVoucher(null);
           }
         }
@@ -667,7 +667,7 @@ export default function POSDaybook() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · Alt+S to open Stock Query</p>
+                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · Alt+S to view item</p>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -785,7 +785,7 @@ export default function POSDaybook() {
                 <div className="overflow-x-auto">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
-                    <p className="text-xs text-muted-foreground">Hover or use ↑↓ to select · Alt+S to open Stock Query</p>
+                    <p className="text-xs text-muted-foreground">Hover or use ↑↓ to select · Alt+S to view item</p>
                   </div>
                   <Table>
                     <TableHeader>
