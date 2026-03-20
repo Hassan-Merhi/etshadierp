@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 
 interface FactoryUser {
   id: string;
@@ -50,46 +51,8 @@ const COST_FIELDS: { key: string; label: string }[] = [
   { key: "bales_list_cost_per_kg", label: "Bales List: Cost/kg" },
 ];
 
-const ALL_FACTORY_PAGES: { key: string; label: string; group: string }[] = [
-  { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
-  { key: "factory/daybook", label: "Daybook", group: "Overview" },
-  { key: "factory/stock-entry", label: "Stock Entry", group: "Operations" },
-  { key: "factory/bales-hub", label: "Bales & Lookup", group: "Operations" },
-  { key: "factory/raw-materials", label: "Raw Materials", group: "Operations" },
-  { key: "factory/bale-products", label: "Bale Products", group: "Operations" },
-  { key: "factory/customers", label: "Customers", group: "Sales" },
-  { key: "factory/sales/loadings", label: "Loadings", group: "Sales" },
-  { key: "factory/sales/proformas", label: "Proformas", group: "Sales" },
-  { key: "factory/sales/pending-invoices", label: "Pending Invoices", group: "Sales" },
-  { key: "factory/sales/invoices", label: "Invoices", group: "Sales" },
-  { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
-  { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
-  { key: "factory/stock-query", label: "Stock Query", group: "Inventory" },
-  { key: "factory/bale-relabeling", label: "Bale Relabeling", group: "Inventory" },
-  { key: "factory/vouchers", label: "Vouchers", group: "Accounting" },
-  { key: "factory/accounts", label: "Accounts", group: "Accounting" },
-  { key: "factory/workers", label: "Workers", group: "Finance" },
-  { key: "factory/suppliers", label: "Suppliers", group: "Finance" },
-  { key: "factory/containers", label: "Containers", group: "Finance" },
-  { key: "factory/intelligence/dashboard", label: "Factory Dashboard", group: "Intelligence" },
-  { key: "factory/intelligence/kpis", label: "KPIs", group: "Intelligence" },
-  { key: "factory/intelligence/profitability", label: "Profitability", group: "Intelligence" },
-  { key: "factory/intelligence/waste", label: "Waste Tracking", group: "Intelligence" },
-  { key: "factory/intelligence/alerts", label: "Alerts", group: "Intelligence" },
-  { key: "factory/intelligence/supplier-scores", label: "Supplier Scores", group: "Intelligence" },
-  { key: "factory/intelligence/mix-optimizer", label: "Mix Optimizer", group: "Intelligence" },
-  { key: "factory/intelligence/cashflow", label: "Cash Flow", group: "Intelligence" },
-  { key: "factory/intelligence/settings", label: "Intelligence Settings", group: "Intelligence" },
-  { key: "factory/supplier-report", label: "Supplier Report", group: "Reports" },
-  { key: "factory/supplier-statement", label: "Supplier Statement", group: "Reports" },
-  { key: "factory/production-summary", label: "Production Summary", group: "Reports" },
-  { key: "factory/analytics", label: "Analytics", group: "Reports" },
-  { key: "factory/barcode-lookup", label: "Barcode Lookup", group: "Reports" },
-  { key: "factory/import", label: "Import Data", group: "Other" },
-  { key: "factory/chat", label: "Chat", group: "Other" },
-  { key: "factory/settings", label: "Settings", group: "Other" },
-];
-
+// Central source of truth from FactorySidebar — no separate hardcoded list
+const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
 const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
 
 export default function FactoryUsers() {

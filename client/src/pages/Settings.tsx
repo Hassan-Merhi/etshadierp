@@ -64,7 +64,8 @@
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
+  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
+  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
   import { useCompany } from "@/contexts/CompanyContext";
   import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
@@ -1768,67 +1769,16 @@ function BulkRenameTab() {
   );
 }
 
-const ALL_FACTORY_PAGES_SETTINGS: { key: string; label: string; group: string }[] = [
-  { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
-  { key: "factory/stock-entry", label: "Stock Entry", group: "Operations" },
-  { key: "factory/bales-hub", label: "Bales & Lookup", group: "Operations" },
-  { key: "factory/raw-materials", label: "Raw Materials", group: "Operations" },
-  { key: "factory/bale-products", label: "Bale Products", group: "Operations" },
-  { key: "factory/customers", label: "Customers", group: "Sales" },
-  { key: "factory/sales/loadings", label: "Loadings", group: "Sales" },
-  { key: "factory/sales/proformas", label: "Proformas", group: "Sales" },
-  { key: "factory/sales/pending-invoices", label: "Pending Invoices", group: "Sales" },
-  { key: "factory/sales/invoices", label: "Invoices", group: "Sales" },
-  { key: "factory/location-inventory", label: "Location Inventory", group: "Inventory" },
-  { key: "factory/stock-otw", label: "Stock OTW", group: "Inventory" },
-  { key: "factory/stock-query", label: "Stock Query", group: "Inventory" },
-  { key: "factory/vouchers", label: "Vouchers", group: "Accounting" },
-  { key: "factory/accounts", label: "Accounts", group: "Accounting" },
-  { key: "factory/workers", label: "Workers", group: "Finance" },
-  { key: "factory/suppliers", label: "Suppliers", group: "Finance" },
-  { key: "factory/containers", label: "Containers", group: "Finance" },
-  { key: "factory/intelligence/dashboard", label: "Factory Dashboard", group: "Intelligence" },
-  { key: "factory/intelligence/kpis", label: "KPIs", group: "Intelligence" },
-  { key: "factory/intelligence/profitability", label: "Profitability", group: "Intelligence" },
-  { key: "factory/intelligence/waste", label: "Waste Tracking", group: "Intelligence" },
-  { key: "factory/intelligence/alerts", label: "Alerts", group: "Intelligence" },
-  { key: "factory/intelligence/supplier-scores", label: "Supplier Scores", group: "Intelligence" },
-  { key: "factory/intelligence/mix-optimizer", label: "Mix Optimizer", group: "Intelligence" },
-  { key: "factory/intelligence/cashflow", label: "Cash Flow", group: "Intelligence" },
-  { key: "factory/intelligence/settings", label: "Intelligence Settings", group: "Intelligence" },
-  { key: "factory/supplier-report", label: "Supplier Report", group: "Reports" },
-  { key: "factory/supplier-statement", label: "Supplier Statement", group: "Reports" },
-  { key: "factory/production-summary", label: "Production Summary", group: "Reports" },
-  { key: "factory/analytics", label: "Analytics", group: "Reports" },
-  { key: "factory/barcode-lookup", label: "Barcode Lookup", group: "Other" },
-  { key: "factory/import", label: "Import Data", group: "Other" },
-  { key: "factory/chat", label: "Chat", group: "Other" },
-  { key: "factory/settings", label: "Settings", group: "Other" },
-];
+// Single source of truth: derived from FactorySidebar nav — new pages appear automatically
+const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
 const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map(p => p.group)));
 
-const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = [
-  { key: "dashboard", label: "Dashboard", group: "Overview" },
-  { key: "pos", label: "Point of Sale", group: "Sales & POS" },
-  { key: "pos_daybook", label: "POS Daybook", group: "Sales & POS" },
-  { key: "stock_items", label: "Stock Items", group: "Inventory" },
-  { key: "location_inventory", label: "Location Inventory", group: "Inventory" },
-  { key: "containers", label: "Containers", group: "Inventory" },
-  { key: "stock_otw", label: "Stock OTW", group: "Inventory" },
-  { key: "stock_query", label: "Stock Query", group: "Inventory" },
-  { key: "location_summary", label: "Location Summary", group: "Inventory" },
-  { key: "accounts", label: "Accounts", group: "Accounting" },
-  { key: "suppliers", label: "Suppliers", group: "Accounting" },
-  { key: "customers", label: "Customers", group: "Accounting" },
-  { key: "daybook", label: "Daybook", group: "Accounting" },
-  { key: "payroll", label: "Payroll", group: "Accounting" },
-  { key: "vouchers", label: "Vouchers", group: "Vouchers" },
-  { key: "optional_vouchers", label: "Optional Vouchers", group: "Vouchers" },
-  { key: "create", label: "Create Voucher", group: "Vouchers" },
-  { key: "analytics", label: "Analytics", group: "Analytics" },
-  { key: "sales_report", label: "Sales Report", group: "Analytics" },
-  { key: "settings", label: "Settings", group: "System" },
-];
+// Single source of truth: derived from FEATURE_KEYS + FEATURE_PAGE_INFO in shared/schema
+const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map(key => ({
+  key,
+  label: FEATURE_PAGE_INFO[key].label,
+  group: FEATURE_PAGE_INFO[key].group,
+}));
 
 const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
 
@@ -2836,6 +2786,7 @@ function POSReceiptSettings() {
         assignedLocationId: role.assignedLocationId,
         posStation: role.posStation,
         canSellNegativeStock: role.canSellNegativeStock ?? false,
+        daybookEditDays: role.daybookEditDays ?? 0,
       });
       if (role.role?.startsWith("POS")) {
         try {
@@ -5321,6 +5272,29 @@ function POSReceiptSettings() {
                               value={field.value || ""}
                             />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={roleForm.control}
+                      name="daybookEditDays"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>POS Editable Days</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              min="0"
+                              placeholder="0 = no editing"
+                              data-testid="input-daybook-edit-days"
+                              onChange={(e) => field.onChange(e.target.value !== "" ? parseInt(e.target.value) : 0)}
+                              value={field.value ?? 0}
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-0.5">How many past days this POS user can edit vouchers (0 = cannot edit)</p>
                           <FormMessage />
                         </FormItem>
                       )}

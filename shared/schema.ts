@@ -1938,6 +1938,31 @@ export const FEATURE_KEYS = [
 
 export type FeatureKey = typeof FEATURE_KEYS[number];
 
+// Central source of truth: label + group for every ERP feature key
+export const FEATURE_PAGE_INFO: Record<FeatureKey, { label: string; group: string }> = {
+  dashboard:           { label: "Tracking / Overview",  group: "Overview"   },
+  factory_production:  { label: "Factory Production",   group: "Overview"   },
+  pos:                 { label: "Point of Sale",        group: "Sales & POS" },
+  pos_daybook:         { label: "POS Daybook",          group: "Sales & POS" },
+  location_inventory:  { label: "Location Inventory",   group: "Inventory"  },
+  stock_otw:           { label: "Stock OTW",            group: "Inventory"  },
+  containers:          { label: "Containers",           group: "Inventory"  },
+  stock_items:         { label: "Stock Items",          group: "Inventory"  },
+  stock_query:         { label: "Inventory View",       group: "Inventory"  },
+  location_summary:    { label: "Location Summary",     group: "Inventory"  },
+  optional_vouchers:   { label: "Optional Vouchers",    group: "Inventory"  },
+  accounts:            { label: "Accounts",             group: "Accounting" },
+  suppliers:           { label: "Suppliers",            group: "Accounting" },
+  customers:           { label: "Customers",            group: "Accounting" },
+  payroll:             { label: "Payroll",              group: "Accounting" },
+  daybook:             { label: "Daybook",              group: "Accounting" },
+  vouchers:            { label: "Vouchers",             group: "Vouchers"   },
+  create:              { label: "Create Voucher",       group: "Vouchers"   },
+  sales_report:        { label: "Sales Report",         group: "Analytics"  },
+  analytics:           { label: "Analytics",            group: "Analytics"  },
+  settings:            { label: "Settings",             group: "System"     },
+};
+
 // Map feature keys to their route paths
 export const FEATURE_ROUTES: Record<FeatureKey, string> = {
   dashboard: "/",

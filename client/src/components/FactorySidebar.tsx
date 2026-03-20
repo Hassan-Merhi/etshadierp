@@ -160,6 +160,21 @@ const allMenuGroups: MenuGroup[] = [
   },
 ];
 
+// Central source of truth for Factory page access — derived from sidebar nav
+// Any page added to allMenuGroups or the extra items below automatically appears in settings.
+export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] = [
+  ...allMenuGroups.flatMap(group =>
+    group.items.map(item => ({
+      key: item.url.replace(/^\//, ""),
+      label: item.title,
+      group: group.title,
+    }))
+  ),
+  { key: "factory/daybook", label: "Daybook", group: "Other" },
+  { key: "factory/chat",    label: "Chat",    group: "Other" },
+  { key: "factory/settings", label: "Settings", group: "Other" },
+];
+
 export function FactorySidebar({ user }: { user?: any }) {
   const [location] = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
