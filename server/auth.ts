@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { db } from "./db";
-import { userLocations } from "@shared/schema";
+import { userLocations, userCompanyRoles } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 // Authentication middleware - checks if user is logged in
@@ -22,9 +22,33 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   // Load the user's role for the current company
-  const userCompanyRole = await storage.getUserCompanyRole(req.session.userId, req.session.currentCompanyId);
+  let userCompanyRole = await storage.getUserCompanyRole(req.session.userId, req.session.currentCompanyId);
+
+  // Developer bypass: if no role for this specific company, check if this user
+  // is a Developer in ANY company — if so, synthesize a full-access role
   if (!userCompanyRole) {
-    return res.status(403).json({ message: "You do not have access to this company" });
+    const allRoles = await db
+      .select()
+      .from(userCompanyRoles)
+      .where(eq(userCompanyRoles.userId, req.session.userId));
+    const isDeveloper = allRoles.some((r) => r.role === "Developer");
+    if (isDeveloper) {
+      userCompanyRole = {
+        id: -1,
+        userId: req.session.userId,
+        companyId: req.session.currentCompanyId,
+        role: "Developer",
+        assignedLocationId: null,
+        posStation: null,
+        cashAccountId: null,
+        canSellNegativeStock: true,
+        daybookEditDays: 9999,
+        canAccessCustomers: true,
+        createdAt: new Date(),
+      };
+    } else {
+      return res.status(403).json({ message: "You do not have access to this company" });
+    }
   }
 
   // Attach user with company-specific role and location info

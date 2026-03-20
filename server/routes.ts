@@ -1485,6 +1485,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+
+      // Developer sees all companies automatically
+      if (req.user.role === "Developer") {
+        const allCompanies = await storage.getAllCompanies();
+        const companiesWithRoles = allCompanies.map((company: any) => ({
+          id: -1,
+          userId: req.user!.id,
+          companyId: company.id,
+          role: "Developer",
+          assignedLocationId: null,
+          cashAccountId: null,
+          posStation: null,
+          canSellNegativeStock: true,
+          daybookEditDays: 9999,
+          canAccessCustomers: true,
+          createdAt: new Date(),
+          companyCode: company.code,
+          companyName: company.name,
+          companyActive: company.active,
+          companyType: company.companyType || "erp",
+        }));
+        return res.json(companiesWithRoles);
+      }
+
       const userCompanies = await storage.getUserCompaniesWithRoles(
         req.user.id,
       );
@@ -1684,11 +1708,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user has access to this company
-      const userRole = await storage.getUserCompanyRole(req.user.id, companyId);
+      let userRole = await storage.getUserCompanyRole(req.user.id, companyId);
       if (!userRole) {
-        return res
-          .status(403)
-          .json({ message: "You don't have access to this company" });
+        // Developer bypass: allow access to any company if user is a Developer anywhere
+        if (req.user.role === "Developer") {
+          userRole = {
+            id: -1,
+            userId: req.user.id,
+            companyId,
+            role: "Developer",
+            assignedLocationId: null,
+            posStation: null,
+            cashAccountId: null,
+            canSellNegativeStock: true,
+            daybookEditDays: 9999,
+            canAccessCustomers: true,
+            createdAt: new Date(),
+          };
+        } else {
+          return res
+            .status(403)
+            .json({ message: "You don't have access to this company" });
+        }
       }
 
       req.session.currentCompanyId = companyId;
