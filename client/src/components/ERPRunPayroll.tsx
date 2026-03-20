@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote, Download } from "lucide-react";
+import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -235,61 +235,205 @@ export default function ERPRunPayroll() {
     return Array.from(selectedWorkers).reduce((s, id) => s + getNetPay(id), 0);
   }, [selectedWorkers, advanceOverrides, workerById]);
 
-  function exportCSV() {
-    const rows: string[] = [];
-    rows.push(["Group", "Worker", "Base Salary", "Advance Deduction", "Net Pay"].join(","));
+  interface PayrollRow {
+    group: string;
+    name: string;
+    base: number;
+    deduction: number;
+    net: number;
+    isGroupTotal?: boolean;
+    isGrandTotal?: boolean;
+  }
 
+  function buildPayrollData(): PayrollRow[] {
+    const rows: PayrollRow[] = [];
     function addGroup(label: string, memberIds: number[]) {
       const members = memberIds.filter((id) => workerById[id]);
       if (members.length === 0) return;
       let groupBase = 0, groupDeduction = 0, groupNet = 0;
       for (const id of members) {
         const w = workerById[id];
-        const name = `${w.firstName} ${w.lastName}`.trim();
         const salary = parseFloat(w.monthlySalary || "0");
         const advanceBal = advanceBalanceByEmployee[id] || 0;
         const deduction = Math.min(advanceBal, salary);
         const net = Math.max(0, salary - deduction);
         groupBase += salary; groupDeduction += deduction; groupNet += net;
-        rows.push([
-          `"${label}"`,
-          `"${name}"`,
-          salary.toFixed(2),
-          deduction.toFixed(2),
-          net.toFixed(2),
-        ].join(","));
+        rows.push({ group: label, name: `${w.firstName} ${w.lastName}`.trim(), base: salary, deduction, net });
       }
-      rows.push([
-        `"${label} — TOTAL"`, `""`,
-        groupBase.toFixed(2),
-        groupDeduction.toFixed(2),
-        groupNet.toFixed(2),
-      ].join(","));
-      rows.push("");
+      rows.push({ group: label, name: `${label} — TOTAL`, base: groupBase, deduction: groupDeduction, net: groupNet, isGroupTotal: true });
+    }
+    for (const group of workerGroups) addGroup(group.name, (group.members || []).map((m) => m.id));
+    if (ungroupedWorkers.length > 0) addGroup("Ungrouped", ungroupedWorkers.map((w) => w.id));
+    const allBase = rows.filter((r) => r.isGroupTotal).reduce((s, r) => s + r.base, 0);
+    const allDed = rows.filter((r) => r.isGroupTotal).reduce((s, r) => s + r.deduction, 0);
+    const allNet = rows.filter((r) => r.isGroupTotal).reduce((s, r) => s + r.net, 0);
+    rows.push({ group: "", name: "GRAND TOTAL", base: allBase, deduction: allDed, net: allNet, isGrandTotal: true });
+    return rows;
+  }
+
+  async function exportExcel() {
+    const XLSXStyle = await import("xlsx-js-style");
+    const XLSX = XLSXStyle.default || XLSXStyle;
+    const data = buildPayrollData();
+    const dateStr = new Date().toLocaleDateString();
+
+    const wsData: any[][] = [
+      ["Payroll Report", "", "", "", dateStr],
+      [],
+      ["Group", "Worker", "Base Salary", "Advance Deduction", "Net Pay"],
+    ];
+
+    for (const row of data) {
+      wsData.push([row.group, row.name, row.base, row.deduction, row.net]);
     }
 
-    for (const group of workerGroups) {
-      addGroup(group.name, (group.members || []).map((m) => m.id));
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Column widths
+    ws["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 16 }];
+
+    // Style helpers
+    const headerFill = { fgColor: { rgb: "1E3A5F" } };
+    const groupTotalFill = { fgColor: { rgb: "D6E4F0" } };
+    const grandTotalFill = { fgColor: { rgb: "1E3A5F" } };
+    const altFill = { fgColor: { rgb: "F4F8FC" } };
+    const white = { fgColor: { rgb: "FFFFFF" } };
+
+    const bold = { bold: true };
+    const boldWhite = { bold: true, color: { rgb: "FFFFFF" } };
+    const numFmt = "#,##0.00";
+
+    // Title row
+    const titleCell = ws["A1"];
+    if (titleCell) {
+      titleCell.s = { font: { bold: true, sz: 14, color: { rgb: "1E3A5F" } }, alignment: { horizontal: "left" } };
     }
-    const ungrouped = ungroupedWorkers.map((w) => w.id);
-    if (ungrouped.length > 0) addGroup("Ungrouped", ungrouped);
 
-    const allBase = workers.reduce((s, w) => s + parseFloat(w.monthlySalary || "0"), 0);
-    const allDeduction = workers.reduce((s, w) => s + Math.min(advanceBalanceByEmployee[w.id] || 0, parseFloat(w.monthlySalary || "0")), 0);
-    const allNet = workers.reduce((s, w) => {
-      const sal = parseFloat(w.monthlySalary || "0");
-      return s + Math.max(0, sal - Math.min(advanceBalanceByEmployee[w.id] || 0, sal));
-    }, 0);
-    rows.push([`"GRAND TOTAL"`, `""`, allBase.toFixed(2), allDeduction.toFixed(2), allNet.toFixed(2)].join(","));
+    // Header row (row index 2 = row 3 in 1-based)
+    ["A3", "B3", "C3", "D3", "E3"].forEach((addr) => {
+      if (!ws[addr]) ws[addr] = { v: "" };
+      ws[addr].s = {
+        font: boldWhite,
+        fill: headerFill,
+        alignment: { horizontal: addr === "A3" || addr === "B3" ? "left" : "right" },
+        border: { bottom: { style: "thin", color: { rgb: "FFFFFF" } } },
+      };
+    });
 
-    const csv = rows.join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `payroll-export-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Data rows start at row 4 (index 3)
+    let excelRow = 4;
+    let altToggle = false;
+    for (const row of data) {
+      const cols = ["A", "B", "C", "D", "E"];
+      const isTotal = row.isGroupTotal || row.isGrandTotal;
+      const fill = row.isGrandTotal ? grandTotalFill : row.isGroupTotal ? groupTotalFill : altToggle ? altFill : white;
+      const fontColor = row.isGrandTotal ? { color: { rgb: "FFFFFF" } } : {};
+
+      cols.forEach((col, i) => {
+        const addr = `${col}${excelRow}`;
+        if (!ws[addr]) ws[addr] = { v: "" };
+        const isNum = i >= 2;
+        ws[addr].s = {
+          font: { ...(isTotal ? bold : {}), ...fontColor },
+          fill,
+          numFmt: isNum ? numFmt : undefined,
+          alignment: { horizontal: isNum ? "right" : "left" },
+        };
+        if (isNum && ws[addr].v !== undefined) ws[addr].t = "n";
+      });
+
+      if (!isTotal) altToggle = !altToggle;
+      else altToggle = false;
+      excelRow++;
+    }
+
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: excelRow - 1, c: 4 } });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Payroll");
+    XLSX.writeFile(wb, `payroll-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  async function exportPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const data = buildPayrollData();
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const dateStr = new Date().toLocaleDateString();
+    const primaryBlue = [30, 58, 95] as [number, number, number];
+    const lightBlue = [214, 228, 240] as [number, number, number];
+
+    // Title
+    doc.setFontSize(18);
+    doc.setTextColor(...primaryBlue);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payroll Report", 14, 18);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(dateStr, 14, 25);
+
+    // Build table body — insert group label rows
+    const body: any[] = [];
+    let currentGroup = "";
+    for (const row of data) {
+      if (!row.isGrandTotal && row.group && row.group !== currentGroup && !row.isGroupTotal) {
+        currentGroup = row.group;
+        body.push([{ content: row.group, colSpan: 5, styles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", fontSize: 9 } }]);
+      }
+      if (row.isGrandTotal) {
+        body.push([
+          { content: "GRAND TOTAL", colSpan: 2, styles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", halign: "left" } },
+          { content: row.base.toFixed(2), styles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", halign: "right" } },
+          { content: row.deduction.toFixed(2), styles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", halign: "right" } },
+          { content: row.net.toFixed(2), styles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", halign: "right" } },
+        ]);
+      } else if (row.isGroupTotal) {
+        body.push([
+          { content: "", styles: { fillColor: lightBlue } },
+          { content: `${row.group} Total`, styles: { fillColor: lightBlue, fontStyle: "bold" } },
+          { content: row.base.toFixed(2), styles: { fillColor: lightBlue, fontStyle: "bold", halign: "right" } },
+          { content: row.deduction.toFixed(2), styles: { fillColor: lightBlue, fontStyle: "bold", halign: "right" } },
+          { content: row.net.toFixed(2), styles: { fillColor: lightBlue, fontStyle: "bold", halign: "right" } },
+        ]);
+      } else {
+        body.push([
+          { content: "", styles: { halign: "center" } },
+          row.name,
+          { content: row.base.toFixed(2), styles: { halign: "right" } },
+          { content: row.deduction > 0 ? `-${row.deduction.toFixed(2)}` : "—", styles: { halign: "right", textColor: row.deduction > 0 ? [180, 100, 0] : [150, 150, 150] } },
+          { content: row.net.toFixed(2), styles: { halign: "right", fontStyle: "bold" } },
+        ]);
+      }
+    }
+
+    autoTable(doc, {
+      startY: 30,
+      head: [[
+        { content: "#", styles: { halign: "center" } },
+        "Worker",
+        { content: "Base Salary", styles: { halign: "right" } },
+        { content: "Deduction", styles: { halign: "right" } },
+        { content: "Net Pay", styles: { halign: "right" } },
+      ]],
+      body,
+      columnStyles: {
+        0: { cellWidth: 8 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 32, halign: "right" },
+        3: { cellWidth: 32, halign: "right" },
+        4: { cellWidth: 32, halign: "right" },
+      },
+      headStyles: { fillColor: primaryBlue, textColor: 255, fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 8.5 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 14, right: 14 },
+      styles: { cellPadding: 2.5 },
+    });
+
+    doc.save(`payroll-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
   const totalSelected = useMemo(() => {
@@ -461,12 +605,21 @@ export default function ERPRunPayroll() {
           )}
           <Button
             variant="outline"
-            onClick={exportCSV}
+            onClick={exportExcel}
             disabled={workers.length === 0}
-            data-testid="button-export-payroll"
+            data-testid="button-export-excel"
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={exportPDF}
+            disabled={workers.length === 0}
+            data-testid="button-export-pdf"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
           </Button>
           <Button
             onClick={openPayDialog}
