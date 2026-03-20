@@ -449,6 +449,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
@@ -649,6 +650,56 @@ export default function Daybook({ user }: { user?: any } = {}) {
     };
     fetchAll();
   }, [viewDialogOpen, selectedVoucher, viewVoucherEntries]);
+
+  // Reset highlighted row when view dialog opens/closes
+  useEffect(() => {
+    setSelectedDialogRow(null);
+  }, [viewDialogOpen]);
+
+  // Scroll highlighted row into view when navigating with arrow keys
+  useEffect(() => {
+    if (selectedDialogRow === null) return;
+    const row = document.querySelector(`[data-dialog-row="${selectedDialogRow}"]`);
+    if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedDialogRow]);
+
+  // Keyboard navigation for sales items in view dialog (↑↓ to select, Alt+S to open item)
+  useEffect(() => {
+    if (!viewDialogOpen || !selectedVoucher) return;
+    const salesItems = viewVoucherEntries.filter(
+      (e: ViewVoucherEntry) => e.isStockItem || e.stockItemId,
+    );
+    if (salesItems.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
+
+      if (e.key === "ArrowDown" && !isTyping) {
+        e.preventDefault();
+        setSelectedDialogRow(prev => (prev === null ? 0 : Math.min(prev + 1, salesItems.length - 1)));
+        return;
+      }
+      if (e.key === "ArrowUp" && !isTyping) {
+        e.preventDefault();
+        setSelectedDialogRow(prev => (prev === null ? salesItems.length - 1 : Math.max(prev - 1, 0)));
+        return;
+      }
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        if (selectedDialogRow !== null && salesItems[selectedDialogRow]) {
+          const itemId = (salesItems[selectedDialogRow] as ViewVoucherEntry).stockItemId;
+          if (itemId) {
+            navigate(`/stock-query/${itemId}`);
+            setViewDialogOpen(false);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [viewDialogOpen, selectedVoucher, viewVoucherEntries, navigate, selectedDialogRow]);
 
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<
@@ -2253,7 +2304,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
                         {/* Sales Items Table */}
                         {salesItems.length > 0 && (
-                          <div className="border rounded-md">
+                          <div>
+                            <p className="text-xs text-muted-foreground text-right mb-1">Hover or use ↑↓ to select · Alt+S to view item</p>
+                            <div className="border rounded-md">
                             <Table>
                               <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
@@ -2270,7 +2323,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {salesItems.map((item: ViewVoucherEntry) => {
+                                {salesItems.map((item: ViewVoucherEntry, idx: number) => {
                                   const qty = parseFloat(item.quantity || "0");
                                   const rate = parseFloat(
                                     item.rate || item.sellingPrice || "0",
@@ -2279,7 +2332,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     item.totalSales || item.creditAmount || "0",
                                   );
                                   return (
-                                    <TableRow key={item.id}>
+                                    <TableRow
+                                      key={item.id}
+                                      data-dialog-row={idx}
+                                      className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
+                                      onMouseEnter={() => setSelectedDialogRow(idx)}
+                                    >
                                       <TableCell>
                                         <div className="font-medium">
                                           {item.stockItemName ||
@@ -2329,6 +2387,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableBody>
                             </Table>
+                          </div>
                           </div>
                         )}
                       </div>
