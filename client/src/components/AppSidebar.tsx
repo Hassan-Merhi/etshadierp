@@ -187,6 +187,7 @@ export function AppSidebar({ user }: { user?: any }) {
   const isItemVisible = (item: MenuItem) => {
     const isPOSUser = user?.role?.startsWith("POS");
     const isAdmin = user?.role === "Admin";
+    const isDeveloper = user?.role === "Developer";
     const featureKey = ROUTE_TO_FEATURE[item.url];
 
     if (item.url === "/factory/raw-stock") {
@@ -199,7 +200,7 @@ export function AppSidebar({ user }: { user?: any }) {
       return !isPOSUser;
     }
 
-    if (isAdmin || myErpPages?.fullAccess) return true;
+    if (isDeveloper || isAdmin || myErpPages?.fullAccess) return true;
 
     if (isPOSUser) {
       const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"];

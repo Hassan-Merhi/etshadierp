@@ -35976,7 +35976,7 @@ if (asOfDate) {
         const userId = req.user?.id;
         if (!companyId || !role || !userId) return res.status(400).json({ message: "No company or role selected" });
         const hiddenErpCostFields = await storage.getErpUserHiddenCostFields(userId);
-        if (role === "Admin") {
+        if (role === "Admin" || role === "Developer") {
           const { FEATURE_KEYS } = await import("@shared/schema");
           return res.json({ pageKeys: [...FEATURE_KEYS], fullAccess: true, hiddenErpCostFields: [] });
         }
