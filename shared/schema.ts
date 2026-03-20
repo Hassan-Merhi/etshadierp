@@ -3801,3 +3801,34 @@ export const insertLiveSpreadsheetSchema = createInsertSchema(liveSpreadsheets).
 
 export type InsertLiveSpreadsheet = z.infer<typeof insertLiveSpreadsheetSchema>;
 export type LiveSpreadsheet = typeof liveSpreadsheets.$inferSelect;
+
+// ERP Worker Docs — fully separate from Factory worker documents
+export const erpWorkerDocs = pgTable("erp_worker_docs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileData: text("file_data").notNull(),
+  description: text("description"),
+  uploadedBy: text("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+});
+
+export const insertErpWorkerDocSchema = createInsertSchema(erpWorkerDocs).omit({
+  id: true,
+  uploadedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  employeeId: z.number().min(1),
+  fileName: z.string().min(1),
+  fileType: z.string().min(1),
+  fileSize: z.number().min(0),
+  fileData: z.string().min(1),
+  description: z.string().optional(),
+  uploadedBy: z.string().optional(),
+});
+
+export type InsertErpWorkerDoc = z.infer<typeof insertErpWorkerDocSchema>;
+export type ErpWorkerDoc = typeof erpWorkerDocs.$inferSelect;

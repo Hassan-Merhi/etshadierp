@@ -106,6 +106,8 @@ import {
   storedFiles,
   liveSpreadsheets,
   insertLiveSpreadsheetSchema,
+  erpWorkerDocs,
+  insertErpWorkerDocSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -6190,6 +6192,92 @@ if (asOfDate) {
       }
     },
   );
+
+  // ─── ERP Worker Docs (fully isolated from Factory docs) ─────────────────────
+
+  app.get("/api/employees/:id/docs", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
+      const docs = await db
+        .select({ id: erpWorkerDocs.id, employeeId: erpWorkerDocs.employeeId, companyId: erpWorkerDocs.companyId,
+          fileName: erpWorkerDocs.fileName, fileType: erpWorkerDocs.fileType, fileSize: erpWorkerDocs.fileSize,
+          description: erpWorkerDocs.description, uploadedBy: erpWorkerDocs.uploadedBy, uploadedAt: erpWorkerDocs.uploadedAt })
+        .from(erpWorkerDocs)
+        .where(and(eq(erpWorkerDocs.companyId, companyId), eq(erpWorkerDocs.employeeId, employeeId)))
+        .orderBy(desc(erpWorkerDocs.uploadedAt));
+      res.json(docs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/employees/:id/docs", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
+      const parsed = insertErpWorkerDocSchema.parse({ ...req.body, companyId, employeeId });
+      const [doc] = await db.insert(erpWorkerDocs).values(parsed).returning();
+      res.status(201).json(doc);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/erp-worker-docs/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const docId = parseInt(req.params.id);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
+      const [existing] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Document not found" });
+      const { description, fileName } = req.body;
+      const [updated] = await db.update(erpWorkerDocs).set({ description, fileName }).where(eq(erpWorkerDocs.id, docId)).returning();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/erp-worker-docs/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const docId = parseInt(req.params.id);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
+      const [existing] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Document not found" });
+      await db.delete(erpWorkerDocs).where(eq(erpWorkerDocs.id, docId));
+      res.json({ message: "Document deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/erp-worker-docs/:id/download", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const docId = parseInt(req.params.id);
+      if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
+      const [doc] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      if (!doc) return res.status(404).json({ message: "Document not found" });
+      const base64Data = doc.fileData.split(",").pop() || doc.fileData;
+      const buffer = Buffer.from(base64Data, "base64");
+      res.set("Content-Type", doc.fileType);
+      res.set("Content-Disposition", `attachment; filename="${doc.fileName}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Salary Advances
   app.get(

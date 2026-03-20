@@ -76,6 +76,7 @@ import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import { ERPWorkerDetail } from "@/components/ERPWorkerDetail";
 
 const depositSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
@@ -203,6 +204,8 @@ export default function Payroll() {
   const [statementExpanded, setStatementExpanded] = useState(false);
   const [editEmployeeDialogOpen, setEditEmployeeDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [selectedWorkerProfileId, setSelectedWorkerProfileId] = useState<number | null>(null);
+  const [workerProfileSearch, setWorkerProfileSearch] = useState("");
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -1380,6 +1383,7 @@ export default function Payroll() {
               items: [
                 { key: "employees", label: "Employees", icon: Users as LucideIcon },
                 { key: "workers", label: "Workers", icon: HardHat as LucideIcon },
+                { key: "worker-profiles", label: "Worker Profiles", icon: User as LucideIcon },
                 { key: "advances", label: "Advances", icon: Banknote as LucideIcon },
               ],
             },
@@ -2218,6 +2222,122 @@ export default function Payroll() {
           </Dialog>
         </>
         )}
+
+        {selectedTab === "worker-profiles" && (() => {
+          const selectedWorkerProfile = selectedWorkerProfileId
+            ? workerStaff.find(w => w.id === selectedWorkerProfileId) ?? null
+            : null;
+
+          const filteredWorkers = workerStaff.filter(w => {
+            const q = workerProfileSearch.toLowerCase();
+            if (!q) return true;
+            return (
+              `${w.firstName} ${w.lastName}`.toLowerCase().includes(q) ||
+              (w.code || "").toLowerCase().includes(q) ||
+              (w.department || "").toLowerCase().includes(q)
+            );
+          });
+
+          if (selectedWorkerProfile) {
+            return (
+              <ERPWorkerDetail
+                worker={selectedWorkerProfile as any}
+                onBack={() => setSelectedWorkerProfileId(null)}
+              />
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-semibold">Worker Profiles</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Click a worker to view their full profile, statement, advances, and documents
+                  </p>
+                </div>
+                <Button onClick={() => setNewWorkerDialogOpen(true)} data-testid="button-new-worker-profile">
+                  <Plus className="h-4 w-4 mr-2" /> New Worker
+                </Button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name, code, or department..."
+                  value={workerProfileSearch}
+                  onChange={(e) => setWorkerProfileSearch(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                  data-testid="input-search-worker-profiles"
+                />
+              </div>
+
+              {employeesLoading ? (
+                <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-md bg-muted animate-pulse" />)}</div>
+              ) : filteredWorkers.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    <HardHat className="mx-auto h-8 w-8 mb-3 opacity-30" />
+                    <p className="text-sm">{workerStaff.length === 0 ? "No workers found. Create workers using the New Worker button." : "No workers match your search."}</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Code</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Salary Type</TableHead>
+                            <TableHead className="text-right">Base Salary</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredWorkers.map((worker) => (
+                            <TableRow
+                              key={worker.id}
+                              className="cursor-pointer hover-elevate"
+                              onClick={() => setSelectedWorkerProfileId(worker.id)}
+                              data-testid={`row-worker-profile-${worker.id}`}
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                                    {(worker.firstName?.[0] ?? "").toUpperCase()}{(worker.lastName?.[0] ?? "").toUpperCase()}
+                                  </div>
+                                  <span className="font-medium text-sm" data-testid={`text-worker-name-${worker.id}`}>{worker.firstName} {worker.lastName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</TableCell>
+                              <TableCell className="text-sm" data-testid={`text-worker-dept-${worker.id}`}>{worker.department || "—"}</TableCell>
+                              <TableCell className="text-sm">Monthly</TableCell>
+                              <TableCell className="text-right font-mono text-sm" data-testid={`text-worker-salary-${worker.id}`}>{formatAmount(parseFloat(worker.monthlySalary || "0"))}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={`text-xs ${worker.active === false ? "text-muted-foreground" : "text-green-700 dark:text-green-400"}`} data-testid={`badge-worker-status-${worker.id}`}>
+                                  {worker.active === false ? "Inactive" : "Active"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button size="sm" variant="ghost" className="text-xs" data-testid={`button-view-worker-${worker.id}`}>
+                                  View
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          );
+        })()}
 
         {selectedTab === "advances" && (
           <>
