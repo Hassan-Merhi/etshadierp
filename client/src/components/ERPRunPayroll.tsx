@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle } from "lucide-react";
+import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,11 @@ function getInitials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
+function fmt(val: string | number | null | undefined) {
+  const n = parseFloat(String(val || 0));
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
+
 interface Employee {
   id: number;
   code: string;
@@ -67,6 +72,14 @@ interface LedgerAccount {
   accountType: string;
 }
 
+interface SalaryAdvance {
+  id: number;
+  employeeId: number;
+  amount: string;
+  remainingBalance: string;
+  status: string;
+}
+
 export default function ERPRunPayroll() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
@@ -75,10 +88,11 @@ export default function ERPRunPayroll() {
   const [expandedGroups, setExpandedGroups] = useState<Record<number | string, boolean>>({});
   const [selectedWorkers, setSelectedWorkers] = useState<Set<number>>(new Set());
   const [payDialogOpen, setPayDialogOpen] = useState(false);
-  const [amounts, setAmounts] = useState<Record<number, string>>({});
   const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0]);
   const [payAccountId, setPayAccountId] = useState("");
   const [payNotes, setPayNotes] = useState("");
+  // advanceOverrides: employeeId → deduction amount string
+  const [advanceOverrides, setAdvanceOverrides] = useState<Record<number, string>>({});
 
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -102,6 +116,15 @@ export default function ERPRunPayroll() {
     },
   });
 
+  const { data: salaryAdvances = [] } = useQuery<SalaryAdvance[]>({
+    queryKey: ["/api/salary-advances"],
+    queryFn: async () => {
+      const res = await fetch("/api/salary-advances", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const cashAccounts = useMemo(
     () => ledgerAccounts.filter((a) => a.accountType === "Cash"),
     [ledgerAccounts],
@@ -119,6 +142,20 @@ export default function ERPRunPayroll() {
     }),
     [workerGroupsRaw],
   );
+
+  // Outstanding advance balance per employee
+  const advanceBalanceByEmployee = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const adv of salaryAdvances) {
+      if (adv.status === "Active" || adv.status === "active" || adv.status === "Partial") {
+        const bal = parseFloat(adv.remainingBalance || "0");
+        if (bal > 0) {
+          map[adv.employeeId] = (map[adv.employeeId] || 0) + bal;
+        }
+      }
+    }
+    return map;
+  }, [salaryAdvances]);
 
   const workerMemberships = useMemo(() => {
     const map: Record<number, number[]> = {};
@@ -162,11 +199,6 @@ export default function ERPRunPayroll() {
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
-    setAmounts((prev) => {
-      if (prev[id]) return prev;
-      const w = workerById[id];
-      return { ...prev, [id]: w?.monthlySalary || "" };
-    });
   }
 
   function toggleGroupSelection(memberIds: number[]) {
@@ -175,39 +207,44 @@ export default function ERPRunPayroll() {
     setSelectedWorkers((prev) => {
       const next = new Set(prev);
       if (allSelected) { visibleIds.forEach((id) => next.delete(id)); }
-      else {
-        visibleIds.forEach((id) => {
-          next.add(id);
-          if (!amounts[id]) {
-            const w = workerById[id];
-            setAmounts((pa) => ({ ...pa, [id]: w?.monthlySalary || "" }));
-          }
-        });
-      }
+      else { visibleIds.forEach((id) => next.add(id)); }
       return next;
     });
   }
 
   function openPayDialog() {
-    const updated: Record<number, string> = { ...amounts };
+    // Initialize advance overrides: default to full outstanding balance
+    const overrides: Record<number, string> = {};
     for (const id of selectedWorkers) {
-      if (!updated[id]) {
-        const w = workerById[id];
-        updated[id] = w?.monthlySalary || "";
-      }
+      const balance = advanceBalanceByEmployee[id] || 0;
+      overrides[id] = balance.toFixed(2);
     }
-    setAmounts(updated);
+    setAdvanceOverrides(overrides);
     setPayDialogOpen(true);
   }
 
+  // Net pay per worker = salary - advance deduction
+  function getNetPay(id: number): number {
+    const w = workerById[id];
+    const salary = parseFloat(w?.monthlySalary || "0");
+    const deduction = parseFloat(advanceOverrides[id] || "0");
+    return Math.max(0, salary - deduction);
+  }
+
   const totalPayable = useMemo(() => {
-    return Array.from(selectedWorkers).reduce((s, id) => s + parseFloat(amounts[id] || "0"), 0);
-  }, [selectedWorkers, amounts]);
+    return Array.from(selectedWorkers).reduce((s, id) => s + getNetPay(id), 0);
+  }, [selectedWorkers, advanceOverrides, workerById]);
+
+  const totalSelected = useMemo(() => {
+    return Array.from(selectedWorkers).reduce((s, id) => {
+      return s + parseFloat(workerById[id]?.monthlySalary || "0");
+    }, 0);
+  }, [selectedWorkers, workerById]);
 
   const payMutation = useMutation({
     mutationFn: async () => {
       const payments = Array.from(selectedWorkers)
-        .map((id) => ({ workerId: id, amount: amounts[id] || "0" }))
+        .map((id) => ({ workerId: id, amount: fmt(getNetPay(id)) }))
         .filter((p) => parseFloat(p.amount) > 0);
       if (!payAccountId) throw new Error("Please select a payment account");
       if (payments.length === 0) throw new Error("No workers with valid amounts");
@@ -224,10 +261,11 @@ export default function ERPRunPayroll() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/worker-payments-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
       toast({ title: "Payroll processed", description: `${selectedWorkers.size} worker(s) paid successfully` });
       setPayDialogOpen(false);
       setSelectedWorkers(new Set());
-      setAmounts({});
+      setAdvanceOverrides({});
       setPayNotes("");
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -250,6 +288,8 @@ export default function ERPRunPayroll() {
     if (!filtered.has(worker.id)) return null;
     const fullName = `${worker.firstName} ${worker.lastName}`.trim();
     const isSelected = selectedWorkers.has(worker.id);
+    const advanceBalance = advanceBalanceByEmployee[worker.id] || 0;
+    const salary = parseFloat(worker.monthlySalary || "0");
     return (
       <div
         key={worker.id}
@@ -281,14 +321,21 @@ export default function ERPRunPayroll() {
                 <p className="text-xs text-muted-foreground mt-0.5">{worker.department}</p>
               )}
             </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t">
-              <span className="text-xs text-muted-foreground font-mono" data-testid={`text-code-${worker.id}`}>
-                {worker.code || "—"}
-              </span>
-              {worker.monthlySalary && (
-                <span className="text-xs font-medium text-muted-foreground">
-                  {formatAmount(parseFloat(worker.monthlySalary))}
-                </span>
+            <div className="mt-3 pt-3 border-t space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground font-mono">{worker.code || "—"}</span>
+                <span className="text-xs font-medium">{formatAmount(salary)}</span>
+              </div>
+              {advanceBalance > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Banknote className="h-3 w-3" />
+                    Advance
+                  </span>
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    -{formatAmount(advanceBalance)}
+                  </span>
+                </div>
               )}
             </div>
           </CardContent>
@@ -352,7 +399,7 @@ export default function ERPRunPayroll() {
         <div className="flex items-center gap-2">
           {selectedWorkers.size > 0 && (
             <span className="text-sm text-muted-foreground">
-              {selectedWorkers.size} selected — {formatAmount(totalPayable)}
+              {selectedWorkers.size} selected — {formatAmount(totalSelected)}
             </span>
           )}
           <Button
@@ -371,9 +418,6 @@ export default function ERPRunPayroll() {
           <Users className="mx-auto h-10 w-10 mb-3 opacity-40" />
           <p className="font-medium">
             {searchQuery ? "No workers match your search" : "No active workers found"}
-          </p>
-          <p className="text-sm mt-1">
-            {searchQuery ? "Try adjusting your search" : "Add workers from the Workers tab"}
           </p>
         </div>
       ) : (
@@ -395,7 +439,7 @@ export default function ERPRunPayroll() {
           <DialogHeader>
             <DialogTitle>Process Payroll</DialogTitle>
             <DialogDescription>
-              Review and confirm payment for {selectedWorkers.size} worker(s). Total: {formatAmount(totalPayable)}
+              Review advances and confirm net pay for {selectedWorkers.size} worker(s). Net total: {formatAmount(totalPayable)}
             </DialogDescription>
           </DialogHeader>
 
@@ -442,14 +486,15 @@ export default function ERPRunPayroll() {
             </div>
 
             <div className="space-y-2">
-              <Label>Workers & Amounts</Label>
+              <Label>Workers & Net Pay</Label>
               <div className="border rounded-md overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Worker</TableHead>
-                      <TableHead>Dept.</TableHead>
-                      <TableHead className="w-40">Amount</TableHead>
+                      <TableHead className="text-right">Base Salary</TableHead>
+                      <TableHead className="text-right">Advance Deduction</TableHead>
+                      <TableHead className="text-right">Net Pay</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -457,21 +502,41 @@ export default function ERPRunPayroll() {
                       const w = workerById[id];
                       if (!w) return null;
                       const fullName = `${w.firstName} ${w.lastName}`.trim();
+                      const salary = parseFloat(w.monthlySalary || "0");
+                      const advanceBalance = advanceBalanceByEmployee[id] || 0;
+                      const deduction = parseFloat(advanceOverrides[id] || "0");
+                      const netPay = Math.max(0, salary - deduction);
                       return (
                         <TableRow key={id} data-testid={`row-pay-worker-${id}`}>
-                          <TableCell className="font-medium">{fullName}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{w.department || "—"}</TableCell>
                           <TableCell>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="h-8 text-sm"
-                              value={amounts[id] || ""}
-                              onChange={(e) => setAmounts((prev) => ({ ...prev, [id]: e.target.value }))}
-                              data-testid={`input-amount-${id}`}
-                            />
+                            <div>
+                              <p className="font-medium text-sm">{fullName}</p>
+                              {w.department && <p className="text-xs text-muted-foreground">{w.department}</p>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">{formatAmount(salary)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                max={String(advanceBalance)}
+                                step="0.01"
+                                placeholder="0.00"
+                                className="h-8 text-sm w-28 text-right"
+                                value={advanceOverrides[id] || ""}
+                                onChange={(e) => setAdvanceOverrides((prev) => ({ ...prev, [id]: e.target.value }))}
+                                data-testid={`input-advance-deduction-${id}`}
+                              />
+                              {advanceBalance > 0 && (
+                                <span className="text-xs text-amber-600 dark:text-amber-400">
+                                  Outstanding: {formatAmount(advanceBalance)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-sm" data-testid={`text-net-pay-${id}`}>
+                            {formatAmount(netPay)}
                           </TableCell>
                         </TableRow>
                       );
@@ -479,9 +544,10 @@ export default function ERPRunPayroll() {
                   </TableBody>
                 </Table>
               </div>
-              <p className="text-xs text-muted-foreground text-right">
-                Total: <span className="font-semibold">{formatAmount(totalPayable)}</span>
-              </p>
+              <div className="flex justify-end gap-6 text-xs text-muted-foreground px-1">
+                <span>Total Base: <span className="font-semibold text-foreground">{formatAmount(totalSelected)}</span></span>
+                <span>Net Payable: <span className="font-semibold text-foreground">{formatAmount(totalPayable)}</span></span>
+              </div>
             </div>
           </div>
 

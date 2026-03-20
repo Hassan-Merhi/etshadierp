@@ -138,7 +138,7 @@ type DeductionFormData = z.infer<typeof deductionSchema>;
 
 const workerFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  lastName: z.string().optional().default(""),
   code: z.string().optional(),
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   department: z.string().optional(),
@@ -1385,7 +1385,6 @@ export default function Payroll() {
               label: "Payroll",
               items: [
                 { key: "employees", label: "Employees", icon: Users as LucideIcon },
-                { key: "workers", label: "Workers", icon: HardHat as LucideIcon },
                 { key: "worker-profiles", label: "Worker Profiles", icon: User as LucideIcon },
                 { key: "run-payroll", label: "Run Payroll", icon: PlayCircle as LucideIcon },
                 { key: "advances", label: "Advances", icon: Banknote as LucideIcon },
@@ -2348,10 +2347,7 @@ export default function Payroll() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Name</TableHead>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Department</TableHead>
                             <TableHead>Group</TableHead>
-                            <TableHead>Salary Type</TableHead>
                             <TableHead className="text-right">Base Salary</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead></TableHead>
@@ -2373,14 +2369,11 @@ export default function Payroll() {
                                   <span className="font-medium text-sm" data-testid={`text-worker-name-${worker.id}`}>{worker.firstName} {worker.lastName}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="font-mono text-xs" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</TableCell>
-                              <TableCell className="text-sm" data-testid={`text-worker-dept-${worker.id}`}>{worker.department || "—"}</TableCell>
                               <TableCell>
                                 {workerGroupMap[worker.id]
                                   ? <Badge variant="secondary" className="text-xs">{workerGroupMap[worker.id]}</Badge>
                                   : <span className="text-xs text-muted-foreground">—</span>}
                               </TableCell>
-                              <TableCell className="text-sm">Monthly</TableCell>
                               <TableCell className="text-right font-mono text-sm" data-testid={`text-worker-salary-${worker.id}`}>{formatAmount(parseFloat(worker.monthlySalary || "0"))}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={`text-xs ${worker.active === false ? "text-muted-foreground" : "text-green-700 dark:text-green-400"}`} data-testid={`badge-worker-status-${worker.id}`}>
