@@ -2902,15 +2902,15 @@ function POSReceiptSettings() {
         label: "Users & Access",
         items: [
           { key: "users", label: "Users", icon: Users },
-          { key: "active-users", label: "Active Users", icon: Eye },
-          { key: "login-history", label: "Login History", icon: Clock },
+          { key: "active-users", label: "Active Users", icon: Eye, devOnly: true },
+          { key: "login-history", label: "Login History", icon: Clock, devOnly: true },
         ],
       },
       {
         label: "Tools",
         items: [
-          { key: "data-tools", label: "Data Tools", icon: Database },
-          { key: "bulk-rename", label: "Bulk Rename", icon: Package },
+          { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true },
+          { key: "bulk-rename", label: "Bulk Rename", icon: Package, devOnly: true },
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files", label: "File Storage", icon: Upload },
         ],
@@ -2918,7 +2918,7 @@ function POSReceiptSettings() {
       {
         label: "POS",
         items: appMode !== "factory" ? [
-          { key: "pos-settings", label: "POS Settings", icon: ShoppingCart },
+          { key: "pos-settings", label: "POS Settings", icon: ShoppingCart, devOnly: true },
         ] : [],
       },
       {
@@ -2939,7 +2939,7 @@ function POSReceiptSettings() {
             </SelectTrigger>
             <SelectContent>
               {sidebarGroups.map((group) =>
-                group.items.length > 0 ? group.items.map((item) => (
+                group.items.length > 0 ? group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer").map((item) => (
                   <SelectItem key={item.key} value={item.key} data-testid={`tab-mobile-${item.key}`}>
                     {item.label}
                   </SelectItem>
@@ -2955,7 +2955,7 @@ function POSReceiptSettings() {
             <div key={group.label}>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
               <div className="space-y-0.5">
-                {group.items.map((item) => {
+                {group.items.filter((item) => !(item as any).devOnly || currentUser?.role === "Developer").map((item) => {
                   const Icon = item.icon;
                   const isActive = activeSection === item.key;
                   return (
@@ -3648,11 +3648,11 @@ function POSReceiptSettings() {
 
 
           {/* Active Users Tab */}
-          {activeSection === "active-users" && (
+          {activeSection === "active-users" && currentUser?.role === "Developer" && (
             <ActiveUsersSection />
           )}
 
-          {activeSection === "login-history" && <LoginHistoryTab />}
+          {activeSection === "login-history" && currentUser?.role === "Developer" && <LoginHistoryTab />}
 
 
           {activeSection === "edit-log" && (
@@ -3679,16 +3679,16 @@ function POSReceiptSettings() {
             </div>
           )}
 
-          {activeSection === "data-tools" && (
+          {activeSection === "data-tools" && currentUser?.role === "Developer" && (
             <DataToolsTab />
           )}
           {activeSection === "exchange-rates" && (
             <ExchangeRateSettings />
           )}
-          {activeSection === "bulk-rename" && (
+          {activeSection === "bulk-rename" && currentUser?.role === "Developer" && (
             <BulkRenameTab />
           )}
-          {activeSection === "pos-settings" && (
+          {activeSection === "pos-settings" && currentUser?.role === "Developer" && (
             <PosSettingsTab />
           )}
           {activeSection === "files" && (
@@ -3778,6 +3778,7 @@ function POSReceiptSettings() {
                   </Card>
                 </Link>
 
+                {currentUser?.role === "Developer" && (
                 <Link href="/orphaned-records">
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
@@ -3796,6 +3797,7 @@ function POSReceiptSettings() {
                     </div>
                   </Card>
                 </Link>
+                )}
 
                 <Link href="/chatbot-settings">
                   <Card className="p-6 hover-elevate cursor-pointer">
@@ -3835,6 +3837,7 @@ function POSReceiptSettings() {
                   </Card>
                 </Link>
 
+                {currentUser?.role === "Developer" && (
                 <Link href="/inventory-repair">
                   <Card className="p-6 hover-elevate cursor-pointer">
                     <div className="flex items-center justify-between">
@@ -3853,6 +3856,7 @@ function POSReceiptSettings() {
                     </div>
                   </Card>
                 </Link>
+                )}
 
                 <Link href="/net-profit-details">
                   <Card className="p-6 hover-elevate cursor-pointer">
@@ -3892,6 +3896,7 @@ function POSReceiptSettings() {
                   </Card>
                 </Link>
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -3921,7 +3926,9 @@ function POSReceiptSettings() {
                     </Button>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -3951,7 +3958,9 @@ function POSReceiptSettings() {
                     </Button>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -3978,7 +3987,9 @@ function POSReceiptSettings() {
                     </Button>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -4044,6 +4055,7 @@ function POSReceiptSettings() {
                     </AlertDialog>
                   </div>
                 </Card>
+                )}
 
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
@@ -4077,6 +4089,7 @@ function POSReceiptSettings() {
                   </div>
                 </Card>
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -4102,7 +4115,9 @@ function POSReceiptSettings() {
                     </Button>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -4151,7 +4166,9 @@ function POSReceiptSettings() {
                     </Button>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -4241,7 +4258,9 @@ function POSReceiptSettings() {
                     </div>
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
@@ -4361,7 +4380,9 @@ function POSReceiptSettings() {
                     )}
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
@@ -4483,7 +4504,9 @@ function POSReceiptSettings() {
                     )}
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6 md:col-span-2">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -4591,7 +4614,9 @@ function POSReceiptSettings() {
                     )}
                   </div>
                 </Card>
+                )}
 
+                {currentUser?.role === "Developer" && (
                 <Card className="p-6 md:col-span-2">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
@@ -4632,8 +4657,11 @@ function POSReceiptSettings() {
                     </div>
                   </div>
                 </Card>
+                )}
 
-                <NetPositionAdjustmentCard />
+                {currentUser?.role === "Developer" && (
+                  <NetPositionAdjustmentCard />
+                )}
               </div>
             </div>
           )}
