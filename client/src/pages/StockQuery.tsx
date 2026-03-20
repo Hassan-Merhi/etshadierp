@@ -32,7 +32,9 @@ function StockQueryContent() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const isFactory = appMode === "factory";
-  const [searchTerm, setSearchTerm] = useState("");
+  const search = useSearch();
+  const initialQ = new URLSearchParams(search).get("q") || "";
+  const [searchTerm, setSearchTerm] = useState(initialQ);
   const [_location, navigate] = useLocation();
 
   const { data: stockItems = [], isLoading: erpLoading } = useQuery<StockItem[]>({

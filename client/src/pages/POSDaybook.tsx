@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +93,7 @@ export default function POSDaybook() {
   const [editedNotes, setEditedNotes] = useState("");
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
+  const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const reprintRef = useRef<HTMLDivElement>(null);
@@ -224,6 +225,62 @@ export default function POSDaybook() {
       }
     }
   }, [voucherIdParam, vouchers, selectedVoucher, toast]);
+
+  // Reset selected row when dialog opens/closes or mode changes
+  useEffect(() => {
+    setSelectedDialogRow(null);
+  }, [selectedVoucher, isEditMode]);
+
+  // Keyboard navigation for dialog item rows
+  const getDialogItems = useCallback((): Array<{ stockItemName?: string }> => {
+    if (!selectedVoucher) return [];
+    if (isEditMode) return editedItems;
+    return (voucherDetails as any)?.salesItems || [];
+  }, [selectedVoucher, isEditMode, editedItems, voucherDetails]);
+
+  useEffect(() => {
+    if (!selectedVoucher) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
+
+      const items = getDialogItems();
+
+      if (e.key === "ArrowDown" && !isTyping) {
+        e.preventDefault();
+        setSelectedDialogRow(prev => {
+          if (prev === null) return 0;
+          return Math.min(prev + 1, items.length - 1);
+        });
+        return;
+      }
+
+      if (e.key === "ArrowUp" && !isTyping) {
+        e.preventDefault();
+        setSelectedDialogRow(prev => {
+          if (prev === null) return items.length - 1;
+          return Math.max(prev - 1, 0);
+        });
+        return;
+      }
+
+      // Alt+S or Shift+Alt+S → open Stock Query for selected item
+      if (e.altKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        if (selectedDialogRow !== null && items[selectedDialogRow]) {
+          const itemName = items[selectedDialogRow].stockItemName || "";
+          if (itemName) {
+            navigate(`/stock-query?q=${encodeURIComponent(itemName)}`);
+            setSelectedVoucher(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedVoucher, getDialogItems, navigate, selectedDialogRow]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -550,7 +607,7 @@ export default function POSDaybook() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
                     <Popover open={addItemOpen} onOpenChange={setAddItemOpen}>
                       <PopoverTrigger asChild>
@@ -603,6 +660,7 @@ export default function POSDaybook() {
                       </PopoverContent>
                     </Popover>
                   </div>
+                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · Alt+S to open Stock Query</p>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -621,7 +679,11 @@ export default function POSDaybook() {
                         const isPositiveProfit = profit >= 0;
                         
                         return (
-                          <TableRow key={item.id || idx}>
+                          <TableRow
+                            key={item.id || idx}
+                            className={selectedDialogRow === idx ? "bg-accent" : ""}
+                            onMouseEnter={() => setSelectedDialogRow(idx)}
+                          >
                             <TableCell className="font-medium">
                               {item.stockItemName || `Item ${item.stockItemId}`}
                             </TableCell>
@@ -713,7 +775,10 @@ export default function POSDaybook() {
                 )}
 
                 <div className="overflow-x-auto">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Items Sold</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
+                    <p className="text-xs text-muted-foreground">Hover or use ↑↓ to select · Alt+S to open Stock Query</p>
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -736,7 +801,11 @@ export default function POSDaybook() {
                         const isHassansProfitPositive = hassansProfit >= 0;
                         
                         return (
-                          <TableRow key={item.id || idx}>
+                          <TableRow
+                            key={item.id || idx}
+                            className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
+                            onMouseEnter={() => setSelectedDialogRow(idx)}
+                          >
                             <TableCell className="font-medium">
                               {item.stockItemName || `Item ${item.stockItemId}`}
                             </TableCell>
