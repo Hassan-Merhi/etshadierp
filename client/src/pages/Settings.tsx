@@ -5446,29 +5446,34 @@ function POSReceiptSettings() {
                       )}
                     />
 
-                    <FormField
-                      control={roleForm.control}
-                      name="daybookEditDays"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>POS Editable Days</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              min="0"
-                              placeholder="0 = no editing"
-                              data-testid="input-daybook-edit-days"
-                              onChange={(e) => field.onChange(e.target.value !== "" ? parseInt(e.target.value) : 0)}
-                              value={field.value ?? 0}
-                            />
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground mt-0.5">How many past days this POS user can edit vouchers (0 = cannot edit)</p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </>
+                )}
+
+                {selectedRole !== "Admin" && selectedRole !== "Owner" && (
+                  <FormField
+                    control={roleForm.control}
+                    name="daybookEditDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>POS Daybook Editable Days</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            min="0"
+                            placeholder="0 = no editing"
+                            data-testid="input-daybook-edit-days"
+                            onChange={(e) => field.onChange(e.target.value !== "" ? parseInt(e.target.value) : 0)}
+                            value={field.value ?? 0}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          How many past days this user can edit POS daybook vouchers (0 = cannot edit). Admin and Owner can always edit.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
   
                 <FormField
