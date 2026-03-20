@@ -1071,6 +1071,8 @@ export default function Payroll() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members"] });
       setEditWorkerDialogOpen(false);
       editWorkerForm.reset();
       setSelectedWorkerForEdit(null);

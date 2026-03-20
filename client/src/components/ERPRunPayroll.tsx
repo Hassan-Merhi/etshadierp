@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Users, Search, ChevronDown, ChevronRight, DollarSign, Loader2, PlayCircle, Banknote, Download, FileSpreadsheet, FileText, Printer, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +93,8 @@ export default function ERPRunPayroll() {
   const [payNotes, setPayNotes] = useState("");
   // advanceOverrides: employeeId → deduction amount string
   const [advanceOverrides, setAdvanceOverrides] = useState<Record<number, string>>({});
+  const [paySuccess, setPaySuccess] = useState(false);
+  const [paidSnapshot, setPaidSnapshot] = useState<{ name: string; group: string; base: number; deduction: number; net: number; date: string; notes: string }[]>([]);
 
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -245,17 +247,19 @@ export default function ERPRunPayroll() {
     isGrandTotal?: boolean;
   }
 
-  function buildPayrollData(): PayrollRow[] {
+  function buildPayrollData(useSelected = false): PayrollRow[] {
     const rows: PayrollRow[] = [];
     function addGroup(label: string, memberIds: number[]) {
-      const members = memberIds.filter((id) => workerById[id]);
+      let members = memberIds.filter((id) => workerById[id]);
+      if (useSelected && selectedWorkers.size > 0) members = members.filter((id) => selectedWorkers.has(id));
       if (members.length === 0) return;
       let groupBase = 0, groupDeduction = 0, groupNet = 0;
       for (const id of members) {
         const w = workerById[id];
         const salary = parseFloat(w.monthlySalary || "0");
-        const advanceBal = advanceBalanceByEmployee[id] || 0;
-        const deduction = Math.min(advanceBal, salary);
+        const deduction = useSelected
+          ? parseFloat(advanceOverrides[id] || "0")
+          : Math.min(advanceBalanceByEmployee[id] || 0, salary);
         const net = Math.max(0, salary - deduction);
         groupBase += salary; groupDeduction += deduction; groupNet += net;
         rows.push({ group: label, name: `${w.firstName} ${w.lastName}`.trim(), base: salary, deduction, net });
@@ -274,7 +278,7 @@ export default function ERPRunPayroll() {
   async function exportExcel() {
     const XLSXStyle = await import("xlsx-js-style");
     const XLSX = XLSXStyle.default || XLSXStyle;
-    const data = buildPayrollData();
+    const data = buildPayrollData(selectedWorkers.size > 0);
     const dateStr = new Date().toLocaleDateString();
 
     const wsData: any[][] = [
@@ -359,7 +363,7 @@ export default function ERPRunPayroll() {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
 
-    const data = buildPayrollData();
+    const data = buildPayrollData(selectedWorkers.size > 0);
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const dateStr = new Date().toLocaleDateString();
     const primaryBlue = [30, 58, 95] as [number, number, number];
@@ -463,14 +467,85 @@ export default function ERPRunPayroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/worker-payments-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
-      toast({ title: "Payroll processed", description: `${selectedWorkers.size} worker(s) paid successfully` });
-      setPayDialogOpen(false);
+      // Capture snapshot before clearing selection
+      const snapshot = Array.from(selectedWorkers).map((id) => {
+        const w = workerById[id];
+        const salary = parseFloat(w?.monthlySalary || "0");
+        const deduction = parseFloat(advanceOverrides[id] || "0");
+        const net = Math.max(0, salary - deduction);
+        const groupName = workerGroups.find((g) => (g.members || []).some((m) => m.id === id))?.name || "Ungrouped";
+        return { name: `${w?.firstName || ""} ${w?.lastName || ""}`.trim(), group: groupName, base: salary, deduction, net, date: payDate, notes: payNotes };
+      });
+      setPaidSnapshot(snapshot);
+      setPaySuccess(true);
       setSelectedWorkers(new Set());
       setAdvanceOverrides({});
       setPayNotes("");
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
+
+  function printPayroll(snapshot: typeof paidSnapshot) {
+    const dateStr = snapshot[0]?.date || new Date().toISOString().split("T")[0];
+    const notes = snapshot[0]?.notes || "";
+    const totalBase = snapshot.reduce((s, r) => s + r.base, 0);
+    const totalDed = snapshot.reduce((s, r) => s + r.deduction, 0);
+    const totalNet = snapshot.reduce((s, r) => s + r.net, 0);
+
+    // Group rows by group name
+    const groupMap: Record<string, typeof snapshot> = {};
+    for (const r of snapshot) {
+      if (!groupMap[r.group]) groupMap[r.group] = [];
+      groupMap[r.group].push(r);
+    }
+
+    const rows = Object.entries(groupMap).map(([grp, members]) => {
+      const memberRows = members.map((m, i) => `
+        <tr style="background:${i % 2 === 0 ? "#fff" : "#f4f8fc"}">
+          <td style="padding:5px 8px;border-bottom:1px solid #ddd">${m.name}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #ddd;text-align:right">${m.base.toFixed(2)}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #ddd;text-align:right;color:${m.deduction > 0 ? "#b45309" : "#999"}">${m.deduction > 0 ? `-${m.deduction.toFixed(2)}` : "—"}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #ddd;text-align:right;font-weight:600">${m.net.toFixed(2)}</td>
+        </tr>`).join("");
+      const grpBase = members.reduce((s, r) => s + r.base, 0);
+      const grpDed = members.reduce((s, r) => s + r.deduction, 0);
+      const grpNet = members.reduce((s, r) => s + r.net, 0);
+      return `
+        <tr><td colspan="4" style="padding:6px 8px;background:#1e3a5f;color:#fff;font-weight:700;font-size:11px">${grp}</td></tr>
+        ${memberRows}
+        <tr style="background:#d6e4f0">
+          <td style="padding:5px 8px;font-weight:700;font-size:11px">${grp} — Total</td>
+          <td style="padding:5px 8px;text-align:right;font-weight:700">${grpBase.toFixed(2)}</td>
+          <td style="padding:5px 8px;text-align:right;font-weight:700">${grpDed > 0 ? `-${grpDed.toFixed(2)}` : "—"}</td>
+          <td style="padding:5px 8px;text-align:right;font-weight:700">${grpNet.toFixed(2)}</td>
+        </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><title>Payroll Report</title>
+      <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{color:#1e3a5f;margin:0}table{width:100%;border-collapse:collapse}th{background:#1e3a5f;color:#fff;padding:6px 8px;text-align:left}th:nth-child(n+2){text-align:right}@media print{button{display:none}}</style>
+      </head><body>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div><h1>Payroll Report</h1>${notes ? `<p style="color:#666;margin:4px 0 0">${notes}</p>` : ""}</div>
+        <div style="text-align:right;color:#555"><div>${dateStr}</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Worker</th><th style="text-align:right">Base Salary</th><th style="text-align:right">Deduction</th><th style="text-align:right">Net Pay</th></tr></thead>
+        <tbody>${rows}
+          <tr style="background:#1e3a5f;color:#fff">
+            <td style="padding:6px 8px;font-weight:700">GRAND TOTAL</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalBase.toFixed(2)}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalDed > 0 ? `-${totalDed.toFixed(2)}` : "—"}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700">${totalNet.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;text-align:right"><button onclick="window.print()">Print</button></div>
+      <script>window.onload=()=>window.print();</script>
+    </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+  }
 
   const isLoading = empLoading || groupsLoading;
 
@@ -653,8 +728,59 @@ export default function ERPRunPayroll() {
         </div>
       )}
 
-      <Dialog open={payDialogOpen} onOpenChange={(open) => { if (!open) setPayDialogOpen(false); }}>
+      <Dialog open={payDialogOpen} onOpenChange={(open) => { if (!open) { setPayDialogOpen(false); setPaySuccess(false); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-run-payroll">
+          {paySuccess ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  Payroll Processed
+                </DialogTitle>
+                <DialogDescription>
+                  {paidSnapshot.length} worker(s) paid successfully. You can print or export the payroll report below.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Worker</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead className="text-right">Base</TableHead>
+                      <TableHead className="text-right">Deduction</TableHead>
+                      <TableHead className="text-right">Net Pay</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paidSnapshot.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium text-sm">{r.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{r.group}</TableCell>
+                        <TableCell className="text-right text-sm">{formatAmount(r.base)}</TableCell>
+                        <TableCell className="text-right text-sm text-amber-600 dark:text-amber-400">{r.deduction > 0 ? `-${formatAmount(r.deduction)}` : "—"}</TableCell>
+                        <TableCell className="text-right font-semibold text-sm">{formatAmount(r.net)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end gap-4 text-xs text-muted-foreground px-1">
+                <span>Total Base: <span className="font-semibold text-foreground">{formatAmount(paidSnapshot.reduce((s, r) => s + r.base, 0))}</span></span>
+                <span>Net Paid: <span className="font-semibold text-foreground">{formatAmount(paidSnapshot.reduce((s, r) => s + r.net, 0))}</span></span>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setPayDialogOpen(false); setPaySuccess(false); }} data-testid="button-close-pay-success">
+                  Close
+                </Button>
+                <Button onClick={() => printPayroll(paidSnapshot)} data-testid="button-print-payroll">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Report
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+          <>
           <DialogHeader>
             <DialogTitle>Process Payroll</DialogTitle>
             <DialogDescription>
@@ -786,6 +912,8 @@ export default function ERPRunPayroll() {
               )}
             </Button>
           </DialogFooter>
+          </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
