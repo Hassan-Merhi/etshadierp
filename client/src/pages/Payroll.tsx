@@ -206,6 +206,7 @@ export default function Payroll() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedWorkerProfileId, setSelectedWorkerProfileId] = useState<number | null>(null);
   const [workerProfileSearch, setWorkerProfileSearch] = useState("");
+  const [workerProfileGroupFilter, setWorkerProfileGroupFilter] = useState<number | null>(null);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -2228,7 +2229,16 @@ export default function Payroll() {
             ? workerStaff.find(w => w.id === selectedWorkerProfileId) ?? null
             : null;
 
+          // Workers belonging to the selected group filter (-1 = ungrouped)
+          const allGroupedWorkerIds = workerGroups.flatMap(g => g.members.map(m => m.id));
+          const workerIdsInSelectedGroup = workerProfileGroupFilter === -1
+            ? workerStaff.filter(w => !allGroupedWorkerIds.includes(w.id)).map(w => w.id)
+            : workerProfileGroupFilter !== null
+              ? workerGroups.find(g => g.id === workerProfileGroupFilter)?.members.map(m => m.id) ?? []
+              : null;
+
           const filteredWorkers = workerStaff.filter(w => {
+            if (workerIdsInSelectedGroup !== null && !workerIdsInSelectedGroup.includes(w.id)) return false;
             const q = workerProfileSearch.toLowerCase();
             if (!q) return true;
             return (
@@ -2238,11 +2248,19 @@ export default function Payroll() {
             );
           });
 
+          // Group membership lookup: workerId → group name
+          const workerGroupMap: Record<number, string> = {};
+          workerGroups.forEach(g => g.members.forEach(m => { workerGroupMap[m.id] = g.name; }));
+
           if (selectedWorkerProfile) {
             return (
               <ERPWorkerDetail
                 worker={selectedWorkerProfile as any}
                 onBack={() => setSelectedWorkerProfileId(null)}
+                onEdit={(w) => {
+                  setSelectedWorkerForEdit(w as any);
+                  setEditWorkerDialogOpen(true);
+                }}
               />
             );
           }
@@ -2253,7 +2271,7 @@ export default function Payroll() {
                 <div>
                   <h2 className="text-lg font-semibold">Worker Profiles</h2>
                   <p className="text-sm text-muted-foreground">
-                    Click a worker to view their full profile, statement, advances, and documents
+                    Click a worker to view their profile, statement, advances, and documents
                   </p>
                 </div>
                 <Button onClick={() => setNewWorkerDialogOpen(true)} data-testid="button-new-worker-profile">
@@ -2261,16 +2279,54 @@ export default function Payroll() {
                 </Button>
               </div>
 
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by name, code, or department..."
-                  value={workerProfileSearch}
-                  onChange={(e) => setWorkerProfileSearch(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-                  data-testid="input-search-worker-profiles"
-                />
-              </div>
+              {/* Group filter tabs */}
+              {workerGroups.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setWorkerProfileGroupFilter(null)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${workerProfileGroupFilter === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}
+                    data-testid="filter-group-all"
+                  >
+                    All Workers ({workerStaff.length})
+                  </button>
+                  {workerGroups.map(g => {
+                    const count = workerStaff.filter(w => g.members.some(m => m.id === w.id)).length;
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => setWorkerProfileGroupFilter(g.id)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${workerProfileGroupFilter === g.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}
+                        data-testid={`filter-group-${g.id}`}
+                      >
+                        {g.name} ({count})
+                      </button>
+                    );
+                  })}
+                  {/* Ungrouped workers button */}
+                  {(() => {
+                    const ungroupedCount = workerStaff.filter(w => !workerGroups.some(g => g.members.some(m => m.id === w.id))).length;
+                    if (ungroupedCount === 0) return null;
+                    return (
+                      <button
+                        onClick={() => setWorkerProfileGroupFilter(-1)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${workerProfileGroupFilter === -1 ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}
+                        data-testid="filter-group-ungrouped"
+                      >
+                        Ungrouped ({ungroupedCount})
+                      </button>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <input
+                type="text"
+                placeholder="Search by name, code, or department..."
+                value={workerProfileSearch}
+                onChange={(e) => setWorkerProfileSearch(e.target.value)}
+                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                data-testid="input-search-worker-profiles"
+              />
 
               {employeesLoading ? (
                 <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-md bg-muted animate-pulse" />)}</div>
@@ -2278,7 +2334,7 @@ export default function Payroll() {
                 <Card>
                   <CardContent className="py-12 text-center text-muted-foreground">
                     <HardHat className="mx-auto h-8 w-8 mb-3 opacity-30" />
-                    <p className="text-sm">{workerStaff.length === 0 ? "No workers found. Create workers using the New Worker button." : "No workers match your search."}</p>
+                    <p className="text-sm">{workerStaff.length === 0 ? "No workers found. Create workers using the New Worker button." : "No workers match your search or filter."}</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -2291,6 +2347,7 @@ export default function Payroll() {
                             <TableHead>Name</TableHead>
                             <TableHead>Code</TableHead>
                             <TableHead>Department</TableHead>
+                            <TableHead>Group</TableHead>
                             <TableHead>Salary Type</TableHead>
                             <TableHead className="text-right">Base Salary</TableHead>
                             <TableHead>Status</TableHead>
@@ -2315,6 +2372,11 @@ export default function Payroll() {
                               </TableCell>
                               <TableCell className="font-mono text-xs" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</TableCell>
                               <TableCell className="text-sm" data-testid={`text-worker-dept-${worker.id}`}>{worker.department || "—"}</TableCell>
+                              <TableCell>
+                                {workerGroupMap[worker.id]
+                                  ? <Badge variant="secondary" className="text-xs">{workerGroupMap[worker.id]}</Badge>
+                                  : <span className="text-xs text-muted-foreground">—</span>}
+                              </TableCell>
                               <TableCell className="text-sm">Monthly</TableCell>
                               <TableCell className="text-right font-mono text-sm" data-testid={`text-worker-salary-${worker.id}`}>{formatAmount(parseFloat(worker.monthlySalary || "0"))}</TableCell>
                               <TableCell>
@@ -2322,9 +2384,15 @@ export default function Payroll() {
                                   {worker.active === false ? "Inactive" : "Active"}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                <Button size="sm" variant="ghost" className="text-xs" data-testid={`button-view-worker-${worker.id}`}>
-                                  View
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-xs"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
+                                  data-testid={`button-edit-profile-worker-${worker.id}`}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               </TableCell>
                             </TableRow>

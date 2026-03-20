@@ -79,6 +79,7 @@ interface Transaction {
 interface Props {
   worker: Employee;
   onBack: () => void;
+  onEdit?: (worker: Employee) => void;
 }
 
 const ALLOWED_TYPES = [
@@ -100,7 +101,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ERPWorkerDetail({ worker, onBack }: Props) {
+export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
@@ -375,6 +376,11 @@ export function ERPWorkerDetail({ worker, onBack }: Props) {
               <Badge variant={worker.active === false ? "secondary" : "outline"} className="text-xs" data-testid="badge-worker-status">
                 {worker.active === false ? "Inactive" : "Active"}
               </Badge>
+              {onEdit && (
+                <Button size="sm" variant="outline" className="w-full" onClick={() => onEdit(worker)} data-testid="button-edit-worker-profile">
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Worker
+                </Button>
+              )}
             </CardContent>
           </Card>
 
