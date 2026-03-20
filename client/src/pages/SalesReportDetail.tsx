@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PLFilter = "all" | "gain" | "loss";
+type PLBasis = "config" | "cost";
 
 interface SalesReportItem {
   id: number;
@@ -46,6 +47,7 @@ export default function SalesReportDetail() {
   const { formatAmount } = useCurrencyContext();
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [plFilter, setPlFilter] = useState<PLFilter>("all");
+  const [plBasis, setPlBasis] = useState<PLBasis>("config");
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";
@@ -70,8 +72,10 @@ export default function SalesReportDetail() {
   const sortedItems = [...items]
     .sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""))
     .filter((item) => {
-      if (plFilter === "gain") return item.configuredProfit > 0;
-      if (plFilter === "loss") return item.configuredProfit < 0;
+      if (plFilter === "all") return true;
+      const value = plBasis === "cost" ? parseFloat(item.costProfit) : item.configuredProfit;
+      if (plFilter === "gain") return value > 0;
+      if (plFilter === "loss") return value < 0;
       return true;
     });
 
@@ -109,37 +113,62 @@ export default function SalesReportDetail() {
             All items sold {grouping === "daily" ? "on this day" : grouping === "monthly" ? "this month" : "this year"}
           </p>
         </div>
-        <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-pl-toggle">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-            onClick={() => setPlFilter("all")}
-            data-testid="button-filter-all"
-          >
-            <LayoutList className="h-3.5 w-3.5 mr-1" />
-            All
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
-            onClick={() => setPlFilter("gain")}
-            data-testid="button-filter-gaining"
-          >
-            <TrendingUp className="h-3.5 w-3.5 mr-1" />
-            Gaining
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
-            onClick={() => setPlFilter("loss")}
-            data-testid="button-filter-losing"
-          >
-            <TrendingDown className="h-3.5 w-3.5 mr-1" />
-            Losing
-          </Button>
+        <div className="flex flex-col gap-1 items-end" data-testid="filter-pl-toggle">
+          <div className="flex items-center gap-1 rounded-md border p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+              onClick={() => setPlFilter("all")}
+              data-testid="button-filter-all"
+            >
+              <LayoutList className="h-3.5 w-3.5 mr-1" />
+              All
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
+              onClick={() => setPlFilter("gain")}
+              data-testid="button-filter-gaining"
+            >
+              <TrendingUp className="h-3.5 w-3.5 mr-1" />
+              Gaining
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
+              onClick={() => setPlFilter("loss")}
+              data-testid="button-filter-losing"
+            >
+              <TrendingDown className="h-3.5 w-3.5 mr-1" />
+              Losing
+            </Button>
+          </div>
+          {plFilter !== "all" && (
+            <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-basis-toggle">
+              <span className="text-xs text-muted-foreground px-1">by:</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={plBasis === "config" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                onClick={() => setPlBasis("config")}
+                data-testid="button-basis-config"
+              >
+                Config P/L
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={plBasis === "cost" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                onClick={() => setPlBasis("cost")}
+                data-testid="button-basis-cost"
+              >
+                Cost P/L
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
