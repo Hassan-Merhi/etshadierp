@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, Link, useLocation } from "wouter";
@@ -43,6 +44,7 @@ export default function ContainerDetail() {
   const containerId = params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
   const [showSellDialog, setShowSellDialog] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const { toast } = useToast();
   const [_location, setLocation] = useLocation();
   const { selectedCompany } = useCompany();
@@ -366,16 +368,12 @@ export default function ContainerDetail() {
     },
   });
 
-  const handleDeletePO = (poId: number, poNumber: string) => {
-    if (confirm(`Are you sure you want to delete PO ${poNumber}? This will also delete all line items, the voucher, and remove the container if this is the last PO.`)) {
-      deletePOMutation.mutate(poId);
-    }
+  const handleDeletePO = (poId: number, _poNumber: string) => {
+    setPendingDelete(() => () => deletePOMutation.mutate(poId));
   };
 
   const handleDeleteContainer = () => {
-    if (confirm(`Are you sure you want to delete container ${containerData?.container.containerNumber}? This will delete all purchase orders, line items, charges, vouchers, and the container itself. This action cannot be undone.`)) {
-      deleteContainerMutation.mutate(parseInt(containerId!));
-    }
+    setPendingDelete(() => () => deleteContainerMutation.mutate(parseInt(containerId!)));
   };
 
   const handleSellSubmit = (data: z.infer<typeof saleFormSchema>) => {
@@ -493,9 +491,7 @@ export default function ContainerDetail() {
             </Button>
             <Button
               onClick={() => {
-                if (confirm("Reverse offload? This will delete inventory and vouchers created during offload.")) {
-                  reverseOffloadMutation.mutate(parseInt(containerId!));
-                }
+                setPendingDelete(() => () => reverseOffloadMutation.mutate(parseInt(containerId!)));
               }}
               variant="outline"
               disabled={reverseOffloadMutation.isPending}
@@ -837,9 +833,7 @@ export default function ContainerDetail() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => {
-                              if (confirm(`Delete ${uploaded.fileName}?`)) deleteDocMutation.mutate(uploaded.id);
-                            }}
+                            onClick={() => { setPendingDelete(() => () => deleteDocMutation.mutate(uploaded.id)); }}
                             data-testid={`button-delete-doc-${dt.code}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -868,7 +862,7 @@ export default function ContainerDetail() {
                       <Button size="icon" variant="ghost" onClick={() => window.open(`/api/factory/uploads/${d.storageKey}`, "_blank")} data-testid={`button-view-doc-opt-${d.id}`}>
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Delete ${d.fileName}?`)) deleteDocMutation.mutate(d.id); }} data-testid={`button-delete-doc-opt-${d.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => { setPendingDelete(() => () => deleteDocMutation.mutate(d.id)); }} data-testid={`button-delete-doc-opt-${d.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -909,7 +903,7 @@ export default function ContainerDetail() {
                       <Badge variant={fr.computedStatus === "PAID" ? "default" : fr.computedStatus === "PARTIAL" ? "secondary" : "destructive"} data-testid={`badge-freight-status-${fr.id}`}>
                         {fr.computedStatus}
                       </Badge>
-                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this freight charge and all its payments?")) deleteFreightMutation.mutate(fr.id); }} data-testid={`button-delete-freight-${fr.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => { setPendingDelete(() => () => deleteFreightMutation.mutate(fr.id)); }} data-testid={`button-delete-freight-${fr.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -927,7 +921,7 @@ export default function ContainerDetail() {
                           <span>{formatDisplayDate(p.paymentDate)} - {p.method || "Cash"} {p.reference ? `(${p.reference})` : ""}</span>
                           <div className="flex items-center gap-1">
                             <span className="font-mono">{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate({ freightId: fr.id, paymentId: p.id }); }} data-testid={`button-delete-payment-${p.id}`}>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setPendingDelete(() => () => deletePaymentMutation.mutate({ freightId: fr.id, paymentId: p.id })); }} data-testid={`button-delete-payment-${p.id}`}>
                               <XCircle className="h-3 w-3" />
                             </Button>
                           </div>
@@ -1261,6 +1255,11 @@ export default function ContainerDetail() {
           </form>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -413,13 +414,14 @@ export function StockItemDetailsDialog({
     });
   };
 
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
+
   const handleDeleteAlias = (aliasId: number) => {
-    if (confirm("Are you sure you want to delete this code alias?")) {
-      deleteAliasMutation.mutate(aliasId);
-    }
+    setPendingDelete(() => () => deleteAliasMutation.mutate(aliasId));
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -938,5 +940,11 @@ export function StockItemDetailsDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+    <DeleteConfirmDialog
+      open={!!pendingDelete}
+      onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+      onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+    />
+    </>
   );
 }

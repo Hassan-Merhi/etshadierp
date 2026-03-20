@@ -1,4 +1,5 @@
   import { useState, useEffect, Fragment, useRef } from "react";
+  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
   import { useForm } from "react-hook-form";
   import { zodResolver } from "@hookform/resolvers/zod";
   import { z } from "zod";
@@ -2114,6 +2115,7 @@ function POSReceiptSettings() {
     const [editingRole, setEditingRole] = useState<any>(null);
     const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
     const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
     const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
     const [expandedBreakdownId, setExpandedBreakdownId] = useState<number | null>(null);
@@ -2977,9 +2979,7 @@ function POSReceiptSettings() {
   
     const handleDeleteRole = (roleId: number, userId: string) => {
       setCurrentUserId(userId);
-      if (confirm("Are you sure you want to remove this role assignment?")) {
-        deleteRoleMutation.mutate(roleId);
-      }
+      setPendingDelete(() => () => deleteRoleMutation.mutate(roleId));
     };
   
     const toggleUserExpansion = (userId: string) => {
@@ -5541,6 +5541,11 @@ function POSReceiptSettings() {
             </Form>
           </DialogContent>
         </Dialog>
+        <DeleteConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+          onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        />
       </div>
     );
   }

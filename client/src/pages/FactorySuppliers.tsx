@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -158,6 +159,7 @@ export default function FactorySuppliers() {
   const { formatDisplayDate } = useDateFormat();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
   const [statementReturnToParent, setStatementReturnToParent] = useState(false);
   const [parentViewSupplierId, setParentViewSupplierId] = useState<number | null>(null);
@@ -1430,7 +1432,7 @@ export default function FactorySuppliers() {
                       amount: `$${formatNum(p.amountUsd)}`,
                       amountIsNeg: false,
                       notes: p.notes,
-                      onDelete: () => { if (confirm("Delete this payment?")) deletePaymentMutation.mutate(p.id); },
+                      onDelete: () => { setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)); },
                       usdImpact: -parseFloat(p.amountUsd || "0"),
                     })),
                     ...(statementData.ledger || [])
@@ -1476,7 +1478,7 @@ export default function FactorySuppliers() {
                       amountIsNeg: true,
                       notes: null,
                       onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
-                      onDelete: () => { if (confirm("Delete this opening balance commission entry? This cannot be undone.")) deleteObCommissionMutation.mutate(oc.rawStockId); },
+                      onDelete: () => { setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)); },
                       usdImpact: -parseFloat(oc.amount || "0"),
                     })),
                   ].sort((a, b) => {
@@ -2012,7 +2014,7 @@ export default function FactorySuppliers() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => { if (confirm(`Permanently delete "${sup.name}"? This will remove all their records and cannot be undone.`)) permanentDeleteMutation.mutate(sup.id); }}
+                              onClick={() => { setPendingDelete(() => () => permanentDeleteMutation.mutate(sup.id)); }}
                               data-testid={`button-delete-supplier-${sup.id}`}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -2650,6 +2652,11 @@ export default function FactorySuppliers() {
           )}
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }

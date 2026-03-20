@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,7 @@ export default function BaleProducts() {
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
   const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "" });
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -570,9 +572,7 @@ export default function BaleProducts() {
                             size="icon"
                             variant="ghost"
                             onClick={() => {
-                              if (confirm(`Delete category "${cat.name}"?`)) {
-                                deleteCategoryMutation.mutate(cat.id);
-                              }
+                              setPendingDelete(() => () => deleteCategoryMutation.mutate(cat.id));
                             }}
                             data-testid={`button-delete-category-${cat.id}`}
                           >
@@ -867,9 +867,7 @@ export default function BaleProducts() {
               <Button
                 variant="destructive"
                 onClick={() => {
-                  if (confirm("Delete this product? It will be removed from the products list.")) {
-                    deleteProductMutation.mutate(editingProduct!.id);
-                  }
+                  setPendingDelete(() => () => deleteProductMutation.mutate(editingProduct!.id));
                 }}
                 disabled={deleteProductMutation.isPending}
                 data-testid="button-delete-edit-product"
@@ -948,6 +946,11 @@ export default function BaleProducts() {
           </div>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }

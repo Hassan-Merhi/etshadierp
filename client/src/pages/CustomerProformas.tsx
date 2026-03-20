@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 
 interface ProformaLine {
   id: number;
@@ -57,6 +58,7 @@ export default function CustomerProformas() {
   const [newLine, setNewLine] = useState({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
   const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "" });
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -309,9 +311,7 @@ export default function CustomerProformas() {
                         variant="ghost"
                         size="icon"
                         onClick={() => {
-                          if (confirm("Delete this proforma?")) {
-                            deleteProformaMutation.mutate(proforma.id);
-                          }
+                          setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id));
                         }}
                         disabled={deleteProformaMutation.isPending}
                         data-testid={`button-delete-proforma-${proforma.id}`}
@@ -434,9 +434,7 @@ export default function CustomerProformas() {
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => {
-                                          if (confirm("Delete this line?")) {
-                                            deleteLineMutation.mutate(line.id);
-                                          }
+                                          setPendingDelete(() => () => deleteLineMutation.mutate(line.id));
                                         }}
                                         disabled={deleteLineMutation.isPending}
                                         data-testid={`button-delete-line-${line.id}`}
@@ -637,6 +635,11 @@ export default function CustomerProformas() {
           </div>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }

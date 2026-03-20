@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -56,6 +57,7 @@ export default function Bales() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showBaleDialog, setShowBaleDialog] = useState(false);
   const [scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingBarcodeToMark, setPendingBarcodeToMark] = useState<number | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -401,9 +403,7 @@ export default function Bales() {
                       variant="ghost"
                       size="icon"
                       onClick={() => {
-                        if (confirm("Delete this bale?")) {
-                          deleteBale.mutate(bale.id);
-                        }
+                        setPendingDelete(() => () => deleteBale.mutate(bale.id));
                       }}
                       data-testid={`button-delete-bale-${bale.id}`}
                     >
@@ -583,6 +583,11 @@ export default function Bales() {
           </Form>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }

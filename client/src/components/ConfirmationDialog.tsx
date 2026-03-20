@@ -67,7 +67,6 @@ export function ConfirmationDialog({
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
-      // Reset second confirm state when dialog closes
       setShowSecondConfirm(false);
     }
   };
@@ -123,6 +122,42 @@ export function ConfirmationDialog({
             </AlertDialogFooter>
           </>
         ) : null}
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// Controlled delete confirmation dialog — fixed wording, no trigger needed.
+// Usage: manage `open` state externally, pass the action to `onConfirm`.
+interface DeleteConfirmDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}
+
+export function DeleteConfirmDialog({ open, onOpenChange, onConfirm }: DeleteConfirmDialogProps) {
+  const handleConfirm = () => {
+    onConfirm();
+    onOpenChange(false);
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>ARE YOU SURE YOU WANT TO DELETE THIS?</AlertDialogTitle>
+          <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirm}
+            data-testid="button-delete-confirm"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );

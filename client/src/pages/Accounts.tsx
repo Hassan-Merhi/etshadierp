@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -217,6 +218,7 @@ export default function Accounts() {
 
   // Export language selection
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
+  const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
 
   const exportLabels: Record<string, {
     ledger: string; type: string; debit: string; credit: string; runningBalance: string; date: string; notes: string;
@@ -1165,25 +1167,15 @@ export default function Accounts() {
 
   const handleDeleteAccount = () => {
     if (supplierToEdit) {
-      if (window.confirm(`Are you sure you want to delete "${supplierToEdit.name}"? This action cannot be undone.`)) {
-        deleteSupplierMutation.mutate();
-      }
+      setPendingDelete(() => () => deleteSupplierMutation.mutate());
       return;
     }
     if (customerToEdit) {
-      if (window.confirm(`Are you sure you want to delete "${customerToEdit.name}"? This action cannot be undone.`)) {
-        deleteCustomerMutation.mutate();
-      }
+      setPendingDelete(() => () => deleteCustomerMutation.mutate());
       return;
     }
     if (!accountToEdit) return;
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${accountToEdit.name}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteLedgerMutation.mutate(accountToEdit.id);
-    }
+    setPendingDelete(() => () => deleteLedgerMutation.mutate(accountToEdit.id));
   };
 
   const onEditSubmit = (data: UpdateLedgerAccount) => {
@@ -1245,14 +1237,7 @@ export default function Accounts() {
 
   const handleDeleteBankAccount = () => {
     if (!bankToEdit) return;
-
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${bankToEdit.name}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteBankMutation.mutate(bankToEdit.id);
-    }
+    setPendingDelete(() => () => deleteBankMutation.mutate(bankToEdit.id));
   };
 
   return (
@@ -2622,9 +2607,7 @@ export default function Accounts() {
                                   className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`Permanently delete "${account.name}" and all related records? This cannot be undone.`)) {
-                                      deleteFactorySupplierMutation.mutate(account.accountId as number);
-                                    }
+                                    setPendingDelete(() => () => deleteFactorySupplierMutation.mutate(account.accountId as number));
                                   }}
                                   data-testid={`button-delete-factory-supplier-${account.accountId}`}
                                 >
@@ -3051,6 +3034,11 @@ export default function Accounts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+      />
     </div>
   );
 }
