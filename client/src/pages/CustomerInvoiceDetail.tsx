@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2 } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, TrendingUp, AlertTriangle } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -23,6 +24,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface OrderLine {
   articleCode: string;
@@ -68,6 +75,54 @@ interface OrderDetail {
   charges: OrderCharge[];
 }
 
+interface ProfitLine {
+  articleCode: string;
+  baleName: string;
+  qty: number;
+  pricePerBale: number;
+  selling: number;
+  costPerBale: number;
+  cost: number;
+  profit: number | null;
+  profitPctOnCost: number | null;
+  marginPct: number | null;
+  missingCost: boolean;
+}
+
+interface ProfitabilityData {
+  orderId: number;
+  invoiceNumber: string | null;
+  customerName: string | null;
+  lines: ProfitLine[];
+  totalSelling: number;
+  totalCost: number | null;
+  totalProfit: number | null;
+  totalProfitPctOnCost: number | null;
+  totalMarginPct: number | null;
+  partialCostData: boolean;
+}
+
+function fmt(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function pct(n: number | null) {
+  if (n === null) return null;
+  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
+
+function ProfitValue({ value, className }: { value: number | null; className?: string }) {
+  if (value === null) return <span className="text-muted-foreground text-xs">—</span>;
+  const color = value > 0 ? "text-green-600 dark:text-green-400" : value < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
+  return <span className={`font-mono font-semibold ${color} ${className ?? ""}`}>{fmt(value)}</span>;
+}
+
+function ProfitPct({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-muted-foreground text-xs">—</span>;
+  const color = value > 0 ? "text-green-600 dark:text-green-400" : value < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
+  return <span className={`text-xs font-mono ${color}`}>{pct(value)}</span>;
+}
+
 export default function CustomerInvoiceDetail() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -76,12 +131,23 @@ export default function CustomerInvoiceDetail() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [, params] = useRoute("/factory/sales/invoices/:id");
+  const [showProfitability, setShowProfitability] = useState(false);
 
   const orderId = params?.id ? parseInt(params.id) : null;
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ["/api/factory/customer-orders", orderId],
     enabled: !!orderId,
+  });
+
+  const { data: profitability, isLoading: profitLoading } = useQuery<ProfitabilityData>({
+    queryKey: ["/api/factory/customer-orders", orderId, "profitability"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", `/api/factory/customer-orders/${orderId}/profitability`);
+      if (!res.ok) throw new Error("Failed to load profitability");
+      return res.json();
+    },
+    enabled: !!orderId && showProfitability,
   });
 
   const getStatusBadge = (status: string) => {
@@ -208,6 +274,14 @@ export default function CustomerInvoiceDetail() {
               Continue Editing
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={() => setShowProfitability(true)}
+            data-testid="button-view-profitability"
+          >
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Profitability
+          </Button>
           <Button
             variant="outline"
             onClick={handleExportExcel}
@@ -362,6 +436,140 @@ export default function CustomerInvoiceDetail() {
           </div>
         </div>
       </Card>
+
+      <Dialog open={showProfitability} onOpenChange={setShowProfitability}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Profitability — {order.invoiceNumber || `Draft #${order.id}`}
+            </DialogTitle>
+          </DialogHeader>
+
+          {profitLoading ? (
+            <div className="space-y-3 py-4">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : !profitability ? (
+            <div className="py-8 text-center text-muted-foreground" data-testid="text-profit-error">
+              Could not load profitability data.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {profitability.partialCostData && (
+                <div className="flex items-start gap-2 rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-300" data-testid="text-partial-cost-warning">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>Some lines are missing production cost data. Totals may be incomplete.</span>
+                </div>
+              )}
+
+              <Card className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bale</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Sell/Bale</TableHead>
+                      <TableHead className="text-right">Total Selling</TableHead>
+                      <TableHead className="text-right">Cost/Bale</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="text-right">Profit</TableHead>
+                      <TableHead className="text-right">Margin</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {profitability.lines.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                          No lines found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      profitability.lines.map((line, idx) => (
+                        <TableRow key={idx} data-testid={`row-profit-line-${idx}`}>
+                          <TableCell>
+                            <div className="font-medium text-sm">{line.baleName || line.articleCode}</div>
+                            {line.baleName && line.articleCode && (
+                              <div className="text-xs text-muted-foreground font-mono">{line.articleCode}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono" data-testid={`text-profit-qty-${idx}`}>
+                            {line.qty}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`text-sell-per-bale-${idx}`}>
+                            {fmt(line.pricePerBale)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`text-total-selling-${idx}`}>
+                            {fmt(line.selling)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`text-cost-per-bale-${idx}`}>
+                            {line.missingCost ? (
+                              <span className="text-yellow-600 dark:text-yellow-400 text-xs flex items-center justify-end gap-1">
+                                <AlertTriangle className="h-3 w-3" /> No cost
+                              </span>
+                            ) : fmt(line.costPerBale)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`text-total-cost-${idx}`}>
+                            {line.missingCost ? (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            ) : fmt(line.cost)}
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-line-profit-${idx}`}>
+                            <ProfitValue value={line.profit} />
+                          </TableCell>
+                          <TableCell className="text-right" data-testid={`text-line-margin-${idx}`}>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <ProfitPct value={line.marginPct} />
+                              {line.profitPctOnCost !== null && (
+                                <span className="text-xs text-muted-foreground font-mono">{pct(line.profitPctOnCost)} on cost</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+
+              <Card className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-muted-foreground">Total Selling</span>
+                    <span className="font-mono font-semibold" data-testid="text-total-selling-sum">
+                      {fmt(profitability.totalSelling)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-muted-foreground">Total Cost</span>
+                    <span className="font-mono font-semibold" data-testid="text-total-cost-sum">
+                      {profitability.totalCost !== null ? fmt(profitability.totalCost) : (
+                        <span className="text-muted-foreground text-xs">Incomplete</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 flex items-center justify-between gap-4">
+                    <span className="font-semibold">Total Profit</span>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <ProfitValue value={profitability.totalProfit} className="text-base" />
+                      {profitability.totalMarginPct !== null && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Margin: <ProfitPct value={profitability.totalMarginPct} />
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            On cost: <ProfitPct value={profitability.totalProfitPctOnCost} />
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -11227,6 +11227,95 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.get("/api/factory/customer-orders/:id/profitability", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const [order] = await db
+        .select({ id: customerOrders.id, status: customerOrders.status, invoiceNumber: customerOrders.invoiceNumber, customerName: customers.legalName })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
+      const articleCodes = lines.map((l: any) => l.articleCode).filter(Boolean);
+
+      const products = articleCodes.length > 0
+        ? await db.select({
+            articleCode: factoryBaleProducts.articleCode,
+            productionPrice: factoryBaleProducts.productionPrice,
+            name: factoryBaleProducts.name,
+          }).from(factoryBaleProducts)
+            .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes)))
+        : [];
+
+      const productMap: Record<string, { productionPrice: string | null; name: string }> = {};
+      for (const p of products) {
+        if (p.articleCode) productMap[p.articleCode] = { productionPrice: p.productionPrice, name: p.name };
+      }
+
+      let totalSelling = 0;
+      let totalCost = 0;
+      let totalCostKnown = true;
+
+      const profitLines = lines.map((line: any) => {
+        const qty = Number(line.qty || 0);
+        const selling = parseFloat(line.totalPrice || "0");
+        const product = line.articleCode ? productMap[line.articleCode] : null;
+        const hasCost = product !== null && product.productionPrice !== null;
+        const costPerBale = hasCost ? parseFloat(product!.productionPrice!) : 0;
+        const cost = hasCost ? costPerBale * qty : 0;
+        const profit = hasCost ? selling - cost : null;
+        const profitPctOnCost = hasCost && cost !== 0 ? ((selling - cost) / cost) * 100 : null;
+        const marginPct = hasCost && selling !== 0 ? ((selling - cost) / selling) * 100 : null;
+
+        totalSelling += selling;
+        if (hasCost) {
+          totalCost += cost;
+        } else {
+          totalCostKnown = false;
+        }
+
+        return {
+          articleCode: line.articleCode,
+          baleName: line.baleName,
+          qty,
+          selling,
+          costPerBale,
+          cost,
+          profit,
+          profitPctOnCost,
+          marginPct,
+          missingCost: !hasCost,
+          pricePerBale: parseFloat(line.pricePerBale || "0"),
+        };
+      });
+
+      const totalProfit = totalCostKnown ? totalSelling - totalCost : null;
+      const totalProfitPctOnCost = totalCostKnown && totalCost !== 0 ? ((totalSelling - totalCost) / totalCost) * 100 : null;
+      const totalMarginPct = totalCostKnown && totalSelling !== 0 ? ((totalSelling - totalCost) / totalSelling) * 100 : null;
+
+      res.json({
+        orderId: id,
+        invoiceNumber: order.invoiceNumber,
+        customerName: order.customerName,
+        lines: profitLines,
+        totalSelling,
+        totalCost: totalCostKnown ? totalCost : null,
+        totalProfit,
+        totalProfitPctOnCost,
+        totalMarginPct,
+        partialCostData: !totalCostKnown,
+      });
+    } catch (error: any) {
+      console.error("Error fetching order profitability:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
