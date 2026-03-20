@@ -20522,7 +20522,7 @@ if (asOfDate) {
       // - Profit: Equity/Capital, not operating liability
       // - Equity: Owner's capital
       // - Fixed Asset: Not liquid assets for operating position
-      const excludedAccountTypes = ["Income", "Profit", "Equity", "Fixed Asset"];
+      const excludedAccountTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
       
       // Asset types that might contain fixed assets by name pattern
       const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
