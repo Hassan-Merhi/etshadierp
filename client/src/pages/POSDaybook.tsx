@@ -278,7 +278,7 @@ export default function POSDaybook() {
         if (selectedDialogRow !== null && items[selectedDialogRow]) {
           const itemId = items[selectedDialogRow].stockItemId;
           if (itemId) {
-            navigate(`/stock-query/${itemId}`);
+            navigate(`/stock-query/${itemId}?from=pos-daybook`);
             setSelectedVoucher(null);
           }
         }

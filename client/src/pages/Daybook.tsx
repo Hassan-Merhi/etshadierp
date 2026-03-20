@@ -278,6 +278,11 @@ interface ViewVoucherEntry {
   totalAmount?: string;
   sellingPrice?: string;
   totalSales?: string;
+  costPrice?: string | null;
+  profit?: string | null;
+  hassansPrice?: string | null;
+  hassansProfit?: string | null;
+  hassansPercentage?: string | null;
   adjustmentType?: string;
 }
 
@@ -690,7 +695,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         if (selectedDialogRow !== null && salesItems[selectedDialogRow]) {
           const itemId = (salesItems[selectedDialogRow] as ViewVoucherEntry).stockItemId;
           if (itemId) {
-            navigate(`/stock-query/${itemId}`);
+            navigate(`/stock-query/${itemId}?from=daybook`);
             setViewDialogOpen(false);
           }
         }
@@ -2264,6 +2269,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   // Special rendering for Sales vouchers
                   (() => {
                     // Separate ledger entries (cash/revenue) from sales items
+                    const canSeeProfitCost = !(!user || user?.role?.startsWith("POS"));
+
                     const ledgerEntries = viewVoucherEntries.filter(
                       (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
                     );
@@ -2311,26 +2318,25 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <TableHeader className="sticky top-0 z-10 bg-background">
                                 <TableRow>
                                   <TableHead>Item Name</TableHead>
-                                  <TableHead className="text-right">
-                                    Qty
-                                  </TableHead>
-                                  <TableHead className="text-right">
-                                    Rate
-                                  </TableHead>
-                                  <TableHead className="text-right">
-                                    Total Amount
-                                  </TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Price</TableHead>
+                                  {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
+                                  <TableHead className="text-right">Total</TableHead>
+                                  {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
+                                  {canSeeProfitCost && <TableHead className="text-right">Hassan's Price</TableHead>}
+                                  {canSeeProfitCost && <TableHead className="text-right">Hassan's Profit</TableHead>}
+                                  {canSeeProfitCost && <TableHead className="text-right">Hassan's %</TableHead>}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {salesItems.map((item: ViewVoucherEntry, idx: number) => {
                                   const qty = parseFloat(item.quantity || "0");
-                                  const rate = parseFloat(
-                                    item.rate || item.sellingPrice || "0",
-                                  );
-                                  const totalAmount = parseFloat(
-                                    item.totalSales || item.creditAmount || "0",
-                                  );
+                                  const rate = parseFloat(item.rate || item.sellingPrice || "0");
+                                  const totalAmount = parseFloat(item.totalSales || item.creditAmount || "0");
+                                  const profit = parseFloat(item.profit || "0");
+                                  const isPositiveProfit = profit >= 0;
+                                  const hassansProfit = parseFloat(item.hassansProfit || "0");
+                                  const isHassansProfitPositive = hassansProfit >= 0;
                                   return (
                                     <TableRow
                                       key={item.id}
@@ -2340,8 +2346,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     >
                                       <TableCell>
                                         <div className="font-medium">
-                                          {item.stockItemName ||
-                                            item.accountName}
+                                          {item.stockItemName || item.accountName}
                                         </div>
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
@@ -2350,9 +2355,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                       <TableCell className="text-right font-mono">
                                         {formatAmount(rate)}
                                       </TableCell>
-                                      <TableCell className="text-right font-mono">
+                                      {canSeeProfitCost && (
+                                        <TableCell className="text-right font-mono text-muted-foreground">
+                                          {item.costPrice ? formatAmount(parseFloat(item.costPrice)) : "-"}
+                                        </TableCell>
+                                      )}
+                                      <TableCell className="text-right font-mono font-semibold">
                                         {formatAmount(totalAmount)}
                                       </TableCell>
+                                      {canSeeProfitCost && (
+                                        <TableCell className={`text-right font-mono font-semibold ${item.profit ? (isPositiveProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : ""}`}>
+                                          {item.profit ? formatAmount(profit) : "-"}
+                                        </TableCell>
+                                      )}
+                                      {canSeeProfitCost && (
+                                        <TableCell className="text-right font-mono text-muted-foreground">
+                                          {item.hassansPrice ? formatAmount(parseFloat(item.hassansPrice)) : "-"}
+                                        </TableCell>
+                                      )}
+                                      {canSeeProfitCost && (
+                                        <TableCell className={`text-right font-mono font-semibold ${item.hassansProfit ? (isHassansProfitPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : ""}`}>
+                                          {item.hassansProfit ? formatAmount(hassansProfit) : "-"}
+                                        </TableCell>
+                                      )}
+                                      {canSeeProfitCost && (
+                                        <TableCell className="text-right font-mono text-muted-foreground">
+                                          {item.hassansPercentage ? `${item.hassansPercentage}%` : "-"}
+                                        </TableCell>
+                                      )}
                                     </TableRow>
                                   );
                                 })}
@@ -2360,30 +2390,25 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <TableRow className="font-bold bg-muted/50">
                                   <TableCell>Total</TableCell>
                                   <TableCell className="text-right font-mono">
-                                    {formatNumber(
-                                      salesItems.reduce(
-                                        (sum: number, item: ViewVoucherEntry) =>
-                                          sum +
-                                          parseFloat(item.quantity || "0"),
-                                        0,
-                                      ),
-                                    )}
+                                    {formatNumber(salesItems.reduce((sum: number, item: ViewVoucherEntry) => sum + parseFloat(item.quantity || "0"), 0))}
                                   </TableCell>
                                   <TableCell></TableCell>
+                                  {canSeeProfitCost && <TableCell></TableCell>}
                                   <TableCell className="text-right font-mono">
-                                    {formatAmount(
-                                      salesItems.reduce(
-                                        (sum: number, item: ViewVoucherEntry) =>
-                                          sum +
-                                          parseFloat(
-                                            item.totalSales ||
-                                              item.creditAmount ||
-                                              "0",
-                                          ),
-                                        0,
-                                      ),
-                                    )}
+                                    {formatAmount(salesItems.reduce((sum: number, item: ViewVoucherEntry) => sum + parseFloat(item.totalSales || item.creditAmount || "0"), 0))}
                                   </TableCell>
+                                  {canSeeProfitCost && (
+                                    <TableCell className="text-right font-mono">
+                                      {formatAmount(salesItems.reduce((sum: number, item: ViewVoucherEntry) => sum + parseFloat(item.profit || "0"), 0))}
+                                    </TableCell>
+                                  )}
+                                  {canSeeProfitCost && <TableCell></TableCell>}
+                                  {canSeeProfitCost && (
+                                    <TableCell className="text-right font-mono">
+                                      {formatAmount(salesItems.reduce((sum: number, item: ViewVoucherEntry) => sum + parseFloat(item.hassansProfit || "0"), 0))}
+                                    </TableCell>
+                                  )}
+                                  {canSeeProfitCost && <TableCell></TableCell>}
                                 </TableRow>
                               </TableBody>
                             </Table>

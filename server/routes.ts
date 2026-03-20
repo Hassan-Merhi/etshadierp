@@ -17743,6 +17743,9 @@ if (asOfDate) {
 
       // For Sales vouchers, also get sales items
       if (voucher.voucherType === "Sales") {
+        const userRole = req.session.currentRole;
+        const isPOSUser = userRole?.startsWith("POS");
+
         const salesItemsList = await db
           .select({
             id: salesItems.id,
@@ -17750,7 +17753,10 @@ if (asOfDate) {
             stockItemId: salesItems.stockItemId,
             quantity: salesItems.quantity,
             sellingPrice: salesItems.sellingPrice,
+            costPrice: salesItems.costPrice,
             totalSales: salesItems.totalSales,
+            profit: salesItems.profit,
+            configuredPrice: salesItems.configuredPrice,
             stockItemName: stockItems.name,
             stockItemCode: stockItems.code,
           })
@@ -17759,23 +17765,38 @@ if (asOfDate) {
           .where(eq(salesItems.voucherId, id));
 
         if (salesItemsList.length > 0) {
-          const itemsWithDetails = salesItemsList.map((item) => ({
-            id: item.id,
-            voucherId: item.voucherId,
-            stockItemId: item.stockItemId,
-            stockItemName: item.stockItemName || 'Unknown Item',
-            stockItemCode: item.stockItemCode || '-',
-            quantity: item.quantity,
-            rate: item.sellingPrice,
-            sellingPrice: item.sellingPrice,
-            totalSales: item.totalSales,
-            debitAmount: "0",
-            creditAmount: item.totalSales,
-            narration: `Sale of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.sellingPrice}`,
-            accountName: item.stockItemName || 'Unknown Item',
-            accountCode: item.stockItemCode || '-',
-            isStockItem: true,
-          }));
+          const itemsWithDetails = salesItemsList.map((item) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const actualPrice = parseFloat(item.sellingPrice) || 0;
+            const configuredPriceNum = parseFloat(item.configuredPrice || "0");
+            const hassansProfit = configuredPriceNum > 0 ? (actualPrice - configuredPriceNum) * qty : 0;
+            const hassansTotal = configuredPriceNum > 0 ? configuredPriceNum * qty : 0;
+            const hassansPercentage = hassansTotal > 0 ? (hassansProfit / hassansTotal) * 100 : 0;
+
+            return {
+              id: item.id,
+              voucherId: item.voucherId,
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || 'Unknown Item',
+              stockItemCode: item.stockItemCode || '-',
+              quantity: item.quantity,
+              rate: item.sellingPrice,
+              sellingPrice: item.sellingPrice,
+              costPrice: isPOSUser ? null : item.costPrice,
+              totalSales: item.totalSales,
+              profit: isPOSUser ? null : item.profit,
+              configuredPrice: configuredPriceNum > 0 ? item.configuredPrice : null,
+              hassansPrice: configuredPriceNum > 0 ? configuredPriceNum.toFixed(2) : null,
+              hassansProfit: configuredPriceNum > 0 ? hassansProfit.toFixed(2) : null,
+              hassansPercentage: configuredPriceNum > 0 ? hassansPercentage.toFixed(1) : null,
+              debitAmount: "0",
+              creditAmount: item.totalSales,
+              narration: `Sale of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.sellingPrice}`,
+              accountName: item.stockItemName || 'Unknown Item',
+              accountCode: item.stockItemCode || '-',
+              isStockItem: true,
+            };
+          });
           return res.json([...entries, ...itemsWithDetails]);
         }
       }

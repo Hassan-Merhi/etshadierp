@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -79,8 +79,13 @@ export default function StockItemDetail() {
     enabled: !!itemId,
   });
 
+  const search = useSearch();
+  const from = new URLSearchParams(search).get("from");
+
   const handleBack = () => {
-    navigate("/stock-query");
+    if (from === "pos-daybook") navigate("/pos-daybook");
+    else if (from === "daybook") navigate("/daybook");
+    else navigate("/stock-query");
   };
 
   useEscapeBack(handleBack);
