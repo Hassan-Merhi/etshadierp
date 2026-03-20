@@ -231,6 +231,13 @@ export default function POSDaybook() {
     setSelectedDialogRow(null);
   }, [selectedVoucher, isEditMode]);
 
+  // Scroll highlighted row into view when using arrow keys
+  useEffect(() => {
+    if (selectedDialogRow === null) return;
+    const row = document.querySelector(`[data-dialog-row="${selectedDialogRow}"]`);
+    if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedDialogRow]);
+
   // Keyboard navigation for dialog item rows
   const getDialogItems = useCallback((): Array<{ stockItemName?: string }> => {
     if (!selectedVoucher) return [];
@@ -278,8 +285,8 @@ export default function POSDaybook() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [selectedVoucher, getDialogItems, navigate, selectedDialogRow]);
 
   // Save mutation
@@ -681,6 +688,7 @@ export default function POSDaybook() {
                         return (
                           <TableRow
                             key={item.id || idx}
+                            data-dialog-row={idx}
                             className={selectedDialogRow === idx ? "bg-accent" : ""}
                             onMouseEnter={() => setSelectedDialogRow(idx)}
                           >
@@ -803,6 +811,7 @@ export default function POSDaybook() {
                         return (
                           <TableRow
                             key={item.id || idx}
+                            data-dialog-row={idx}
                             className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
                             onMouseEnter={() => setSelectedDialogRow(idx)}
                           >
