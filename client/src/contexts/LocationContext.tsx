@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Location {
   id: number;
@@ -16,14 +17,23 @@ interface LocationContextType {
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
 
-export function LocationProvider({ children }: { children: ReactNode }) {
+function LocationProviderInner({ children }: { children: ReactNode }) {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const { selectedCompany } = useCompany();
+
+  useEffect(() => {
+    setSelectedLocation(null);
+  }, [selectedCompany?.id]);
 
   return (
     <LocationContext.Provider value={{ selectedLocation, setSelectedLocation }}>
       {children}
     </LocationContext.Provider>
   );
+}
+
+export function LocationProvider({ children }: { children: ReactNode }) {
+  return <LocationProviderInner>{children}</LocationProviderInner>;
 }
 
 export function useLocation() {
