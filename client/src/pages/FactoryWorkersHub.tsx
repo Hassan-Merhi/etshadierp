@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, DollarSign, CalendarDays, Banknote } from "lucide-react";
+import { HardHat, DollarSign, CalendarDays, Banknote, Users } from "lucide-react";
 import FactoryWorkers from "@/pages/FactoryWorkers";
 import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
 import FactoryAttendance from "@/pages/FactoryAttendance";
 import FactoryAdvancesTab from "@/pages/FactoryAdvancesTab";
+import FactoryEmployees from "@/pages/FactoryEmployees";
 
-type TabValue = "workers" | "payroll" | "attendance" | "advances";
+type TabValue = "workers" | "payroll" | "attendance" | "advances" | "employees";
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
@@ -14,6 +15,7 @@ function getInitialTab(): TabValue {
   if (tab === "payroll") return "payroll";
   if (tab === "attendance") return "attendance";
   if (tab === "advances") return "advances";
+  if (tab === "employees") return "employees";
   return "workers";
 }
 
@@ -22,10 +24,14 @@ export default function FactoryWorkersHub() {
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-      <TabsList className="mb-4">
+      <TabsList className="mb-4 flex flex-wrap gap-1">
         <TabsTrigger value="workers" data-testid="tab-workers">
           <HardHat className="h-4 w-4 mr-2" />
           Workers
+        </TabsTrigger>
+        <TabsTrigger value="employees" data-testid="tab-employees">
+          <Users className="h-4 w-4 mr-2" />
+          Employees
         </TabsTrigger>
         <TabsTrigger value="payroll" data-testid="tab-payroll">
           <DollarSign className="h-4 w-4 mr-2" />
@@ -43,6 +49,9 @@ export default function FactoryWorkersHub() {
 
       <TabsContent value="workers" className="mt-0">
         <FactoryWorkers />
+      </TabsContent>
+      <TabsContent value="employees" className="mt-0">
+        <FactoryEmployees />
       </TabsContent>
       <TabsContent value="payroll" className="mt-0">
         <FactoryPayrollTab />

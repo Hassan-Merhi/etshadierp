@@ -115,6 +115,7 @@ import WipersReEntry from "@/pages/WipersReEntry";
 import FactoryUsers from "@/pages/FactoryUsers";
 import FactoryWorkersHub from "@/pages/FactoryWorkersHub";
 import FactoryWorkerDetail from "@/pages/FactoryWorkerDetail";
+import FactoryEmployeeDetail from "@/pages/FactoryEmployeeDetail";
 import FactorySupplierReport from "@/pages/FactorySupplierReport";
 import FactorySupplierStatement from "@/pages/FactorySupplierStatement";
 import FactoryCustomers from "@/pages/FactoryCustomers";
@@ -663,6 +664,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/proformas" component={FactoryProformas} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
+                    <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers" component={FactoryWorkersHub} />
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>

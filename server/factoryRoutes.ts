@@ -74,6 +74,7 @@ import {
   factoryPayrolls,
   factoryWorkerDocuments,
   factoryAlerts,
+  employees,
   factoryWasteEntries,
   factoryBalePhotos,
   factoryDailyKpiSnapshots,
@@ -14973,6 +14974,436 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }));
 
       res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Factory Employees ────────────────────────────────────────────────────────
+
+  // GET /api/factory/employees - list employees (employeeType = "Employee") for current company
+  app.get("/api/factory/employees", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        )
+        .orderBy(employees.firstName);
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/employees/:id - single employee
+  app.get("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const [emp] = await db
+        .select()
+        .from(employees)
+        .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")));
+
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      res.json(emp);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/employees - create employee with employeeType = "Employee"
+  app.post("/api/factory/employees", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { firstName, lastName, code, department, phone, monthlySalary, joinDate, active } = req.body;
+      if (!firstName || !lastName) return res.status(400).json({ message: "First name and last name are required" });
+      if (!joinDate) return res.status(400).json({ message: "Join date is required" });
+
+      // Auto-generate code if not provided
+      let empCode = code;
+      if (!empCode) {
+        const firstPart = firstName.trim().substring(0, 3).toUpperCase();
+        const lastPart = lastName.trim().substring(0, 3).toUpperCase();
+        let baseCode = firstPart + lastPart || "EMP";
+        empCode = baseCode;
+        let suffix = 1;
+        const existing = await db.select({ code: employees.code }).from(employees).where(eq(employees.companyId, companyId));
+        const existingCodes = new Set(existing.map((e: any) => e.code));
+        while (existingCodes.has(empCode)) {
+          empCode = `${baseCode}${suffix}`;
+          suffix++;
+        }
+      } else {
+        const [existing] = await db.select().from(employees).where(and(eq(employees.companyId, companyId), eq(employees.code, empCode)));
+        if (existing) return res.status(400).json({ message: "Employee code already exists" });
+      }
+
+      const [emp] = await db.insert(employees).values({
+        companyId,
+        code: empCode,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone || null,
+        department: department || null,
+        monthlySalary: monthlySalary ? String(monthlySalary) : "0",
+        joinDate,
+        employeeType: "Employee",
+        active: active !== false,
+      }).returning();
+
+      res.status(201).json(emp);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/factory/employees/:id - update employee
+  app.patch("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const { firstName, lastName, department, phone, monthlySalary, active } = req.body;
+      const updates: any = {};
+      if (firstName !== undefined) updates.firstName = firstName;
+      if (lastName !== undefined) updates.lastName = lastName;
+      if (department !== undefined) updates.department = department;
+      if (phone !== undefined) updates.phone = phone;
+      if (monthlySalary !== undefined) updates.monthlySalary = String(monthlySalary);
+      if (active !== undefined) updates.active = active;
+
+      const [updated] = await db.update(employees).set(updates).where(
+        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
+      ).returning();
+
+      if (!updated) return res.status(404).json({ message: "Employee not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/employees/:id/statement - running ledger from voucher entries
+  app.get("/api/factory/employees/:id/statement", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const [emp] = await db.select().from(employees).where(
+        and(eq(employees.id, id), eq(employees.companyId, companyId))
+      );
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+
+      // Pull all voucher entries for this employee
+      const entries = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          voucherType: vouchers.voucherType,
+          description: vouchers.description,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.employeeId, id),
+            eq(vouchers.companyId, companyId)
+          )
+        )
+        .orderBy(vouchers.voucherDate, vouchers.id);
+
+      // Build running balance
+      let runningBalance = 0;
+      const rows = entries.map((e: any) => {
+        const credit = parseFloat(e.creditAmount || "0");
+        const debit = parseFloat(e.debitAmount || "0");
+        runningBalance += credit - debit;
+        return {
+          ...e,
+          credit,
+          debit,
+          balance: runningBalance,
+        };
+      });
+
+      res.json({ employee: emp, rows });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/employees/:id/deposit - single deposit
+  // DR: PAYROLL_DEPOSIT_EXPENSE, CR: Employee (via employeeId)
+  app.post("/api/factory/employees/:id/deposit", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const { amount, date, notes } = req.body;
+      const depositAmount = parseFloat(amount);
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+      if (!date) return res.status(400).json({ message: "Date is required" });
+
+      const [emp] = await db.select().from(employees).where(
+        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
+      );
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+
+      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
+      let [payrollExpenseAccount] = await db.select().from(ledgerAccounts).where(
+        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
+      );
+      if (!payrollExpenseAccount) {
+        [payrollExpenseAccount] = await db.insert(ledgerAccounts).values({
+          companyId,
+          code: "PAYROLL_DEPOSIT_EXPENSE",
+          name: "Payroll Deposit Expense",
+          accountType: "Indirect Expense",
+          openingBalance: "0",
+          active: true,
+        }).returning();
+      }
+
+      const voucherNumber = `EMP-DEP-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId,
+        voucherNumber,
+        voucherType: "Journal",
+        voucherDate: date,
+        description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
+        totalAmount: depositAmount.toFixed(2),
+      }).returning();
+
+      // DR: Payroll Expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: payrollExpenseAccount.id,
+        debitAmount: depositAmount.toFixed(2),
+        creditAmount: "0",
+        narration: notes || `Salary deposit - ${voucherNumber}`,
+      });
+
+      // CR: Employee
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: null,
+        employeeId: id,
+        debitAmount: "0",
+        creditAmount: depositAmount.toFixed(2),
+        narration: notes || `Salary deposit - ${voucherNumber}`,
+      });
+
+      // Update employee balance
+      const newBalance = parseFloat(emp.currentBalance || "0") + depositAmount;
+      const newDeposits = parseFloat(emp.totalDeposits || "0") + depositAmount;
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalDeposits: newDeposits.toFixed(2),
+      }).where(eq(employees.id, id));
+
+      const [updated] = await db.select().from(employees).where(eq(employees.id, id));
+      res.json({ voucher, employee: updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/employees/:id/withdraw - single withdrawal
+  // DR: Employee (via employeeId), CR: Cash ledger account
+  app.post("/api/factory/employees/:id/withdraw", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const { amount, date, notes, cashAccountId } = req.body;
+      const withdrawAmount = parseFloat(amount);
+      if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+      if (!date) return res.status(400).json({ message: "Date is required" });
+      if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
+
+      const [emp] = await db.select().from(employees).where(
+        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
+      );
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+
+      // Verify cash account belongs to this company
+      const [cashAccount] = await db.select().from(ledgerAccounts).where(
+        and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId))
+      );
+      if (!cashAccount) return res.status(404).json({ message: "Cash account not found" });
+
+      const voucherNumber = `EMP-WD-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId,
+        voucherNumber,
+        voucherType: "Journal",
+        voucherDate: date,
+        description: notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
+        totalAmount: withdrawAmount.toFixed(2),
+      }).returning();
+
+      // DR: Employee
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: null,
+        employeeId: id,
+        debitAmount: withdrawAmount.toFixed(2),
+        creditAmount: "0",
+        narration: notes || `Withdrawal - ${voucherNumber}`,
+      });
+
+      // CR: Cash
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: cashAccount.id,
+        debitAmount: "0",
+        creditAmount: withdrawAmount.toFixed(2),
+        narration: notes || `Withdrawal - ${voucherNumber}`,
+      });
+
+      // Update employee balance (can go negative)
+      const newBalance = parseFloat(emp.currentBalance || "0") - withdrawAmount;
+      const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + withdrawAmount;
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalWithdrawals: newWithdrawals.toFixed(2),
+      }).where(eq(employees.id, id));
+
+      const [updated] = await db.select().from(employees).where(eq(employees.id, id));
+      res.json({ voucher, employee: updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/employees/bulk-payroll - bulk payroll deposit for multiple employees
+  app.post("/api/factory/employees/bulk-payroll", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { deposits, date, notes } = req.body;
+      if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
+        return res.status(400).json({ message: "No deposits provided" });
+      }
+      if (!date) return res.status(400).json({ message: "Date is required" });
+
+      // Validate amounts
+      const validDeposits = deposits.filter((d: any) => {
+        const a = parseFloat(d.amount);
+        return !isNaN(a) && a > 0 && d.employeeId;
+      });
+      if (validDeposits.length === 0) {
+        return res.status(400).json({ message: "No valid deposit amounts provided" });
+      }
+
+      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
+      let [payrollExpenseAccount] = await db.select().from(ledgerAccounts).where(
+        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
+      );
+      if (!payrollExpenseAccount) {
+        [payrollExpenseAccount] = await db.insert(ledgerAccounts).values({
+          companyId,
+          code: "PAYROLL_DEPOSIT_EXPENSE",
+          name: "Payroll Deposit Expense",
+          accountType: "Indirect Expense",
+          openingBalance: "0",
+          active: true,
+        }).returning();
+      }
+
+      const totalAmount = validDeposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
+      const voucherNumber = `EMP-PAY-${Date.now()}`;
+
+      // Single bulk voucher
+      const [bulkVoucher] = await db.insert(vouchers).values({
+        companyId,
+        voucherNumber,
+        voucherType: "Journal",
+        voucherDate: date,
+        description: notes || `Bulk payroll deposit - ${validDeposits.length} employees`,
+        totalAmount: totalAmount.toFixed(2),
+      }).returning();
+
+      // DR: Payroll Expense (total)
+      await db.insert(voucherEntries).values({
+        voucherId: bulkVoucher.id,
+        ledgerAccountId: payrollExpenseAccount.id,
+        debitAmount: totalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: notes || `Bulk payroll - ${validDeposits.length} employees - ${voucherNumber}`,
+      });
+
+      // CR: Each employee individually
+      const results = [];
+      for (const dep of validDeposits) {
+        const empId = parseInt(dep.employeeId);
+        const amount = parseFloat(dep.amount);
+
+        const [emp] = await db.select().from(employees).where(
+          and(eq(employees.id, empId), eq(employees.companyId, companyId))
+        );
+        if (!emp) continue;
+
+        await db.insert(voucherEntries).values({
+          voucherId: bulkVoucher.id,
+          ledgerAccountId: null,
+          employeeId: empId,
+          debitAmount: "0",
+          creditAmount: amount.toFixed(2),
+          narration: `Payroll deposit for ${emp.firstName} ${emp.lastName} - ${voucherNumber}`,
+        });
+
+        // Update employee balance
+        const newBalance = parseFloat(emp.currentBalance || "0") + amount;
+        const newDeposits = parseFloat(emp.totalDeposits || "0") + amount;
+        await db.update(employees).set({
+          currentBalance: newBalance.toFixed(2),
+          totalDeposits: newDeposits.toFixed(2),
+        }).where(eq(employees.id, empId));
+
+        results.push({ employeeId: empId, amount, name: `${emp.firstName} ${emp.lastName}` });
+      }
+
+      res.json({ voucher: bulkVoucher, results, totalAmount });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
