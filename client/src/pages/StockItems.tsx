@@ -286,18 +286,20 @@ export default function StockItems() {
 
       const data = stockItems.map(item => {
         const costDubai = costDubaiMap.get(item.id);
+        const defaultPrice = item.sellingPrice || "0";
         const row: Record<string, string> = {
           Code: item.code,
           Name: item.name,
           Barcode: item.barcode || "",
           UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId),
-          "Default Selling Price": formatAmount(item.sellingPrice),
+          "Default Selling Price": formatAmount(defaultPrice),
           "Cost Dubai": costDubai ? formatAmount(costDubai) : "",
         };
         for (const loc of sortedLocations) {
-          const price = priceMap.get(item.id)?.get(loc);
-          row[`Price - ${loc}`] = price ? formatAmount(price) : "";
+          const locPrice = priceMap.get(item.id)?.get(loc);
+          // Fall back to default selling price if no location-specific price set
+          row[`Price - ${loc}`] = formatAmount(locPrice ?? defaultPrice);
         }
         row["Active"] = item.active ? "Yes" : "No";
         return row;
