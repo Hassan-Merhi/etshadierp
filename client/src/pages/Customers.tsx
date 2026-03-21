@@ -7,7 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Plus, Search, Building2, Pencil, ExternalLink, DollarSign } from "lucide-react";
+import { Plus, Search, Building2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,10 +50,13 @@ export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statementCustomer, setStatementCustomer] = useState<(Customer & { balance: number; balanceSide: string }) | null>(null);
 
-  // Fetch customer sales/transactions when a customer is selected for statement
-  const { data: customerSales = [], isLoading: salesLoading } = useQuery<any[]>({
-    queryKey: [`/api/container-sales/customer/${statementCustomer?.id}`],
-    enabled: !!statementCustomer?.id,
+  // Fetch ledger transactions when a customer is selected for statement
+  const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
+    queryKey: ["/api/accounts/ledger", statementCustomer?.ledgerAccountId, "transactions"],
+    queryFn: () =>
+      fetch(`/api/accounts/ledger/${statementCustomer!.ledgerAccountId}/transactions`)
+        .then((r) => r.json()),
+    enabled: !!statementCustomer?.ledgerAccountId,
   });
 
   const { data: customers = [], isLoading } = useQuery<(Customer & { balance: number; balanceSide: string })[]>({
@@ -164,9 +167,11 @@ export default function Customers() {
     setIsEditOpen(true);
   };
 
-  const filteredCustomers = customers.filter((customer) =>
-    (customer.legalName || "").toLowerCase().includes((searchQuery || "").toLowerCase())
-  );
+  const filteredCustomers = customers.filter((customer) => {
+    const matchesSearch = (customer.legalName || "").toLowerCase().includes((searchQuery || "").toLowerCase());
+    const hasBalance = (customer.balance || 0) !== 0;
+    return matchesSearch && (hasBalance || !!searchQuery);
+  });
 
   if (isLoading) {
     return (
@@ -329,7 +334,6 @@ export default function Customers() {
                     >
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                       {customer.legalName}
-                      <DollarSign className="h-3 w-3" />
                     </button>
                   </TableCell>
                   <TableCell className="text-right font-mono">
@@ -499,119 +503,103 @@ export default function Customers() {
 
       {/* Customer Statement Dialog */}
       <Dialog open={!!statementCustomer} onOpenChange={(open) => !open && setStatementCustomer(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] md:w-auto max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              {statementCustomer?.legalName} - Statement
+              {statementCustomer?.legalName}
             </DialogTitle>
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-sm text-muted-foreground">
-              <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
+            <div className="flex items-center gap-3 pt-1 text-sm text-muted-foreground">
+              <span>Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
               <Badge variant={statementCustomer?.balanceSide === "Cr" ? "default" : "secondary"}>
                 {statementCustomer?.balanceSide || "Dr"}
               </Badge>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto mt-4">
-            {salesLoading ? (
+          <div className="flex-1 overflow-y-auto mt-2">
+            {txnsLoading ? (
               <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
-            ) : customerSales.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions found for this customer
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {customerSales.length} transaction{customerSales.length !== 1 ? "s" : ""}
-                </div>
-                <div className="hidden md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Container</TableHead>
-                        <TableHead>Invoice</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Paid</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...customerSales]
-                        .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
-                        .map((sale: any, idx: number) => (
-                          <TableRow key={sale.id}>
-                            <TableCell className="font-mono text-sm">
-                              {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
-                            </TableCell>
-                            <TableCell className="font-mono font-medium">
-                              {sale.containerNumber || "-"}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {sale.invoiceNumber || "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(sale.totalAmount || 0)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(sale.paidAmount || 0)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
-                                {sale.paymentStatus || "PENDING"}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="md:hidden space-y-3">
-                  {[...customerSales]
-                    .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
-                    .map((sale: any, idx: number) => (
-                      <Card key={sale.id}>
-                        <div className="p-3 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
-                            </span>
-                            <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
-                              {sale.paymentStatus || "PENDING"}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-sm">
-                            <span className="font-mono font-medium">{sale.containerNumber || "-"}</span>
-                            <span className="text-muted-foreground">{sale.invoiceNumber || "-"}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-sm">
-                            <span className="text-muted-foreground">Amount: <span className="font-mono text-foreground">{formatAmount(sale.totalAmount || 0)}</span></span>
-                            <span className="text-muted-foreground">Paid: <span className="font-mono text-foreground">{formatAmount(sale.paidAmount || 0)}</span></span>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
+            ) : (() => {
+              const sorted = [...ledgerTxns].sort((a, b) =>
+                new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime()
+              );
+              const totalDr = sorted.reduce((s, t) => s + parseFloat(t.debitAmount || "0"), 0);
+              const totalCr = sorted.reduce((s, t) => s + parseFloat(t.creditAmount || "0"), 0);
+              const closingBalance = statementCustomer?.balance || 0;
+              const openingBalance = closingBalance - totalDr + totalCr;
 
-                {/* Summary */}
-                <div className="border-t pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div className="text-sm text-muted-foreground">
-                    Total: {customerSales.length} container sale{customerSales.length !== 1 ? "s" : ""}
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Outstanding: </span>
-                    <span className="font-mono font-semibold text-lg">
-                      {formatAmount(statementCustomer?.balance || 0)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+              let running = openingBalance;
+
+              return sorted.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No transactions found</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Voucher</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {openingBalance !== 0 && (
+                      <TableRow className="text-muted-foreground text-sm">
+                        <TableCell>—</TableCell>
+                        <TableCell colSpan={2} className="italic">Opening Balance</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(Math.abs(openingBalance))}</TableCell>
+                      </TableRow>
+                    )}
+                    {sorted.map((t, i) => {
+                      const dr = parseFloat(t.debitAmount || "0");
+                      const cr = parseFloat(t.creditAmount || "0");
+                      running = running + dr - cr;
+                      return (
+                        <TableRow key={t.entryId ?? i}>
+                          <TableCell className="font-mono text-sm whitespace-nowrap">
+                            {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {t.voucherNumber || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {t.narration || t.voucherDescription || t.voucherType || "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {dr > 0 ? formatAmount(dr) : ""}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {cr > 0 ? formatAmount(cr) : ""}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-medium">
+                            {formatAmount(Math.abs(running))}
+                            <span className="text-xs text-muted-foreground ml-1">{running >= 0 ? "Dr" : "Cr"}</span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  <TableHeader className="border-t-2">
+                    <TableRow className="font-semibold">
+                      <TableHead colSpan={3}>Total</TableHead>
+                      <TableHead className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableHead>
+                      <TableHead className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableHead>
+                      <TableHead className="text-right font-mono text-foreground">
+                        {formatAmount(Math.abs(closingBalance))}
+                        <span className="text-xs font-normal text-muted-foreground ml-1">{(statementCustomer?.balanceSide || "Dr")}</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                </Table>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
