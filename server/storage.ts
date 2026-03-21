@@ -2056,8 +2056,13 @@ export class DbStorage implements IStorage {
       .from(schema.inventory)
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
-      .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
-      .where(eq(schema.inventory.companyId, companyId));
+      .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
+      .where(
+        and(
+          eq(schema.inventory.companyId, companyId),
+          isNull(schema.locations.deletedAt),
+        )
+      );
 
     return results;
   }
