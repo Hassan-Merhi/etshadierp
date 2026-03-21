@@ -155,6 +155,7 @@ const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true, employee
   openingBalance: z.string().optional(),
   employeeGroupId: z.string().optional(),
   salesBonusPct: z.string().optional(),
+  salesBonusPctSourceCompanyId: z.string().optional(),
   balesBonusRate: z.string().optional(),
 });
 
@@ -1276,6 +1277,7 @@ export default function Payroll() {
         active: editingEmployee.active,
         employeeGroupId: editingEmployee.employeeGroupId?.toString() || "",
         salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
+        salesBonusPctSourceCompanyId: (editingEmployee as any).salesBonusPctSourceCompanyId != null ? String((editingEmployee as any).salesBonusPctSourceCompanyId) : "",
         balesBonusRate: editingEmployee.balesBonusRate != null ? String(editingEmployee.balesBonusRate) : "",
       });
     }
@@ -1283,10 +1285,10 @@ export default function Payroll() {
   }, [editingEmployee, editEmployeeDialogOpen]);
 
   useEffect(() => {
-    if (editingBaleRates) {
+    if (editEmployeeDialogOpen && editingBaleRates) {
       setEditBaleRates(editingBaleRates.map((r: any) => ({ locationId: String(r.locationId), rate: String(r.rate), sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "" })));
     }
-  }, [editingBaleRates]);
+  }, [editingBaleRates, editEmployeeDialogOpen]);
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
@@ -1448,7 +1450,9 @@ export default function Payroll() {
         }
         // Percentage-of-sales bonus: use the explicitly selected location only
         if (hasPct && bulkBonusAutoPctLocationId) {
-          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${start}&endDate=${end}`);
+          const empPctSrcCompanyId = (emp as any).salesBonusPctSourceCompanyId;
+          const pctSrcParam = empPctSrcCompanyId ? `&sourceCompanyId=${empPctSrcCompanyId}` : "";
+          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
           const data = await res.json();
           total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
         }
@@ -5157,16 +5161,41 @@ export default function Payroll() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sales Bonus %</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          placeholder="e.g. 0.2"
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="input-edit-sales-bonus-pct"
-                        />
-                      </FormControl>
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            placeholder="e.g. 0.2"
+                            {...field}
+                            value={field.value || ""}
+                            className="flex-1 min-w-[120px]"
+                            data-testid="input-edit-sales-bonus-pct"
+                          />
+                        </FormControl>
+                        {otherCompanies.length > 0 && (
+                          <FormField
+                            control={editEmployeeForm.control}
+                            name="salesBonusPctSourceCompanyId"
+                            render={({ field: scField }) => (
+                              <Select
+                                value={scField.value || ""}
+                                onValueChange={(v) => scField.onChange(v === "__current__" ? "" : v)}
+                              >
+                                <SelectTrigger className="w-36 text-xs" data-testid="select-edit-bonus-pct-source-company">
+                                  <SelectValue placeholder={selectedCompany?.name || "This company"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
+                                  {otherCompanies.map(c => (
+                                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
