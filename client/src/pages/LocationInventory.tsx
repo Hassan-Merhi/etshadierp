@@ -103,6 +103,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [showAllStock, setShowAllStock] = useState(false);
   const [allStockGroupFilter, setAllStockGroupFilter] = useState<string>("");
   const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
+  const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -282,6 +283,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             if (String(row.stockGroupId) !== allStockGroupFilter) return false;
           }
         }
+        if (allStockLocationFilter) {
+          const locId = parseInt(allStockLocationFilter, 10);
+          const qty = row.qtyByLocation[locId];
+          if (qty == null || qty === 0) return false;
+        }
         if (allStockSearchTerm) {
           const s = allStockSearchTerm.toLowerCase();
           return (
@@ -295,7 +301,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         const g = a.stockGroupName.localeCompare(b.stockGroupName);
         return g !== 0 ? g : a.stockItemName.localeCompare(b.stockItemName);
       });
-  }, [combinedStockRows, allStockGroupFilter, allStockSearchTerm]);
+  }, [combinedStockRows, allStockGroupFilter, allStockLocationFilter, allStockSearchTerm]);
 
   // Filter out items with 0 quantity
   const inventory = inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
@@ -391,6 +397,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setShowAllStock(false);
     setAllStockSearchTerm("");
     setAllStockGroupFilter("");
+    setAllStockLocationFilter("");
   };
 
   // Handle back to groups
@@ -1224,8 +1231,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
           <Card className="p-4 w-full">
             {/* Filters row */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
+              <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search items by name or code..."
@@ -1239,7 +1246,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 value={allStockGroupFilter || "__all__"}
                 onValueChange={(v) => setAllStockGroupFilter(v === "__all__" ? "" : v)}
               >
-                <SelectTrigger className="w-full sm:w-52" data-testid="select-all-stock-group">
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-group">
                   <SelectValue placeholder="All Groups" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1247,6 +1254,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   {allInventoryGroups.map((g) => (
                     <SelectItem key={String(g.id)} value={g.id === null ? "null" : String(g.id)}>
                       {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={allStockLocationFilter || "__all__"}
+                onValueChange={(v) => setAllStockLocationFilter(v === "__all__" ? "" : v)}
+              >
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-location">
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Locations</SelectItem>
+                  {allInventoryLocations.map((loc) => (
+                    <SelectItem key={String(loc.id)} value={String(loc.id)}>
+                      {loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1268,8 +1291,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-10">
-                      <th className="text-left px-3 font-medium whitespace-nowrap">Group</th>
-                      <th className="text-left px-3 font-medium whitespace-nowrap">Code</th>
                       <th className="text-left px-3 font-medium whitespace-nowrap">Item Name</th>
                       {allInventoryLocations.map((loc) => (
                         <th key={loc.id} className="text-right px-3 font-medium whitespace-nowrap">
@@ -1282,8 +1303,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tbody>
                     {filteredCombinedRows.map((row) => (
                       <tr key={row.stockItemId} className="border-t hover-elevate" data-testid={`row-allstock-${row.stockItemId}`}>
-                        <td className="px-3 py-2 text-muted-foreground text-xs whitespace-nowrap">{row.stockGroupName}</td>
-                        <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{row.stockItemCode}</td>
                         <td className="px-3 py-2 font-medium whitespace-nowrap">{row.stockItemName}</td>
                         {allInventoryLocations.map((loc) => (
                           <td key={loc.id} className="px-3 py-2 text-right font-mono whitespace-nowrap">
