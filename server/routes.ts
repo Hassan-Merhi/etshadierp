@@ -13964,7 +13964,7 @@ if (asOfDate) {
         const [acct] = await db.select({ ob: employees.openingBalance })
           .from(employees).where(eq(employees.id, accountId));
         rawOB = parseFloat(acct?.ob ?? "0") || 0;
-        obSide = "Dr";
+        obSide = "Cr";
       } else if (accountType === "customer") {
         const [acct] = await db.select({ ob: customers.openingBalance })
           .from(customers).where(eq(customers.id, accountId));
@@ -14086,10 +14086,10 @@ if (asOfDate) {
         obSide = "Cr";
       } else if (accountType === "employee") {
         rawEntries = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
-        const [acct] = await db.select().from(employees).where(eq(employees.id, accountId));
-        accountName = acct?.name ?? "Employee";
+        const [acct] = await db.select({ firstName: employees.firstName, lastName: employees.lastName, openingBalance: employees.openingBalance }).from(employees).where(eq(employees.id, accountId));
+        accountName = acct ? `${acct.firstName} ${acct.lastName}` : "Employee";
         rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
-        obSide = "Dr";
+        obSide = "Cr";
       } else if (accountType === "customer") {
         const customerStmt = await storage.getCustomerStatement(accountId, companyId, startDate, endDate);
         rawEntries = customerStmt.map((row: any) => ({
