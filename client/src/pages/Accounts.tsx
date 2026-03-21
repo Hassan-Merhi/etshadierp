@@ -181,6 +181,7 @@ export default function Accounts() {
   );
   const [supplierToEdit, setSupplierToEdit] = useState<Account | null>(null);
   const [customerToEdit, setCustomerToEdit] = useState<Account | null>(null);
+  const [employeeToEdit, setEmployeeToEdit] = useState<Account | null>(null);
 
   // Helper to update URL params without full page reload
   // Reads current params from window.location.search to avoid stale state
@@ -999,6 +1000,30 @@ export default function Accounts() {
     },
   });
 
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async (data: UpdateLedgerAccount) => {
+      if (!employeeToEdit) throw new Error("No employee selected");
+      const nameParts = (data.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      return await modeApiRequest("PATCH", `/api/employees/${employeeToEdit.accountId}`, {
+        firstName,
+        lastName,
+        active: data.active,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Employee updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setEmployeeToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update employee", variant: "destructive" });
+    },
+  });
+
   const deleteFactorySupplierMutation = useMutation({
     mutationFn: async (supplierId: number) => {
       return await modeApiRequest("DELETE", `/api/factory/suppliers/${supplierId}/permanent`);
@@ -1185,6 +1210,10 @@ export default function Accounts() {
     }
     if (customerToEdit) {
       updateCustomerMutation.mutate(data);
+      return;
+    }
+    if (employeeToEdit) {
+      updateEmployeeMutation.mutate(data);
       return;
     }
     updateLedgerMutation.mutate(data);
@@ -2520,7 +2549,8 @@ export default function Accounts() {
                         const isBank = account.type === "bank";
                         const isSupplier = account.type === "supplier";
                         const isCustomer = account.type === "customer";
-                        const isEditable = isLedger || isBank || isSupplier || isCustomer;
+                        const isEmployee = account.type === "employee";
+                        const isEditable = isLedger || isBank || isSupplier || isCustomer || isEmployee;
                         const isLedgerSelected =
                           accountToEdit?.id === account.accountId && isLedger;
                         const isBankSelected =
@@ -2529,7 +2559,9 @@ export default function Accounts() {
                           supplierToEdit?.accountId === account.accountId && isSupplier;
                         const isCustomerSelected =
                           customerToEdit?.accountId === account.accountId && isCustomer;
-                        const isSelected = isLedgerSelected || isBankSelected || isSupplierSelected || isCustomerSelected;
+                        const isEmployeeSelected =
+                          employeeToEdit?.accountId === account.accountId && isEmployee;
+                        const isSelected = isLedgerSelected || isBankSelected || isSupplierSelected || isCustomerSelected || isEmployeeSelected;
 
                         const isFactorySupplier = account.type === "factorySupplier";
 
@@ -2591,6 +2623,7 @@ export default function Accounts() {
                                 setAccountToEdit(null);
                                 setBankToEdit(null);
                                 setSupplierToEdit(null);
+                                setEmployeeToEdit(null);
                                 setCustomerToEdit(account);
                                 editForm.reset({
                                   code: account.code,
@@ -2599,11 +2632,22 @@ export default function Accounts() {
                                   openingBalanceSide: account.openingBalanceSide ?? "Dr",
                                   active: account.active,
                                 });
+                              } else if (isEmployee) {
+                                setAccountToEdit(null);
+                                setBankToEdit(null);
+                                setSupplierToEdit(null);
+                                setCustomerToEdit(null);
+                                setEmployeeToEdit(account);
+                                editForm.reset({
+                                  code: account.code,
+                                  name: account.name,
+                                  active: account.active,
+                                });
                               } else {
                                 toast({
                                   title: "Not Editable",
                                   description:
-                                    "Only ledger, bank, supplier, and customer accounts can be edited",
+                                    "Only ledger, bank, supplier, customer, and employee accounts can be edited",
                                 });
                               }
                             }}
@@ -2644,11 +2688,11 @@ export default function Accounts() {
                 )}
               </div>
 
-              {(accountToEdit || supplierToEdit || customerToEdit) && (
+              {(accountToEdit || supplierToEdit || customerToEdit || employeeToEdit) && (
                 <Card className="bg-muted/50">
                   <CardHeader>
                     <CardTitle className="text-sm">
-                      {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : "Edit Account Details"}
+                      {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : employeeToEdit ? "Edit Employee" : "Edit Account Details"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -2691,7 +2735,7 @@ export default function Accounts() {
                             </FormItem>
                           )}
                         />
-                        {!supplierToEdit && !customerToEdit && (
+                        {!supplierToEdit && !customerToEdit && !employeeToEdit && (
                           <>
                             <FormField
                               control={editForm.control}
@@ -2797,6 +2841,7 @@ export default function Accounts() {
                           )}
                         </div>
                         <div className="flex gap-2 justify-between">
+                          {!employeeToEdit && (
                           <Button
                             type="button"
                             variant="destructive"
@@ -2809,6 +2854,7 @@ export default function Accounts() {
                               ? "Deleting..."
                               : "Delete"}
                           </Button>
+                          )}
                           <div className="flex gap-2">
                             <Button
                               type="button"
@@ -2817,6 +2863,7 @@ export default function Accounts() {
                                 setAccountToEdit(null);
                                 setSupplierToEdit(null);
                                 setCustomerToEdit(null);
+                                setEmployeeToEdit(null);
                                 editForm.reset();
                               }}
                               data-testid="button-cancel-edit"
@@ -2825,11 +2872,11 @@ export default function Accounts() {
                             </Button>
                             <Button
                               type="submit"
-                              disabled={updateLedgerMutation.isPending || updateSupplierMutation.isPending || updateCustomerMutation.isPending}
+                              disabled={updateLedgerMutation.isPending || updateSupplierMutation.isPending || updateCustomerMutation.isPending || updateEmployeeMutation.isPending}
                               data-testid="button-save-edit"
                             >
                               <Edit className="w-4 h-4 mr-2" />
-                              {updateLedgerMutation.isPending
+                              {(updateLedgerMutation.isPending || updateEmployeeMutation.isPending)
                                 ? "Saving..."
                                 : "Save Changes"}
                             </Button>
