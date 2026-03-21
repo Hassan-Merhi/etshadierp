@@ -1587,16 +1587,24 @@ export default function Accounts() {
                                   className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? "ml-8" : ""}`}
                                   data-testid={`button-select-account-${account.id}`}
                                 >
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 w-full">
                                     <Badge
                                       variant="outline"
-                                      className="text-xs"
+                                      className="text-xs shrink-0"
                                     >
                                       {account.type}
                                     </Badge>
-                                    <span className="text-sm">
+                                    <span className="text-sm flex-1">
                                       {account.name}
                                     </span>
+                                    {!hideBalances && account.balance !== 0 && (
+                                      <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
+                                        {formatAmount(Math.abs(account.balance))}{" "}
+                                        <span className={account.balanceSide?.toLowerCase() === "dr" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+                                          {account.balanceSide ?? ""}
+                                        </span>
+                                      </span>
+                                    )}
                                   </div>
                                 </button>
                               </div>
@@ -1616,16 +1624,24 @@ export default function Accounts() {
                                       className="w-full p-3 pl-16 text-left hover-elevate"
                                       data-testid={`button-select-account-${child.id}`}
                                     >
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 w-full">
                                         <Badge
                                           variant="outline"
-                                          className="text-xs"
+                                          className="text-xs shrink-0"
                                         >
                                           {child.type}
                                         </Badge>
-                                        <span className="text-sm">
+                                        <span className="text-sm flex-1">
                                           {child.name}
                                         </span>
+                                        {!hideBalances && child.balance !== 0 && (
+                                          <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
+                                            {formatAmount(Math.abs(child.balance))}{" "}
+                                            <span className={child.balanceSide?.toLowerCase() === "dr" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400"}>
+                                              {child.balanceSide ?? ""}
+                                            </span>
+                                          </span>
+                                        )}
                                       </div>
                                     </button>
                                   </div>
