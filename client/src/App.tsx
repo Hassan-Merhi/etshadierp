@@ -1,3 +1,4 @@
+import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -145,7 +146,6 @@ const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
 const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
   AlertDialog,
