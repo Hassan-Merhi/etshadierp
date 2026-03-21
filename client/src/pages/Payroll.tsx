@@ -156,6 +156,7 @@ const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true, employee
   employeeGroupId: z.string().optional(),
   salesBonusPct: z.string().optional(),
   salesBonusPctSourceCompanyId: z.string().optional(),
+  salesBonusPctLocationId: z.string().optional(),
   balesBonusRate: z.string().optional(),
 });
 
@@ -1278,6 +1279,7 @@ export default function Payroll() {
         employeeGroupId: editingEmployee.employeeGroupId?.toString() || "",
         salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
         salesBonusPctSourceCompanyId: (editingEmployee as any).salesBonusPctSourceCompanyId != null ? String((editingEmployee as any).salesBonusPctSourceCompanyId) : "",
+        salesBonusPctLocationId: (editingEmployee as any).salesBonusPctLocationId != null ? String((editingEmployee as any).salesBonusPctLocationId) : "",
         balesBonusRate: editingEmployee.balesBonusRate != null ? String(editingEmployee.balesBonusRate) : "",
       });
     }
@@ -1448,11 +1450,13 @@ export default function Payroll() {
             total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
           }
         }
-        // Percentage-of-sales bonus: use the explicitly selected location only
-        if (hasPct && bulkBonusAutoPctLocationId) {
+        // Percentage-of-sales bonus: use per-employee location if set, else fall back to global picker
+        const empPctLocationId = (emp as any).salesBonusPctLocationId;
+        const resolvedPctLocationId = empPctLocationId ? String(empPctLocationId) : bulkBonusAutoPctLocationId;
+        if (hasPct && resolvedPctLocationId) {
           const empPctSrcCompanyId = (emp as any).salesBonusPctSourceCompanyId;
           const pctSrcParam = empPctSrcCompanyId ? `&sourceCompanyId=${empPctSrcCompanyId}` : "";
-          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
+          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${resolvedPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
           const data = await res.json();
           total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
         }
@@ -5158,7 +5162,12 @@ export default function Payroll() {
                 <FormField
                   control={editEmployeeForm.control}
                   name="salesBonusPct"
-                  render={({ field }) => (
+                  render={({ field }) => {
+                    const pctSourceCompanyId = editEmployeeForm.watch("salesBonusPctSourceCompanyId") || "";
+                    const pctLocations = pctSourceCompanyId
+                      ? allCompanyLocations.filter(l => String(l.companyId) === pctSourceCompanyId)
+                      : locations;
+                    return (
                     <FormItem>
                       <FormLabel>Sales Bonus %</FormLabel>
                       <div className="flex gap-2 items-center flex-wrap">
@@ -5169,7 +5178,7 @@ export default function Payroll() {
                             placeholder="e.g. 0.2"
                             {...field}
                             value={field.value || ""}
-                            className="flex-1 min-w-[120px]"
+                            className="w-28"
                             data-testid="input-edit-sales-bonus-pct"
                           />
                         </FormControl>
@@ -5180,9 +5189,12 @@ export default function Payroll() {
                             render={({ field: scField }) => (
                               <Select
                                 value={scField.value || ""}
-                                onValueChange={(v) => scField.onChange(v === "__current__" ? "" : v)}
+                                onValueChange={(v) => {
+                                  scField.onChange(v === "__current__" ? "" : v);
+                                  editEmployeeForm.setValue("salesBonusPctLocationId", "");
+                                }}
                               >
-                                <SelectTrigger className="w-36 text-xs" data-testid="select-edit-bonus-pct-source-company">
+                                <SelectTrigger className="w-32 text-xs" data-testid="select-edit-bonus-pct-source-company">
                                   <SelectValue placeholder={selectedCompany?.name || "This company"} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -5195,10 +5207,30 @@ export default function Payroll() {
                             )}
                           />
                         )}
+                        <FormField
+                          control={editEmployeeForm.control}
+                          name="salesBonusPctLocationId"
+                          render={({ field: locField }) => (
+                            <Select
+                              value={locField.value || ""}
+                              onValueChange={locField.onChange}
+                            >
+                              <SelectTrigger className="flex-1 min-w-[120px]" data-testid="select-edit-bonus-pct-location">
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pctLocations.map(loc => (
+                                  <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
                       </div>
                       <FormMessage />
                     </FormItem>
-                  )}
+                    );
+                  }}
                 />
 
                 <div className="space-y-2">

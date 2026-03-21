@@ -3817,7 +3817,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId, salesBonusPct, salesBonusPctSourceCompanyId, balesBonusRate } = req.body;
+      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId, salesBonusPct, salesBonusPctSourceCompanyId, salesBonusPctLocationId, balesBonusRate } = req.body;
 
       const updates: Record<string, any> = {};
       if (firstName !== undefined) updates.firstName = firstName;
@@ -3830,6 +3830,7 @@ if (asOfDate) {
       if (employeeGroupId !== undefined) updates.employeeGroupId = employeeGroupId === null || employeeGroupId === "" || employeeGroupId === "none" ? null : parseInt(employeeGroupId);
       if (salesBonusPct !== undefined) updates.salesBonusPct = salesBonusPct === "" || salesBonusPct === null ? null : salesBonusPct;
       if (salesBonusPctSourceCompanyId !== undefined) updates.salesBonusPctSourceCompanyId = salesBonusPctSourceCompanyId === "" || salesBonusPctSourceCompanyId === null ? null : parseInt(salesBonusPctSourceCompanyId);
+      if (salesBonusPctLocationId !== undefined) updates.salesBonusPctLocationId = salesBonusPctLocationId === "" || salesBonusPctLocationId === null ? null : parseInt(salesBonusPctLocationId);
       if (balesBonusRate !== undefined) updates.balesBonusRate = balesBonusRate === "" || balesBonusRate === null ? null : balesBonusRate;
 
       if (Object.keys(updates).length === 0) {
