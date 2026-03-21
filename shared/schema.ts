@@ -1024,6 +1024,7 @@ export const employeeBaleRates = pgTable("employee_bale_rates", {
   employeeId: integer("employee_id").notNull(),
   locationId: integer("location_id").notNull(),
   rate: decimal("rate", { precision: 10, scale: 4 }).notNull(),
+  sourceCompanyId: integer("source_company_id"),
 });
 export type EmployeeBaleRate = typeof employeeBaleRates.$inferSelect;
 

@@ -238,7 +238,7 @@ export default function Payroll() {
   const [selectedWorkerProfileId, setSelectedWorkerProfileId] = useState<number | null>(null);
   const [workerProfileSearch, setWorkerProfileSearch] = useState("");
   const [workerProfileGroupFilter, setWorkerProfileGroupFilter] = useState<number | null>(null);
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -349,7 +349,7 @@ export default function Payroll() {
   const [bulkDepositNotes, setBulkDepositNotes] = useState("");
 
   // Edit employee bale rates state
-  const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string }[]>([]);
+  const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string; sourceCompanyId: string }[]>([]);
   const [bulkBonusAutoMonth, setBulkBonusAutoMonth] = useState<"thisMonth" | "custom">("thisMonth");
   const [bulkBonusAutoStart, setBulkBonusAutoStart] = useState(() => getThisMonthRange().start);
   const [bulkBonusAutoEnd, setBulkBonusAutoEnd] = useState(() => getThisMonthRange().end);
@@ -391,6 +391,28 @@ export default function Payroll() {
   const { data: locations = [] } = useQuery<Array<{ id: number; name: string; companyId: number }>>({
     queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
+  });
+
+  // Fetch locations for all other companies the user has access to (for cross-company bale rates)
+  const otherCompanies = companies.filter(c => c.id !== selectedCompany?.id);
+  const { data: allCompanyLocations = [] } = useQuery<Array<{ id: number; name: string; companyId: number; companyName: string }>>({
+    queryKey: ["/api/all-company-locations", companies.map(c => c.id).join(",")],
+    queryFn: async () => {
+      const results: Array<{ id: number; name: string; companyId: number; companyName: string }> = [];
+      for (const company of otherCompanies) {
+        try {
+          const res = await fetch(`/api/locations?companyId=${company.id}`, { credentials: "include" });
+          if (res.ok) {
+            const locs = await res.json();
+            for (const loc of locs) {
+              results.push({ id: loc.id, name: loc.name, companyId: company.id, companyName: company.name });
+            }
+          }
+        } catch {}
+      }
+      return results;
+    },
+    enabled: otherCompanies.length > 0,
   });
 
   // Employee Groups mutations
@@ -1262,7 +1284,7 @@ export default function Payroll() {
 
   useEffect(() => {
     if (editingBaleRates) {
-      setEditBaleRates(editingBaleRates.map(r => ({ locationId: String(r.locationId), rate: String(r.rate) })));
+      setEditBaleRates(editingBaleRates.map((r: any) => ({ locationId: String(r.locationId), rate: String(r.rate), sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "" })));
     }
   }, [editingBaleRates]);
 
@@ -1417,7 +1439,8 @@ export default function Payroll() {
 
         if (hasBaleRates) {
           for (const r of rates) {
-            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}`);
+            const srcParam = (r as any).sourceCompanyId ? `&sourceCompanyId=${(r as any).sourceCompanyId}` : "";
+            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}${srcParam}`);
             const data = await res.json();
             // Per-unit bale bonus
             total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
@@ -5156,7 +5179,7 @@ export default function Payroll() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => setEditBaleRates(prev => [...prev, { locationId: "", rate: "" }])}
+                      onClick={() => setEditBaleRates(prev => [...prev, { locationId: "", rate: "", sourceCompanyId: "" }])}
                       data-testid="button-add-bale-rate"
                     >
                       <Plus className="h-3 w-3 mr-1" />
@@ -5166,17 +5189,38 @@ export default function Payroll() {
                   {editBaleRates.length === 0 && (
                     <p className="text-xs text-muted-foreground">No per-location rates configured. Add locations to enable auto-calculation.</p>
                   )}
-                  {editBaleRates.map((row, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
+                  {editBaleRates.map((row, idx) => {
+                    const rowCompanyId = row.sourceCompanyId || "";
+                    const locationsForRow = rowCompanyId
+                      ? allCompanyLocations.filter(l => String(l.companyId) === rowCompanyId)
+                      : locations;
+                    return (
+                    <div key={idx} className="flex gap-2 items-start flex-wrap">
+                      {otherCompanies.length > 0 && (
+                        <Select
+                          value={rowCompanyId}
+                          onValueChange={(v) => setEditBaleRates(prev => prev.map((r, i) => i === idx ? { ...r, sourceCompanyId: v === "__current__" ? "" : v, locationId: "" } : r))}
+                        >
+                          <SelectTrigger className="w-32 text-xs" data-testid={`select-bale-rate-company-${idx}`}>
+                            <SelectValue placeholder={selectedCompany?.name || "This company"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
+                            {otherCompanies.map(c => (
+                              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <Select
                         value={row.locationId}
                         onValueChange={(v) => setEditBaleRates(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v } : r))}
                       >
-                        <SelectTrigger className="flex-1" data-testid={`select-bale-rate-location-${idx}`}>
+                        <SelectTrigger className="flex-1 min-w-[120px]" data-testid={`select-bale-rate-location-${idx}`}>
                           <SelectValue placeholder="Select location" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locations.map(loc => (
+                          {locationsForRow.map(loc => (
                             <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -5200,7 +5244,8 @@ export default function Payroll() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

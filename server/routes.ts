@@ -3801,7 +3801,7 @@ if (asOfDate) {
       const { rates } = req.body;
       if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
       const valid = rates.filter((r: any) => r.locationId && parseFloat(r.rate) > 0)
-        .map((r: any) => ({ locationId: parseInt(r.locationId), rate: String(parseFloat(r.rate)) }));
+        .map((r: any) => ({ locationId: parseInt(r.locationId), rate: String(parseFloat(r.rate)), sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null }));
       await storage.setEmployeeBaleRates(employeeId, companyId, valid);
       return res.json({ ok: true });
     } catch (e: any) {
@@ -4774,13 +4774,15 @@ if (asOfDate) {
   // Payroll - Sales Summary for bonus calculation
   app.get("/api/payroll/sales-summary", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { locationId, startDate, endDate } = req.query;
+      const sessionCompanyId = req.session.currentCompanyId;
+      if (!sessionCompanyId) return res.status(400).json({ message: "No company selected" });
+      const { locationId, startDate, endDate, sourceCompanyId } = req.query;
       if (!locationId || !startDate || !endDate) {
         return res.status(400).json({ message: "locationId, startDate, and endDate are required" });
       }
       const locId = parseInt(locationId as string);
+      // Allow querying another company's sales if sourceCompanyId is provided
+      const companyId = sourceCompanyId ? parseInt(sourceCompanyId as string) : sessionCompanyId;
       const conditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.locationId, locId),

@@ -306,7 +306,7 @@ export interface IStorage {
 
   // Employee Bale Rates (per-location)
   getEmployeeBaleRates(employeeId: number, companyId: number): Promise<schema.EmployeeBaleRate[]>;
-  setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string }[]): Promise<void>;
+  setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string; sourceCompanyId?: number | null }[]): Promise<void>;
 
   // Salary Advance Deductions
   getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
@@ -5331,14 +5331,14 @@ export class DbStorage implements IStorage {
       ));
   }
 
-  async setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string }[]): Promise<void> {
+  async setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string; sourceCompanyId?: number | null }[]): Promise<void> {
     await db.delete(schema.employeeBaleRates).where(and(
       eq(schema.employeeBaleRates.employeeId, employeeId),
       eq(schema.employeeBaleRates.companyId, companyId)
     ));
     if (rates.length > 0) {
       await db.insert(schema.employeeBaleRates).values(
-        rates.map(r => ({ companyId, employeeId, locationId: r.locationId, rate: r.rate }))
+        rates.map(r => ({ companyId, employeeId, locationId: r.locationId, rate: r.rate, sourceCompanyId: r.sourceCompanyId ?? null }))
       );
     }
   }
