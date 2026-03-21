@@ -80,7 +80,7 @@ interface SalaryAdvance {
   employeeId: number;
   amount: string;
   remainingBalance: string;
-  status: string;
+  fullyPaid: boolean;
 }
 interface PreviewItem {
   employeeId: number;
@@ -185,7 +185,7 @@ export default function ERPRunPayroll() {
   const advanceBalanceByEmployee = useMemo(() => {
     const map: Record<number, number> = {};
     for (const adv of salaryAdvances) {
-      if (adv.status === "Active" || adv.status === "active" || adv.status === "Partial") {
+      if (!adv.fullyPaid) {
         const bal = parseFloat(adv.remainingBalance || "0");
         if (bal > 0) map[adv.employeeId] = (map[adv.employeeId] || 0) + bal;
       }
@@ -686,11 +686,18 @@ export default function ERPRunPayroll() {
                                 onChange={(e) => updateDeduction(idx, e.target.value)}
                                 data-testid={`input-deduction-${it.employeeId}`}
                               />
-                              {advBal > 0 && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400">
-                                  Outstanding: {formatAmount(advBal)}
-                                </span>
-                              )}
+                              {advBal > 0 && (() => {
+                                const remaining = advBal - it.deduction;
+                                return remaining > 0.005 ? (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                                    Remaining: {formatAmount(remaining)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-green-600 dark:text-green-400">
+                                    Fully deducted
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold text-sm" data-testid={`text-net-${it.employeeId}`}>
