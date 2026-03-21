@@ -143,6 +143,7 @@ import Chat from "@/pages/Chat";
 import SpreadsheetEditor from "@/pages/SpreadsheetEditor";
 import LiveSheets from "@/pages/LiveSheets";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useEffect, useCallback, useState, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -541,7 +542,9 @@ function AuthenticatedApp() {
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
-                  <Router user={user} posImportEnabled={posImportEnabled} />
+                  <ErrorBoundary key={currentLocation}>
+                    <Router user={user} posImportEnabled={posImportEnabled} />
+                  </ErrorBoundary>
                 </div>
               </main>
             </div>
@@ -626,6 +629,7 @@ function AuthenticatedApp() {
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
+                  <ErrorBoundary key={currentLocation}>
                   <Switch>
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
@@ -701,6 +705,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-details" component={NetProfitDetails} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
+                  </ErrorBoundary>
                 </div>
               </main>
             </div>
@@ -754,7 +759,9 @@ function AuthenticatedApp() {
             <OfflineBanner />
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">
               <div className="w-full">
-                <Router user={user} />
+                <ErrorBoundary key={currentLocation}>
+                  <Router user={user} />
+                </ErrorBoundary>
               </div>
             </main>
           </div>
