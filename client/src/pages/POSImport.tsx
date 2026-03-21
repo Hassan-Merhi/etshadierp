@@ -64,11 +64,12 @@ export default function POSImport() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const fmtPrint = (n: number, prefix = "") => {
-    const fixed = n.toFixed(2);
+    const fixed = Math.abs(n).toFixed(2);
     const clean = fixed.replace(/\.00$/, "");
     const parts = clean.split(".");
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return prefix + parts.join(".");
+    const num = parts.join(".");
+    return prefix ? prefix + "\u00A0" + num : num;
   };
 
   // Print always shows USD amounts

@@ -339,9 +339,9 @@ export default function POSDaybook() {
   };
 
   const fmtPrint = (n: number, prefix = "") => {
-    const parts = n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",").split(".");
-    if (parts[1] === "00") return prefix + parts[0];
-    return prefix + parts.join(".");
+    const parts = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",").split(".");
+    const num = parts[1] === "00" ? parts[0] : parts.join(".");
+    return prefix ? prefix + "\u00A0" + num : num;
   };
 
   const handleReprint = useReactToPrint({
