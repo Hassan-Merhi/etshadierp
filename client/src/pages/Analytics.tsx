@@ -313,8 +313,8 @@ export default function Analytics() {
   const [, navigate] = useLocation();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideAnalyticsFinancials = (myErpPages?.hiddenErpCostFields ?? []).includes("analytics_financials");
-  const [selectedPeriod, setSelectedPeriod] = useState("all");
-  const [detailsPeriod, setDetailsPeriod] = useState("all");
+  const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [detailsPeriod, setDetailsPeriod] = useState("month");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
