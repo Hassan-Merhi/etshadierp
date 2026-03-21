@@ -113,6 +113,7 @@ import {
   erpPayrollRuns,
   erpPayrollRunItems,
   intercompanyPosConfigs,
+  companies,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -163,7 +164,19 @@ async function runIntercompanyPosTransfer(
       .where(eq(intercompanyPosConfigs.sourceCompanyId, sourceCompanyId));
     if (!config || !config.enabled) return;
 
-    // 2. Get the cash account name so we can match it in the dest company
+    // 2. Fetch both company names for use in narrations
+    const [srcCompanyRow] = await db
+      .select({ name: companies.name })
+      .from(companies)
+      .where(eq(companies.id, sourceCompanyId));
+    const [dstCompanyRow] = await db
+      .select({ name: companies.name })
+      .from(companies)
+      .where(eq(companies.id, config.destCompanyId));
+    const srcCompanyName = srcCompanyRow?.name ?? `Company ${sourceCompanyId}`;
+    const dstCompanyName = dstCompanyRow?.name ?? `Company ${config.destCompanyId}`;
+
+    // 3. Get the cash account name so we can match it in the dest company
     const [cashAccount] = await db
       .select({ name: ledgerAccounts.name })
       .from(ledgerAccounts)
@@ -197,7 +210,7 @@ async function runIntercompanyPosTransfer(
 
     // 4. Create/update SOURCE voucher
     const srcVoucherNum = `INTERCO-SRC-${sourceCompanyId}-${saleDateStr}`;
-    const srcNarration = `Intercompany POS transfer (auto) – ${saleDateStr}`;
+    const srcNarration = `GC Cash transferred to ${dstCompanyName} – ${saleDateStr}`;
     await upsertIntercompanyVoucher({
       companyId: sourceCompanyId,
       voucherNumber: srcVoucherNum,
@@ -211,7 +224,7 @@ async function runIntercompanyPosTransfer(
     // 5. Create/update DEST voucher (only if we found a matching cash account)
     if (destCashAccount) {
       const dstVoucherNum = `INTERCO-DST-${config.destCompanyId}-${saleDateStr}`;
-      const dstNarration = `Intercompany POS receipt (auto) – ${saleDateStr}`;
+      const dstNarration = `GC Cash transferred from ${srcCompanyName} – ${saleDateStr}`;
       await upsertIntercompanyVoucher({
         companyId: config.destCompanyId,
         voucherNumber: dstVoucherNum,
@@ -256,6 +269,12 @@ async function upsertIntercompanyVoucher(opts: {
 
   if (existing) {
     // --- Update existing voucher ---
+    // Update the description in case the narration format changed
+    await db
+      .update(vouchers)
+      .set({ description: narration })
+      .where(eq(vouchers.id, existing.id));
+
     const entries = await db
       .select()
       .from(voucherEntries)
