@@ -1294,6 +1294,11 @@ export default function Payroll() {
 
   const handleDeposit = (employee: Employee) => {
     setSelectedEmployee(employee);
+    depositForm.reset({
+      amount: employee.monthlySalary || "",
+      date: new Date().toISOString().split("T")[0],
+      notes: "",
+    });
     setDepositDialogOpen(true);
   };
 
