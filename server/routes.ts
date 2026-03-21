@@ -7578,6 +7578,48 @@ if (asOfDate) {
     }
   });
 
+  // Export last 4 sales per stock item (for Excel export)
+  app.get("/api/stock-items/last-sales-export", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db.execute(sql`
+        WITH ranked AS (
+          SELECT
+            si.stock_item_id   AS "stockItemId",
+            sk.code            AS "itemCode",
+            sk.name            AS "itemName",
+            v.voucher_number   AS "voucherNumber",
+            v.voucher_date     AS "voucherDate",
+            COALESCE(l.name, '') AS "locationName",
+            si.quantity        AS "quantity",
+            si.selling_price   AS "rate",
+            si.total_sales     AS "amount",
+            ROW_NUMBER() OVER (
+              PARTITION BY si.stock_item_id
+              ORDER BY v.voucher_date DESC, v.id DESC
+            ) AS rn
+          FROM sales_items si
+          JOIN vouchers v ON si.voucher_id = v.id
+          JOIN stock_items sk ON si.stock_item_id = sk.id
+          LEFT JOIN locations l ON v.location_id = l.id
+          WHERE v.company_id = ${companyId}
+            AND v.optional = false
+        )
+        SELECT "stockItemId", "itemCode", "itemName", "voucherNumber",
+               "voucherDate", "locationName", "quantity", "rate", "amount", rn
+        FROM ranked
+        WHERE rn <= 4
+        ORDER BY "itemName" ASC, rn ASC
+      `);
+
+      res.json(rows.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {

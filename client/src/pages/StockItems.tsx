@@ -264,6 +264,61 @@ export default function StockItems() {
   const allFilteredSelected = filteredStockItems.length > 0 && 
     filteredStockItems.every(item => selectedIds.includes(item.id));
 
+  const exportSalesHistory = async () => {
+    try {
+      const res = await fetch("/api/stock-items/last-sales-export", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sales history");
+      const rows: {
+        stockItemId: number;
+        itemCode: string;
+        itemName: string;
+        voucherNumber: string;
+        voucherDate: string;
+        locationName: string;
+        quantity: string;
+        rate: string;
+        amount: string;
+        rn: number;
+      }[] = await res.json();
+
+      if (rows.length === 0) {
+        toast({ title: "No sales data", description: "No sales history found for any item." });
+        return;
+      }
+
+      const data: Record<string, string>[] = [];
+      let lastItemId: number | null = null;
+      for (const row of rows) {
+        if (lastItemId !== null && row.stockItemId !== lastItemId) {
+          data.push({});
+        }
+        lastItemId = row.stockItemId;
+        data.push({
+          "Item Code": row.itemCode,
+          "Item Name": row.itemName,
+          "Sale #": String(row.rn),
+          "Voucher No.": row.voucherNumber || "",
+          "Date": row.voucherDate ? new Date(row.voucherDate).toLocaleDateString() : "",
+          "Location": row.locationName || "",
+          "Qty": row.quantity ? parseFloat(row.quantity).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "",
+          "Rate": row.rate ? parseFloat(row.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
+          "Amount": row.amount ? parseFloat(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
+        });
+      }
+
+      const worksheet = utils.json_to_sheet(data);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Sales History");
+      writeFile(workbook, "stock-items-sales-history.xlsx");
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Could not export sales history",
+        variant: "destructive",
+      });
+    }
+  };
+
   const exportToExcel = async () => {
     try {
       const res = await fetch("/api/stock-item-location-prices/all", { credentials: "include" });
@@ -358,7 +413,11 @@ export default function StockItems() {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={exportToExcel} data-testid="menu-export">
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Export Stock Items
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportSalesHistory} data-testid="menu-export-sales-history">
+                <Download className="h-4 w-4 mr-2" />
+                Export Sales History
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
