@@ -825,9 +825,9 @@ export default function POSImport() {
                 <thead>
                   <tr style={{ borderBottom: '2px solid black' }}>
                     <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900', borderRight: '2px solid black' }}>Description</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
-                    <th style={{ textAlign: 'right', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
+                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
+                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
+                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -837,9 +837,9 @@ export default function POSImport() {
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #b0b8c1', backgroundColor: idx % 2 === 0 ? 'white' : '#f2f5f8' }}>
                         <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', borderRight: '2px solid black' }}>{item.stockItemName || item.itemCode}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, printCurrPrefix)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, printCurrPrefix)}</td>
+                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
+                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, printCurrPrefix)}</td>
+                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, printCurrPrefix)}</td>
                       </tr>
                     );
                   })}
@@ -847,9 +847,9 @@ export default function POSImport() {
                 <tfoot>
                   <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
                     <td style={{ padding: '5px 3px', fontWeight: '900', borderRight: '2px solid black' }}>TOTAL</td>
-                    <td style={{ textAlign: 'right', padding: '5px 3px' }}>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px' }}>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
                     <td style={{ padding: '5px 3px' }}></td>
-                    <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', fontWeight: '900' }}>
                       {fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), printCurrPrefix)}
                     </td>
                   </tr>
