@@ -28,6 +28,7 @@ import {
   BarChart3,
   ShoppingCart,
   Container as ContainerIcon,
+  Landmark,
   type LucideIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -361,6 +362,7 @@ export default function Analytics() {
         { key: "assets", label: "Assets", icon: Package },
         { key: "liabilities", label: "Liabilities", icon: FileText },
         { key: "cash", label: "Cash", icon: Wallet },
+        { key: "loans-banks", label: "Loans / Banks", icon: Landmark },
       ],
     },
     {
@@ -835,6 +837,12 @@ export default function Analytics() {
       ))
   );
 
+  const loansBanksAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "bank" ||
+      (acc.type === "ledger" && acc.accountType === "Loans")
+  );
+
   const directIncomeAccounts = accounts.filter(
     (acc) =>
       acc.type === "ledger" &&
@@ -1274,6 +1282,49 @@ export default function Analytics() {
                   </TableHeader>
                   <TableBody>
                     {renderHierarchicalAccounts(cashAccounts, true)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "loans-banks" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Landmark className="h-5 w-5 text-blue-500" />
+                  Loans &amp; Bank Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total Balance</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(loansBanksAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : loansBanksAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No loan or bank accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Side</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(loansBanksAccounts, true)}
                   </TableBody>
                 </Table>
               )}
