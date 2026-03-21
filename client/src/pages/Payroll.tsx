@@ -372,6 +372,11 @@ export default function Payroll() {
 
   const { data: editingBaleRates } = useQuery<Array<{ id: number; locationId: number; rate: string }>>({
     queryKey: ["/api/employees", editingEmployee?.id, "bale-rates"],
+    queryFn: async () => {
+      if (!editingEmployee?.id) return [];
+      const res = await modeApiRequest("GET", `/api/employees/${editingEmployee.id}/bale-rates`);
+      return res.json();
+    },
     enabled: !!editingEmployee && editEmployeeDialogOpen,
   });
 
