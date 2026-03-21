@@ -140,6 +140,7 @@ const FactorySupplierScoreboard = lazy(() => import("@/pages/FactorySupplierScor
 const FactoryMixOptimizer = lazy(() => import("@/pages/FactoryMixOptimizer"));
 const FactoryCashflow = lazy(() => import("@/pages/FactoryCashflow"));
 const FactoryWaste = lazy(() => import("@/pages/FactoryWaste"));
+const WasteDispatchPage = lazy(() => import("@/pages/WasteDispatch"));
 const FactoryIntelSettings = lazy(() => import("@/pages/FactorySettings"));
 const Chat = lazy(() => import("@/pages/Chat"));
 const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
@@ -701,6 +702,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/mix-optimizer" component={FactoryMixOptimizer} />
                     <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
+                    <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}

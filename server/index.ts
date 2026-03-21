@@ -488,6 +488,26 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Waste Dispatch tables (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS waste_dispatches (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      location_id integer NOT NULL,
+      voucher_id integer,
+      dispatch_number text NOT NULL,
+      dispatch_date date NOT NULL,
+      notes text,
+      total_amount decimal(15,2) NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS waste_dispatch_items (
+      id serial PRIMARY KEY,
+      dispatch_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      quantity decimal(15,3) NOT NULL,
+      rate decimal(15,2) NOT NULL,
+      total_amount decimal(15,2) NOT NULL
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

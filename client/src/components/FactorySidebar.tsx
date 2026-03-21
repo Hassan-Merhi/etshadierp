@@ -93,6 +93,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
+      { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
     ],
   },
   {

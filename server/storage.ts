@@ -4032,7 +4032,8 @@ export class DbStorage implements IStorage {
     locationId: number,
     adjustmentType: "Production" | "Consumption" | "Mixed",
     notes: string,
-    items: Array<{stockItemId: number, quantity: string, rate: string}>
+    items: Array<{stockItemId: number, quantity: string, rate: string}>,
+    consumptionAccountOverride?: { code: string; name: string }
   ): Promise<any> {
     return await db.transaction(async (tx) => {
       // Check if voucher is optional - if so, skip inventory updates
@@ -4113,8 +4114,8 @@ export class DbStorage implements IStorage {
         
         // CONSUMPTION_EXPENSE: Indirect Expense account - debits record consumption expenses
         consumptionAccountId = await findOrCreateAdjustmentAccount(
-          "CONSUMPTION_EXPENSE", 
-          "Consumption Expense (Stock Adjustment)",
+          consumptionAccountOverride?.code ?? "CONSUMPTION_EXPENSE", 
+          consumptionAccountOverride?.name ?? "Consumption Expense (Stock Adjustment)",
           "Indirect Expense",
           "Dr"
         );

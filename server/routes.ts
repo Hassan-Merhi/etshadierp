@@ -114,6 +114,8 @@ import {
   erpPayrollRunItems,
   intercompanyPosConfigs,
   companies,
+  wasteDispatches,
+  wasteDispatchItems,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -21228,6 +21230,212 @@ if (asOfDate) {
       }
     },
   );
+
+  // ===== WASTE DISPATCHES =====
+
+  app.get("/api/waste-dispatches", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const dispatches = await db
+        .select({
+          id: wasteDispatches.id,
+          companyId: wasteDispatches.companyId,
+          locationId: wasteDispatches.locationId,
+          voucherId: wasteDispatches.voucherId,
+          dispatchNumber: wasteDispatches.dispatchNumber,
+          dispatchDate: wasteDispatches.dispatchDate,
+          notes: wasteDispatches.notes,
+          totalAmount: wasteDispatches.totalAmount,
+          createdAt: wasteDispatches.createdAt,
+          locationName: locations.name,
+        })
+        .from(wasteDispatches)
+        .leftJoin(locations, eq(locations.id, wasteDispatches.locationId))
+        .where(eq(wasteDispatches.companyId, companyId))
+        .orderBy(desc(wasteDispatches.createdAt));
+
+      res.json(dispatches);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/waste-dispatches/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [dispatch] = await db
+        .select({
+          id: wasteDispatches.id,
+          companyId: wasteDispatches.companyId,
+          locationId: wasteDispatches.locationId,
+          voucherId: wasteDispatches.voucherId,
+          dispatchNumber: wasteDispatches.dispatchNumber,
+          dispatchDate: wasteDispatches.dispatchDate,
+          notes: wasteDispatches.notes,
+          totalAmount: wasteDispatches.totalAmount,
+          createdAt: wasteDispatches.createdAt,
+          locationName: locations.name,
+        })
+        .from(wasteDispatches)
+        .leftJoin(locations, eq(locations.id, wasteDispatches.locationId))
+        .where(and(eq(wasteDispatches.id, id), eq(wasteDispatches.companyId, companyId)));
+
+      if (!dispatch) return res.status(404).json({ message: "Dispatch not found" });
+
+      const items = await db
+        .select({
+          id: wasteDispatchItems.id,
+          stockItemId: wasteDispatchItems.stockItemId,
+          quantity: wasteDispatchItems.quantity,
+          rate: wasteDispatchItems.rate,
+          totalAmount: wasteDispatchItems.totalAmount,
+          stockItemName: stockItems.name,
+          stockItemUnit: stockItems.unit,
+        })
+        .from(wasteDispatchItems)
+        .leftJoin(stockItems, eq(stockItems.id, wasteDispatchItems.stockItemId))
+        .where(eq(wasteDispatchItems.dispatchId, id));
+
+      res.json({ ...dispatch, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/waste-dispatches", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { locationId, dispatchDate, notes, items } = req.body;
+
+      if (!locationId || !dispatchDate || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "locationId, dispatchDate, and items are required" });
+      }
+
+      // Validate items
+      for (const item of items) {
+        if (!item.stockItemId || !item.quantity || parseFloat(item.quantity) <= 0) {
+          return res.status(400).json({ message: "Each item must have stockItemId and positive quantity" });
+        }
+      }
+
+      // Generate dispatch number: WD-{YEAR}-{padded seq}
+      const year = new Date(dispatchDate).getFullYear();
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(wasteDispatches)
+        .where(eq(wasteDispatches.companyId, companyId));
+      const seq = (count || 0) + 1;
+      const dispatchNumber = `WD-${year}-${String(seq).padStart(4, "0")}`;
+
+      // Get location name for voucher description
+      const [location] = await db.select().from(locations).where(eq(locations.id, locationId));
+      if (!location) return res.status(400).json({ message: "Location not found" });
+
+      // Calculate total (will be updated after createStockAdjustment to use actual rates)
+      const itemsForAdj = items.map((item: any) => ({
+        stockItemId: parseInt(item.stockItemId),
+        quantity: (-Math.abs(parseFloat(item.quantity))).toFixed(3), // negative = consumption
+        rate: "0", // rate will be determined from inventory by createStockAdjustment
+      }));
+
+      // Create voucher with type "Consumption"
+      const voucher = await storage.createVoucher({
+        companyId,
+        voucherType: "Consumption",
+        voucherNumber: dispatchNumber,
+        voucherDate: dispatchDate,
+        description: `Waste dispatch from ${location.name}`,
+        totalAmount: "0",
+        optional: false,
+        locationId,
+      });
+
+      // Create stock adjustment (uses WASTE_EXPENSE account instead of CONSUMPTION_EXPENSE)
+      const adjResult = await storage.createStockAdjustment(
+        voucher.id,
+        locationId,
+        "Consumption",
+        notes || "",
+        itemsForAdj,
+        { code: "WASTE_EXPENSE", name: "Waste Expense" }
+      );
+
+      // Calculate total from actual rates used
+      const totalAmount = adjResult.items.reduce(
+        (sum: number, item: any) => sum + parseFloat(item.totalAmount),
+        0
+      );
+
+      // Update voucher with actual total
+      await db.update(vouchers)
+        .set({ totalAmount: totalAmount.toFixed(2) })
+        .where(eq(vouchers.id, voucher.id));
+
+      // Create waste dispatch record
+      const [dispatch] = await db.insert(wasteDispatches).values({
+        companyId,
+        locationId,
+        voucherId: voucher.id,
+        dispatchNumber,
+        dispatchDate,
+        notes: notes || null,
+        totalAmount: totalAmount.toFixed(2),
+      }).returning();
+
+      // Create waste dispatch items
+      for (let i = 0; i < adjResult.items.length; i++) {
+        const adjItem = adjResult.items[i];
+        await db.insert(wasteDispatchItems).values({
+          dispatchId: dispatch.id,
+          stockItemId: adjItem.stockItemId,
+          quantity: Math.abs(parseFloat(adjItem.quantity)).toFixed(3),
+          rate: adjItem.rate,
+          totalAmount: adjItem.totalAmount,
+        });
+      }
+
+      res.json({ ...dispatch, voucherNumber: dispatchNumber });
+    } catch (error: any) {
+      console.error("[Waste Dispatch POST] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/waste-dispatches/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [dispatch] = await db
+        .select()
+        .from(wasteDispatches)
+        .where(and(eq(wasteDispatches.id, id), eq(wasteDispatches.companyId, companyId)));
+
+      if (!dispatch) return res.status(404).json({ message: "Dispatch not found" });
+
+      // Delete voucher (reverses inventory changes automatically via deleteVoucher logic)
+      if (dispatch.voucherId) {
+        await storage.deleteVoucher(dispatch.voucherId);
+      }
+
+      // Delete waste dispatch items and dispatch record
+      await db.delete(wasteDispatchItems).where(eq(wasteDispatchItems.dispatchId, id));
+      await db.delete(wasteDispatches).where(eq(wasteDispatches.id, id));
+
+      res.json({ message: "Waste dispatch deleted and inventory reversed" });
+    } catch (error: any) {
+      console.error("[Waste Dispatch DELETE] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Financial Stats - FOR US minus ON US minus Owner's Capital = Net Profit
   // This calculates: Assets - Liabilities - Owner's Capital = Business Profit

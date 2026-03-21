@@ -3928,3 +3928,33 @@ export const erpPayrollRunItems = pgTable("erp_payroll_run_items", {
 export const insertErpPayrollRunItemSchema = createInsertSchema(erpPayrollRunItems).omit({ id: true });
 export type InsertErpPayrollRunItem = z.infer<typeof insertErpPayrollRunItemSchema>;
 export type ErpPayrollRunItem = typeof erpPayrollRunItems.$inferSelect;
+
+// Waste Dispatches (factory waste bale dispatch)
+export const wasteDispatches = pgTable("waste_dispatches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  voucherId: integer("voucher_id"),
+  dispatchNumber: text("dispatch_number").notNull(),
+  dispatchDate: date("dispatch_date").notNull(),
+  notes: text("notes"),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWasteDispatchSchema = createInsertSchema(wasteDispatches).omit({ id: true, createdAt: true });
+export type InsertWasteDispatch = z.infer<typeof insertWasteDispatchSchema>;
+export type WasteDispatch = typeof wasteDispatches.$inferSelect;
+
+export const wasteDispatchItems = pgTable("waste_dispatch_items", {
+  id: serial("id").primaryKey(),
+  dispatchId: integer("dispatch_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+});
+
+export const insertWasteDispatchItemSchema = createInsertSchema(wasteDispatchItems).omit({ id: true });
+export type InsertWasteDispatchItem = z.infer<typeof insertWasteDispatchItemSchema>;
+export type WasteDispatchItem = typeof wasteDispatchItems.$inferSelect;
