@@ -4745,7 +4745,7 @@ if (asOfDate) {
   // Payroll - Sales Summary for bonus calculation
   app.get("/api/payroll/sales-summary", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = req.session.companyId;
+      const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { locationId, startDate, endDate } = req.query;
       if (!locationId || !startDate || !endDate) {
