@@ -7,7 +7,8 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
 import { LocationCreateDialog } from "@/components/LocationCreateDialog";
@@ -90,6 +91,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
   const { registerCursorNav, clearCursorNav } = useCursorNav();
   const [viewAllItems, setViewAllItems] = useState<boolean>(false);
+  const [printWithCost, setPrintWithCost] = useState<boolean>(false);
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [itemSearchTerm, setItemSearchTerm] = useState("");
@@ -139,6 +141,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     contentRef: printRef,
     documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toISOString().slice(0, 10)}`,
   });
+
+  // Helper: set cost visibility then print
+  const handlePrintWithOption = (withCost: boolean) => {
+    setPrintWithCost(withCost);
+    setViewAllItems(true);
+    setTimeout(() => handlePrint(), 150);
+  };
 
   // Fetch all locations (only for non-POS users)
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
@@ -1077,29 +1086,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {selectedLocationLocal.name} - Stock Groups
             </h1>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-              <Button
-                onClick={() => handleExportInventory()}
-                data-testid="button-export-inventory"
-                variant="outline"
-                className="gap-2 flex-1 md:flex-none"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export to Excel</span>
-                <span className="sm:hidden">Export</span>
-              </Button>
-              <Button
-                onClick={() => {
-                  setViewAllItems(true);
-                  setTimeout(() => handlePrint(), 100);
-                }}
-                data-testid="button-print-inventory-quick"
-                variant="outline"
-                className="gap-2 flex-1 md:flex-none"
-              >
-                <Printer className="w-4 h-4" />
-                <span className="hidden sm:inline">Print Inventory</span>
-                <span className="sm:hidden">Print</span>
-              </Button>
+              {/* Export dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2 flex-1 md:flex-none" data-testid="button-export-dropdown">
+                    <Download className="w-4 h-4" />
+                    Export
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => handleExportInventory()} data-testid="button-export-excel">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export to Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="button-export-pdf-with-cost">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Export to PDF (with cost)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="button-export-pdf-no-cost">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Export to PDF (without cost)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button
                 onClick={() => setViewAllItems(true)}
                 data-testid="button-view-all-items"
@@ -1110,28 +1122,34 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <span className="hidden sm:inline">View All Stock Items</span>
                 <span className="sm:hidden">View All</span>
               </Button>
+
               {!posUser && (
-                <>
-                  <Button
-                    onClick={() => handleUseLocation(selectedLocationLocal)}
-                    data-testid="button-use-location"
-                    className="gap-2 flex-1 md:flex-none"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    <span className="hidden sm:inline">Use Location for POS</span>
-                    <span className="sm:hidden">POS</span>
-                  </Button>
-                  <Button
-                    onClick={() => setDeleteDialogOpen(true)}
-                    data-testid="button-delete-location"
-                    variant="destructive"
-                    className="gap-2 flex-1 md:flex-none"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Delete Location</span>
-                    <span className="sm:hidden">Delete</span>
-                  </Button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="gap-2 flex-1 md:flex-none" data-testid="button-location-actions-dropdown">
+                      Location
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => handleUseLocation(selectedLocationLocal)}
+                      data-testid="button-use-location"
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Use Location for POS
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteDialogOpen(true)}
+                      data-testid="button-delete-location"
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Location
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -1917,11 +1935,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <tr>
                             <th>Particulars</th>
                             <th className="qty-col">Closing Balance<br/><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span></th>
+                            {printWithCost && <th className="qty-col">Avg Rate</th>}
+                            {printWithCost && <th className="qty-col">Total Value</th>}
                           </tr>
                         </thead>
                         <tbody>
                           {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
                             const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
+                            const groupValue = items.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0);
                             const firstItemUom = items[0]?.stockItemUom || "";
                             const isGroupNegative = groupTotal < 0;
                             
@@ -1934,6 +1955,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                     <span className={isGroupNegative ? "negative-value" : ""}>{Math.floor(groupTotal).toLocaleString()}</span>
                                     <span className="qty-unit">{firstItemUom}</span>
                                   </td>
+                                  {printWithCost && <td className="qty-col"></td>}
+                                  {printWithCost && <td className="qty-col">{formatAmount(groupValue)}</td>}
                                 </tr>
                                 {/* Group items */}
                                 {items.map((item) => {
@@ -1946,6 +1969,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                         <span className={isItemNegative ? "negative-value" : ""}>{Math.floor(itemQty).toLocaleString()}</span>
                                         <span className="qty-unit">{item.stockItemUom}</span>
                                       </td>
+                                      {printWithCost && <td className="qty-col">{formatAmount(parseFloat(item.averageRate))}</td>}
+                                      {printWithCost && <td className="qty-col">{formatAmount(parseFloat(item.totalValue))}</td>}
                                     </tr>
                                   );
                                 })}
@@ -1959,6 +1984,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               <span>{Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}</span>
                               <span className="qty-unit">{inventory[0]?.stockItemUom || ""}</span>
                             </td>
+                            {printWithCost && <td className="qty-col"></td>}
+                            {printWithCost && <td className="qty-col">{formatAmount(inventory.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}</td>}
                           </tr>
                         </tbody>
                       </table>
