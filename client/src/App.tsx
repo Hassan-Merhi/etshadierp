@@ -637,6 +637,7 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <ErrorBoundary resetKey={currentLocation}>
+                  <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
                   <Switch>
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
@@ -712,6 +713,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-details" component={NetProfitDetails} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
+                  </Suspense>
                   </ErrorBoundary>
                 </div>
               </main>

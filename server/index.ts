@@ -463,6 +463,20 @@ let migrationsDone = false;
       pct decimal(10,4) NOT NULL,
       source_company_id integer
     )`,
+    // Company settings table (logo, invoice footer, misc per-company config)
+    `CREATE TABLE IF NOT EXISTS company_settings (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL UNIQUE,
+      logo_url text,
+      logo_file_name text,
+      logo_updated_at timestamp,
+      invoice_footer text,
+      parent_credit_account_id integer,
+      net_position_adjustment decimal(15,2) DEFAULT 0,
+      pos_excel_import_enabled boolean DEFAULT false,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
