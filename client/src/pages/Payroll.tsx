@@ -182,6 +182,13 @@ interface SalaryAdvance {
   createdAt: string;
 }
 
+function getThisMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+  const end = new Date().toISOString().split("T")[0];
+  return { start, end };
+}
+
 export default function Payroll() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -1293,13 +1300,6 @@ export default function Payroll() {
   const handleWithdrawal = (employee: Employee) => {
     setSelectedEmployee(employee);
     setWithdrawalDialogOpen(true);
-  };
-
-  const getThisMonthRange = () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const end = new Date().toISOString().split("T")[0];
-    return { start, end };
   };
 
   const handleBonus = (employee: Employee) => {
