@@ -89,7 +89,7 @@ const navEntries: NavEntry[] = [
       { title: "Stock OTW", url: "/stock-otw", icon: Ship },
       { title: "Containers", url: "/containers", icon: Container },
       { title: "Stock Items", url: "/stock-items", icon: Package },
-      { title: "Inventory View", url: "/stock-query", icon: Search },
+      { title: "Stock Query", url: "/stock-query", icon: Search },
       { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
     ],
   },

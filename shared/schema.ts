@@ -1974,7 +1974,7 @@ export const FEATURE_PAGE_INFO: Record<FeatureKey, { label: string; group: strin
   stock_otw:           { label: "Stock OTW",            group: "Inventory"  },
   containers:          { label: "Containers",           group: "Inventory"  },
   stock_items:         { label: "Stock Items",          group: "Inventory"  },
-  stock_query:         { label: "Inventory View",       group: "Inventory"  },
+  stock_query:         { label: "Stock Query",           group: "Inventory"  },
   location_summary:    { label: "Location Summary",     group: "Inventory"  },
   optional_vouchers:   { label: "Optional Vouchers",    group: "Inventory"  },
   accounts:            { label: "Accounts",             group: "Accounting" },
