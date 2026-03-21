@@ -429,6 +429,12 @@ export default function Payroll() {
     enabled: otherCompanies.length > 0,
   });
 
+  // Computed at component level so the location Select always gets fresh data
+  const pctSourceCompanyId = editEmployeeForm.watch("salesBonusPctSourceCompanyId") || "";
+  const pctLocations = pctSourceCompanyId
+    ? allCompanyLocations.filter(l => String(l.companyId) === pctSourceCompanyId)
+    : locations;
+
   // Employee Groups mutations
   const createGroupMutation = useMutation({
     mutationFn: async () => {
@@ -5199,10 +5205,6 @@ export default function Payroll() {
                   control={editEmployeeForm.control}
                   name="salesBonusPct"
                   render={({ field }) => {
-                    const pctSourceCompanyId = editEmployeeForm.watch("salesBonusPctSourceCompanyId") || "";
-                    const pctLocations = pctSourceCompanyId
-                      ? allCompanyLocations.filter(l => String(l.companyId) === pctSourceCompanyId)
-                      : locations;
                     return (
                     <FormItem>
                       <FormLabel>Sales Bonus %</FormLabel>

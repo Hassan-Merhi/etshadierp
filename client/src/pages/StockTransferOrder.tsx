@@ -337,7 +337,7 @@ export default function StockTransferOrder() {
   useEffect(() => {
     if (focusedCell === null) return;
     const el = matrixRef.current?.querySelector('[data-focused="true"]');
-    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    el?.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [focusedCell]);
 
   const selectedLocations = selectedLocationIds
