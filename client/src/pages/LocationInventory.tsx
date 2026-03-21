@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
@@ -7,7 +7,7 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -98,6 +98,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [asOfDate, setAsOfDate] = useState<string>("");
   const [showNegativeStock, setShowNegativeStock] = useState(false);
   const [negativeSearchTerm, setNegativeSearchTerm] = useState("");
+  // All-locations combined stock view
+  const [showAllStock, setShowAllStock] = useState(false);
+  const [allStockGroupFilter, setAllStockGroupFilter] = useState<string>("");
+  const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -201,6 +205,97 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     enabled: showNegativeStock,
   });
 
+  // All-locations combined inventory
+  const { data: allInventoryData = [], isLoading: allInventoryLoading } = useQuery<any[]>({
+    queryKey: ["/api/inventory"],
+    queryFn: async () => {
+      const response = await fetch("/api/inventory", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch inventory");
+      return response.json();
+    },
+    enabled: showAllStock,
+    staleTime: 30000,
+  });
+
+  // Derive unique locations from all inventory (sorted A-Z)
+  const allInventoryLocations = useMemo(() => {
+    const locs = new Map<number, { id: number; name: string }>();
+    allInventoryData.forEach((item: any) => {
+      if (item.locationId && !locs.has(item.locationId))
+        locs.set(item.locationId, { id: item.locationId, name: item.locationName || "" });
+    });
+    return [...locs.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allInventoryData]);
+
+  // Derive unique stock groups from all inventory (for filter dropdown)
+  const allInventoryGroups = useMemo(() => {
+    const groups = new Map<string, { id: number | null; name: string }>();
+    allInventoryData.forEach((item: any) => {
+      const key = String(item.stockGroupId ?? "null");
+      if (!groups.has(key))
+        groups.set(key, { id: item.stockGroupId ?? null, name: item.stockGroupName || "Unassigned" });
+    });
+    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allInventoryData]);
+
+  // Build combined rows: one per stock item, with qty-by-location map
+  const combinedStockRows = useMemo(() => {
+    const itemMap = new Map<number, {
+      stockItemId: number;
+      stockItemName: string;
+      stockItemCode: string;
+      stockGroupId: number | null;
+      stockGroupName: string;
+      qtyByLocation: Record<number, number>;
+      totalQty: number;
+    }>();
+    allInventoryData.forEach((item: any) => {
+      const qty = parseFloat(item.quantity || "0");
+      if (qty === 0) return;
+      if (!itemMap.has(item.stockItemId)) {
+        itemMap.set(item.stockItemId, {
+          stockItemId: item.stockItemId,
+          stockItemName: item.stockItemName || "",
+          stockItemCode: item.stockItemCode || "",
+          stockGroupId: item.stockGroupId ?? null,
+          stockGroupName: item.stockGroupName || "Unassigned",
+          qtyByLocation: {},
+          totalQty: 0,
+        });
+      }
+      const row = itemMap.get(item.stockItemId)!;
+      row.qtyByLocation[item.locationId] = (row.qtyByLocation[item.locationId] || 0) + qty;
+      row.totalQty += qty;
+    });
+    return [...itemMap.values()];
+  }, [allInventoryData]);
+
+  // Apply search + group filter, then sort by group → item name
+  const filteredCombinedRows = useMemo(() => {
+    return combinedStockRows
+      .filter((row) => {
+        if (allStockGroupFilter) {
+          if (allStockGroupFilter === "null") {
+            if (row.stockGroupId !== null) return false;
+          } else {
+            if (String(row.stockGroupId) !== allStockGroupFilter) return false;
+          }
+        }
+        if (allStockSearchTerm) {
+          const s = allStockSearchTerm.toLowerCase();
+          return (
+            row.stockItemName.toLowerCase().includes(s) ||
+            row.stockItemCode.toLowerCase().includes(s)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const g = a.stockGroupName.localeCompare(b.stockGroupName);
+        return g !== 0 ? g : a.stockItemName.localeCompare(b.stockItemName);
+      });
+  }, [combinedStockRows, allStockGroupFilter, allStockSearchTerm]);
+
   // Filter out items with 0 quantity
   const inventory = inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
@@ -292,6 +387,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setSelectedLocationLocal(null);
     setSelectedGroup(null);
     setViewAllItems(false);
+    setShowAllStock(false);
+    setAllStockSearchTerm("");
+    setAllStockGroupFilter("");
   };
 
   // Handle back to groups
@@ -305,7 +403,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     ? handleBackToGroups
     : selectedLocationLocal
       ? handleBackToLocations
-      : null;
+      : showAllStock
+        ? handleBackToLocations
+        : null;
   useEscapeBack(escapeBackHandler);
 
   // Keyboard navigation for table
@@ -913,7 +1013,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       <>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
-        {!selectedLocationLocal && <span>Select Location</span>}
+        {!selectedLocationLocal && !showAllStock && <span>Select Location</span>}
+        {showAllStock && !selectedLocationLocal && (
+          <>
+            <Button
+              variant="ghost"
+              onClick={handleBackToLocations}
+              className="h-auto p-0 text-sm hover:underline"
+              data-testid="button-back-from-all-stock"
+            >
+              Locations
+            </Button>
+            <ChevronRight className="w-4 h-4" />
+            <span>All Stock (All Locations)</span>
+          </>
+        )}
         {selectedLocationLocal && !selectedGroup && !viewAllItems && (
           <>
             {(!posUser || locations.length > 1) && (
@@ -989,21 +1103,34 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       </div>
 
       {/* Location List View */}
-      {!selectedLocationLocal && (
+      {!selectedLocationLocal && !showAllStock && (
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
             <h1 className="text-xl md:text-3xl font-bold">Location Inventory</h1>
-            {!posUser && (
-              <Button
-                variant="default"
-                onClick={() => setCreateLocationDialogOpen(true)}
-                data-testid="button-create-location"
-                className="gap-2 w-full sm:w-auto"
-              >
-                <MapPin className="w-4 h-4" />
-                Create Location
-              </Button>
-            )}
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              {!posUser && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAllStock(true)}
+                  data-testid="button-view-all-stock"
+                  className="gap-2 flex-1 sm:flex-none"
+                >
+                  <Globe className="w-4 h-4" />
+                  View All Stock
+                </Button>
+              )}
+              {!posUser && (
+                <Button
+                  variant="default"
+                  onClick={() => setCreateLocationDialogOpen(true)}
+                  data-testid="button-create-location"
+                  className="gap-2 flex-1 sm:flex-none"
+                >
+                  <MapPin className="w-4 h-4" />
+                  Create Location
+                </Button>
+              )}
+            </div>
           </div>
 
           <LocationCreateDialog
