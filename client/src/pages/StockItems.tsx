@@ -383,7 +383,7 @@ export default function StockItems() {
               const val = e.target.value;
               setSelectedGroupFilter(val === "all" ? null : parseInt(val));
             }}
-            className="w-full md:w-auto px-3 py-2 border rounded-md text-sm"
+            className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
             data-testid="select-stock-group"
           >
             <option value="all">All Groups</option>
