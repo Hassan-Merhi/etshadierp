@@ -1557,14 +1557,14 @@ export default function Analytics() {
             open={selectedLocationForDetails !== null} 
             onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
           >
-            <DialogContent className="max-w-4xl w-[95vw] md:w-auto max-h-[80vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>
                   Sales Details - {salesData.find(l => l.locationId === selectedLocationForDetails)?.locationName}
                 </DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
                 <Select value={detailsPeriod} onValueChange={setDetailsPeriod}>
                   <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue />
@@ -1589,11 +1589,11 @@ export default function Analytics() {
                   </p>
                 ) : (
                   <>
+                    <div className="overflow-y-auto flex-1 min-h-0">
                     <div className="hidden md:block">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Voucher</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead className="text-right">Items</TableHead>
                           <TableHead className="text-right">Quantity</TableHead>
@@ -1603,9 +1603,6 @@ export default function Analytics() {
                       <TableBody>
                         {transactions.map((transaction) => (
                           <TableRow key={transaction.id}>
-                            <TableCell className="font-mono text-sm">
-                              {transaction.voucherNumber}
-                            </TableCell>
                             <TableCell>
                               {formatDisplayDate(transaction.voucherDate)}
                             </TableCell>
@@ -1628,19 +1625,19 @@ export default function Analytics() {
                         <Card key={transaction.id}>
                           <CardContent className="p-3 space-y-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono text-sm">{transaction.voucherNumber}</span>
                               <span className="text-sm text-muted-foreground">{formatDisplayDate(transaction.voucherDate)}</span>
+                              <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>
-                              <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
                             </div>
                           </CardContent>
                         </Card>
                       ))}
                     </div>
+                    </div>
 
-                    <div className="border-t pt-4">
+                    <div className="border-t pt-4 shrink-0">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total Transactions:</span>
                         <span className="font-medium">{transactions.length}</span>
