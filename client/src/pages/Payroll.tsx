@@ -1403,15 +1403,37 @@ export default function Payroll() {
     const newAmounts: Record<number, string> = {};
     try {
       for (const emp of employeeStaff) {
+        const pct = parseFloat(emp.salesBonusPct || "0");
+        const hasPct = pct > 0;
+
         const ratesRes = await modeApiRequest("GET", `/api/employees/${emp.id}/bale-rates`);
         const rates: Array<{ locationId: number; rate: string }> = await ratesRes.json();
-        if (!rates || rates.length === 0) continue;
+        const hasBaleRates = rates && rates.length > 0;
+
+        if (!hasBaleRates && !hasPct) continue;
+
         let total = 0;
-        for (const r of rates) {
-          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}`);
-          const data = await res.json();
-          total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
+
+        if (hasBaleRates) {
+          for (const r of rates) {
+            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}`);
+            const data = await res.json();
+            // Per-unit bale bonus
+            total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
+            // Percentage of sales bonus at same location
+            if (hasPct) {
+              total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
+            }
+          }
+        } else if (hasPct) {
+          // No per-location rates — sum sales across all locations
+          for (const loc of locations) {
+            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${loc.id}&startDate=${start}&endDate=${end}`);
+            const data = await res.json();
+            total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
+          }
         }
+
         if (total > 0.005) newAmounts[emp.id] = total.toFixed(2);
       }
       setBulkBonusAmounts(prev => ({ ...prev, ...newAmounts }));
@@ -4620,7 +4642,7 @@ export default function Payroll() {
                     Calculate All
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Calculates bale bonuses for employees with saved location rates. Manually set amounts override.</p>
+                <p className="text-xs text-muted-foreground">Calculates bonuses from saved rates: per-unit bale rates and/or sales % rates pulled from analytics. Manually set amounts override.</p>
               </div>
 
               <div className="border rounded-md flex-1 overflow-hidden">
