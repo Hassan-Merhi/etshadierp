@@ -341,6 +341,13 @@ export default function Payroll() {
   const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toISOString().split('T')[0]);
   const [bulkDepositNotes, setBulkDepositNotes] = useState("");
 
+  // Edit employee bale rates state
+  const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string }[]>([]);
+  const [bulkBonusAutoMonth, setBulkBonusAutoMonth] = useState<"thisMonth" | "custom">("thisMonth");
+  const [bulkBonusAutoStart, setBulkBonusAutoStart] = useState(() => getThisMonthRange().start);
+  const [bulkBonusAutoEnd, setBulkBonusAutoEnd] = useState(() => getThisMonthRange().end);
+  const [bulkBonusAutoLoading, setBulkBonusAutoLoading] = useState(false);
+
   // Bulk Bonus state
   const [bulkBonusDialogOpen, setBulkBonusDialogOpen] = useState(false);
   const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toISOString().split('T')[0]);
@@ -361,6 +368,11 @@ export default function Payroll() {
   const { data: groupMembers = [] } = useQuery<any[]>({
     queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
     enabled: !!selectedGroupForMembers?.id,
+  });
+
+  const { data: editingBaleRates } = useQuery<Array<{ id: number; locationId: number; rate: string }>>({
+    queryKey: ["/api/employees", editingEmployee?.id, "bale-rates"],
+    enabled: !!editingEmployee && editEmployeeDialogOpen,
   });
 
   const { data: locations = [] } = useQuery<Array<{ id: number; name: string; companyId: number }>>({
@@ -1197,12 +1209,16 @@ export default function Payroll() {
       payload.employeeGroupId = (employeeGroupId && employeeGroupId !== "" && employeeGroupId !== "none")
         ? parseInt(employeeGroupId, 10)
         : null;
-      return await modeApiRequest("PATCH", `/api/employees/${editingEmployee.id}`, payload);
+      await modeApiRequest("PATCH", `/api/employees/${editingEmployee.id}`, payload);
+      // Save per-location bale rates
+      const validRates = editBaleRates.filter(r => r.locationId && parseFloat(r.rate) > 0);
+      await modeApiRequest("PUT", `/api/employees/${editingEmployee.id}/bale-rates`, { rates: validRates });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", editingEmployee?.id, "bale-rates"] });
       setEditEmployeeDialogOpen(false);
       setEditingEmployee(null);
       editEmployeeForm.reset();
@@ -1228,7 +1244,14 @@ export default function Payroll() {
         balesBonusRate: editingEmployee.balesBonusRate != null ? String(editingEmployee.balesBonusRate) : "",
       });
     }
+    if (!editEmployeeDialogOpen) setEditBaleRates([]);
   }, [editingEmployee, editEmployeeDialogOpen]);
+
+  useEffect(() => {
+    if (editingBaleRates) {
+      setEditBaleRates(editingBaleRates.map(r => ({ locationId: String(r.locationId), rate: String(r.rate) })));
+    }
+  }, [editingBaleRates]);
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
@@ -1361,6 +1384,33 @@ export default function Payroll() {
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
+  };
+
+  const autoCalculateBonuses = async () => {
+    setBulkBonusAutoLoading(true);
+    const start = bulkBonusAutoMonth === "thisMonth" ? getThisMonthRange().start : bulkBonusAutoStart;
+    const end = bulkBonusAutoMonth === "thisMonth" ? getThisMonthRange().end : bulkBonusAutoEnd;
+    const newAmounts: Record<number, string> = {};
+    try {
+      for (const emp of employeeStaff) {
+        const ratesRes = await modeApiRequest("GET", `/api/employees/${emp.id}/bale-rates`);
+        const rates: Array<{ locationId: number; rate: string }> = await ratesRes.json();
+        if (!rates || rates.length === 0) continue;
+        let total = 0;
+        for (const r of rates) {
+          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}`);
+          const data = await res.json();
+          total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
+        }
+        if (total > 0.005) newAmounts[emp.id] = total.toFixed(2);
+      }
+      setBulkBonusAmounts(prev => ({ ...prev, ...newAmounts }));
+      const count = Object.keys(newAmounts).length;
+      toast({ title: "Auto-calculated", description: `Bonus calculated for ${count} employee${count !== 1 ? "s" : ""}` });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+    setBulkBonusAutoLoading(false);
   };
 
   const saveBonusToPending = () => {
@@ -4523,6 +4573,46 @@ export default function Payroll() {
                 </div>
               </div>
 
+              {/* Auto-calculate from saved rates */}
+              <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+                <p className="text-sm font-medium">Auto-Calculate from Saved Rates</p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bulkBonusAutoMonth === "thisMonth" ? "default" : "outline"}
+                    onClick={() => setBulkBonusAutoMonth("thisMonth")}
+                  >
+                    This Month
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bulkBonusAutoMonth === "custom" ? "default" : "outline"}
+                    onClick={() => setBulkBonusAutoMonth("custom")}
+                  >
+                    Custom
+                  </Button>
+                  {bulkBonusAutoMonth === "custom" && (
+                    <>
+                      <Input type="date" className="h-8 w-36 text-sm" value={bulkBonusAutoStart} onChange={(e) => setBulkBonusAutoStart(e.target.value)} />
+                      <Input type="date" className="h-8 w-36 text-sm" value={bulkBonusAutoEnd} onChange={(e) => setBulkBonusAutoEnd(e.target.value)} />
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={autoCalculateBonuses}
+                    disabled={bulkBonusAutoLoading}
+                    data-testid="button-auto-calculate-bonuses"
+                  >
+                    {bulkBonusAutoLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                    Calculate All
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Calculates bale bonuses for employees with saved location rates. Manually set amounts override.</p>
+              </div>
+
               <div className="border rounded-md flex-1 overflow-hidden">
                 <div className="max-h-[400px] overflow-y-auto">
                   <Table>
@@ -4994,47 +5084,79 @@ export default function Payroll() {
 
               <div className="border-t pt-4 space-y-3">
                 <p className="text-sm font-medium text-muted-foreground">Bonus Configuration (Optional)</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={editEmployeeForm.control}
-                    name="salesBonusPct"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sales Bonus %</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.0001"
-                            placeholder="e.g. 0.2"
-                            {...field}
-                            value={field.value || ""}
-                            data-testid="input-edit-sales-bonus-pct"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editEmployeeForm.control}
-                    name="balesBonusRate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bales Rate ($/unit)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="e.g. 2.00"
-                            {...field}
-                            value={field.value || ""}
-                            data-testid="input-edit-bales-bonus-rate"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={editEmployeeForm.control}
+                  name="salesBonusPct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sales Bonus %</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          placeholder="e.g. 0.2"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-sales-bonus-pct"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Bale Bonus Rates by Location</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditBaleRates(prev => [...prev, { locationId: "", rate: "" }])}
+                      data-testid="button-add-bale-rate"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Location
+                    </Button>
+                  </div>
+                  {editBaleRates.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No per-location rates configured. Add locations to enable auto-calculation.</p>
+                  )}
+                  {editBaleRates.map((row, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <Select
+                        value={row.locationId}
+                        onValueChange={(v) => setEditBaleRates(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v } : r))}
+                      >
+                        <SelectTrigger className="flex-1" data-testid={`select-bale-rate-location-${idx}`}>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map(loc => (
+                            <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Rate/unit"
+                        className="w-28 text-right"
+                        value={row.rate}
+                        onChange={(e) => setEditBaleRates(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))}
+                        data-testid={`input-bale-rate-${idx}`}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditBaleRates(prev => prev.filter((_, i) => i !== idx))}
+                        data-testid={`button-remove-bale-rate-${idx}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
 

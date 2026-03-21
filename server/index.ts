@@ -441,6 +441,14 @@ let migrationsDone = false;
     // Employee bonus configuration fields (Mar 2026)
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS sales_bonus_pct decimal(10,4)`,
     `ALTER TABLE employees ADD COLUMN IF NOT EXISTS bales_bonus_rate decimal(10,4)`,
+    // Per-employee per-location bale bonus rates (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS employee_bale_rates (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      employee_id integer NOT NULL,
+      location_id integer NOT NULL,
+      rate decimal(10,4) NOT NULL
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

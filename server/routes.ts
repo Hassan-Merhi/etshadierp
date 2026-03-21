@@ -3780,6 +3780,35 @@ if (asOfDate) {
     }
   });
 
+  // Employee bale rates per location
+  app.get("/api/employees/:id/bale-rates", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const employeeId = parseInt(req.params.id);
+      const rates = await storage.getEmployeeBaleRates(employeeId, companyId);
+      return res.json(rates);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.put("/api/employees/:id/bale-rates", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const employeeId = parseInt(req.params.id);
+      const { rates } = req.body;
+      if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
+      const valid = rates.filter((r: any) => r.locationId && parseFloat(r.rate) > 0)
+        .map((r: any) => ({ locationId: parseInt(r.locationId), rate: String(parseFloat(r.rate)) }));
+      await storage.setEmployeeBaleRates(employeeId, companyId, valid);
+      return res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.patch("/api/employees/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;

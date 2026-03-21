@@ -304,6 +304,10 @@ export interface IStorage {
   updateSalaryAdvance(id: number, updates: Partial<schema.InsertSalaryAdvance>): Promise<schema.SalaryAdvance>;
   deleteSalaryAdvance(id: number): Promise<void>;
 
+  // Employee Bale Rates (per-location)
+  getEmployeeBaleRates(employeeId: number, companyId: number): Promise<schema.EmployeeBaleRate[]>;
+  setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string }[]): Promise<void>;
+
   // Salary Advance Deductions
   getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
   createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction>;
@@ -5317,6 +5321,26 @@ export class DbStorage implements IStorage {
         eq(schema.salaryAdvances.fullyPaid, false)
       ))
       .orderBy(sql`${schema.salaryAdvances.advanceDate}`);
+  }
+
+  async getEmployeeBaleRates(employeeId: number, companyId: number): Promise<schema.EmployeeBaleRate[]> {
+    return await db.select().from(schema.employeeBaleRates)
+      .where(and(
+        eq(schema.employeeBaleRates.employeeId, employeeId),
+        eq(schema.employeeBaleRates.companyId, companyId)
+      ));
+  }
+
+  async setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string }[]): Promise<void> {
+    await db.delete(schema.employeeBaleRates).where(and(
+      eq(schema.employeeBaleRates.employeeId, employeeId),
+      eq(schema.employeeBaleRates.companyId, companyId)
+    ));
+    if (rates.length > 0) {
+      await db.insert(schema.employeeBaleRates).values(
+        rates.map(r => ({ companyId, employeeId, locationId: r.locationId, rate: r.rate }))
+      );
+    }
   }
 
   async createSalaryAdvance(advance: schema.InsertSalaryAdvance): Promise<schema.SalaryAdvance> {

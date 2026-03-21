@@ -1017,6 +1017,16 @@ export const insertSalesItemSchema = createInsertSchema(salesItems).omit({
 export type InsertSalesItem = z.infer<typeof insertSalesItemSchema>;
 export type SalesItem = typeof salesItems.$inferSelect;
 
+// Per-employee, per-location bale bonus rates
+export const employeeBaleRates = pgTable("employee_bale_rates", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  rate: decimal("rate", { precision: 10, scale: 4 }).notNull(),
+});
+export type EmployeeBaleRate = typeof employeeBaleRates.$inferSelect;
+
 // Draft POS Sales - stores unsaved POS transactions for later completion
 export const draftPosSales = pgTable("draft_pos_sales", {
   id: serial("id").primaryKey(),
