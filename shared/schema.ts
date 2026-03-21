@@ -1030,6 +1030,17 @@ export const employeeBaleRates = pgTable("employee_bale_rates", {
 });
 export type EmployeeBaleRate = typeof employeeBaleRates.$inferSelect;
 
+// Per-employee, per-location sales bonus % rates
+export const employeeBalePctRates = pgTable("employee_bale_pct_rates", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  pct: decimal("pct", { precision: 10, scale: 4 }).notNull(),
+  sourceCompanyId: integer("source_company_id"),
+});
+export type EmployeeBalePctRate = typeof employeeBalePctRates.$inferSelect;
+
 // Draft POS Sales - stores unsaved POS transactions for later completion
 export const draftPosSales = pgTable("draft_pos_sales", {
   id: serial("id").primaryKey(),

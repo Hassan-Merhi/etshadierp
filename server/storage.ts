@@ -308,6 +308,10 @@ export interface IStorage {
   getEmployeeBaleRates(employeeId: number, companyId: number): Promise<schema.EmployeeBaleRate[]>;
   setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string; sourceCompanyId?: number | null }[]): Promise<void>;
 
+  // Employee Bale Pct Rates (per-location % bonus)
+  getEmployeeBalePctRates(employeeId: number, companyId: number): Promise<schema.EmployeeBalePctRate[]>;
+  setEmployeeBalePctRates(employeeId: number, companyId: number, rates: { locationId: number; pct: string; sourceCompanyId?: number | null }[]): Promise<void>;
+
   // Salary Advance Deductions
   getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
   createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction>;
@@ -5339,6 +5343,26 @@ export class DbStorage implements IStorage {
     if (rates.length > 0) {
       await db.insert(schema.employeeBaleRates).values(
         rates.map(r => ({ companyId, employeeId, locationId: r.locationId, rate: r.rate, sourceCompanyId: r.sourceCompanyId ?? null }))
+      );
+    }
+  }
+
+  async getEmployeeBalePctRates(employeeId: number, companyId: number): Promise<schema.EmployeeBalePctRate[]> {
+    return await db.select().from(schema.employeeBalePctRates)
+      .where(and(
+        eq(schema.employeeBalePctRates.employeeId, employeeId),
+        eq(schema.employeeBalePctRates.companyId, companyId)
+      ));
+  }
+
+  async setEmployeeBalePctRates(employeeId: number, companyId: number, rates: { locationId: number; pct: string; sourceCompanyId?: number | null }[]): Promise<void> {
+    await db.delete(schema.employeeBalePctRates).where(and(
+      eq(schema.employeeBalePctRates.employeeId, employeeId),
+      eq(schema.employeeBalePctRates.companyId, companyId)
+    ));
+    if (rates.length > 0) {
+      await db.insert(schema.employeeBalePctRates).values(
+        rates.map(r => ({ companyId, employeeId, locationId: r.locationId, pct: r.pct, sourceCompanyId: r.sourceCompanyId ?? null }))
       );
     }
   }

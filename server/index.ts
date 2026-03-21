@@ -449,6 +449,20 @@ let migrationsDone = false;
       location_id integer NOT NULL,
       rate decimal(10,4) NOT NULL
     )`,
+    // Cross-company sales bonus % source fields on employees (Mar 2026)
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS sales_bonus_pct_source_company_id integer`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS sales_bonus_pct_location_id integer`,
+    // Cross-company source on bale rates (Mar 2026)
+    `ALTER TABLE employee_bale_rates ADD COLUMN IF NOT EXISTS source_company_id integer`,
+    // Per-employee per-location sales bonus % rates table (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS employee_bale_pct_rates (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      employee_id integer NOT NULL,
+      location_id integer NOT NULL,
+      pct decimal(10,4) NOT NULL,
+      source_company_id integer
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

@@ -352,6 +352,8 @@ export default function Payroll() {
 
   // Edit employee bale rates state
   const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string; sourceCompanyId: string }[]>([]);
+  // Edit employee bale pct rates state (% bonus by location)
+  const [editBalePctRates, setEditBalePctRates] = useState<{ locationId: string; pct: string; sourceCompanyId: string }[]>([]);
   const [bulkBonusAutoMonth, setBulkBonusAutoMonth] = useState<"thisMonth" | "custom">("thisMonth");
   const [bulkBonusAutoStart, setBulkBonusAutoStart] = useState(() => getThisMonthRange().start);
   const [bulkBonusAutoEnd, setBulkBonusAutoEnd] = useState(() => getThisMonthRange().end);
@@ -385,6 +387,16 @@ export default function Payroll() {
     queryFn: async () => {
       if (!editingEmployee?.id) return [];
       const res = await modeApiRequest("GET", `/api/employees/${editingEmployee.id}/bale-rates`);
+      return res.json();
+    },
+    enabled: !!editingEmployee && editEmployeeDialogOpen,
+  });
+
+  const { data: editingBalePctRates } = useQuery<Array<{ id: number; locationId: number; pct: string; sourceCompanyId?: number | null }>>({
+    queryKey: ["/api/employees", editingEmployee?.id, "bale-pct-rates"],
+    queryFn: async () => {
+      if (!editingEmployee?.id) return [];
+      const res = await modeApiRequest("GET", `/api/employees/${editingEmployee.id}/bale-pct-rates`);
       return res.json();
     },
     enabled: !!editingEmployee && editEmployeeDialogOpen,
@@ -1250,12 +1262,16 @@ export default function Payroll() {
       // Save per-location bale rates
       const validRates = editBaleRates.filter(r => r.locationId && parseFloat(r.rate) > 0);
       await modeApiRequest("PUT", `/api/employees/${editingEmployee.id}/bale-rates`, { rates: validRates });
+      // Save per-location bale pct rates
+      const validPctRates = editBalePctRates.filter(r => r.locationId && parseFloat(r.pct) > 0);
+      await modeApiRequest("PUT", `/api/employees/${editingEmployee.id}/bale-pct-rates`, { rates: validPctRates });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", editingEmployee?.id, "bale-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", editingEmployee?.id, "bale-pct-rates"] });
       setEditEmployeeDialogOpen(false);
       setEditingEmployee(null);
       editEmployeeForm.reset();
@@ -1283,7 +1299,7 @@ export default function Payroll() {
         balesBonusRate: editingEmployee.balesBonusRate != null ? String(editingEmployee.balesBonusRate) : "",
       });
     }
-    if (!editEmployeeDialogOpen) setEditBaleRates([]);
+    if (!editEmployeeDialogOpen) { setEditBaleRates([]); setEditBalePctRates([]); }
   }, [editingEmployee, editEmployeeDialogOpen]);
 
   useEffect(() => {
@@ -1291,6 +1307,12 @@ export default function Payroll() {
       setEditBaleRates(editingBaleRates.map((r: any) => ({ locationId: String(r.locationId), rate: String(r.rate), sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "" })));
     }
   }, [editingBaleRates, editEmployeeDialogOpen]);
+
+  useEffect(() => {
+    if (editEmployeeDialogOpen && editingBalePctRates) {
+      setEditBalePctRates(editingBalePctRates.map((r: any) => ({ locationId: String(r.locationId), pct: String(r.pct), sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "" })));
+    }
+  }, [editingBalePctRates, editEmployeeDialogOpen]);
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
@@ -1434,10 +1456,14 @@ export default function Payroll() {
         const hasPct = pct > 0;
 
         const ratesRes = await modeApiRequest("GET", `/api/employees/${emp.id}/bale-rates`);
-        const rates: Array<{ locationId: number; rate: string }> = await ratesRes.json();
+        const rates: Array<{ locationId: number; rate: string; sourceCompanyId?: number }> = await ratesRes.json();
         const hasBaleRates = rates && rates.length > 0;
 
-        if (!hasBaleRates && !hasPct) continue;
+        const pctRatesRes = await modeApiRequest("GET", `/api/employees/${emp.id}/bale-pct-rates`);
+        const pctRates: Array<{ locationId: number; pct: string; sourceCompanyId?: number }> = await pctRatesRes.json();
+        const hasPerLocationPct = pctRates && pctRates.length > 0;
+
+        if (!hasBaleRates && !hasPct && !hasPerLocationPct) continue;
 
         let total = 0;
 
@@ -1450,15 +1476,25 @@ export default function Payroll() {
             total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
           }
         }
-        // Percentage-of-sales bonus: use per-employee location if set, else fall back to global picker
-        const empPctLocationId = (emp as any).salesBonusPctLocationId;
-        const resolvedPctLocationId = empPctLocationId ? String(empPctLocationId) : bulkBonusAutoPctLocationId;
-        if (hasPct && resolvedPctLocationId) {
-          const empPctSrcCompanyId = (emp as any).salesBonusPctSourceCompanyId;
-          const pctSrcParam = empPctSrcCompanyId ? `&sourceCompanyId=${empPctSrcCompanyId}` : "";
-          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${resolvedPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
-          const data = await res.json();
-          total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
+        // Per-location % bonus rates take priority over global salesBonusPct
+        if (hasPerLocationPct) {
+          for (const r of pctRates) {
+            const srcParam = r.sourceCompanyId ? `&sourceCompanyId=${r.sourceCompanyId}` : "";
+            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${r.locationId}&startDate=${start}&endDate=${end}${srcParam}`);
+            const data = await res.json();
+            total += (parseFloat(data.totalSalesAmount || "0") * parseFloat(r.pct || "0")) / 100;
+          }
+        } else {
+          // Fallback: global salesBonusPct with per-employee or global location picker
+          const empPctLocationId = (emp as any).salesBonusPctLocationId;
+          const resolvedPctLocationId = empPctLocationId ? String(empPctLocationId) : bulkBonusAutoPctLocationId;
+          if (hasPct && resolvedPctLocationId) {
+            const empPctSrcCompanyId = (emp as any).salesBonusPctSourceCompanyId;
+            const pctSrcParam = empPctSrcCompanyId ? `&sourceCompanyId=${empPctSrcCompanyId}` : "";
+            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${resolvedPctLocationId}&startDate=${start}&endDate=${end}${pctSrcParam}`);
+            const data = await res.json();
+            total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
+          }
         }
 
         if (total > 0.005) newAmounts[emp.id] = total.toFixed(2);
@@ -5308,6 +5344,83 @@ export default function Payroll() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Bales % by Location */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <Label className="text-sm">Bales % by Location</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditBalePctRates(prev => [...prev, { locationId: "", pct: "", sourceCompanyId: "" }])}
+                    data-testid="button-add-bale-pct-rate"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Location
+                  </Button>
+                </div>
+                {editBalePctRates.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No per-location % rates configured. Add locations to enable % auto-calculation.</p>
+                )}
+                {editBalePctRates.map((row, idx) => {
+                  const rowCompanyId = row.sourceCompanyId || "";
+                  const locationsForRow = rowCompanyId
+                    ? allCompanyLocations.filter(l => String(l.companyId) === rowCompanyId)
+                    : locations;
+                  return (
+                    <div key={idx} className="flex gap-2 items-start flex-wrap">
+                      {otherCompanies.length > 0 && (
+                        <Select
+                          value={rowCompanyId}
+                          onValueChange={(v) => setEditBalePctRates(prev => prev.map((r, i) => i === idx ? { ...r, sourceCompanyId: v === "__current__" ? "" : v, locationId: "" } : r))}
+                        >
+                          <SelectTrigger className="w-32 text-xs" data-testid={`select-bale-pct-rate-company-${idx}`}>
+                            <SelectValue placeholder={selectedCompany?.name || "This company"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
+                            {otherCompanies.map(c => (
+                              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Select
+                        value={row.locationId}
+                        onValueChange={(v) => setEditBalePctRates(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v } : r))}
+                      >
+                        <SelectTrigger className="flex-1 min-w-[120px]" data-testid={`select-bale-pct-rate-location-${idx}`}>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locationsForRow.map(loc => (
+                            <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="% rate"
+                        className="w-24 text-right"
+                        value={row.pct}
+                        onChange={(e) => setEditBalePctRates(prev => prev.map((r, i) => i === idx ? { ...r, pct: e.target.value } : r))}
+                        data-testid={`input-bale-pct-rate-${idx}`}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditBalePctRates(prev => prev.filter((_, i) => i !== idx))}
+                        data-testid={`button-remove-bale-pct-rate-${idx}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
