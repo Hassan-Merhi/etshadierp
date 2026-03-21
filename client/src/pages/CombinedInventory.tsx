@@ -45,6 +45,8 @@ interface CombinedRow {
   inHandQty: number;
   totalQty: number;
   inHandValue: number;
+  avgRate: number;
+  combinedValue: number;
 }
 
 interface StockGroupSummary {
@@ -55,6 +57,7 @@ interface StockGroupSummary {
   inHandQty: number;
   totalQty: number;
   inHandValue: number;
+  combinedValue: number;
 }
 
 type ViewMode = "groups" | "all";
@@ -118,6 +121,8 @@ export default function CombinedInventory() {
               inHandQty: 0,
               totalQty: qty,
               inHandValue: 0,
+              avgRate: 0,
+              combinedValue: 0,
             });
           }
         });
@@ -146,6 +151,8 @@ export default function CombinedInventory() {
           inHandQty: qty,
           totalQty: qty,
           inHandValue: value,
+          avgRate: 0,
+          combinedValue: 0,
         });
       }
     });
@@ -162,10 +169,18 @@ export default function CombinedInventory() {
             inHandQty: 0,
             totalQty: 0,
             inHandValue: 0,
+            avgRate: 0,
+            combinedValue: 0,
           });
         }
       });
     }
+
+    // Compute avgRate and combinedValue for each row after merging
+    map.forEach((row) => {
+      row.avgRate = row.inHandQty > 0 ? row.inHandValue / row.inHandQty : 0;
+      row.combinedValue = row.avgRate * row.totalQty;
+    });
 
     return Array.from(map.values()).sort((a, b) =>
       a.stockItemName.localeCompare(b.stockItemName)
@@ -192,6 +207,7 @@ export default function CombinedInventory() {
         existing.inHandQty += row.inHandQty;
         existing.totalQty += row.totalQty;
         existing.inHandValue += row.inHandValue;
+        existing.combinedValue += row.combinedValue;
       } else {
         groupMap.set(k, {
           stockGroupId: row.stockGroupId,
@@ -201,6 +217,7 @@ export default function CombinedInventory() {
           inHandQty: row.inHandQty,
           totalQty: row.totalQty,
           inHandValue: row.inHandValue,
+          combinedValue: row.combinedValue,
         });
       }
     });
@@ -221,6 +238,7 @@ export default function CombinedInventory() {
     inHandQty: filteredAll.reduce((s, r) => s + r.inHandQty, 0),
     totalQty: filteredAll.reduce((s, r) => s + r.totalQty, 0),
     inHandValue: filteredAll.reduce((s, r) => s + r.inHandValue, 0),
+    combinedValue: filteredAll.reduce((s, r) => s + r.combinedValue, 0),
   }), [filteredAll]);
 
   const drillGroup = selectedGroupId !== undefined
@@ -233,18 +251,19 @@ export default function CombinedInventory() {
     const XLSX = await import("xlsx");
     const exportRows = isDrillMode ? groupItems : filteredAll;
     const wsData = [
-      ["Item Name", "Stock Group", "OTW Qty", "In-Hand Qty", "Total Qty", "In-Hand Value"],
+      ["Item Name", "Stock Group", "OTW Qty", "In-Hand Qty", "Total Qty", "Avg Rate", "Total Value"],
       ...exportRows.map((r) => [
         r.stockItemName,
         r.stockGroupName || "Uncategorized",
         r.otwQty,
         r.inHandQty,
         r.totalQty,
-        r.inHandValue,
+        parseFloat(r.avgRate.toFixed(2)),
+        parseFloat(r.combinedValue.toFixed(2)),
       ]),
     ];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [{ wch: 35 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
+    ws["!cols"] = [{ wch: 35 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Combined Inventory");
     const filename = isDrillMode
@@ -449,7 +468,7 @@ function GroupsView({
                 <TableHead className="text-right">OTW Qty</TableHead>
                 <TableHead className="text-right">In-Hand Qty</TableHead>
                 <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right hidden md:table-cell">In-Hand Value</TableHead>
+                <TableHead className="text-right hidden md:table-cell">Total Value</TableHead>
                 <TableHead className="w-8"></TableHead>
               </TableRow>
             </TableHeader>
@@ -484,7 +503,7 @@ function GroupsView({
                     {formatNumber(g.totalQty, 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono hidden md:table-cell text-muted-foreground">
-                    {g.inHandValue > 0 ? formatAmount(g.inHandValue) : "—"}
+                    {g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -505,8 +524,8 @@ function GroupsView({
                 <TableCell className="text-right font-mono" data-testid="total-combined-qty">
                   {formatNumber(groups.reduce((s, g) => s + g.totalQty, 0), 0)}
                 </TableCell>
-                <TableCell className="text-right font-mono hidden md:table-cell" data-testid="total-inhand-value">
-                  {formatAmount(groups.reduce((s, g) => s + g.inHandValue, 0))}
+                <TableCell className="text-right font-mono hidden md:table-cell" data-testid="total-combined-value">
+                  {formatAmount(groups.reduce((s, g) => s + g.combinedValue, 0))}
                 </TableCell>
                 <TableCell></TableCell>
               </TableRow>
@@ -532,6 +551,7 @@ function ItemsTable({
     inHandQty: rows.reduce((s, r) => s + r.inHandQty, 0),
     totalQty: rows.reduce((s, r) => s + r.totalQty, 0),
     inHandValue: rows.reduce((s, r) => s + r.inHandValue, 0),
+    combinedValue: rows.reduce((s, r) => s + r.combinedValue, 0),
   }), [rows]);
 
   if (rows.length === 0) {
@@ -557,7 +577,8 @@ function ItemsTable({
                 <TableHead className="text-right">OTW Qty</TableHead>
                 <TableHead className="text-right">In-Hand Qty</TableHead>
                 <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right">In-Hand Value</TableHead>
+                <TableHead className="text-right hidden md:table-cell">Avg Rate</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -577,8 +598,11 @@ function ItemsTable({
                   <TableCell className="text-right font-mono font-semibold">
                     {formatNumber(row.totalQty, 0)}
                   </TableCell>
+                  <TableCell className="text-right font-mono hidden md:table-cell text-muted-foreground">
+                    {row.avgRate > 0 ? formatAmount(row.avgRate) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-right font-mono">
-                    {row.inHandValue > 0 ? formatAmount(row.inHandValue) : <span className="text-muted-foreground">—</span>}
+                    {row.combinedValue > 0 ? formatAmount(row.combinedValue) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -589,7 +613,8 @@ function ItemsTable({
                 <TableCell className="text-right font-mono">{formatNumber(totals.otwQty, 0)}</TableCell>
                 <TableCell className="text-right font-mono">{formatNumber(totals.inHandQty, 0)}</TableCell>
                 <TableCell className="text-right font-mono">{formatNumber(totals.totalQty, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatAmount(totals.inHandValue)}</TableCell>
+                <TableCell className="text-right font-mono hidden md:table-cell"></TableCell>
+                <TableCell className="text-right font-mono">{formatAmount(totals.combinedValue)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
