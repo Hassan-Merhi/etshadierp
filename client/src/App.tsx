@@ -356,6 +356,14 @@ function AuthenticatedApp() {
     }
   }, [isLoading, error, user, setLocation]);
 
+  // Safety-net: if still loading after 12 seconds, force redirect to login
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) return;
+    const t = setTimeout(() => setLoadingTimedOut(true), 12000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
   const isPOS = user?.role?.startsWith("POS") ?? false;
   const { toast } = useToast();
   const prevUnreadRef = useRef<number>(-1);
@@ -406,15 +414,11 @@ function AuthenticatedApp() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
+  if (loadingTimedOut || (!isLoading && (error || !user))) {
+    return <Redirect to="/login" />;
   }
 
-  if (error || !user) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-muted-foreground">Loading...</p>
