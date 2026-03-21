@@ -2183,8 +2183,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     <th style={{ textAlign: 'right', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Rate</th>
                     <th style={{ textAlign: 'right', padding: '4px 7px', width: '12%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Amt</th>
                     <th style={{ textAlign: 'right', padding: '4px 7px', width: '12%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Config</th>
-                    <th style={{ textAlign: 'right', padding: '4px 7px', width: '14%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>P/L Bale</th>
-                    <th style={{ textAlign: 'right', padding: '4px 7px', width: '14%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Total P/L</th>
+                    <th style={{ textAlign: 'center', padding: '4px 7px', width: '14%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>P/L Bale</th>
+                    <th style={{ textAlign: 'center', padding: '4px 7px', width: '14%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Total P/L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2204,11 +2204,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         <td style={{ textAlign: 'right', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrintCurrency(itemRateUSD)}</td>
                         <td style={{ textAlign: 'right', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrintCurrency(itemAmountUSD)}</td>
                         <td style={{ textAlign: 'right', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrintCurrency(configuredPrice)}</td>
-                        <td style={{ textAlign: 'right', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: plBaleColor }}>
-                          {plPerBale > 0 ? '+' : ''}{fmtPrint(plPerBale, "$")}
+                        <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: plBaleColor }}>
+                          {fmtPrint(plPerBale, "$")}
                         </td>
-                        <td style={{ textAlign: 'right', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: totalPLColor }}>
-                          {totalPL > 0 ? '+' : ''}{fmtPrint(totalPL, "$")}
+                        <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: totalPLColor }}>
+                          {fmtPrint(totalPL, "$")}
                         </td>
                       </tr>
                     );
