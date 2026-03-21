@@ -56,6 +56,7 @@ interface SaleRow {
   amount: number;
   stockItemId?: number;
   salesItemId?: number; // Original sales item ID for edit mode
+  configuredPrice?: number; // Configured selling price for P/L calculation (USD)
 }
 
 interface InventoryItem {
@@ -63,6 +64,7 @@ interface InventoryItem {
   name: string;
   stock: number;
   price: number;
+  configuredPrice: number; // Configured selling price (for P/L)
 }
 
 interface APIInventoryItem {
@@ -144,6 +146,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     name: (item.stockItemName || "Unknown Item").trim(),
     stock: parseFloat(item.quantity),
     price: parseFloat(item.lastSellingPrice || item.averageRate),
+    configuredPrice: parseFloat(item.lastSellingPrice || "0"),
     stockItemId: item.stockItemId,
   }));
 
@@ -318,6 +321,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         rate: parseFloat(item.sellingPrice),
         rateUSD: parseFloat(item.sellingPrice), // Stored rates are in USD
         amount: parseFloat(item.totalSales),
+        configuredPrice: parseFloat(item.configuredPrice || "0") || undefined,
       }));
       
       // Add a blank row at the end for adding new items
@@ -853,6 +857,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     { key: "quantity", label: "Qty", width: "w-14 sm:w-20" },
     { key: "rate", label: "Rate", width: "w-16 sm:w-24" },
     { key: "amount", label: "Amt", width: "w-18 sm:w-28" },
+    { key: "plBale", label: "P/L", width: "w-16 sm:w-20" },
+    { key: "totalPL", label: "T.P/L", width: "w-16 sm:w-20" },
     { key: "delete", label: "", width: "w-9 sm:w-12" },
   ];
 
@@ -902,6 +908,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       quantity: qty,
       stockItemId: item.stockItemId,
       amount: qty * displayRate,
+      configuredPrice: item.configuredPrice,
     };
     
     setRows(newRows);
@@ -1010,7 +1017,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
-    const maxCol = columns.length - 2; // Exclude delete column from navigation
+    const maxCol = columns.length - 4; // Exclude plBale, totalPL, delete from navigation
     const maxRow = rows.length - 1;
     const isItemNameField = columns[colIndex].key === "itemName";
     const filteredItems = getFilteredInventory();
@@ -1208,6 +1215,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       quantity: qty,
       stockItemId: item.stockItemId,
       amount: qty * displayRate,
+      configuredPrice: item.configuredPrice,
     };
     if (targetRow === rows.length - 1) {
       newRows.push({ id: String(rows.length + 1), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
@@ -1652,8 +1660,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   <span className="text-xs text-muted-foreground shrink-0">{realIndex + 1}.</span>
                   <span className="text-sm font-medium truncate">{row.itemName}</span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  Qty: {row.quantity} · Rate: {formatDisplayAmount(row.rate)}
+                <div className="text-xs text-muted-foreground mt-0.5 font-mono flex items-center gap-2 flex-wrap">
+                  <span>Qty: {row.quantity} · Rate: {formatDisplayAmount(row.rate)}</span>
+                  {row.stockItemId && (row.configuredPrice ?? 0) > 0 && (() => {
+                    const cfgUSD = row.configuredPrice ?? 0;
+                    const plBaleUSD = row.rateUSD - cfgUSD;
+                    const totalPLDisplay = (activeCurrency === "CFA" && exchangeRate ? plBaleUSD * exchangeRate : plBaleUSD) * row.quantity;
+                    return (
+                      <span className={totalPLDisplay > 0 ? "text-green-600 dark:text-green-400" : totalPLDisplay < 0 ? "text-red-500 dark:text-red-400" : ""}>
+                        P/L: {totalPLDisplay >= 0 ? "" : "-"}{formatDisplayAmount(Math.abs(totalPLDisplay))}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-1.5">
@@ -1748,7 +1766,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
-                          ) : (
+                          ) : col.key === "plBale" || col.key === "totalPL" ? (() => {
+                            const cfgUSD = row.configuredPrice ?? 0;
+                            const plBaleUSD = row.rateUSD - cfgUSD;
+                            const plBaleDisplay = activeCurrency === "CFA" && exchangeRate ? plBaleUSD * exchangeRate : plBaleUSD;
+                            const val = col.key === "plBale" ? plBaleDisplay : plBaleDisplay * row.quantity;
+                            const hasConfig = (row.stockItemId && cfgUSD > 0);
+                            const color = !hasConfig ? undefined : val > 0 ? "text-green-700 dark:text-green-400" : val < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
+                            return (
+                              <div className={`flex items-center justify-end h-full px-1.5 sm:px-2 font-mono text-xs sm:text-sm ${color ?? "text-muted-foreground"}`}>
+                                {hasConfig ? formatDisplayAmount(Math.abs(val)) : "—"}
+                              </div>
+                            );
+                          })() : (
                             <input
                               ref={(el) => {
                                 if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
@@ -1819,13 +1849,30 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
           {/* Total Section */}
           <div className="border-t border-muted bg-muted/20 p-2 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-md ml-auto">
+            <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-lg ml-auto">
               <div className="flex items-center justify-between sm:justify-start gap-2 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Items:</span>
                 <span className="font-mono">{rows.filter((r) => r.amount > 0).length}</span>
                 <span className="text-muted-foreground ml-2">Qty:</span>
                 <span className="font-mono" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
               </div>
+              {(() => {
+                const totalPLUSD = rows.reduce((sum, row) => {
+                  if (!row.stockItemId || !(row.configuredPrice ?? 0)) return sum;
+                  return sum + (row.rateUSD - (row.configuredPrice ?? 0)) * row.quantity;
+                }, 0);
+                const totalPLDisplay = activeCurrency === "CFA" && exchangeRate ? totalPLUSD * exchangeRate : totalPLUSD;
+                const anyConfig = rows.some(r => r.stockItemId && (r.configuredPrice ?? 0) > 0);
+                if (!anyConfig) return null;
+                return (
+                  <div className="flex items-center justify-between sm:justify-start gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">P/L:</span>
+                    <span className={`text-base sm:text-lg font-semibold font-mono ${totalPLDisplay > 0 ? "text-green-700 dark:text-green-400" : totalPLDisplay < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`} data-testid="text-total-pl">
+                      {totalPLDisplay >= 0 ? "" : "-"}{formatDisplayAmount(Math.abs(totalPLDisplay))}
+                    </span>
+                  </div>
+                );
+              })()}
               <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-sm sm:text-lg font-medium">Total:</span>
                 <span className="text-lg sm:text-2xl font-semibold font-mono" data-testid="text-grand-total">
