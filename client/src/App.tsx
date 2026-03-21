@@ -24,6 +24,7 @@ import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { usePresence } from "@/hooks/use-presence";
+import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -273,6 +274,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 function AuthenticatedApp() {
   const { selectedCompany } = useCompany();
   usePresence(); // Track user presence
+  useWsInvalidation(); // Real-time cache invalidation via WebSocket
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);

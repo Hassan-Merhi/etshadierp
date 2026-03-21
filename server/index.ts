@@ -4,6 +4,7 @@ import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import fs from "fs";
 import { registerRoutes } from "./routes";
+import { setupWS } from "./wsServer";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db } from "./db";
@@ -454,6 +455,7 @@ let migrationsDone = false;
   });
 
   const server = await registerRoutes(app);
+  setupWS(server);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

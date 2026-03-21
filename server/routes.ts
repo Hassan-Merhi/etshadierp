@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { broadcast } from "./wsServer";
 import multer from "multer";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "./excelHelper";
 import bcrypt from "bcryptjs";
@@ -711,6 +712,18 @@ async function syncEmployeeBalancesFromEntries(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Broadcast a cache-invalidation signal to all WS clients after any successful write
+  app.use((req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      res.on("finish", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          broadcast({ type: "invalidate" });
+        }
+      });
+    }
+    next();
+  });
+
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
   registerFactoryPayrollRoutes(app, requireAuth, db);
