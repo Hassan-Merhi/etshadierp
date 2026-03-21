@@ -303,7 +303,7 @@ export default function SalesReport() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.altKey && e.key === "s") {
+      if (e.altKey && (e.key === "s" || e.key === "ß")) {
         if (!selectedStockItem || selectedStockItem === "all") return;
         e.preventDefault();
         navigate(`/stock-query/${selectedStockItem}`);

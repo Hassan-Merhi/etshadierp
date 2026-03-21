@@ -273,7 +273,7 @@ export default function POSDaybook() {
       }
 
       // Alt+S → open Stock Item detail directly for selected item
-      if (e.altKey && (e.key === "s" || e.key === "S")) {
+      if (e.altKey && (e.key === "s" || e.key === "S" || e.key === "ß")) {
         e.preventDefault();
         if (selectedDialogRow !== null && items[selectedDialogRow]) {
           const itemId = items[selectedDialogRow].stockItemId;

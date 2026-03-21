@@ -81,7 +81,7 @@ export default function SalesReportDetail() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.altKey && e.key === "s") {
+      if (e.altKey && (e.key === "s" || e.key === "ß")) {
         if (selectedItemId == null) return;
         const item = sortedItems.find((i) => i.id === selectedItemId);
         if (item?.stockItemId) {

@@ -690,7 +690,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         setSelectedDialogRow(prev => (prev === null ? salesItems.length - 1 : Math.max(prev - 1, 0)));
         return;
       }
-      if (e.altKey && (e.key === "s" || e.key === "S")) {
+      if (e.altKey && (e.key === "s" || e.key === "S" || e.key === "ß")) {
         e.preventDefault();
         if (selectedDialogRow !== null && salesItems[selectedDialogRow]) {
           const itemId = (salesItems[selectedDialogRow] as ViewVoucherEntry).stockItemId;
