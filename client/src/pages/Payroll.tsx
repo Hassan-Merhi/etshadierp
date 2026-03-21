@@ -698,7 +698,7 @@ export default function Payroll() {
   const ungroupedWorkers = useMemo(() => {
     const groupedWorkerIds = new Set<number>();
     workerGroups.forEach(group => {
-      group.members.forEach(member => {
+      (group.members || []).forEach(member => {
         groupedWorkerIds.add(member.id);
       });
     });
@@ -2535,11 +2535,11 @@ export default function Payroll() {
             : null;
 
           // Workers belonging to the selected group filter (-1 = ungrouped)
-          const allGroupedWorkerIds = workerGroups.flatMap(g => g.members.map(m => m.id));
+          const allGroupedWorkerIds = workerGroups.flatMap(g => (g.members || []).map(m => m.id));
           const workerIdsInSelectedGroup = workerProfileGroupFilter === -1
             ? workerStaff.filter(w => !allGroupedWorkerIds.includes(w.id)).map(w => w.id)
             : workerProfileGroupFilter !== null
-              ? workerGroups.find(g => g.id === workerProfileGroupFilter)?.members.map(m => m.id) ?? []
+              ? (workerGroups.find(g => g.id === workerProfileGroupFilter)?.members || []).map(m => m.id)
               : null;
 
           const filteredWorkers = workerStaff.filter(w => {
@@ -2555,7 +2555,7 @@ export default function Payroll() {
 
           // Group membership lookup: workerId → group name
           const workerGroupMap: Record<number, string> = {};
-          workerGroups.forEach(g => g.members.forEach(m => { workerGroupMap[m.id] = g.name; }));
+          workerGroups.forEach(g => (g.members || []).forEach(m => { workerGroupMap[m.id] = g.name; }));
 
           if (selectedWorkerProfile) {
             return (
@@ -2595,7 +2595,7 @@ export default function Payroll() {
                     All Workers ({workerStaff.length})
                   </button>
                   {workerGroups.map(g => {
-                    const count = workerStaff.filter(w => g.members.some(m => m.id === w.id)).length;
+                    const count = workerStaff.filter(w => (g.members || []).some(m => m.id === w.id)).length;
                     return (
                       <button
                         key={g.id}
@@ -2609,7 +2609,7 @@ export default function Payroll() {
                   })}
                   {/* Ungrouped workers button */}
                   {(() => {
-                    const ungroupedCount = workerStaff.filter(w => !workerGroups.some(g => g.members.some(m => m.id === w.id))).length;
+                    const ungroupedCount = workerStaff.filter(w => !workerGroups.some(g => (g.members || []).some(m => m.id === w.id))).length;
                     if (ungroupedCount === 0) return null;
                     return (
                       <button

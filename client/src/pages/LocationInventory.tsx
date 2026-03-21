@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1199,6 +1200,111 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             {!locationsLoading && filteredLocations.length > 0 && (
               <div className="mt-4 text-sm text-muted-foreground">
                 Showing {filteredLocations.length} of {locations.length} locations
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* View All Stock — cross-location table */}
+      {showAllStock && !selectedLocationLocal && (
+        <div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <h1 className="text-xl md:text-3xl font-bold">All Stock — All Locations</h1>
+            <Button
+              variant="outline"
+              onClick={() => setShowAllStock(false)}
+              data-testid="button-back-from-all-stock-header"
+              className="gap-2"
+            >
+              <X className="w-4 h-4" />
+              Back to Locations
+            </Button>
+          </div>
+
+          <Card className="p-4 w-full">
+            {/* Filters row */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items by name or code..."
+                  value={allStockSearchTerm}
+                  onChange={(e) => setAllStockSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-all-stock-search"
+                />
+              </div>
+              <Select
+                value={allStockGroupFilter || "__all__"}
+                onValueChange={(v) => setAllStockGroupFilter(v === "__all__" ? "" : v)}
+              >
+                <SelectTrigger className="w-full sm:w-52" data-testid="select-all-stock-group">
+                  <SelectValue placeholder="All Groups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Groups</SelectItem>
+                  {allInventoryGroups.map((g) => (
+                    <SelectItem key={String(g.id)} value={g.id === null ? "null" : String(g.id)}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {allInventoryLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : filteredCombinedRows.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {allInventoryData.length === 0 ? "No stock found across any location." : "No items match your search."}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr className="h-10">
+                      <th className="text-left px-3 font-medium whitespace-nowrap">Group</th>
+                      <th className="text-left px-3 font-medium whitespace-nowrap">Code</th>
+                      <th className="text-left px-3 font-medium whitespace-nowrap">Item Name</th>
+                      {allInventoryLocations.map((loc) => (
+                        <th key={loc.id} className="text-right px-3 font-medium whitespace-nowrap">
+                          {loc.name}
+                        </th>
+                      ))}
+                      <th className="text-right px-3 font-medium whitespace-nowrap">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCombinedRows.map((row) => (
+                      <tr key={row.stockItemId} className="border-t hover-elevate" data-testid={`row-allstock-${row.stockItemId}`}>
+                        <td className="px-3 py-2 text-muted-foreground text-xs whitespace-nowrap">{row.stockGroupName}</td>
+                        <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{row.stockItemCode}</td>
+                        <td className="px-3 py-2 font-medium whitespace-nowrap">{row.stockItemName}</td>
+                        {allInventoryLocations.map((loc) => (
+                          <td key={loc.id} className="px-3 py-2 text-right font-mono whitespace-nowrap">
+                            {row.qtyByLocation[loc.id] != null
+                              ? row.qtyByLocation[loc.id].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                              : "—"}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-right font-mono font-semibold whitespace-nowrap">
+                          {row.totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!allInventoryLoading && filteredCombinedRows.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Showing {filteredCombinedRows.length} item{filteredCombinedRows.length !== 1 ? "s" : ""} across {allInventoryLocations.length} location{allInventoryLocations.length !== 1 ? "s" : ""}
               </div>
             )}
           </Card>
