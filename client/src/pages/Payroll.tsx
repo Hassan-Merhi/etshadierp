@@ -187,6 +187,10 @@ export default function Payroll() {
   const modeApiRequest = getApiRequest(appMode);
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const cleanTxnDesc = (text: string): string => {
+    if (!text) return text;
+    return text.replace(/\s*-\s*[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{5,}\s*$/i, "").trim();
+  };
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
@@ -4648,7 +4652,7 @@ export default function Payroll() {
                                   {txn.date ? formatDisplayDate(txn.date) : "-"}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
-                                  {txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-"}
+                                  {cleanTxnDesc(txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-")}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {txn.isDebit ? formatAmount(parseFloat(txn.amount || "0")) : <span className="text-muted-foreground">—</span>}
@@ -4680,7 +4684,7 @@ export default function Payroll() {
                             <div key={txn.id || `${txn.voucherId}-${txn.date}`} className="flex items-start justify-between gap-3 px-3 py-2">
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs text-muted-foreground font-mono">{txn.date ? formatDisplayDate(txn.date) : "-"}</p>
-                                <p className="text-sm truncate">{txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-"}</p>
+                                <p className="text-sm truncate">{cleanTxnDesc(txn.narration || txn.voucherDescription || txn.description || txn.voucherType || "-")}</p>
                               </div>
                               <div className="text-right shrink-0">
                                 {txn.isDebit ? (
