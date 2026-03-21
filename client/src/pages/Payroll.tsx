@@ -354,6 +354,7 @@ export default function Payroll() {
   const [bulkBonusAutoStart, setBulkBonusAutoStart] = useState(() => getThisMonthRange().start);
   const [bulkBonusAutoEnd, setBulkBonusAutoEnd] = useState(() => getThisMonthRange().end);
   const [bulkBonusAutoLoading, setBulkBonusAutoLoading] = useState(false);
+  const [bulkBonusAutoPctLocationId, setBulkBonusAutoPctLocationId] = useState<string>("");
 
   // Bulk Bonus state
   const [bulkBonusDialogOpen, setBulkBonusDialogOpen] = useState(false);
@@ -1420,18 +1421,13 @@ export default function Payroll() {
             const data = await res.json();
             // Per-unit bale bonus
             total += parseFloat(data.totalQuantity || "0") * parseFloat(r.rate || "0");
-            // Percentage of sales bonus at same location
-            if (hasPct) {
-              total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
-            }
           }
-        } else if (hasPct) {
-          // No per-location rates — sum sales across all locations
-          for (const loc of locations) {
-            const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${loc.id}&startDate=${start}&endDate=${end}`);
-            const data = await res.json();
-            total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
-          }
+        }
+        // Percentage-of-sales bonus: use the explicitly selected location only
+        if (hasPct && bulkBonusAutoPctLocationId) {
+          const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${start}&endDate=${end}`);
+          const data = await res.json();
+          total += (parseFloat(data.totalSalesAmount || "0") * pct) / 100;
         }
 
         if (total > 0.005) newAmounts[emp.id] = total.toFixed(2);
@@ -4642,7 +4638,23 @@ export default function Payroll() {
                     Calculate All
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Calculates bonuses from saved rates: per-unit bale rates and/or sales % rates pulled from analytics. Manually set amounts override.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Sales % location:</span>
+                  <Select value={bulkBonusAutoPctLocationId} onValueChange={setBulkBonusAutoPctLocationId}>
+                    <SelectTrigger className="h-7 text-xs w-44">
+                      <SelectValue placeholder="Select for % bonus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {bulkBonusAutoPctLocationId && (
+                    <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setBulkBonusAutoPctLocationId("")}>Clear</Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Per-unit bale rates use their configured locations. Sales % bonus uses the location selected above (leave blank to skip % calculation).</p>
               </div>
 
               <div className="border rounded-md flex-1 overflow-hidden">
