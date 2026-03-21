@@ -41,6 +41,8 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,7 +72,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -152,6 +154,8 @@ const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true, employee
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   openingBalance: z.string().optional(),
   employeeGroupId: z.string().optional(),
+  salesBonusPct: z.string().optional(),
+  balesBonusRate: z.string().optional(),
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -186,6 +190,20 @@ export default function Payroll() {
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
+  const [bonusTab, setBonusTab] = useState<"sales" | "bales">("sales");
+  const [bonusSalesPeriod, setBonusSalesPeriod] = useState<"thisMonth" | "custom">("thisMonth");
+  const [bonusSalesLocationId, setBonusSalesLocationId] = useState<string>("");
+  const [bonusSalesStart, setBonusSalesStart] = useState<string>("");
+  const [bonusSalesEnd, setBonusSalesEnd] = useState<string>("");
+  const [bonusSalesPreview, setBonusSalesPreview] = useState<{ totalSalesAmount: string; totalQuantity: string; locationName: string } | null>(null);
+  const [bonusSalesLoading, setBonusSalesLoading] = useState(false);
+  const [bonusSalesCustomPct, setBonusSalesCustomPct] = useState<string>("");
+  const [bonusDate, setBonusDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [bonusNotes, setBonusNotes] = useState<string>("");
+  const [balesRows, setBalesRows] = useState<Array<{ locationId: string; qty: string; rate: string; preview: string | null; loading: boolean }>>([{ locationId: "", qty: "", rate: "", preview: null, loading: false }]);
+  const [balesPeriod, setBalesPeriod] = useState<"thisMonth" | "custom">("thisMonth");
+  const [balesStart, setBalesStart] = useState<string>("");
+  const [balesEnd, setBalesEnd] = useState<string>("");
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [bulkPaymentDialogOpen, setBulkPaymentDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
@@ -336,6 +354,11 @@ export default function Payroll() {
   const { data: groupMembers = [] } = useQuery<any[]>({
     queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
     enabled: !!selectedGroupForMembers?.id,
+  });
+
+  const { data: locations = [] } = useQuery<Array<{ id: number; name: string; companyId: number }>>({
+    queryKey: ["/api/locations", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   // Employee Groups mutations
@@ -717,6 +740,8 @@ export default function Payroll() {
       joinDate: new Date().toISOString().split('T')[0],
       openingBalance: "",
       active: true,
+      salesBonusPct: "",
+      balesBonusRate: "",
     },
   });
 
@@ -730,6 +755,8 @@ export default function Payroll() {
       department: "",
       joinDate: new Date().toISOString().split('T')[0],
       active: true,
+      salesBonusPct: "",
+      balesBonusRate: "",
     },
   });
 
@@ -1188,6 +1215,8 @@ export default function Payroll() {
         joinDate: editingEmployee.joinDate || new Date().toISOString().split('T')[0],
         active: editingEmployee.active,
         employeeGroupId: editingEmployee.employeeGroupId?.toString() || "",
+        salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
+        balesBonusRate: editingEmployee.balesBonusRate != null ? String(editingEmployee.balesBonusRate) : "",
       });
     }
   }, [editingEmployee, editEmployeeDialogOpen]);
@@ -1229,9 +1258,100 @@ export default function Payroll() {
     setWithdrawalDialogOpen(true);
   };
 
+  const getThisMonthRange = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const end = new Date().toISOString().split("T")[0];
+    return { start, end };
+  };
+
   const handleBonus = (employee: Employee) => {
     setSelectedEmployee(employee);
+    const range = getThisMonthRange();
+    setBonusTab("sales");
+    setBonusSalesPeriod("thisMonth");
+    setBonusSalesLocationId("");
+    setBonusSalesStart(range.start);
+    setBonusSalesEnd(range.end);
+    setBonusSalesPreview(null);
+    setBonusSalesCustomPct(employee.salesBonusPct != null ? String(employee.salesBonusPct) : "");
+    setBonusDate(new Date().toISOString().split("T")[0]);
+    setBonusNotes("");
+    setBalesRows([{ locationId: "", qty: "", rate: employee.balesBonusRate != null ? String(employee.balesBonusRate) : "", preview: null, loading: false }]);
+    setBalesPeriod("thisMonth");
+    setBalesStart(range.start);
+    setBalesEnd(range.end);
     setBonusDialogOpen(true);
+  };
+
+  const fetchSalesPreview = async () => {
+    if (!bonusSalesLocationId) return;
+    const start = bonusSalesPeriod === "thisMonth" ? getThisMonthRange().start : bonusSalesStart;
+    const end = bonusSalesPeriod === "thisMonth" ? getThisMonthRange().end : bonusSalesEnd;
+    setBonusSalesLoading(true);
+    try {
+      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${bonusSalesLocationId}&startDate=${start}&endDate=${end}`);
+      const data = await res.json();
+      setBonusSalesPreview(data);
+    } catch (e) {
+      setBonusSalesPreview(null);
+    }
+    setBonusSalesLoading(false);
+  };
+
+  const fetchBalesQty = async (idx: number) => {
+    const row = balesRows[idx];
+    if (!row.locationId) return;
+    const start = balesPeriod === "thisMonth" ? getThisMonthRange().start : balesStart;
+    const end = balesPeriod === "thisMonth" ? getThisMonthRange().end : balesEnd;
+    setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, loading: true } : r));
+    try {
+      const res = await modeApiRequest("GET", `/api/payroll/sales-summary?locationId=${row.locationId}&startDate=${start}&endDate=${end}`);
+      const data = await res.json();
+      setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, qty: Number(data.totalQuantity || 0).toFixed(0), loading: false } : r));
+    } catch {
+      setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, loading: false } : r));
+    }
+  };
+
+  const submitSmartBonus = async () => {
+    let amount = 0;
+    let description = "";
+    if (bonusTab === "sales") {
+      if (!bonusSalesPreview) return;
+      const pct = parseFloat(bonusSalesCustomPct || "0");
+      const sales = parseFloat(bonusSalesPreview.totalSalesAmount || "0");
+      amount = (sales * pct) / 100;
+      description = `Sales bonus ${pct}% of ${formatAmount(sales)} at ${bonusSalesPreview.locationName}`;
+    } else {
+      amount = balesRows.reduce((sum, r) => {
+        const q = parseFloat(r.qty || "0");
+        const rate = parseFloat(r.rate || "0");
+        return sum + q * rate;
+      }, 0);
+      const parts = balesRows
+        .filter(r => r.locationId && parseFloat(r.qty || "0") > 0)
+        .map(r => {
+          const loc = locations.find(l => l.id === parseInt(r.locationId));
+          return `${Number(r.qty).toFixed(0)} units × ${formatAmount(parseFloat(r.rate || "0"))} at ${loc?.name ?? "Unknown"}`;
+        });
+      description = parts.join("; ");
+    }
+    if (amount <= 0) return;
+    try {
+      await modeApiRequest("POST", "/api/payroll/bonus-employee", {
+        employeeId: selectedEmployee?.id,
+        amount: amount.toFixed(2),
+        date: bonusDate,
+        notes: bonusNotes || description,
+      });
+      toast({ title: "Bonus given", description: `${formatAmount(amount)} bonus processed` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBonusDialogOpen(false);
+      setSelectedEmployee(null);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   const handleRecordDeduction = (advance: SalaryAdvance) => {
@@ -2497,85 +2617,301 @@ export default function Payroll() {
         </DialogContent>
       </Dialog>
 
-      {/* Employee Bonus Dialog */}
+      {/* Employee Smart Bonus Dialog */}
       <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
-        <DialogContent data-testid="dialog-bonus">
+        <DialogContent data-testid="dialog-bonus" className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Give Bonus</DialogTitle>
+            <DialogTitle>Calculate Bonus</DialogTitle>
             <DialogDescription>
-              Give a bonus to {selectedEmployee?.firstName} {selectedEmployee?.lastName}
+              {selectedEmployee?.firstName} {selectedEmployee?.lastName}
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...bonusForm}>
-            <form onSubmit={bonusForm.handleSubmit((data) => bonusMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={bonusForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bonus Amount</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-bonus-amount"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <Tabs value={bonusTab} onValueChange={(v) => { setBonusTab(v as "sales" | "bales"); setBonusSalesPreview(null); }}>
+            <TabsList className="w-full">
+              <TabsTrigger value="sales" className="flex-1" data-testid="tab-sales-bonus">
+                <Percent className="h-4 w-4 mr-1" />
+                Sales %
+              </TabsTrigger>
+              <TabsTrigger value="bales" className="flex-1" data-testid="tab-bales-bonus">
+                <Package className="h-4 w-4 mr-1" />
+                Bales / Units
+              </TabsTrigger>
+            </TabsList>
 
-              <FormField
-                control={bonusForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} data-testid="input-bonus-date" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* ── Sales % Tab ── */}
+            <TabsContent value="sales" className="space-y-4 mt-4">
+              {selectedEmployee?.salesBonusPct == null || parseFloat(selectedEmployee.salesBonusPct) === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    No sales bonus % configured for this employee. Edit the employee to set a percentage.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
 
-              <FormField
-                control={bonusForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Reason for bonus..."
-                        {...field}
-                        data-testid="input-bonus-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setBonusDialogOpen(false)}
-                  data-testid="button-cancel-bonus"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={bonusMutation.isPending} data-testid="button-submit-bonus">
-                  {bonusMutation.isPending ? "Processing..." : "Give Bonus"}
-                </Button>
+              <div className="space-y-1">
+                <Label>Bonus Rate (%)</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  placeholder="e.g. 0.2"
+                  value={bonusSalesCustomPct}
+                  onChange={(e) => { setBonusSalesCustomPct(e.target.value); setBonusSalesPreview(null); }}
+                  data-testid="input-sales-bonus-pct"
+                />
+                <p className="text-xs text-muted-foreground">Total sales × this % = bonus</p>
               </div>
-            </form>
-          </Form>
+
+              <div className="space-y-1">
+                <Label>Location</Label>
+                <Select value={bonusSalesLocationId} onValueChange={(v) => { setBonusSalesLocationId(v); setBonusSalesPreview(null); }}>
+                  <SelectTrigger data-testid="select-sales-location">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Period</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bonusSalesPeriod === "thisMonth" ? "default" : "outline"}
+                    onClick={() => { setBonusSalesPeriod("thisMonth"); setBonusSalesPreview(null); }}
+                    data-testid="button-sales-this-month"
+                  >
+                    This Month
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bonusSalesPeriod === "custom" ? "default" : "outline"}
+                    onClick={() => { setBonusSalesPeriod("custom"); setBonusSalesPreview(null); }}
+                    data-testid="button-sales-custom-period"
+                  >
+                    Custom
+                  </Button>
+                </div>
+                {bonusSalesPeriod === "custom" && (
+                  <div className="flex gap-2 mt-2">
+                    <Input type="date" value={bonusSalesStart} onChange={(e) => { setBonusSalesStart(e.target.value); setBonusSalesPreview(null); }} data-testid="input-sales-start" />
+                    <Input type="date" value={bonusSalesEnd} onChange={(e) => { setBonusSalesEnd(e.target.value); setBonusSalesPreview(null); }} data-testid="input-sales-end" />
+                  </div>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={fetchSalesPreview}
+                disabled={!bonusSalesLocationId || bonusSalesLoading}
+                data-testid="button-calculate-sales"
+              >
+                {bonusSalesLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Calculate Bonus
+              </Button>
+
+              {bonusSalesPreview && (
+                <div className="rounded-md border bg-muted/30 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Location</span>
+                    <span className="font-medium">{bonusSalesPreview.locationName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Sales</span>
+                    <span className="font-medium font-mono">{formatAmount(parseFloat(bonusSalesPreview.totalSalesAmount || "0"))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Rate</span>
+                    <span className="font-medium">{bonusSalesCustomPct}%</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>Bonus Amount</span>
+                    <span className="text-green-600 dark:text-green-400 font-mono">
+                      {formatAmount((parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── Bales / Units Tab ── */}
+            <TabsContent value="bales" className="space-y-4 mt-4">
+              <div className="space-y-1">
+                <Label>Period</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={balesPeriod === "thisMonth" ? "default" : "outline"}
+                    onClick={() => setBalesPeriod("thisMonth")}
+                    data-testid="button-bales-this-month"
+                  >
+                    This Month
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={balesPeriod === "custom" ? "default" : "outline"}
+                    onClick={() => setBalesPeriod("custom")}
+                    data-testid="button-bales-custom-period"
+                  >
+                    Custom
+                  </Button>
+                </div>
+                {balesPeriod === "custom" && (
+                  <div className="flex gap-2 mt-2">
+                    <Input type="date" value={balesStart} onChange={(e) => setBalesStart(e.target.value)} data-testid="input-bales-start" />
+                    <Input type="date" value={balesEnd} onChange={(e) => setBalesEnd(e.target.value)} data-testid="input-bales-end" />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_72px_32px_72px_32px] gap-2 text-xs text-muted-foreground px-1">
+                  <span>Location</span><span>Qty</span><span></span><span>Rate ($)</span><span></span>
+                </div>
+                {balesRows.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_72px_32px_72px_32px] gap-2 items-center">
+                    <Select
+                      value={row.locationId}
+                      onValueChange={(v) => setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, locationId: v, qty: "" } : r))}
+                    >
+                      <SelectTrigger data-testid={`select-bales-location-${idx}`} className="h-9">
+                        <SelectValue placeholder="Shop" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={row.qty}
+                      className="h-9"
+                      onChange={(e) => setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, qty: e.target.value } : r))}
+                      data-testid={`input-bales-qty-${idx}`}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      title="Fetch qty from sales data"
+                      disabled={!row.locationId || row.loading}
+                      onClick={() => fetchBalesQty(idx)}
+                      data-testid={`button-fetch-qty-${idx}`}
+                    >
+                      {row.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    </Button>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={row.rate}
+                      className="h-9"
+                      onChange={(e) => setBalesRows(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))}
+                      data-testid={`input-bales-rate-${idx}`}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => setBalesRows(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx))}
+                      data-testid={`button-remove-bales-row-${idx}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {balesRows.map((row, idx) => {
+                  const q = parseFloat(row.qty || "0");
+                  const r = parseFloat(row.rate || "0");
+                  const total = q * r;
+                  if (total <= 0) return null;
+                  const loc = locations.find(l => l.id === parseInt(row.locationId));
+                  return (
+                    <p key={`hint-${idx}`} className="text-xs text-muted-foreground px-1">
+                      {loc?.name}: {Number(q).toFixed(0)} × {formatAmount(r)} = <strong>{formatAmount(total)}</strong>
+                    </p>
+                  );
+                })}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBalesRows(prev => [...prev, { locationId: "", qty: "", rate: selectedEmployee?.balesBonusRate != null ? String(selectedEmployee.balesBonusRate) : "", preview: null, loading: false }])}
+                data-testid="button-add-bales-row"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Shop
+              </Button>
+
+              {(() => {
+                const total = balesRows.reduce((sum, r) => sum + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0);
+                if (total <= 0) return null;
+                return (
+                  <div className="rounded-md border bg-muted/30 p-3 flex justify-between items-center">
+                    <span className="font-medium text-sm">Total Bonus</span>
+                    <span className="text-green-600 dark:text-green-400 font-semibold font-mono">{formatAmount(total)}</span>
+                  </div>
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Date</Label>
+              <Input type="date" value={bonusDate} onChange={(e) => setBonusDate(e.target.value)} data-testid="input-bonus-date" />
+            </div>
+            <div className="space-y-1">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Reason for bonus..."
+                value={bonusNotes}
+                onChange={(e) => setBonusNotes(e.target.value)}
+                data-testid="input-bonus-notes"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setBonusDialogOpen(false)} data-testid="button-cancel-bonus">
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={submitSmartBonus}
+              disabled={
+                bonusTab === "sales"
+                  ? !bonusSalesPreview || parseFloat(bonusSalesCustomPct || "0") <= 0
+                  : balesRows.reduce((s, r) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0) <= 0
+              }
+              data-testid="button-submit-bonus"
+            >
+              {bonusTab === "sales" && bonusSalesPreview
+                ? `Give ${formatAmount((parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100)}`
+                : bonusTab === "bales"
+                ? `Give ${formatAmount(balesRows.reduce((s, r) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0))}`
+                : "Give Bonus"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -3660,6 +3996,52 @@ export default function Payroll() {
                 )}
               />
 
+              <div className="border-t pt-4 space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">Bonus Configuration (Optional)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="salesBonusPct"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sales Bonus %</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            placeholder="e.g. 0.2"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-sales-bonus-pct-create"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="balesBonusRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bales Rate ($/unit)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2.00"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-bales-bonus-rate-create"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -4485,6 +4867,52 @@ export default function Payroll() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">Bonus Configuration (Optional)</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editEmployeeForm.control}
+                    name="salesBonusPct"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sales Bonus %</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            placeholder="e.g. 0.2"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-edit-sales-bonus-pct"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editEmployeeForm.control}
+                    name="balesBonusRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bales Rate ($/unit)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2.00"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-edit-bales-bonus-rate"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

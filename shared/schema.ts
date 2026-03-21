@@ -219,6 +219,8 @@ export const employees = pgTable("employees", {
   totalDeposits: decimal("total_deposits", { precision: 15, scale: 2 }).notNull().default("0"),
   totalWithdrawals: decimal("total_withdrawals", { precision: 15, scale: 2 }).notNull().default("0"),
   active: boolean("active").notNull().default(true),
+  salesBonusPct: decimal("sales_bonus_pct", { precision: 10, scale: 4 }),
+  balesBonusRate: decimal("bales_bonus_rate", { precision: 10, scale: 4 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

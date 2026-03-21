@@ -438,6 +438,9 @@ let migrationsDone = false;
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS show_profit_comparison_on_pos boolean NOT NULL DEFAULT false`,
     // Store configured (Hassan's) price on each sales item so reprints are accurate (Mar 2026)
     `ALTER TABLE sales_items ADD COLUMN IF NOT EXISTS configured_price decimal(15,6)`,
+    // Employee bonus configuration fields (Mar 2026)
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS sales_bonus_pct decimal(10,4)`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS bales_bonus_rate decimal(10,4)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

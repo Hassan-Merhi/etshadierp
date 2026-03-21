@@ -3788,7 +3788,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId } = req.body;
+      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId, salesBonusPct, balesBonusRate } = req.body;
 
       const updates: Record<string, any> = {};
       if (firstName !== undefined) updates.firstName = firstName;
@@ -3799,6 +3799,8 @@ if (asOfDate) {
       if (active !== undefined) updates.active = active;
       if (joinDate !== undefined) updates.joinDate = joinDate;
       if (employeeGroupId !== undefined) updates.employeeGroupId = employeeGroupId === null || employeeGroupId === "" || employeeGroupId === "none" ? null : parseInt(employeeGroupId);
+      if (salesBonusPct !== undefined) updates.salesBonusPct = salesBonusPct === "" || salesBonusPct === null ? null : salesBonusPct;
+      if (balesBonusRate !== undefined) updates.balesBonusRate = balesBonusRate === "" || balesBonusRate === null ? null : balesBonusRate;
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: "No fields to update" });
@@ -4739,6 +4741,42 @@ if (asOfDate) {
       }
     },
   );
+
+  // Payroll - Sales Summary for bonus calculation
+  app.get("/api/payroll/sales-summary", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { locationId, startDate, endDate } = req.query;
+      if (!locationId || !startDate || !endDate) {
+        return res.status(400).json({ message: "locationId, startDate, and endDate are required" });
+      }
+      const locId = parseInt(locationId as string);
+      const conditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.locationId, locId),
+        sql`${vouchers.voucherDate} >= ${startDate}`,
+        sql`${vouchers.voucherDate} <= ${endDate}`,
+      ];
+      const result = await db
+        .select({
+          totalSalesAmount: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+          totalQuantity: sql<string>`COALESCE(SUM(${salesItems.quantity}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(...conditions));
+      const loc = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, locId)).limit(1);
+      return res.json({
+        totalSalesAmount: result[0]?.totalSalesAmount ?? "0",
+        totalQuantity: result[0]?.totalQuantity ?? "0",
+        locationName: loc[0]?.name ?? "",
+      });
+    } catch (error: any) {
+      console.error("[/api/payroll/sales-summary]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Employee Bonus
   app.post(
