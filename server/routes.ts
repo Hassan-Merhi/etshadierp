@@ -112,6 +112,7 @@ import {
   factoryUserProfiles,
   erpPayrollRuns,
   erpPayrollRunItems,
+  intercompanyPosConfigs,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -136,7 +137,209 @@ async function getCurrentExchangeRate(companyId: number): Promise<string | null>
   }
 }
 
+// ─── Intercompany POS auto-transfer helper ────────────────────────────────────
+// Called after every successful POS cash sale.  Creates/updates one consolidated
+// journal voucher per company per day so the ledger stays clean.
+//
+// SOURCE company (e.g. GC-L'shi):
+//   Dr  [sourceIntercoAccount]          full day running total
+//   Cr  [cash outlet that received $$]  amount for this sale
+//
+// DEST company (e.g. Hadi-L'shi):
+//   Dr  [matching cash outlet by name]  amount for this sale
+//   Cr  [destIntercoAccount]            full day running total
+//
+async function runIntercompanyPosTransfer(
+  sourceCompanyId: number,
+  cashAccountId: number,    // ledger account id used as cash in the POS sale
+  saleAmount: number,
+  saleDateStr: string,       // "YYYY-MM-DD"
+) {
+  try {
+    // 1. Load config for the source company
+    const [config] = await db
+      .select()
+      .from(intercompanyPosConfigs)
+      .where(eq(intercompanyPosConfigs.sourceCompanyId, sourceCompanyId));
+    if (!config || !config.enabled) return;
 
+    // 2. Get the cash account name so we can match it in the dest company
+    const [cashAccount] = await db
+      .select({ name: ledgerAccounts.name })
+      .from(ledgerAccounts)
+      .where(eq(ledgerAccounts.id, cashAccountId));
+    if (!cashAccount) return;
+    const cashName = cashAccount.name;
+
+    // 3. Find matching cash account in dest company (exact then ilike)
+    let destCashAccounts = await db
+      .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      .from(ledgerAccounts)
+      .where(
+        and(
+          eq(ledgerAccounts.companyId, config.destCompanyId),
+          eq(ledgerAccounts.name, cashName),
+        )
+      );
+    if (destCashAccounts.length === 0) {
+      // try case-insensitive
+      destCashAccounts = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, config.destCompanyId),
+            ilike(ledgerAccounts.name, cashName),
+          )
+        );
+    }
+    const destCashAccount = destCashAccounts[0] ?? null;
+
+    // 4. Create/update SOURCE voucher
+    const srcVoucherNum = `INTERCO-SRC-${sourceCompanyId}-${saleDateStr}`;
+    const srcNarration = `Intercompany POS transfer (auto) – ${saleDateStr}`;
+    await upsertIntercompanyVoucher({
+      companyId: sourceCompanyId,
+      voucherNumber: srcVoucherNum,
+      date: saleDateStr,
+      narration: srcNarration,
+      debitAccountId: config.sourceIntercoAccountId,   // interco receivable
+      creditAccountId: cashAccountId,                   // cash outlet
+      amount: saleAmount,
+    });
+
+    // 5. Create/update DEST voucher (only if we found a matching cash account)
+    if (destCashAccount) {
+      const dstVoucherNum = `INTERCO-DST-${config.destCompanyId}-${saleDateStr}`;
+      const dstNarration = `Intercompany POS receipt (auto) – ${saleDateStr}`;
+      await upsertIntercompanyVoucher({
+        companyId: config.destCompanyId,
+        voucherNumber: dstVoucherNum,
+        date: saleDateStr,
+        narration: dstNarration,
+        debitAccountId: destCashAccount.id,             // cash outlet in dest
+        creditAccountId: config.destIntercoAccountId,   // interco payable
+        amount: saleAmount,
+      });
+    } else {
+      console.warn(`[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`);
+    }
+  } catch (err: any) {
+    console.error("[IntercompanyPOS] Auto-transfer failed:", err?.message ?? err);
+  }
+}
+
+// Upsert the daily intercompany voucher for one side (source or dest).
+// The voucher has one debit entry (running total) and one or many credit entries
+// (one per cash account used today). We locate existing entries by account ID.
+async function upsertIntercompanyVoucher(opts: {
+  companyId: number;
+  voucherNumber: string;
+  date: string;
+  narration: string;
+  debitAccountId: number;    // account to Dr (running total)
+  creditAccountId: number;   // account to Cr (per cash outlet)
+  amount: number;
+}) {
+  const { companyId, voucherNumber, date, narration, debitAccountId, creditAccountId, amount } = opts;
+
+  // Find existing daily voucher
+  const [existing] = await db
+    .select()
+    .from(vouchers)
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.voucherNumber, voucherNumber),
+      )
+    );
+
+  if (existing) {
+    // --- Update existing voucher ---
+    const entries = await db
+      .select()
+      .from(voucherEntries)
+      .where(eq(voucherEntries.voucherId, existing.id));
+
+    // Find or create credit entry for this cash account
+    const existingCrEntry = entries.find(
+      (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
+    );
+    if (existingCrEntry) {
+      const newCr = (parseFloat(existingCrEntry.creditAmount ?? "0") + amount).toFixed(2);
+      await db
+        .update(voucherEntries)
+        .set({ creditAmount: newCr })
+        .where(eq(voucherEntries.id, existingCrEntry.id));
+    } else {
+      await db.insert(voucherEntries).values({
+        voucherId: existing.id,
+        ledgerAccountId: creditAccountId,
+        debitAmount: "0",
+        creditAmount: amount.toFixed(2),
+        narration,
+      });
+    }
+
+    // Recalculate total credit and update the debit (running total) entry
+    const refreshedEntries = await db
+      .select()
+      .from(voucherEntries)
+      .where(eq(voucherEntries.voucherId, existing.id));
+    const totalCr = refreshedEntries
+      .filter((e) => e.ledgerAccountId !== debitAccountId)
+      .reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+
+    const existingDrEntry = refreshedEntries.find(
+      (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
+    );
+    if (existingDrEntry) {
+      await db
+        .update(voucherEntries)
+        .set({ debitAmount: totalCr.toFixed(2) })
+        .where(eq(voucherEntries.id, existingDrEntry.id));
+    } else {
+      await db.insert(voucherEntries).values({
+        voucherId: existing.id,
+        ledgerAccountId: debitAccountId,
+        debitAmount: totalCr.toFixed(2),
+        creditAmount: "0",
+        narration,
+      });
+    }
+  } else {
+    // --- Create new voucher with two entries ---
+    const [newVoucher] = await db
+      .insert(vouchers)
+      .values({
+        companyId,
+        voucherNumber,
+        voucherType: "Journal",
+        description: narration,
+        voucherDate: date,
+        totalAmount: amount.toFixed(2),
+        sourceModule: "ERP",
+      })
+      .returning();
+
+    // Debit entry
+    await db.insert(voucherEntries).values({
+      voucherId: newVoucher.id,
+      ledgerAccountId: debitAccountId,
+      debitAmount: amount.toFixed(2),
+      creditAmount: "0",
+      narration,
+    });
+    // Credit entry
+    await db.insert(voucherEntries).values({
+      voucherId: newVoucher.id,
+      ledgerAccountId: creditAccountId,
+      debitAmount: "0",
+      creditAmount: amount.toFixed(2),
+      narration,
+    });
+  }
+}
 
 // Helper function to calculate historical inventory for a specific location as of a given date
 async function calculateHistoricalLocationInventory(
@@ -6474,6 +6677,64 @@ if (asOfDate) {
       }
     },
   );
+
+  // ─── Intercompany POS Auto-Transfer Config ────────────────────────────────────
+
+  app.get("/api/intercompany-pos-config", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const [config] = await db.select().from(intercompanyPosConfigs).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
+      res.json(config || null);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/intercompany-pos-config", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { destCompanyId, sourceIntercoAccountId, destIntercoAccountId, enabled } = req.body;
+      if (!destCompanyId || !sourceIntercoAccountId || !destIntercoAccountId) {
+        return res.status(400).json({ message: "destCompanyId, sourceIntercoAccountId, and destIntercoAccountId are required" });
+      }
+      const [existing] = await db.select().from(intercompanyPosConfigs).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
+      if (existing) {
+        const [updated] = await db.update(intercompanyPosConfigs).set({
+          destCompanyId: parseInt(destCompanyId),
+          sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
+          destIntercoAccountId: parseInt(destIntercoAccountId),
+          enabled: enabled !== false,
+          updatedAt: new Date(),
+        }).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId)).returning();
+        return res.json(updated);
+      } else {
+        const [created] = await db.insert(intercompanyPosConfigs).values({
+          sourceCompanyId: companyId,
+          destCompanyId: parseInt(destCompanyId),
+          sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
+          destIntercoAccountId: parseInt(destIntercoAccountId),
+          enabled: enabled !== false,
+        }).returning();
+        return res.status(201).json(created);
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get ledger accounts for any company (for config UI)
+  app.get("/api/intercompany-pos-config/dest-accounts", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const { companyId } = req.query;
+      if (!companyId) return res.status(400).json({ message: "companyId required" });
+      const accounts = await storage.getAllLedgerAccounts(parseInt(companyId as string));
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // ─── ERP Worker Docs (fully isolated from Factory docs) ─────────────────────
 
@@ -19524,6 +19785,17 @@ if (asOfDate) {
       let customerAccount = null;
       if (isCreditSale) {
         customerAccount = await storage.getLedgerAccountById(accountId);
+      }
+
+      // ── Intercompany POS auto-transfer (non-blocking, cash sales only) ──
+      if (!isCreditSale && accountType === "cash") {
+        // fire-and-forget; never let errors surface to the client
+        runIntercompanyPosTransfer(
+          req.session.currentCompanyId!,
+          accountId,
+          grandTotal,
+          voucherDate,
+        ).catch((err) => console.error("[IntercompanyPOS] Unhandled:", err));
       }
 
       // Return complete sale details

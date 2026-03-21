@@ -1205,6 +1205,20 @@ export const insertInterCompanyTransferSchema = createInsertSchema(interCompanyT
 export type InsertInterCompanyTransfer = z.infer<typeof insertInterCompanyTransferSchema>;
 export type InterCompanyTransfer = typeof interCompanyTransfers.$inferSelect;
 
+// Intercompany POS Auto-Transfer Config
+export const intercompanyPosConfigs = pgTable("intercompany_pos_configs", {
+  id: serial("id").primaryKey(),
+  sourceCompanyId: integer("source_company_id").notNull().unique(),
+  destCompanyId: integer("dest_company_id").notNull(),
+  sourceIntercoAccountId: integer("source_interco_account_id").notNull(),
+  destIntercoAccountId: integer("dest_interco_account_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type IntercompanyPosConfig = typeof intercompanyPosConfigs.$inferSelect;
+
 // Salary Advances - track advances given to employees
 export const salaryAdvances = pgTable("salary_advances", {
   id: serial("id").primaryKey(),

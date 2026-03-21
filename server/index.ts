@@ -477,6 +477,17 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Intercompany POS auto-transfer config (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS intercompany_pos_configs (
+      id serial PRIMARY KEY,
+      source_company_id integer NOT NULL UNIQUE,
+      dest_company_id integer NOT NULL,
+      source_interco_account_id integer NOT NULL,
+      dest_interco_account_id integer NOT NULL,
+      enabled boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
