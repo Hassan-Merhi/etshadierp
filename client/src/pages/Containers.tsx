@@ -23,7 +23,9 @@ import {
   Upload,
   FileSpreadsheet,
   Pencil,
+  ChevronDown,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -733,42 +735,49 @@ export default function Containers() {
       >
         {activeTab === "active" && (
           <div className="flex gap-2 flex-wrap">
-            <Button
-              onClick={exportToExcel}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-export-excel"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button
-              onClick={exportAllContainersFull}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-export-all-full"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export All (Full)</span>
-              <span className="sm:hidden">All</span>
-            </Button>
-            <Button
-              onClick={() => setAddDialogOpen(true)}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-add-container"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Container</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-            <Link href="/po-import">
-              <Button className="gap-2" data-testid="button-import-po">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Import PO</span>
-                <span className="sm:hidden">Import</span>
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
+                  <Download className="h-4 w-4" />
+                  Export
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={exportToExcel} data-testid="button-export-excel">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={exportAllContainersFull} data-testid="button-export-all-full">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export All (Full)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-2" data-testid="button-add-dropdown">
+                  <Plus className="h-4 w-4" />
+                  Add
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Container
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild data-testid="button-import-po">
+                  <Link href="/po-import" className="flex items-center">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Import PO
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
         {activeTab === "otw" && (
