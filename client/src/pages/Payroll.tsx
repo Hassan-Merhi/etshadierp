@@ -2386,7 +2386,7 @@ export default function Payroll() {
 
           {/* Manage Worker Group Members Dialog */}
           <Dialog open={workerGroupMembersDialogOpen} onOpenChange={setWorkerGroupMembersDialogOpen}>
-            <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
                 <DialogDescription>
@@ -3192,7 +3192,7 @@ export default function Payroll() {
 
       {/* Bulk Payment Dialog */}
       <Dialog open={bulkPaymentDialogOpen} onOpenChange={setBulkPaymentDialogOpen}>
-        <DialogContent data-testid="dialog-bulk-payment" className="max-w-2xl w-[95vw] md:w-auto">
+        <DialogContent data-testid="dialog-bulk-payment" className="max-w-4xl w-[95vw]">
           <DialogHeader>
             <DialogTitle>Process Bulk Payment</DialogTitle>
             <DialogDescription>
@@ -4326,7 +4326,7 @@ export default function Payroll() {
 
       {/* Bulk Deposit Dialog */}
       <Dialog open={bulkDepositDialogOpen} onOpenChange={setBulkDepositDialogOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-deposit">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-deposit">
           <DialogHeader>
             <DialogTitle>Bulk Salary Deposit</DialogTitle>
             <DialogDescription>
@@ -4437,7 +4437,7 @@ export default function Payroll() {
 
       {/* Bulk Withdrawal Dialog */}
       <Dialog open={bulkWithdrawalDialogOpen} onOpenChange={setBulkWithdrawalDialogOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-withdrawal">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-withdrawal">
           <DialogHeader>
             <DialogTitle>Bulk Withdrawal</DialogTitle>
             <DialogDescription>
@@ -4572,7 +4572,7 @@ export default function Payroll() {
 
       {/* Bulk Bonus Dialog */}
       <Dialog open={bulkBonusDialogOpen} onOpenChange={(open) => { if (!open) { setBulkBonusStep("edit"); } setBulkBonusDialogOpen(open); }}>
-        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
           <DialogHeader>
             <DialogTitle>Bulk Bonus Deposit</DialogTitle>
             <DialogDescription>
@@ -4790,7 +4790,7 @@ export default function Payroll() {
 
       {/* Employee Statement Dialog */}
       <Dialog open={!!statementEmployee} onOpenChange={(open) => !open && setStatementEmployee(null)}>
-        <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
