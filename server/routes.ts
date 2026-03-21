@@ -23770,9 +23770,19 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { status, supplierId, startDate, endDate } = req.query;
+      const { status, supplierId, startDate, endDate, allCompanies } = req.query;
 
-      const conditions = [eq(containers.companyId, companyId)];
+      // Determine which companies to include
+      let companyCondition;
+      if (allCompanies === "true") {
+        const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
+        const companyIds = userCompanies.map((uc) => uc.companyId);
+        companyCondition = companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
+      } else {
+        companyCondition = eq(containers.companyId, companyId);
+      }
+
+      const conditions = [companyCondition];
 
       if (status) {
         conditions.push(eq(containers.status, status as string));
@@ -23782,11 +23792,18 @@ if (asOfDate) {
           eq(containers.supplierId, parseInt(supplierId as string)),
         );
       }
+
+      // For Offloaded containers, filter by offloadDate; otherwise use importDate
+      const isOffloaded = (status as string | undefined)?.toLowerCase() === "offloaded";
       if (startDate) {
-        conditions.push(sql`${containers.importDate} >= ${startDate}`);
+        conditions.push(isOffloaded
+          ? sql`${containers.offloadDate} >= ${startDate}`
+          : sql`${containers.importDate} >= ${startDate}`);
       }
       if (endDate) {
-        conditions.push(sql`${containers.importDate} <= ${endDate}`);
+        conditions.push(isOffloaded
+          ? sql`${containers.offloadDate} <= ${endDate}`
+          : sql`${containers.importDate} <= ${endDate}`);
       }
 
       const containerData = await db
@@ -23796,6 +23813,7 @@ if (asOfDate) {
           supplierName: suppliers.legalName,
           status: containers.status,
           importDate: containers.importDate,
+          offloadDate: containers.offloadDate,
           itemsTotal: containers.itemsTotal,
           chargesTotal: containers.chargesTotal,
           grandTotal: containers.grandTotal,
@@ -23803,7 +23821,7 @@ if (asOfDate) {
         .from(containers)
         .innerJoin(suppliers, eq(containers.supplierId, suppliers.id))
         .where(and(...conditions))
-        .orderBy(containers.importDate);
+        .orderBy(isOffloaded ? containers.offloadDate : containers.importDate);
 
       const totalItemsTotal = containerData.reduce(
         (sum, c) => sum + parseFloat(c.itemsTotal || "0"),

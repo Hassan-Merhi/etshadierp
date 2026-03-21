@@ -141,6 +141,7 @@ interface Container {
   supplierName: string;
   status: string;
   importDate: string;
+  offloadDate: string | null;
   itemsTotal: string;
   chargesTotal: string;
   grandTotal: string;
@@ -328,6 +329,7 @@ export default function Analytics() {
   const [reportStockGroupId, setReportStockGroupId] = useState("all");
   const [reportSupplierId, setReportSupplierId] = useState("all");
   const [reportContainerStatus, setReportContainerStatus] = useState("all");
+  const [reportAllCompanies, setReportAllCompanies] = useState("current");
   
   // Opening Stock Summary state
   const [openingStockLocationId, setOpeningStockLocationId] = useState("all");
@@ -544,6 +546,7 @@ export default function Analytics() {
     if (reportEndDate) params.append("endDate", reportEndDate);
     if (reportSupplierId && reportSupplierId !== "all") params.append("supplierId", reportSupplierId);
     if (reportContainerStatus && reportContainerStatus !== "all") params.append("status", reportContainerStatus);
+    if (reportAllCompanies === "all") params.append("allCompanies", "true");
     return `/api/reports/containers?${params}`;
   };
 
@@ -1868,7 +1871,7 @@ export default function Analytics() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
               <div>
                 <Label htmlFor="container-start-date">Start Date</Label>
                 <DatePickerInput
@@ -1916,6 +1919,18 @@ export default function Analytics() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="container-company">Company</Label>
+                <Select value={reportAllCompanies} onValueChange={setReportAllCompanies}>
+                  <SelectTrigger id="container-company">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current Company</SelectItem>
+                    <SelectItem value="all">All Companies</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {loadingContainers ? (
@@ -1929,7 +1944,7 @@ export default function Analytics() {
                         <TableHead>Container #</TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Import Date</TableHead>
+                        <TableHead>{reportContainerStatus === "Offloaded" ? "Offload Date" : "Import Date"}</TableHead>
                         <TableHead className="text-right">Items Total</TableHead>
                         <TableHead className="text-right">Charges Total</TableHead>
                         <TableHead className="text-right">Grand Total</TableHead>
@@ -1941,7 +1956,7 @@ export default function Analytics() {
                           <TableCell className="font-mono">{container.containerNumber}</TableCell>
                           <TableCell>{container.supplierName}</TableCell>
                           <TableCell>{container.status}</TableCell>
-                          <TableCell>{container.importDate}</TableCell>
+                          <TableCell>{reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</TableCell>
                           <TableCell className="text-right font-mono">
                             {formatAmount(parseFloat(container.itemsTotal))}
                           </TableCell>
@@ -1978,7 +1993,7 @@ export default function Analytics() {
                           <span className="font-mono font-medium">{container.containerNumber}</span>
                           <span className="text-sm text-muted-foreground">{container.status}</span>
                         </div>
-                        <div className="text-sm text-muted-foreground">{container.supplierName} - {container.importDate}</div>
+                        <div className="text-sm text-muted-foreground">{container.supplierName} - {reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</div>
                         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
                           <div>
                             <span className="text-muted-foreground block">Items</span>
