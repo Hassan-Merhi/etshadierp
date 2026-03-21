@@ -72,7 +72,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package, Save, ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -346,6 +346,9 @@ export default function Payroll() {
   const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toISOString().split('T')[0]);
   const [bulkBonusNotes, setBulkBonusNotes] = useState("");
   const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
+  const [bulkBonusStep, setBulkBonusStep] = useState<"edit" | "preview">("edit");
+  // Pending bonuses: calculated per-employee, saved for later bulk posting
+  const [pendingBonuses, setPendingBonuses] = useState<Record<number, { amount: number; description: string; employeeName: string }>>({});
 
   // Bulk Withdrawal state
   const [bulkWithdrawalDialogOpen, setBulkWithdrawalDialogOpen] = useState(false);
@@ -939,6 +942,8 @@ export default function Payroll() {
       setBulkBonusDialogOpen(false);
       setBulkBonusAmounts({});
       setBulkBonusNotes("");
+      setBulkBonusStep("edit");
+      setPendingBonuses({});
     },
     onError: (error: Error) => {
       toast({
@@ -1318,29 +1323,29 @@ export default function Payroll() {
     }
   };
 
-  const submitSmartBonus = async () => {
-    let amount = 0;
-    let description = "";
+  const getSmartBonusAmount = (): { amount: number; description: string } => {
     if (bonusTab === "sales") {
-      if (!bonusSalesPreview) return;
+      if (!bonusSalesPreview) return { amount: 0, description: "" };
       const pct = parseFloat(bonusSalesCustomPct || "0");
       const sales = parseFloat(bonusSalesPreview.totalSalesAmount || "0");
-      amount = (sales * pct) / 100;
-      description = `Sales bonus ${pct}% of ${formatAmount(sales)} at ${bonusSalesPreview.locationName}`;
+      return {
+        amount: (sales * pct) / 100,
+        description: `Sales bonus ${pct}% of ${formatAmount(sales)} at ${bonusSalesPreview.locationName}`,
+      };
     } else {
-      amount = balesRows.reduce((sum, r) => {
-        const q = parseFloat(r.qty || "0");
-        const rate = parseFloat(r.rate || "0");
-        return sum + q * rate;
-      }, 0);
+      const amount = balesRows.reduce((sum, r) => sum + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0);
       const parts = balesRows
         .filter(r => r.locationId && parseFloat(r.qty || "0") > 0)
         .map(r => {
           const loc = locations.find(l => l.id === parseInt(r.locationId));
           return `${Number(r.qty).toFixed(0)} units × ${formatAmount(parseFloat(r.rate || "0"))} at ${loc?.name ?? "Unknown"}`;
         });
-      description = parts.join("; ");
+      return { amount, description: parts.join("; ") };
     }
+  };
+
+  const submitSmartBonus = async () => {
+    const { amount, description } = getSmartBonusAmount();
     if (amount <= 0) return;
     try {
       await modeApiRequest("POST", "/api/payroll/bonus-employee", {
@@ -1356,6 +1361,17 @@ export default function Payroll() {
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
+  };
+
+  const saveBonusToPending = () => {
+    const { amount, description } = getSmartBonusAmount();
+    if (amount <= 0 || !selectedEmployee) return;
+    const empId = selectedEmployee.id;
+    const empName = `${selectedEmployee.firstName} ${selectedEmployee.lastName}`;
+    setPendingBonuses(prev => ({ ...prev, [empId]: { amount, description, employeeName: empName } }));
+    toast({ title: "Bonus saved", description: `${formatAmount(amount)} saved for ${empName}. Open Bulk Bonus Deposit to review and post.` });
+    setBonusDialogOpen(false);
+    setSelectedEmployee(null);
   };
 
   const handleRecordDeduction = (advance: SalaryAdvance) => {
@@ -1585,13 +1601,23 @@ export default function Payroll() {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setBulkBonusAmounts({});
+                        const fromPending: Record<number, string> = {};
+                        for (const [empId, pb] of Object.entries(pendingBonuses)) {
+                          fromPending[parseInt(empId)] = pb.amount.toFixed(2);
+                        }
+                        setBulkBonusAmounts(fromPending);
+                        setBulkBonusStep("edit");
                         setBulkBonusDialogOpen(true);
                       }}
                       data-testid="button-open-bulk-bonus"
                     >
                       <Gift className="h-4 w-4 mr-2" />
                       Bulk Bonus Deposit
+                      {Object.keys(pendingBonuses).length > 0 && (
+                        <Badge className="ml-2" variant="default">
+                          {Object.keys(pendingBonuses).length}
+                        </Badge>
+                      )}
                     </Button>
                     <Button
                       variant="outline"
@@ -2895,9 +2921,23 @@ export default function Payroll() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 flex-wrap">
             <Button type="button" variant="outline" onClick={() => setBonusDialogOpen(false)} data-testid="button-cancel-bonus">
               Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={saveBonusToPending}
+              disabled={
+                bonusTab === "sales"
+                  ? !bonusSalesPreview || parseFloat(bonusSalesCustomPct || "0") <= 0
+                  : balesRows.reduce((s, r) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0) <= 0
+              }
+              data-testid="button-save-bonus-to-bulk"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save to Bulk
             </Button>
             <Button
               type="button"
@@ -2910,10 +2950,10 @@ export default function Payroll() {
               data-testid="button-submit-bonus"
             >
               {bonusTab === "sales" && bonusSalesPreview
-                ? `Give ${formatAmount((parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100)}`
+                ? `Give Now ${formatAmount((parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100)}`
                 : bonusTab === "bales"
-                ? `Give ${formatAmount(balesRows.reduce((s, r) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0))}`
-                : "Give Bonus"}
+                ? `Give Now ${formatAmount(balesRows.reduce((s, r) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0))}`
+                : "Give Now"}
             </Button>
           </div>
         </DialogContent>
@@ -4449,101 +4489,180 @@ export default function Payroll() {
       </Dialog>
 
       {/* Bulk Bonus Dialog */}
-      <Dialog open={bulkBonusDialogOpen} onOpenChange={setBulkBonusDialogOpen}>
+      <Dialog open={bulkBonusDialogOpen} onOpenChange={(open) => { if (!open) { setBulkBonusStep("edit"); } setBulkBonusDialogOpen(open); }}>
         <DialogContent className="max-w-2xl w-[95vw] md:w-auto max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
           <DialogHeader>
             <DialogTitle>Bulk Bonus Deposit</DialogTitle>
             <DialogDescription>
-              Enter bonus amounts for each employee. Leave blank or zero to skip.
+              {bulkBonusStep === "edit"
+                ? "Enter bonus amounts for each employee. Leave blank or zero to skip."
+                : "Review the bonuses below before confirming."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Bonus Date</Label>
-                <Input
-                  type="date"
-                  value={bulkBonusDate}
-                  onChange={(e) => setBulkBonusDate(e.target.value)}
-                  data-testid="input-bulk-bonus-date"
-                />
+          {bulkBonusStep === "edit" ? (
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Bonus Date</Label>
+                  <Input
+                    type="date"
+                    value={bulkBonusDate}
+                    onChange={(e) => setBulkBonusDate(e.target.value)}
+                    data-testid="input-bulk-bonus-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes (optional)</Label>
+                  <Input
+                    placeholder="e.g., Q4 2025 performance bonus"
+                    value={bulkBonusNotes}
+                    onChange={(e) => setBulkBonusNotes(e.target.value)}
+                    data-testid="input-bulk-bonus-notes"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input
-                  placeholder="e.g., Q4 2025 performance bonus"
-                  value={bulkBonusNotes}
-                  onChange={(e) => setBulkBonusNotes(e.target.value)}
-                  data-testid="input-bulk-bonus-notes"
-                />
-              </div>
-            </div>
 
-            <div className="border rounded-md flex-1 overflow-hidden">
-              <div className="max-h-[400px] overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead className="text-right w-40">Bonus Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employeeStaff.map((emp) => (
-                      <TableRow key={emp.id}>
-                        <TableCell>{emp.firstName} {emp.lastName}</TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            className="text-right font-mono w-32 ml-auto"
-                            value={bulkBonusAmounts[emp.id] || ""}
-                            onChange={(e) => setBulkBonusAmounts(prev => ({
-                              ...prev,
-                              [emp.id]: e.target.value
-                            }))}
-                            data-testid={`input-bonus-${emp.id}`}
-                          />
-                        </TableCell>
+              <div className="border rounded-md flex-1 overflow-hidden">
+                <div className="max-h-[400px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead className="text-right w-40">Bonus Amount</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {employeeStaff.map((emp) => {
+                        const isPending = !!pendingBonuses[emp.id];
+                        return (
+                          <TableRow key={emp.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span>{emp.firstName} {emp.lastName}</span>
+                                {isPending && (
+                                  <Badge variant="secondary" className="text-xs">Calculated</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                className="text-right font-mono w-32 ml-auto"
+                                value={bulkBonusAmounts[emp.id] || ""}
+                                onChange={(e) => setBulkBonusAmounts(prev => ({
+                                  ...prev,
+                                  [emp.id]: e.target.value
+                                }))}
+                                data-testid={`input-bonus-${emp.id}`}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
-              <div className="text-sm">
-                <span className="text-muted-foreground">Total Bonus: </span>
-                <span className="font-semibold font-mono">
-                  {formatAmount(Object.values(bulkBonusAmounts)
-                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
-                </span>
-                <span className="text-muted-foreground ml-2">
-                  ({Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setBulkBonusDialogOpen(false)}
-                  data-testid="button-cancel-bulk-bonus"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => bulkBonusMutation.mutate()}
-                  disabled={bulkBonusMutation.isPending || Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length === 0}
-                  data-testid="button-confirm-bulk-bonus"
-                >
-                  {bulkBonusMutation.isPending ? "Processing..." : "Deposit Bonuses"}
-                </Button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total: </span>
+                  <span className="font-semibold font-mono">
+                    {formatAmount(Object.values(bulkBonusAmounts).reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    ({Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setBulkBonusDialogOpen(false)}
+                    data-testid="button-cancel-bulk-bonus"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => setBulkBonusStep("preview")}
+                    disabled={Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length === 0}
+                    data-testid="button-preview-bulk-bonus"
+                  >
+                    Preview
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="border rounded-md flex-1 overflow-hidden">
+                <div className="max-h-[420px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employeeStaff
+                        .filter(emp => parseFloat(bulkBonusAmounts[emp.id] || "0") > 0)
+                        .map(emp => {
+                          const pending = pendingBonuses[emp.id];
+                          return (
+                            <TableRow key={emp.id}>
+                              <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                                {pending?.description || (bulkBonusNotes || "Bonus")}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                {formatAmount(parseFloat(bulkBonusAmounts[emp.id] || "0"))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total: </span>
+                  <span className="font-semibold font-mono">
+                    {formatAmount(Object.values(bulkBonusAmounts).reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    ({Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
+                  </span>
+                  {bulkBonusDate && (
+                    <span className="text-muted-foreground ml-2">· {bulkBonusDate}</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setBulkBonusStep("edit")}
+                    data-testid="button-back-bulk-bonus"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => bulkBonusMutation.mutate()}
+                    disabled={bulkBonusMutation.isPending}
+                    data-testid="button-confirm-bulk-bonus"
+                  >
+                    {bulkBonusMutation.isPending ? "Processing..." : "Confirm & Deposit"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
