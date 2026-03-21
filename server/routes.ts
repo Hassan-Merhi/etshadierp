@@ -230,9 +230,10 @@ async function runIntercompanyPosTransfer(
         voucherNumber: dstVoucherNum,
         date: saleDateStr,
         narration: dstNarration,
-        debitAccountId: destCashAccount.id,             // cash outlet in dest
-        creditAccountId: config.destIntercoAccountId,   // interco payable
+        debitAccountId: destCashAccount.id,             // cash outlet in dest (per-sale)
+        creditAccountId: config.destIntercoAccountId,   // interco payable (running total)
         amount: saleAmount,
+        debitIsRunningTotal: false,  // DEST: CR is running total, DR is per-sale cash outlet
       });
     } else {
       console.warn(`[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`);
@@ -243,18 +244,30 @@ async function runIntercompanyPosTransfer(
 }
 
 // Upsert the daily intercompany voucher for one side (source or dest).
-// The voucher has one debit entry (running total) and one or many credit entries
-// (one per cash account used today). We locate existing entries by account ID.
+//
+// SOURCE company  (debitIsRunningTotal = true, the default):
+//   One DR entry  [debitAccountId  = interco]  → running total, updated every call
+//   Many CR entries [creditAccountId = cash outlet] → one per unique outlet
+//
+// DEST company  (debitIsRunningTotal = false):
+//   Many DR entries [debitAccountId = cash outlet] → one per unique outlet, specific amount
+//   One CR entry  [creditAccountId = interco]  → running total, updated every call
+//
 async function upsertIntercompanyVoucher(opts: {
   companyId: number;
   voucherNumber: string;
   date: string;
   narration: string;
-  debitAccountId: number;    // account to Dr (running total)
-  creditAccountId: number;   // account to Cr (per cash outlet)
+  debitAccountId: number;
+  creditAccountId: number;
   amount: number;
+  debitIsRunningTotal?: boolean;   // true = SOURCE (default), false = DEST
 }) {
-  const { companyId, voucherNumber, date, narration, debitAccountId, creditAccountId, amount } = opts;
+  const {
+    companyId, voucherNumber, date, narration,
+    debitAccountId, creditAccountId, amount,
+  } = opts;
+  const debitIsRunningTotal = opts.debitIsRunningTotal ?? true;
 
   // Find existing daily voucher
   const [existing] = await db
@@ -268,8 +281,7 @@ async function upsertIntercompanyVoucher(opts: {
     );
 
   if (existing) {
-    // --- Update existing voucher ---
-    // Update the description in case the narration format changed
+    // Update description in case narration format changed
     await db
       .update(vouchers)
       .set({ description: narration })
@@ -280,54 +292,111 @@ async function upsertIntercompanyVoucher(opts: {
       .from(voucherEntries)
       .where(eq(voucherEntries.voucherId, existing.id));
 
-    // Find or create credit entry for this cash account
-    const existingCrEntry = entries.find(
-      (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
-    );
-    if (existingCrEntry) {
-      const newCr = (parseFloat(existingCrEntry.creditAmount ?? "0") + amount).toFixed(2);
-      await db
-        .update(voucherEntries)
-        .set({ creditAmount: newCr })
-        .where(eq(voucherEntries.id, existingCrEntry.id));
-    } else {
-      await db.insert(voucherEntries).values({
-        voucherId: existing.id,
-        ledgerAccountId: creditAccountId,
-        debitAmount: "0",
-        creditAmount: amount.toFixed(2),
-        narration,
-      });
-    }
+    if (debitIsRunningTotal) {
+      // ── SOURCE MODE ───────────────────────────────────────────────────────
+      // CR side = per-sale cash outlet (many accounts, one entry each)
+      // DR side = single interco account, always the running total of all CRs
 
-    // Recalculate total credit and update the debit (running total) entry
-    const refreshedEntries = await db
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, existing.id));
-    const totalCr = refreshedEntries
-      .filter((e) => e.ledgerAccountId !== debitAccountId)
-      .reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+      // 1. Find or insert CR entry for this cash outlet
+      const existingCrEntry = entries.find(
+        (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
+      );
+      if (existingCrEntry) {
+        const newCr = (parseFloat(existingCrEntry.creditAmount ?? "0") + amount).toFixed(2);
+        await db
+          .update(voucherEntries)
+          .set({ creditAmount: newCr })
+          .where(eq(voucherEntries.id, existingCrEntry.id));
+      } else {
+        await db.insert(voucherEntries).values({
+          voucherId: existing.id,
+          ledgerAccountId: creditAccountId,
+          debitAmount: "0",
+          creditAmount: amount.toFixed(2),
+          narration,
+        });
+      }
 
-    const existingDrEntry = refreshedEntries.find(
-      (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
-    );
-    if (existingDrEntry) {
-      await db
-        .update(voucherEntries)
-        .set({ debitAmount: totalCr.toFixed(2) })
-        .where(eq(voucherEntries.id, existingDrEntry.id));
+      // 2. Re-fetch and recalculate running total, then update the single DR entry
+      const refreshed = await db
+        .select()
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, existing.id));
+      const totalCr = refreshed
+        .filter((e) => e.ledgerAccountId !== debitAccountId)
+        .reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+
+      const existingDrEntry = refreshed.find(
+        (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
+      );
+      if (existingDrEntry) {
+        await db
+          .update(voucherEntries)
+          .set({ debitAmount: totalCr.toFixed(2) })
+          .where(eq(voucherEntries.id, existingDrEntry.id));
+      } else {
+        await db.insert(voucherEntries).values({
+          voucherId: existing.id,
+          ledgerAccountId: debitAccountId,
+          debitAmount: totalCr.toFixed(2),
+          creditAmount: "0",
+          narration,
+        });
+      }
     } else {
-      await db.insert(voucherEntries).values({
-        voucherId: existing.id,
-        ledgerAccountId: debitAccountId,
-        debitAmount: totalCr.toFixed(2),
-        creditAmount: "0",
-        narration,
-      });
+      // ── DEST MODE ─────────────────────────────────────────────────────────
+      // DR side = per-sale cash outlet (many accounts, one entry each, specific amount)
+      // CR side = single interco account, always the running total of all DRs
+
+      // 1. Find or insert DR entry for this cash outlet (specific amount, not running total)
+      const existingDrEntry = entries.find(
+        (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
+      );
+      if (existingDrEntry) {
+        const newDr = (parseFloat(existingDrEntry.debitAmount ?? "0") + amount).toFixed(2);
+        await db
+          .update(voucherEntries)
+          .set({ debitAmount: newDr })
+          .where(eq(voucherEntries.id, existingDrEntry.id));
+      } else {
+        await db.insert(voucherEntries).values({
+          voucherId: existing.id,
+          ledgerAccountId: debitAccountId,
+          debitAmount: amount.toFixed(2),
+          creditAmount: "0",
+          narration,
+        });
+      }
+
+      // 2. Re-fetch and recalculate running total, then update the single CR entry
+      const refreshed = await db
+        .select()
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, existing.id));
+      const totalDr = refreshed
+        .filter((e) => e.ledgerAccountId !== creditAccountId)
+        .reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
+
+      const existingCrEntry = refreshed.find(
+        (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
+      );
+      if (existingCrEntry) {
+        await db
+          .update(voucherEntries)
+          .set({ creditAmount: totalDr.toFixed(2) })
+          .where(eq(voucherEntries.id, existingCrEntry.id));
+      } else {
+        await db.insert(voucherEntries).values({
+          voucherId: existing.id,
+          ledgerAccountId: creditAccountId,
+          debitAmount: "0",
+          creditAmount: totalDr.toFixed(2),
+          narration,
+        });
+      }
     }
   } else {
-    // --- Create new voucher with two entries ---
+    // ── CREATE new voucher with initial two entries ────────────────────────
     const [newVoucher] = await db
       .insert(vouchers)
       .values({
@@ -341,7 +410,6 @@ async function upsertIntercompanyVoucher(opts: {
       })
       .returning();
 
-    // Debit entry
     await db.insert(voucherEntries).values({
       voucherId: newVoucher.id,
       ledgerAccountId: debitAccountId,
@@ -349,7 +417,6 @@ async function upsertIntercompanyVoucher(opts: {
       creditAmount: "0",
       narration,
     });
-    // Credit entry
     await db.insert(voucherEntries).values({
       voucherId: newVoucher.id,
       ledgerAccountId: creditAccountId,
