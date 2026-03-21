@@ -129,6 +129,7 @@ const allMenuGroups: MenuGroup[] = [
     icon: Wallet,
     items: [
       { title: "Workers", url: "/factory/workers", icon: HardHat },
+      { title: "Employees", url: "/factory/employees", icon: Users },
       { title: "Suppliers", url: "/factory/suppliers", icon: Users },
       { title: "Containers", url: "/factory/containers", icon: Container },
     ],
