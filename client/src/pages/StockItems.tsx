@@ -111,6 +111,22 @@ export default function StockItems() {
     queryKey: ["/api/locations"],
   });
 
+  // Location-specific selling prices for all items
+  const { data: locationPricesRaw = [] } = useQuery<{ stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[]>({
+    queryKey: ["/api/stock-item-location-prices/all"],
+  });
+
+  // Build map: stockItemId -> locationId -> price
+  const locationPriceMap = new Map<number, { locationId: number; locationName: string; sellingPrice: string }[]>();
+  for (const lp of locationPricesRaw) {
+    if (!locationPriceMap.has(lp.stockItemId)) locationPriceMap.set(lp.stockItemId, []);
+    locationPriceMap.get(lp.stockItemId)!.push(lp);
+  }
+  // Sort each item's locations by name
+  for (const [, arr] of locationPriceMap) {
+    arr.sort((a, b) => a.locationName.localeCompare(b.locationName));
+  }
+
   const deleteMutation = useMutation({
     mutationFn: async (ids: number[]) => {
       return await apiRequest("POST", "/api/stock-items/bulk-delete", { ids });
@@ -419,6 +435,7 @@ export default function StockItems() {
                   </th>
                   <th className="text-left px-3 font-medium sticky left-0 bg-muted z-10">Name</th>
                   <th className="text-left px-3 font-medium">Stock Group</th>
+                  {!hideStockRates && <th className="text-left px-3 font-medium min-w-[280px]">Selling Prices</th>}
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
                 </tr>
