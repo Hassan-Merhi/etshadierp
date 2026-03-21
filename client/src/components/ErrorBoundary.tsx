@@ -25,7 +25,6 @@ function isChunkLoadError(error: unknown): boolean {
     if (e.message)     candidates.push(String(e.message));
     if (e.stack)       candidates.push(String(e.stack));
     if (e.name)        candidates.push(String(e.name));
-    // toString fallback
     try { candidates.push(e.toString()); } catch { /* ignore */ }
   }
   const combined = candidates.join(" ");
@@ -36,37 +35,49 @@ function isChunkLoadError(error: unknown): boolean {
     combined.includes("Unable to preload CSS") ||
     combined.includes("ChunkLoadError") ||
     (error as any)?.name === "ChunkLoadError" ||
-    // Vite chunk URL pattern inside any field
     /\/assets\/[^/]+-[A-Za-z0-9_-]+\.js/.test(combined)
   );
-  // NOTE: we intentionally do NOT match bare "Failed to fetch" because that
-  // also fires for failed API requests and would cause false positives.
 }
 
-// Hard navigation — forces the browser to re-fetch the HTML + new chunk URLs.
+// Hard navigation — forces the browser to re-fetch HTML + new chunk URLs.
 function hardNavigate(path: string) {
   window.location.href = path + (path.includes("?") ? "&" : "?") + "_r=" + Date.now();
 }
 
-// Per-page reload guard: allow one auto-reload per pathname.
-function hasAutoReloaded(path: string): boolean {
+const RETRY_WINDOW_MS = 30_000; // 30s sliding window
+const MAX_RETRIES = 2;
+
+function getRetryState(path: string): { count: number; firstAt: number } {
   try {
-    return sessionStorage.getItem("chunkReload:" + path) === "1";
-  } catch {
-    return false;
-  }
+    const raw = sessionStorage.getItem("chunkRetry:" + path);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { count: 0, firstAt: 0 };
 }
 
-function markAutoReloaded(path: string) {
+function recordRetry(path: string) {
   try {
-    sessionStorage.setItem("chunkReload:" + path, "1");
+    const now = Date.now();
+    const state = getRetryState(path);
+    // Reset window if it's been long enough
+    const base = now - state.firstAt < RETRY_WINDOW_MS ? state : { count: 0, firstAt: now };
+    sessionStorage.setItem("chunkRetry:" + path, JSON.stringify({
+      count: base.count + 1,
+      firstAt: base.count === 0 ? now : state.firstAt,
+    }));
   } catch { /* ignore */ }
 }
 
-function clearAutoReloaded(path: string) {
+function clearRetries(path: string) {
   try {
-    sessionStorage.removeItem("chunkReload:" + path);
+    sessionStorage.removeItem("chunkRetry:" + path);
   } catch { /* ignore */ }
+}
+
+function canAutoRetry(path: string): boolean {
+  const { count, firstAt } = getRetryState(path);
+  const withinWindow = Date.now() - firstAt < RETRY_WINDOW_MS;
+  return count < MAX_RETRIES && (count === 0 || withinWindow);
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -82,12 +93,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: unknown): Partial<State> {
     const isChunk = isChunkLoadError(error);
-    // Normalise to Error so we can display the message
     let normalized: Error;
     if (error instanceof Error) {
       normalized = error;
     } else {
-      // Build a useful message from whatever we received
       const msg =
         (error as any)?.message ||
         (error as any)?.stack?.split?.("\n")?.[0] ||
@@ -114,15 +123,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
     if (isChunkLoadError(error)) {
       const path = window.location.pathname;
-      if (!hasAutoReloaded(path)) {
-        markAutoReloaded(path);
-        hardNavigate(path);
+      if (canAutoRetry(path)) {
+        recordRetry(path);
+        // Small delay so Vite/server has time to finish restarting
+        setTimeout(() => hardNavigate(path), 800);
       }
     }
   }
 
   handleReload = () => {
-    clearAutoReloaded(window.location.pathname);
+    clearRetries(window.location.pathname);
     hardNavigate(window.location.pathname);
   };
 
@@ -132,12 +142,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Double-check in render: the stored error message might have survived even
-      // if getDerivedStateFromError couldn't classify it correctly.
       const isChunk =
         this.state.isChunkError ||
         isChunkLoadError(this.state.error) ||
-        // Fallback: inspect the displayed message directly
         (this.state.error?.message ?? "").includes("dynamically imported module") ||
         (this.state.error?.message ?? "").includes("Loading chunk") ||
         /\/assets\/[^/]+-[A-Za-z0-9_-]+\.js/.test(this.state.error?.message ?? "");
