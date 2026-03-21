@@ -503,13 +503,14 @@ export default function Accounts() {
         } else {
           rootAccounts.push(mappedAccount);
         }
-      } else {
-        // Find parent in ledgerAccounts if it has one
+      } else if (account.type === "ledger") {
+        // Only ledger-type accounts participate in the ledger account hierarchy.
+        // Other types (employee, bank, supplier, customer, etc.) are always root-level
+        // to prevent accidental ID collisions with unrelated ledger accounts.
         const ledgerAccount = ledgerAccounts.find(
           (la) => la.id === account.accountId,
         );
         if (ledgerAccount?.parentId) {
-          // Find parent in account map
           const parentAccount = Array.from(accountMap.values()).find(
             (a) => a.accountId === ledgerAccount.parentId,
           );
@@ -521,6 +522,8 @@ export default function Accounts() {
         } else {
           rootAccounts.push(mappedAccount);
         }
+      } else {
+        rootAccounts.push(mappedAccount);
       }
     });
 
