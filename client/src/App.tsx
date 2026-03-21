@@ -542,7 +542,7 @@ function AuthenticatedApp() {
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
-                  <ErrorBoundary key={currentLocation}>
+                  <ErrorBoundary resetKey={currentLocation}>
                     <Router user={user} posImportEnabled={posImportEnabled} />
                   </ErrorBoundary>
                 </div>
@@ -629,7 +629,7 @@ function AuthenticatedApp() {
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
-                  <ErrorBoundary key={currentLocation}>
+                  <ErrorBoundary resetKey={currentLocation}>
                   <Switch>
                     {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
@@ -759,7 +759,7 @@ function AuthenticatedApp() {
             <OfflineBanner />
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">
               <div className="w-full">
-                <ErrorBoundary key={currentLocation}>
+                <ErrorBoundary resetKey={currentLocation}>
                   <Router user={user} />
                 </ErrorBoundary>
               </div>
