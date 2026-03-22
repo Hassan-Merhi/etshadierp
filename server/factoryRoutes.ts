@@ -15411,6 +15411,145 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   });
 
   // ============================================================
+  // BALE LEDGER — full production lifecycle summary
+  // ============================================================
+
+  app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Load all relevant data
+      const [allBalesRaw, allProducts, allCategories] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            fb.id,
+            fb.product_id AS "productId",
+            fb.product_name AS "productName",
+            fb.article_code AS "articleCode",
+            fb.status,
+            COALESCE(fb.weight_kg, 0)::float AS "weightKg",
+            COALESCE(fb.total_cost, 0)::float AS "totalCost",
+            fb.waste_dispatch_id AS "wasteDispatchId"
+          FROM factory_bales fb
+          WHERE fb.company_id = ${companyId}
+          AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'REMOVED')
+        `),
+        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
+        db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
+      ]);
+
+      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
+
+      // Identify waste categories (garbage or wiper)
+      const wasteCategories = new Set<number>(
+        allCategories
+          .filter((c: any) => {
+            const n = (c.name || "").toLowerCase();
+            return n.includes("garbage") || n.includes("wiper");
+          })
+          .map((c: any) => c.id)
+      );
+
+      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
+      const categoryMap = new Map(allCategories.map((c: any) => [c.id, c]));
+
+      function isWasteProduct(productId: number | null, articleCode?: string | null): boolean {
+        if (articleCode?.startsWith("HMD16")) return true;
+        if (!productId) return false;
+        const p = productMap.get(productId);
+        if (!p) return false;
+        return p.categoryId ? wasteCategories.has(p.categoryId) : false;
+      }
+
+      function getProductLabel(bale: any): { productName: string; articleCode: string; categoryName: string; productId: number | null } {
+        const p = bale.productId ? productMap.get(bale.productId) : null;
+        const cat = p?.categoryId ? categoryMap.get(p.categoryId) : null;
+        return {
+          productName: p?.name || bale.productName || bale.articleCode || "Unknown",
+          articleCode: p?.articleCode || bale.articleCode || "—",
+          categoryName: cat?.name || "—",
+          productId: bale.productId || null,
+        };
+      }
+
+      // Group bales into buckets
+      type BucketRow = { productId: number | null; productName: string; articleCode: string; categoryName: string; baleCount: number; totalWeightKg: number; totalCost: number };
+      const buckets: { currentStock: Map<string, BucketRow>; wasteStock: Map<string, BucketRow>; sold: Map<string, BucketRow>; wasteDispatched: Map<string, BucketRow> } = {
+        currentStock: new Map(),
+        wasteStock: new Map(),
+        sold: new Map(),
+        wasteDispatched: new Map(),
+      };
+
+      function addToBucket(bucket: Map<string, BucketRow>, key: string, label: ReturnType<typeof getProductLabel>, bale: any) {
+        const existing = bucket.get(key);
+        const w = parseFloat(bale.weightKg) || 0;
+        const c = parseFloat(bale.totalCost) || 0;
+        if (existing) {
+          existing.baleCount++;
+          existing.totalWeightKg += w;
+          existing.totalCost += c;
+        } else {
+          bucket.set(key, { ...label, baleCount: 1, totalWeightKg: w, totalCost: c });
+        }
+      }
+
+      for (const bale of allBales) {
+        const label = getProductLabel(bale);
+        const key = `${bale.productId ?? "null"}-${label.productName}`;
+        const waste = isWasteProduct(bale.productId, bale.articleCode);
+
+        if (bale.status === "SOLD") {
+          addToBucket(buckets.sold, key, label, bale);
+        } else if (bale.status === "REMOVED" && bale.wasteDispatchId) {
+          addToBucket(buckets.wasteDispatched, key, label, bale);
+        } else if (bale.status === "IN_STOCK" || bale.status === "FINALIZED") {
+          if (waste) {
+            addToBucket(buckets.wasteStock, key, label, bale);
+          } else {
+            addToBucket(buckets.currentStock, key, label, bale);
+          }
+        }
+      }
+
+      function bucketToArray(m: Map<string, BucketRow>) {
+        return Array.from(m.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+      }
+
+      function sumBucket(rows: BucketRow[]) {
+        return rows.reduce((acc, r) => ({
+          baleCount: acc.baleCount + r.baleCount,
+          totalWeightKg: acc.totalWeightKg + r.totalWeightKg,
+          totalCost: acc.totalCost + r.totalCost,
+        }), { baleCount: 0, totalWeightKg: 0, totalCost: 0 });
+      }
+
+      const currentStock = bucketToArray(buckets.currentStock);
+      const wasteStock = bucketToArray(buckets.wasteStock);
+      const sold = bucketToArray(buckets.sold);
+      const wasteDispatched = bucketToArray(buckets.wasteDispatched);
+
+      res.json({
+        currentStock,
+        wasteStock,
+        sold,
+        wasteDispatched,
+        totals: {
+          currentStock: sumBucket(currentStock),
+          wasteStock: sumBucket(wasteStock),
+          sold: sumBucket(sold),
+          wasteDispatched: sumBucket(wasteDispatched),
+          grand: sumBucket([...currentStock, ...wasteStock, ...sold, ...wasteDispatched]),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching bale ledger:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================
   // WASTE DISPATCH ROUTES — factory bale waste disposal
   // ============================================================
 

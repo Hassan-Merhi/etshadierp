@@ -29,6 +29,7 @@ import {
   MessageCircle,
   TableProperties,
   ExternalLink,
+  Layers,
 } from "lucide-react";
 import {
   Sidebar,
@@ -90,6 +91,7 @@ const navEntries: NavEntry[] = [
       { title: "Containers", url: "/containers", icon: Container },
       { title: "Stock Items", url: "/stock-items", icon: Package },
       { title: "Stock Query", url: "/stock-query", icon: Search },
+      { title: "Bale Ledger", url: "/bale-ledger", icon: Layers },
       { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
     ],
   },
