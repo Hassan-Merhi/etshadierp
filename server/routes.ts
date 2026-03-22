@@ -26393,10 +26393,13 @@ if (asOfDate) {
   // Net Profit (P&L) Report - Tally Prime style
   app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) {
+      const sessionCompanyId = req.session.currentCompanyId;
+      if (!sessionCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
+      const isAdminOrDev = req.user?.role === "Admin" || req.user?.role === "Developer";
+      const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+      const companyId = (isAdminOrDev && requestedCompanyId) ? requestedCompanyId : sessionCompanyId;
 
       // Get date range filters (optional)
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
@@ -26439,6 +26442,7 @@ if (asOfDate) {
         : [];
 
       // Calculate balances for each account (credit - debit for normal P&L view)
+      // accountBalances = period-filtered (used for P&L: purchases, sales, expenses, incomes)
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of companyEntries) {
         if (entry.ledgerAccountId) {
@@ -26446,6 +26450,42 @@ if (asOfDate) {
           const credit = parseFloat(entry.creditAmount || "0");
           const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
           accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      // allTimeAccountBalances = ALL vouchers up to endDate (used for Net Position balance sheet)
+      // This ensures Net Position reflects the true running balance of assets/liabilities
+      const allTimeVoucherConditions = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+      if (endDate) {
+        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+      const allTimeVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(...allTimeVoucherConditions))
+        .execute();
+      const allTimeVoucherIds = allTimeVouchers.map((v) => v.id);
+      const allTimeEntries = allTimeVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, allTimeVoucherIds))
+            .execute()
+        : [];
+      const allTimeAccountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of allTimeEntries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = allTimeAccountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          allTimeAccountBalances.set(entry.ledgerAccountId, {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
@@ -26653,14 +26693,15 @@ if (asOfDate) {
       // - Then we add indirect incomes and subtract indirect expenses
       const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
-      // 10. Net Position = Assets − Liabilities (same logic as /api/stats/net-profit dashboard)
-      // Each account's net balance: positive = asset (owed to us), negative = liability (we owe)
+      // 10. Net Position = Assets − Liabilities (balance sheet view)
+      // Uses allTimeAccountBalances (all vouchers up to endDate) so the running balance is accurate
+      // regardless of which period filter is selected for the P&L.
       let netPositionAssets = 0;
       let netPositionLiabilities = 0;
       for (const acc of companyAccounts) {
         const opening = parseFloat(acc.openingBalance || "0");
         const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
         const net = openingSigned + bal.debit - bal.credit;
         if (net >= 0) netPositionAssets += net;
         else netPositionLiabilities += Math.abs(net);
@@ -37444,6 +37485,28 @@ if (asOfDate) {
         }
       }
 
+      // allTimeAccountBalances for Net Position (all vouchers up to endDate, no startDate filter)
+      const allTimeVoucherConditionsXlsx: any[] = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+      if (endDate) allTimeVoucherConditionsXlsx.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
+      const allTimeVouchersXlsx = await db.select({ id: vouchers.id }).from(vouchers).where(and(...allTimeVoucherConditionsXlsx)).execute();
+      const allTimeVoucherIdsXlsx = allTimeVouchersXlsx.map((v) => v.id);
+      const allTimeEntriesXlsx = allTimeVoucherIdsXlsx.length > 0
+        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, allTimeVoucherIdsXlsx)).execute()
+        : [];
+      const allTimeAccountBalancesXlsx = new Map<number, { debit: number; credit: number }>();
+      for (const entry of allTimeEntriesXlsx) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = allTimeAccountBalancesXlsx.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          allTimeAccountBalancesXlsx.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
+        }
+      }
+
       // Opening Stock
       const allStockItems = await storage.getAllStockItems(companyId);
       let openingStockValue = 0;
@@ -37544,13 +37607,13 @@ if (asOfDate) {
       const totalExpenses = purchaseTotal + directExpenseTotal + indirectExpenseTotal;
       const totalIncomes = salesTotal + directIncomeTotal + indirectIncomeTotal;
 
-      // Net Position = Assets - Liabilities
+      // Net Position = Assets - Liabilities (uses allTimeAccountBalancesXlsx for accurate running balance)
       let netPositionAssets = 0;
       let netPositionLiabilities = 0;
       for (const acc of companyAccounts) {
         const opening = parseFloat((acc as any).openingBalance || '0');
         const openingSigned = (acc as any).openingBalanceSide === 'Dr' ? opening : -opening;
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const bal = allTimeAccountBalancesXlsx.get(acc.id) || { debit: 0, credit: 0 };
         const net = openingSigned + bal.debit - bal.credit;
         if (net >= 0) netPositionAssets += net;
         else netPositionLiabilities += Math.abs(net);
