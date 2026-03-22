@@ -15561,35 +15561,16 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const search = (req.query.search as string) || "";
 
       const allCategories = await db.select().from(factoryCategories).where(eq(factoryCategories.companyId, companyId));
-      const wasteCategories = allCategories.filter((c: any) => {
-        const name = (c.name || "").toLowerCase();
-        return name.includes("garbage") || name.includes("wiper");
-      });
-      const wasteCategoryIds = new Set(wasteCategories.map((c: any) => c.id));
-
       const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
-      const wasteProductIds = new Set(
-        allProducts
-          .filter((p: any) => {
-            if (p.categoryId && wasteCategoryIds.has(p.categoryId)) return true;
-            if (p.articleCode?.startsWith("HMD16")) return true;
-            return false;
-          })
-          .map((p: any) => p.id)
-      );
 
-      if (wasteProductIds.size === 0) {
-        return res.json({ bales: [], categories: wasteCategories });
-      }
-
+      // Show ALL in-stock/finalized bales — factory operator selects which to dispatch
       const baleRows = await db
         .select()
         .from(factoryBales)
         .where(
           and(
             eq(factoryBales.companyId, companyId),
-            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED"]),
-            inArray(factoryBales.productId, Array.from(wasteProductIds) as number[])
+            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED"])
           )
         )
         .orderBy(desc(factoryBales.id));
@@ -15635,7 +15616,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           })
         : enriched;
 
-      res.json({ bales: filtered, categories: wasteCategories });
+      res.json({ bales: filtered, categories: allCategories });
     } catch (error: any) {
       console.error("Error fetching waste bales:", error);
       res.status(500).json({ message: error.message });
