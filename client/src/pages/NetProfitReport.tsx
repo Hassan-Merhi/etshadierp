@@ -18,6 +18,7 @@ import {
   BarChart3,
   Building2,
   Loader2,
+  Scale,
 } from "lucide-react";
 
 type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time";
@@ -39,8 +40,8 @@ function getDateRange(period: Period): { startDate: string | null; endDate: stri
   if (period === "today") return { startDate: today, endDate: today };
 
   if (period === "this_week") {
-    const day = now.getDay(); // 0=Sun
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Mon
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(now);
     monday.setDate(diff);
     return { startDate: fmt(monday), endDate: today };
@@ -71,16 +72,17 @@ function AmountCell({ value }: { value: number }) {
   );
 }
 
-function KpiCard({ title, value, icon: Icon, color }: { title: string; value: number; icon: any; color: string }) {
+function KpiCard({ title, subtitle, value, icon: Icon, color }: { title: string; subtitle?: string; value: number; icon: any; color: string }) {
   const isNeg = value < 0;
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-4">
-        <div className={`p-3 rounded-md ${color}`}>
+        <div className={`p-3 rounded-md shrink-0 ${color}`}>
           <Icon className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{title}</p>
+          {subtitle && <p className="text-xs text-muted-foreground/70 italic">{subtitle}</p>}
           <p className={`text-lg font-bold ${isNeg ? "text-red-600 dark:text-red-400" : ""}`}>
             {isNeg ? "-" : ""}
             {formatAmount(Math.abs(value))}
@@ -213,7 +215,8 @@ export default function NetProfitReport() {
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
   const grossProfit = lp?.grossProfit ?? 0;
-  const netProfit = data?.netPosition ?? lp?.netProfit ?? 0;
+  const periodNetProfit = lp?.netProfit ?? 0;
+  const balanceSheetPosition = data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
   return (
@@ -282,11 +285,24 @@ export default function NetProfitReport() {
         {!isLoading && !error && data && (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
               <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
               <KpiCard title="Gross Profit" value={grossProfit} icon={BarChart3} color="bg-amber-600" />
-              <KpiCard title="Net Position" value={netProfit} icon={netProfit >= 0 ? TrendingUp : TrendingDown} color={netProfit >= 0 ? "bg-green-600" : "bg-red-600"} />
+              <KpiCard
+                title="Net Profit"
+                subtitle={periodLabel}
+                value={periodNetProfit}
+                icon={periodNetProfit >= 0 ? TrendingUp : TrendingDown}
+                color={periodNetProfit >= 0 ? "bg-green-600" : "bg-red-600"}
+              />
+              <KpiCard
+                title="Net Position"
+                subtitle="Balance Sheet"
+                value={balanceSheetPosition}
+                icon={Scale}
+                color={balanceSheetPosition >= 0 ? "bg-teal-600" : "bg-orange-600"}
+              />
               <KpiCard title="Closing Stock" value={closingStock} icon={DollarSign} color="bg-purple-600" />
             </div>
 
@@ -337,10 +353,22 @@ export default function NetProfitReport() {
                     <span>Gross Profit</span>
                     <AmountCell value={grossProfit} />
                   </div>
-                  <div className={`flex justify-between font-bold text-sm rounded-md px-2 py-1 ${netProfit >= 0 ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
-                    <span>Net Position</span>
-                    <AmountCell value={netProfit} />
+                  <div className={`flex justify-between font-bold text-sm rounded-md px-2 py-1 ${periodNetProfit >= 0 ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
+                    <span>Net Profit ({periodLabel})</span>
+                    <AmountCell value={periodNetProfit} />
                   </div>
+                </div>
+
+                <Separator className="my-3" />
+
+                <div className="flex justify-between items-center text-sm rounded-md px-2 py-1 bg-muted/40">
+                  <div>
+                    <span className="font-semibold">Balance Sheet Position</span>
+                    <span className="text-xs text-muted-foreground ml-2">(Assets − Liabilities, cumulative)</span>
+                  </div>
+                  <span className={`font-bold ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
+                    {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
+                  </span>
                 </div>
               </CardContent>
             </Card>
