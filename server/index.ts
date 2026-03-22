@@ -488,6 +488,20 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now(),
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Factory Bale Waste Dispatch (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS factory_bale_waste_dispatches (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      dispatch_number text NOT NULL,
+      dispatch_date date NOT NULL,
+      notes text,
+      total_bales integer NOT NULL DEFAULT 0,
+      total_weight_kg decimal(15,3) NOT NULL DEFAULT 0,
+      total_cost_written_off decimal(15,2) NOT NULL DEFAULT 0,
+      created_by integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS waste_dispatch_id integer`,
     // Waste Dispatch tables (Mar 2026)
     `CREATE TABLE IF NOT EXISTS waste_dispatches (
       id serial PRIMARY KEY,

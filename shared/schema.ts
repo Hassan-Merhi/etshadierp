@@ -3958,3 +3958,21 @@ export const wasteDispatchItems = pgTable("waste_dispatch_items", {
 export const insertWasteDispatchItemSchema = createInsertSchema(wasteDispatchItems).omit({ id: true });
 export type InsertWasteDispatchItem = z.infer<typeof insertWasteDispatchItemSchema>;
 export type WasteDispatchItem = typeof wasteDispatchItems.$inferSelect;
+
+// Factory Bale Waste Dispatches — groups bales disposed as waste
+export const factoryBaleWasteDispatches = pgTable("factory_bale_waste_dispatches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  dispatchNumber: text("dispatch_number").notNull(),
+  dispatchDate: date("dispatch_date").notNull(),
+  notes: text("notes"),
+  totalBales: integer("total_bales").notNull().default(0),
+  totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  totalCostWrittenOff: decimal("total_cost_written_off", { precision: 15, scale: 2 }).notNull().default("0"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryBaleWasteDispatchSchema = createInsertSchema(factoryBaleWasteDispatches).omit({ id: true, createdAt: true });
+export type InsertFactoryBaleWasteDispatch = z.infer<typeof insertFactoryBaleWasteDispatchSchema>;
+export type FactoryBaleWasteDispatch = typeof factoryBaleWasteDispatches.$inferSelect;

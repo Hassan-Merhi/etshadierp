@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +156,7 @@ function AccountSection({
 }
 
 export default function NetProfitReport() {
-  const { user } = useAuth();
+  const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
 
   const [period, setPeriod] = useState<Period>("this_month");

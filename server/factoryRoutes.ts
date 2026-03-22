@@ -96,6 +96,7 @@ import {
   baleRecodeItems,
   factoryWorkerAdvances,
   factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -15406,6 +15407,267 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       res.json({ voucher: bulkVoucher, results, totalAmount });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================
+  // WASTE DISPATCH ROUTES — factory bale waste disposal
+  // ============================================================
+
+  app.get("/api/factory/waste-dispatch/bales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const search = (req.query.search as string) || "";
+
+      const allCategories = await db.select().from(factoryCategories).where(eq(factoryCategories.companyId, companyId));
+      const wasteCategories = allCategories.filter((c: any) => {
+        const name = (c.name || "").toLowerCase();
+        return name.includes("garbage") || name.includes("wiper");
+      });
+      const wasteCategoryIds = new Set(wasteCategories.map((c: any) => c.id));
+
+      const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const wasteProductIds = new Set(
+        allProducts
+          .filter((p: any) => {
+            if (p.categoryId && wasteCategoryIds.has(p.categoryId)) return true;
+            if (p.articleCode?.startsWith("HMD16")) return true;
+            return false;
+          })
+          .map((p: any) => p.id)
+      );
+
+      if (wasteProductIds.size === 0) {
+        return res.json({ bales: [], categories: wasteCategories });
+      }
+
+      const baleRows = await db
+        .select()
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED"]),
+            inArray(factoryBales.productId, Array.from(wasteProductIds) as number[])
+          )
+        )
+        .orderBy(desc(factoryBales.id));
+
+      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
+      const categoryMap = new Map(allCategories.map((c: any) => [c.id, c]));
+
+      const locationIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))] as number[];
+      const locationRows = locationIds.length > 0
+        ? await db.select({ id: locations.id, name: locations.name }).from(locations).where(inArray(locations.id, locationIds))
+        : [];
+      const locationMap = new Map(locationRows.map((l: any) => [l.id, l.name]));
+
+      const enriched = baleRows.map((b: any) => {
+        const product = productMap.get(b.productId as number);
+        const cat = product?.categoryId ? categoryMap.get(product.categoryId) : null;
+        return {
+          id: b.id,
+          referenceNumber: b.referenceNumber,
+          productName: product?.name || product?.articleCode || b.productName || "Unknown",
+          articleCode: b.articleCode || product?.articleCode,
+          categoryName: cat?.name || b.category || "—",
+          weightKg: parseFloat(b.weightKg as string) || 0,
+          costPerKg: parseFloat(b.costPerKg as string) || 0,
+          totalCost: parseFloat(b.totalCost as string) || 0,
+          status: b.status,
+          locationName: b.erpLocationId ? (locationMap.get(b.erpLocationId) || "Unknown") : "No Location",
+          locationId: b.erpLocationId,
+          finalizedAt: b.finalizedAt,
+        };
+      });
+
+      const filtered = search
+        ? enriched.filter((b: any) => {
+            const s = search.toLowerCase();
+            return (
+              b.referenceNumber?.toLowerCase().includes(s) ||
+              b.productName?.toLowerCase().includes(s) ||
+              b.articleCode?.toLowerCase().includes(s) ||
+              b.categoryName?.toLowerCase().includes(s) ||
+              b.locationName?.toLowerCase().includes(s)
+            );
+          })
+        : enriched;
+
+      res.json({ bales: filtered, categories: wasteCategories });
+    } catch (error: any) {
+      console.error("Error fetching waste bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/factory/waste-dispatch/history", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const dispatches = await db
+        .select()
+        .from(factoryBaleWasteDispatches)
+        .where(eq(factoryBaleWasteDispatches.companyId, companyId))
+        .orderBy(desc(factoryBaleWasteDispatches.id));
+
+      const dispatchIds = dispatches.map((d: any) => d.id);
+      const linkedBales = dispatchIds.length > 0
+        ? await db
+            .select({
+              id: factoryBales.id,
+              referenceNumber: factoryBales.referenceNumber,
+              productName: factoryBales.productName,
+              weightKg: factoryBales.weightKg,
+              totalCost: factoryBales.totalCost,
+              wasteDispatchId: sql<number>`${factoryBales}.waste_dispatch_id`,
+            })
+            .from(factoryBales)
+            .where(sql`${factoryBales}.waste_dispatch_id = ANY(${dispatchIds})`)
+        : [];
+
+      const balesByDispatch = new Map<number, any[]>();
+      for (const bale of linkedBales) {
+        const did = bale.wasteDispatchId;
+        if (!balesByDispatch.has(did)) balesByDispatch.set(did, []);
+        balesByDispatch.get(did)!.push(bale);
+      }
+
+      res.json(dispatches.map((d: any) => ({
+        ...d,
+        bales: balesByDispatch.get(d.id) || [],
+      })));
+    } catch (error: any) {
+      console.error("Error fetching waste dispatch history:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { baleIds, dispatchDate, notes } = req.body;
+      if (!baleIds || !Array.isArray(baleIds) || baleIds.length === 0) {
+        return res.status(400).json({ message: "baleIds array is required" });
+      }
+      if (!dispatchDate) {
+        return res.status(400).json({ message: "dispatchDate is required" });
+      }
+
+      const userId = (req.session as any).user?.id || null;
+
+      const [lastDispatch] = await db
+        .select({ dispatchNumber: factoryBaleWasteDispatches.dispatchNumber })
+        .from(factoryBaleWasteDispatches)
+        .where(eq(factoryBaleWasteDispatches.companyId, companyId))
+        .orderBy(desc(factoryBaleWasteDispatches.id))
+        .limit(1);
+
+      let nextNum = 1;
+      if (lastDispatch?.dispatchNumber) {
+        const parts = lastDispatch.dispatchNumber.split("-");
+        const last = parseInt(parts[parts.length - 1] || "0", 10);
+        if (!isNaN(last)) nextNum = last + 1;
+      }
+      const dispatchNumber = `WD-${String(nextNum).padStart(4, "0")}`;
+
+      const result = await db.transaction(async (tx: any) => {
+        const balesToDispose = await tx
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+
+        if (balesToDispose.length === 0) throw new Error("No valid bales found");
+
+        for (const bale of balesToDispose) {
+          if (bale.status !== "IN_STOCK" && bale.status !== "FINALIZED") {
+            throw new Error(`Bale ${bale.referenceNumber} is not available (status: ${bale.status})`);
+          }
+        }
+
+        let totalWeightKg = 0;
+        let totalCostWrittenOff = 0;
+        for (const bale of balesToDispose) {
+          totalWeightKg += parseFloat(bale.weightKg as string) || 0;
+          totalCostWrittenOff += parseFloat(bale.totalCost as string) || 0;
+        }
+
+        const [dispatch] = await tx.insert(factoryBaleWasteDispatches).values({
+          companyId,
+          dispatchNumber,
+          dispatchDate,
+          notes: notes || null,
+          totalBales: balesToDispose.length,
+          totalWeightKg: totalWeightKg.toFixed(3),
+          totalCostWrittenOff: totalCostWrittenOff.toFixed(2),
+          createdBy: userId,
+        }).returning();
+
+        const now = new Date();
+
+        const productIds = [...new Set(balesToDispose.map((b: any) => b.productId).filter(Boolean))] as number[];
+        const factoryProducts = productIds.length > 0
+          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          : [];
+        const productMap = new Map(factoryProducts.map((p: any) => [p.id, p]));
+        const stockItemCache = new Map<string, number>();
+
+        for (const bale of balesToDispose) {
+          await tx.execute(sql`UPDATE factory_bales SET status = 'REMOVED', waste_dispatch_id = ${dispatch.id}, updated_at = ${now} WHERE id = ${bale.id}`);
+
+          const product = productMap.get(bale.productId as number);
+          const itemCode = product?.articleCode || product?.code || bale.articleCode || bale.baleCode;
+          if (itemCode && bale.erpLocationId) {
+            let erpStockItemId = stockItemCache.get(itemCode);
+            if (!erpStockItemId) {
+              const [existing] = await tx.select({ id: stockItems.id }).from(stockItems)
+                .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
+              if (existing) {
+                erpStockItemId = existing.id;
+                stockItemCache.set(itemCode, erpStockItemId!);
+              }
+            }
+            if (erpStockItemId) {
+              await adjustInventory(tx, bale.erpLocationId, erpStockItemId, -1, companyId);
+            }
+          }
+        }
+
+        return { dispatch, totalWeightKg, totalCostWrittenOff, bales: balesToDispose };
+      });
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: dispatchDate,
+        txType: "WASTE_DISPOSAL",
+        referenceId: result.dispatch.id,
+        referenceTable: "factory_bale_waste_dispatches",
+        description: `Waste disposal ${dispatchNumber}: ${result.bales.length} bale(s), ${result.totalWeightKg.toFixed(1)} kg written off.${notes ? " " + notes : ""}`,
+        amountCurrency: result.totalCostWrittenOff,
+        amountUsd: result.totalCostWrittenOff,
+        createdBy: userId,
+      });
+
+      res.json({
+        dispatch: result.dispatch,
+        totalBales: result.bales.length,
+        totalWeightKg: result.totalWeightKg,
+        totalCostWrittenOff: result.totalCostWrittenOff,
+        bales: result.bales.map((b: any) => ({
+          id: b.id,
+          referenceNumber: b.referenceNumber,
+          weightKg: parseFloat(b.weightKg as string) || 0,
+          totalCost: parseFloat(b.totalCost as string) || 0,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error submitting waste dispatch:", error);
+      res.status(400).json({ message: error.message });
     }
   });
 }

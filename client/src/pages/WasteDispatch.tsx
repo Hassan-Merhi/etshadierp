@@ -1,539 +1,625 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { Plus, Trash2, Printer, AlertTriangle, Package, X, ClipboardList } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useReactToPrint } from "react-to-print";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Trash2,
+  Search,
+  Printer,
+  ChevronRight,
+  Loader2,
+  Package,
+  Weight,
+  DollarSign,
+  History,
+  CheckSquare,
+} from "lucide-react";
 
-interface Location {
-  id: number;
-  name: string;
-  code: string;
+function fmt(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+function fmtKg(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(n);
 }
 
-interface StockItem {
-  id: number;
-  name: string;
-  unit: string | null;
-}
-
-interface WasteDispatchItem {
-  stockItemId: number;
-  quantity: string;
-  stockItemName?: string;
-  stockItemUnit?: string;
-}
-
-interface WasteDispatch {
-  id: number;
-  dispatchNumber: string;
-  dispatchDate: string;
-  locationId: number;
-  locationName: string | null;
-  notes: string | null;
-  totalAmount: string;
-  createdAt: string;
-  items?: Array<{
-    id: number;
-    stockItemId: number;
-    stockItemName: string | null;
-    stockItemUnit: string | null;
-    quantity: string;
-    rate: string;
-    totalAmount: string;
-  }>;
-}
-
-interface PrintSlipProps {
-  dispatch: WasteDispatch;
-}
-
-function PrintSlip({ dispatch }: PrintSlipProps) {
-  const today = format(new Date(), "dd MMM yyyy");
-  const dispatchDate = dispatch.dispatchDate
-    ? format(new Date(dispatch.dispatchDate), "dd MMM yyyy")
-    : "";
-  const total = parseFloat(dispatch.totalAmount || "0");
-
-  return (
-    <div className="p-8 font-mono text-sm text-black bg-white min-h-screen">
-      <div className="text-center border-b border-black pb-3 mb-4">
-        <div className="text-xl font-bold uppercase tracking-widest">Waste Dispatch Slip</div>
-        <div className="text-xs mt-1">Printed: {today}</div>
-      </div>
-
-      <div className="flex justify-between mb-4">
-        <div>
-          <div><span className="font-bold">Dispatch #:</span> {dispatch.dispatchNumber}</div>
-          <div><span className="font-bold">Date:</span> {dispatchDate}</div>
-        </div>
-        <div className="text-right">
-          <div><span className="font-bold">Location:</span> {dispatch.locationName || "-"}</div>
-        </div>
-      </div>
-
-      {dispatch.notes && (
-        <div className="mb-4 border border-black p-2">
-          <span className="font-bold">Notes: </span>{dispatch.notes}
-        </div>
-      )}
-
-      <table className="w-full border-collapse border border-black text-xs mb-4">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border border-black p-2 text-left">#</th>
-            <th className="border border-black p-2 text-left">Item</th>
-            <th className="border border-black p-2 text-center">Unit</th>
-            <th className="border border-black p-2 text-right">Qty</th>
-            <th className="border border-black p-2 text-right">Rate</th>
-            <th className="border border-black p-2 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(dispatch.items || []).map((item, idx) => (
-            <tr key={item.id}>
-              <td className="border border-black p-2">{idx + 1}</td>
-              <td className="border border-black p-2">{item.stockItemName || "-"}</td>
-              <td className="border border-black p-2 text-center">{item.stockItemUnit || "-"}</td>
-              <td className="border border-black p-2 text-right">{parseFloat(item.quantity).toFixed(3)}</td>
-              <td className="border border-black p-2 text-right">{parseFloat(item.rate).toFixed(2)}</td>
-              <td className="border border-black p-2 text-right">{parseFloat(item.totalAmount).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={5} className="border border-black p-2 text-right font-bold">Total</td>
-            <td className="border border-black p-2 text-right font-bold">{total.toFixed(2)}</td>
-          </tr>
-        </tfoot>
-      </table>
-
-      <div className="flex justify-between mt-12 pt-8">
-        <div className="text-center">
-          <div className="border-t border-black w-36 pt-1">Prepared By</div>
-        </div>
-        <div className="text-center">
-          <div className="border-t border-black w-36 pt-1">Authorized By</div>
-        </div>
-      </div>
-    </div>
-  );
+function today() {
+  return new Date().toISOString().split("T")[0];
 }
 
 export default function WasteDispatch() {
   const { toast } = useToast();
-  const printRef = useRef<HTMLDivElement>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [dispatchDate, setDispatchDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [locationId, setLocationId] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const [dispatchDate, setDispatchDate] = useState(today());
   const [notes, setNotes] = useState("");
-  const [formItems, setFormItems] = useState<WasteDispatchItem[]>([
-    { stockItemId: 0, quantity: "" },
-  ]);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [printDispatch, setPrintDispatch] = useState<WasteDispatch | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [showHistory, setShowHistory] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [printData, setPrintData] = useState<any | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
-  const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
+  };
+
+  const { data, isLoading } = useQuery<{ bales: any[]; categories: any[] }>({
+    queryKey: ["/api/factory/waste-dispatch/bales", debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const r = await fetch(`/api/factory/waste-dispatch/bales?${params}`, {
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
   });
 
-  const { data: stockItemsList = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
+  const { data: history = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/waste-dispatch/history"],
+    enabled: showHistory,
+    queryFn: async () => {
+      const r = await fetch("/api/factory/waste-dispatch/history", {
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
   });
 
-  const { data: dispatches = [], isLoading: dispatchesLoading } = useQuery<WasteDispatch[]>({
-    queryKey: ["/api/waste-dispatches"],
-  });
+  const bales = data?.bales || [];
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-  });
+  const toggleBale = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const openPrint = useCallback(async (dispatch: WasteDispatch) => {
-    if (!dispatch.items) {
-      const res = await fetch(`/api/waste-dispatches/${dispatch.id}`, { credentials: "include" });
-      if (res.ok) {
-        const full = await res.json();
-        setPrintDispatch(full);
-      } else {
-        setPrintDispatch(dispatch);
-      }
+  const toggleAll = () => {
+    if (selected.size === bales.length) {
+      setSelected(new Set());
     } else {
-      setPrintDispatch(dispatch);
+      setSelected(new Set(bales.map((b) => b.id)));
     }
-    setTimeout(() => handlePrint(), 200);
-  }, [handlePrint]);
+  };
 
-  const createMutation = useMutation({
+  const selectedBales = bales.filter((b) => selected.has(b.id));
+  const totalWeight = selectedBales.reduce((s, b) => s + b.weightKg, 0);
+  const totalCost = selectedBales.reduce((s, b) => s + b.totalCost, 0);
+
+  const submitMutation = useMutation({
     mutationFn: async () => {
-      const validItems = formItems.filter(
-        (it) => it.stockItemId > 0 && parseFloat(it.quantity) > 0
-      );
-      if (!locationId) throw new Error("Please select a location");
-      if (validItems.length === 0) throw new Error("Add at least one item with quantity");
-
-      const res = await apiRequest("POST", "/api/waste-dispatches", {
-        locationId: parseInt(locationId),
+      const res = await apiRequest("POST", "/api/factory/waste-dispatch/submit", {
+        baleIds: [...selected],
         dispatchDate,
         notes: notes.trim() || undefined,
-        items: validItems.map((it) => ({
-          stockItemId: it.stockItemId,
-          quantity: it.quantity,
-        })),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to create dispatch");
-      }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/waste-dispatches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Waste dispatch created successfully" });
-      setShowForm(false);
-      resetForm();
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/waste-dispatch/bales"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/waste-dispatch/history"],
+      });
+      setSelected(new Set());
+      setNotes("");
+      setConfirming(false);
+      setPrintData(result);
+      toast({
+        title: "Waste disposed",
+        description: `${result.totalBales} bale(s) marked as disposed (${result.dispatch.dispatchNumber})`,
+      });
     },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setConfirming(false);
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/waste-dispatches/${id}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to delete dispatch");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/waste-dispatches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Dispatch deleted and inventory reversed" });
-      setDeleteId(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setDeleteId(null);
-    },
-  });
-
-  function resetForm() {
-    setLocationId("");
-    setDispatchDate(format(new Date(), "yyyy-MM-dd"));
-    setNotes("");
-    setFormItems([{ stockItemId: 0, quantity: "" }]);
-  }
-
-  function addRow() {
-    setFormItems((prev) => [...prev, { stockItemId: 0, quantity: "" }]);
-  }
-
-  function removeRow(idx: number) {
-    setFormItems((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function updateRow(idx: number, field: keyof WasteDispatchItem, value: string | number) {
-    setFormItems((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it))
-    );
-  }
-
-  const totalQty = formItems.reduce((s, it) => s + (parseFloat(it.quantity) || 0), 0);
+  const handlePrint = () => {
+    if (!printRef.current) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`
+      <html>
+        <head>
+          <title>Waste Disposal — ${printData?.dispatch?.dispatchNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+            h1 { font-size: 18px; margin-bottom: 4px; }
+            .sub { color: #555; font-size: 11px; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+            th { background: #f3f4f6; font-weight: bold; }
+            .footer { margin-top: 24px; font-size: 10px; color: #777; }
+          </style>
+        </head>
+        <body>${printRef.current.innerHTML}</body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+  };
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-5xl mx-auto">
-      {/* Hidden print area */}
-      <div className="hidden print:block" ref={printRef}>
-        {printDispatch && <PrintSlip dispatch={printDispatch} />}
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Page Header */}
+      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold">Waste Bale Dispatch</h1>
-          <p className="text-sm text-muted-foreground">
-            Record waste bale dispatches with automatic inventory deduction and expense accounting
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-destructive" />
+            Waste Dispatch
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Select Garbage or Wiper bales to write off as waste
           </p>
         </div>
         <Button
-          data-testid="button-new-dispatch"
-          onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
-          variant={showForm ? "outline" : "default"}
+          variant="outline"
+          onClick={() => setShowHistory((v) => !v)}
+          data-testid="button-toggle-history"
+          className="gap-2"
         >
-          {showForm ? (
-            <><X className="w-4 h-4 mr-1" />Cancel</>
-          ) : (
-            <><Plus className="w-4 h-4 mr-1" />New Dispatch</>
-          )}
+          <History className="w-4 h-4" />
+          {showHistory ? "Hide History" : "View History"}
         </Button>
       </div>
 
-      {/* Create Form */}
-      {showForm && (
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* History Panel */}
+        {showHistory && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Dispatch History</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {history.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
+              ) : (
+                <div className="divide-y">
+                  {history.map((d: any) => (
+                    <Collapsible key={d.id}>
+                      <CollapsibleTrigger asChild>
+                        <div
+                          className="flex items-center justify-between px-4 py-3 hover-elevate cursor-pointer"
+                          data-testid={`row-dispatch-${d.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium text-sm">{d.dispatchNumber}</p>
+                              <p className="text-xs text-muted-foreground">{d.dispatchDate}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-muted-foreground">{d.totalBales} bales</span>
+                            <span className="text-muted-foreground">
+                              {fmtKg(parseFloat(d.totalWeightKg || "0"))} kg
+                            </span>
+                            <Badge variant="outline" className="text-destructive border-destructive/30">
+                              {fmt(parseFloat(d.totalCostWrittenOff || "0"))}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="bg-muted/30 px-4 pb-3">
+                          {d.notes && (
+                            <p className="text-xs text-muted-foreground mb-2 pt-2">
+                              Note: {d.notes}
+                            </p>
+                          )}
+                          {d.bales && d.bales.length > 0 ? (
+                            <table className="w-full text-xs mt-2">
+                              <thead>
+                                <tr className="text-muted-foreground">
+                                  <th className="text-left py-1 font-medium">Reference</th>
+                                  <th className="text-left py-1 font-medium">Product</th>
+                                  <th className="text-right py-1 font-medium">Weight (kg)</th>
+                                  <th className="text-right py-1 font-medium">Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {d.bales.map((b: any) => (
+                                  <tr key={b.id}>
+                                    <td className="py-0.5 font-mono">{b.referenceNumber}</td>
+                                    <td className="py-0.5">{b.productName}</td>
+                                    <td className="py-0.5 text-right">
+                                      {fmtKg(parseFloat(b.weightKg || "0"))}
+                                    </td>
+                                    <td className="py-0.5 text-right">
+                                      {fmt(parseFloat(b.totalCost || "0"))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="text-xs text-muted-foreground pt-2">
+                              No bale details available.
+                            </p>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dispatch Settings */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">New Waste Dispatch</CardTitle>
+            <CardTitle className="text-base">Dispatch Details</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dispatch-location">Location</Label>
-                {locationsLoading ? (
-                  <Skeleton className="h-9 w-full" />
-                ) : (
-                  <Select
-                    value={locationId}
-                    onValueChange={setLocationId}
-                  >
-                    <SelectTrigger id="dispatch-location" data-testid="select-dispatch-location">
-                      <SelectValue placeholder="Select location..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((loc) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dispatch-date">Date</Label>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Dispatch Date
+                </label>
                 <Input
-                  id="dispatch-date"
-                  data-testid="input-dispatch-date"
                   type="date"
                   value={dispatchDate}
                   onChange={(e) => setDispatchDate(e.target.value)}
+                  className="w-44"
+                  data-testid="input-dispatch-date"
                 />
               </div>
-
-              <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-                <Label htmlFor="dispatch-notes">Notes (optional)</Label>
-                <Input
-                  id="dispatch-notes"
-                  data-testid="input-dispatch-notes"
-                  placeholder="e.g. Yard waste bales"
+              <div className="flex flex-col gap-1 flex-1 min-w-48">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Notes (optional)
+                </label>
+                <Textarea
+                  placeholder="Reason for disposal..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  rows={1}
+                  className="resize-none"
+                  data-testid="input-notes"
                 />
               </div>
-            </div>
-
-            {/* Items */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Label>Items</Label>
-                <Button size="sm" variant="outline" onClick={addRow} data-testid="button-add-item">
-                  <Plus className="w-3 h-3 mr-1" />Add Item
-                </Button>
-              </div>
-
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Stock Item</TableHead>
-                      <TableHead className="w-36">Quantity</TableHead>
-                      <TableHead className="w-10"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {formItems.map((item, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={item.stockItemId > 0 ? String(item.stockItemId) : ""}
-                            onValueChange={(v) => updateRow(idx, "stockItemId", parseInt(v))}
-                          >
-                            <SelectTrigger data-testid={`select-item-stock-${idx}`}>
-                              <SelectValue placeholder="Select item..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {stockItemsList.map((si) => (
-                                <SelectItem key={si.id} value={String(si.id)}>
-                                  {si.name}{si.unit ? ` (${si.unit})` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            placeholder="0.000"
-                            value={item.quantity}
-                            onChange={(e) => updateRow(idx, "quantity", e.target.value)}
-                            data-testid={`input-item-qty-${idx}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {formItems.length > 1 && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeRow(idx)}
-                              data-testid={`button-remove-item-${idx}`}
-                            >
-                              <X className="w-4 h-4 text-destructive" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="text-sm text-muted-foreground text-right">
-                Total items: {formItems.filter((it) => it.stockItemId > 0).length} &nbsp;|&nbsp; Total qty: {totalQty.toFixed(3)}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => { setShowForm(false); resetForm(); }}
-              >
-                Cancel
-              </Button>
-              <Button
-                data-testid="button-submit-dispatch"
-                onClick={() => createMutation.mutate()}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? "Saving..." : "Create Dispatch"}
-              </Button>
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* History Table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" />
-            Dispatch History
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {dispatchesLoading ? (
-            <div className="p-4 flex flex-col gap-2">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+        {/* Bale Selection Table */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <CardTitle className="text-base">Available Waste Bales</CardTitle>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search bales..."
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9 w-56"
+                  data-testid="input-search-bales"
+                />
+              </div>
             </div>
-          ) : dispatches.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-              <Package className="w-8 h-8 opacity-40" />
-              <p className="text-sm">No waste dispatches yet</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dispatch #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dispatches.map((d) => (
-                  <TableRow key={d.id} data-testid={`row-dispatch-${d.id}`}>
-                    <TableCell className="font-mono text-sm font-medium">{d.dispatchNumber}</TableCell>
-                    <TableCell className="text-sm">
-                      {d.dispatchDate ? format(new Date(d.dispatchDate), "dd MMM yyyy") : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm">{d.locationName || "-"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{d.notes || "-"}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">
-                      {parseFloat(d.totalAmount || "0").toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openPrint(d)}
-                          title="Print dispatch slip"
-                          data-testid={`button-print-${d.id}`}
-                        >
-                          <Printer className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleteId(d.id)}
-                          title="Delete & reverse dispatch"
-                          data-testid={`button-delete-${d.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : bales.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-25" />
+                <p className="text-sm">No Garbage or Wiper bales in stock.</p>
+                <p className="text-xs mt-1">
+                  Only bales with Garbage or Wiper category are eligible for waste disposal.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={bales.length > 0 && selected.size === bales.length}
+                        onCheckedChange={toggleAll}
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Weight (kg)</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {bales.map((b) => (
+                    <TableRow
+                      key={b.id}
+                      className={`cursor-pointer ${selected.has(b.id) ? "bg-destructive/5" : ""}`}
+                      onClick={() => toggleBale(b.id)}
+                      data-testid={`row-bale-${b.id}`}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selected.has(b.id)}
+                          onCheckedChange={() => toggleBale(b.id)}
+                          data-testid={`checkbox-bale-${b.id}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{b.referenceNumber}</TableCell>
+                      <TableCell className="text-sm">{b.productName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {b.categoryName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {b.locationName}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{fmtKg(b.weightKg)}</TableCell>
+                      <TableCell className="text-right text-sm">{fmt(b.totalCost)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              Delete Waste Dispatch
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the dispatch and reverse the inventory changes.
-              The waste expense accounting entry will also be reversed. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteId !== null && deleteMutation.mutate(deleteId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
+        {/* Selection Summary + Dispatch Button */}
+        {selected.size > 0 && (
+          <Card className="border-destructive/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium" data-testid="text-selected-count">
+                      {selected.size} bale{selected.size !== 1 ? "s" : ""} selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Weight className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm" data-testid="text-total-weight">
+                      {fmtKg(totalWeight)} kg
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    <span
+                      className="text-sm text-destructive font-medium"
+                      data-testid="text-total-cost"
+                    >
+                      {fmt(totalCost)} write-off
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => setConfirming(true)}
+                  data-testid="button-dispatch-waste"
+                  className="gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Dispatch Waste
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Confirm Dialog */}
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Confirm Waste Disposal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              You are about to permanently remove the following from stock as waste:
+            </p>
+            <div className="bg-destructive/5 border border-destructive/20 rounded-md p-3 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Bales</span>
+                <span className="font-medium">{selected.size}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Weight</span>
+                <span className="font-medium">{fmtKg(totalWeight)} kg</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Cost Written Off</span>
+                <span className="font-medium text-destructive">{fmt(totalCost)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Date</span>
+                <span className="font-medium">{dispatchDate}</span>
+              </div>
+              {notes && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Notes</span>
+                  <span className="font-medium max-w-xs text-right">{notes}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will remove these bales from inventory and log a waste disposal expense in the
+              factory daybook. This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirming(false)}
+              disabled={submitMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete & Reverse"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => submitMutation.mutate()}
+              disabled={submitMutation.isPending}
+              data-testid="button-confirm-dispatch"
+            >
+              {submitMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirm Disposal
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Receipt Dialog */}
+      {printData && (
+        <Dialog open={!!printData} onOpenChange={() => setPrintData(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-green-600" />
+                Disposal Complete — {printData.dispatch.dispatchNumber}
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Printable region */}
+            <div ref={printRef} className="space-y-3">
+              <div>
+                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>
+                  Waste Disposal Record
+                </h1>
+                <p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>
+                  Dispatch No: {printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date:{" "}
+                  {printData.dispatch.dispatchDate}
+                  {printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {printData.dispatch.notes}</>}
+                </p>
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    {["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => (
+                      <th
+                        key={h}
+                        style={{
+                          border: "1px solid #ccc",
+                          padding: "6px 8px",
+                          background: "#f3f4f6",
+                          textAlign: i === 0 ? "left" : "right",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {printData.bales.map((b: any) => (
+                    <tr key={b.id}>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>
+                        {b.referenceNumber}
+                      </td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
+                        {fmtKg(b.weightKg)}
+                      </td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
+                        {fmt(b.totalCost)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", fontWeight: "bold" }}>
+                      TOTAL — {printData.totalBales} bale(s)
+                    </td>
+                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>
+                      {fmtKg(printData.totalWeightKg)}
+                    </td>
+                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold", color: "#dc2626" }}>
+                      {fmt(printData.totalCostWrittenOff)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>
+                This document confirms the waste disposal of factory bales. A daybook expense entry has
+                been created automatically.
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setPrintData(null)}>
+                Close
+              </Button>
+              <Button
+                onClick={handlePrint}
+                data-testid="button-print-receipt"
+                className="gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Print Receipt
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

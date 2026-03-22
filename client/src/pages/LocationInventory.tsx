@@ -1353,10 +1353,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     Export to Excel
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="button-export-pdf-with-cost">
-                    <Printer className="w-4 h-4 mr-2" />
-                    Export to PDF (with cost)
-                  </DropdownMenuItem>
+                  {!posUser && (
+                    <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="button-export-pdf-with-cost">
+                      <Printer className="w-4 h-4 mr-2" />
+                      Export to PDF (with cost)
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="button-export-pdf-no-cost">
                     <Printer className="w-4 h-4 mr-2" />
                     Export to PDF (without cost)
