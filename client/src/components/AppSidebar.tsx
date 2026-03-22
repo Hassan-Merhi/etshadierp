@@ -122,6 +122,7 @@ const navEntries: NavEntry[] = [
     items: [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
+      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
     ],
   },
   { kind: "item", title: "Create", url: "/create", icon: FolderPlus },

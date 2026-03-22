@@ -37390,6 +37390,294 @@ if (asOfDate) {
     }
   });
 
+  // ============================================================
+  // NET PROFIT EXCEL EXPORT
+  // ============================================================
+  app.get("/api/reports/net-profit-excel", requireAuth, async (req, res) => {
+    try {
+      const user = req.session.user as any;
+      const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
+
+      // Allow admin/dev to pass a specific companyId, others use session company
+      const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+      const companyId = (isAdminOrDev && requestedCompanyId) ? requestedCompanyId : req.session.currentCompanyId;
+
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get company name for the report header
+      const allCompanies = await storage.getAllCompanies();
+      const company = allCompanies.find((c: any) => c.id === companyId);
+      const companyName = company?.name || "Company";
+
+      // Date range from query params
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
+      const periodLabel = (req.query.periodLabel as string) || "All Time";
+
+      // === Reuse the same calculation logic as /api/reports/net-profit-statement ===
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
+
+      const voucherConditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+      if (startDate) voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
+      if (endDate) voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
+
+      const companyVouchers = await db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherConditions)).execute();
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, companyVoucherIds)).execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
+        }
+      }
+
+      // Opening Stock
+      const allStockItems = await storage.getAllStockItems(companyId);
+      let openingStockValue = 0;
+      for (const item of allStockItems) openingStockValue += parseFloat(item.openingValue || "0");
+
+      // Purchase Accounts
+      const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-"));
+      let purchaseTotal = 0;
+      const purchaseDetails: any[] = purchaseAccounts.map((acc: any) => {
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = bal.debit - bal.credit;
+        purchaseTotal += net;
+        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
+      });
+
+      // Direct Incomes
+      const directIncomeAccounts = companyAccounts.filter((acc: any) =>
+        acc.accountType === "Income" && acc.subType === "Direct Income" &&
+        !acc.code?.includes("SALES") && !acc.name?.toLowerCase().includes("sales")
+      );
+      let directIncomeTotal = 0;
+      const directIncomeDetails: any[] = directIncomeAccounts.map((acc: any) => {
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = bal.credit - bal.debit;
+        directIncomeTotal += net;
+        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
+      });
+
+      // Direct Expenses
+      const importChargesParent = companyAccounts.find((acc: any) => acc.code === "IMPORT_CHARGES");
+      const importChargesIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesIds.add(importChargesParent.id);
+        companyAccounts.forEach((acc: any) => { if (acc.parentId === importChargesParent.id) importChargesIds.add(acc.id); });
+      }
+      const directExpenseAccounts = companyAccounts.filter((acc: any) =>
+        acc.accountType === "Direct Expense" ||
+        (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+        importChargesIds.has(acc.id)
+      );
+      let directExpenseTotal = 0;
+      const directExpenseDetails: any[] = directExpenseAccounts.map((acc: any) => {
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = bal.debit - bal.credit;
+        directExpenseTotal += net;
+        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
+      });
+
+      // Sales
+      const salesConditions: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
+      if (startDate) salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
+      if (endDate) salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
+      const salesData = await db.select({ total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)` })
+        .from(salesItems).innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id)).where(and(...salesConditions)).execute();
+      const salesTotal = parseFloat(salesData[0]?.total || "0");
+
+      // Closing Stock
+      const activeLocationsData = await db.select({ id: locations.id }).from(locations)
+        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
+      const activeLocationIds = activeLocationsData.map((l) => l.id);
+      let closingStockValue = 0;
+      if (activeLocationIds.length > 0) {
+        const inventoryData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+          .from(inventory).where(inArray(inventory.locationId, activeLocationIds)).execute();
+        for (const inv of inventoryData) closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+      }
+
+      // Gross Profit
+      const tradingCredit = salesTotal + closingStockValue + directIncomeTotal;
+      const tradingDebit = openingStockValue + purchaseTotal + directExpenseTotal;
+      const grossProfit = tradingCredit - tradingDebit;
+
+      // Indirect Expenses
+      const indirectExpenseAccounts = companyAccounts.filter((acc: any) =>
+        acc.accountType === "Indirect Expense" && acc.code !== "PRODUCTION_ADJUSTMENT" && acc.code !== "CONSUMPTION_EXPENSE"
+      );
+      let indirectExpenseTotal = 0;
+      const indirectExpenseDetails: any[] = indirectExpenseAccounts.map((acc: any) => {
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = bal.debit - bal.credit;
+        indirectExpenseTotal += net;
+        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
+      });
+
+      // Indirect Incomes
+      const indirectIncomeAccounts = companyAccounts.filter((acc: any) =>
+        acc.accountType === "Income" && acc.subType === "Indirect Income"
+      );
+      let indirectIncomeTotal = 0;
+      const indirectIncomeDetails: any[] = indirectIncomeAccounts.map((acc: any) => {
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = bal.credit - bal.debit;
+        indirectIncomeTotal += net;
+        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
+      });
+
+      const netProfit = grossProfit + indirectIncomeTotal - indirectExpenseTotal;
+      const totalExpenses = purchaseTotal + directExpenseTotal + indirectExpenseTotal;
+      const totalIncomes = salesTotal + directIncomeTotal + indirectIncomeTotal;
+
+      // === Build Excel Workbook ===
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.default.Workbook();
+      workbook.creator = "ERP System";
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet("Net Profit Report");
+      ws.properties.defaultColWidth = 20;
+
+      const fmt = (n: number) => parseFloat(n.toFixed(2));
+
+      // Header
+      ws.mergeCells("A1:E1");
+      const titleCell = ws.getCell("A1");
+      titleCell.value = `Net Profit Report — ${companyName}`;
+      titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      ws.getRow(1).height = 36;
+
+      ws.mergeCells("A2:E2");
+      const subCell = ws.getCell("A2");
+      subCell.value = `Period: ${periodLabel}${startDate ? `  |  From: ${startDate.toISOString().split("T")[0]}` : ""}${endDate ? `  To: ${endDate.toISOString().split("T")[0]}` : ""}`;
+      subCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
+      subCell.alignment = { horizontal: "center" };
+      ws.getRow(2).height = 22;
+
+      ws.addRow([]); // spacer
+
+      // KPI Summary
+      const kpiHeaderRow = ws.addRow(["", "SUMMARY", "", "", ""]);
+      kpiHeaderRow.getCell(2).font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+      kpiHeaderRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+      ws.mergeCells(`B${kpiHeaderRow.number}:E${kpiHeaderRow.number}`);
+
+      const kpiData = [
+        ["Total Sales (Revenue)", fmt(salesTotal)],
+        ["Opening Stock", fmt(openingStockValue)],
+        ["Closing Stock", fmt(closingStockValue)],
+        ["Total Purchases", fmt(purchaseTotal)],
+        ["Total Direct Expenses", fmt(directExpenseTotal)],
+        ["Total Indirect Expenses", fmt(indirectExpenseTotal)],
+        ["Total All Expenses", fmt(totalExpenses)],
+        ["Gross Profit", fmt(grossProfit)],
+        ["Net Profit / (Loss)", fmt(netProfit)],
+      ];
+      for (const [label, value] of kpiData) {
+        const row = ws.addRow(["", label, "", "", value]);
+        row.getCell(2).font = { bold: label === "Net Profit / (Loss)" || label === "Gross Profit" };
+        row.getCell(5).font = { bold: label === "Net Profit / (Loss)" || label === "Gross Profit", color: { argb: (value as number) >= 0 ? "FF16A34A" : "FFDC2626" } };
+        row.getCell(5).numFmt = '#,##0.00';
+        ws.mergeCells(`B${row.number}:D${row.number}`);
+        if (label === "Net Profit / (Loss)") {
+          row.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: (value as number) >= 0 ? "FFD1FAE5" : "FFFEE2E2" } }; });
+        }
+      }
+
+      ws.addRow([]);
+
+      // Helper to add a section
+      const addSection = (title: string, colorArgb: string, rows: any[], totalLabel: string, totalValue: number) => {
+        const hRow = ws.addRow([title, "Account Name", "Debit", "Credit", "Net Balance"]);
+        ws.mergeCells(`A${hRow.number}:A${hRow.number}`);
+        hRow.eachCell((cell, col) => {
+          cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colorArgb } };
+          cell.alignment = { horizontal: col === 1 ? "left" : "right" };
+        });
+        hRow.getCell(2).alignment = { horizontal: "left" };
+
+        for (const r of rows) {
+          const dataRow = ws.addRow(["", r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
+          dataRow.getCell(3).numFmt = '#,##0.00';
+          dataRow.getCell(4).numFmt = '#,##0.00';
+          dataRow.getCell(5).numFmt = '#,##0.00';
+          dataRow.getCell(5).font = { color: { argb: r.balance >= 0 ? "FF16A34A" : "FFDC2626" } };
+        }
+
+        if (rows.length === 0) {
+          const emptyRow = ws.addRow(["", "(No accounts)", "", "", ""]);
+          emptyRow.getCell(2).font = { italic: true, color: { argb: "FF888888" } };
+        }
+
+        const totRow = ws.addRow(["", `Total ${totalLabel}`, "", "", fmt(totalValue)]);
+        totRow.eachCell(cell => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; });
+        totRow.getCell(5).numFmt = '#,##0.00';
+        totRow.getCell(5).font = { bold: true, color: { argb: totalValue >= 0 ? "FF16A34A" : "FFDC2626" } };
+        ws.addRow([]);
+      };
+
+      addSection("SALES", "FF1E3A5F", [], "Sales", salesTotal);
+      // Replace empty sales section with actual sales row
+      const salesSectionRow = ws.getRow(ws.rowCount - 2);
+      salesSectionRow.getCell(2).value = "Total Sales (POS & Revenue)";
+      salesSectionRow.getCell(5).value = fmt(salesTotal);
+      salesSectionRow.getCell(5).numFmt = '#,##0.00';
+
+      addSection("DIRECT INCOMES", "FF059669", directIncomeDetails, "Direct Incomes", directIncomeTotal);
+      addSection("PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
+      addSection("DIRECT EXPENSES", "FFB45309", directExpenseDetails, "Direct Expenses", directExpenseTotal);
+      addSection("INDIRECT INCOMES", "FF0891B2", indirectIncomeDetails, "Indirect Incomes", indirectIncomeTotal);
+      addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpenseDetails, "Indirect Expenses", indirectExpenseTotal);
+
+      // Final Net Profit row
+      const finalRow = ws.addRow(["NET PROFIT / (LOSS)", "", "", "", fmt(netProfit)]);
+      finalRow.eachCell(cell => {
+        cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netProfit >= 0 ? "FF16A34A" : "FFDC2626" } };
+        cell.alignment = { horizontal: "center" };
+      });
+      finalRow.getCell(5).numFmt = '#,##0.00';
+      ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
+      ws.getRow(finalRow.number).height = 30;
+
+      // Set column widths
+      ws.getColumn(1).width = 26;
+      ws.getColumn(2).width = 36;
+      ws.getColumn(3).width = 18;
+      ws.getColumn(4).width = 18;
+      ws.getColumn(5).width = 18;
+
+      // Stream response
+      const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, "_");
+      const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error: any) {
+      console.error("Net profit Excel export error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
