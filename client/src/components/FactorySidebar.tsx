@@ -95,7 +95,6 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
-      { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
     ],
   },
   {
@@ -114,6 +113,7 @@ const allMenuGroups: MenuGroup[] = [
     icon: MapPin,
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
+      { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
       { title: "Stock OTW", url: "/factory/stock-otw", icon: Ship },
       { title: "Stock Query", url: "/factory/stock-query", icon: Database },
       { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: RefreshCw },
