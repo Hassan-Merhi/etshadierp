@@ -192,6 +192,10 @@ export default function NetProfitReport() {
     },
   });
 
+  const { data: dashboardData } = useQuery<any>({
+    queryKey: ["/api/stats/net-profit"],
+  });
+
   const handleExport = () => {
     const p = new URLSearchParams();
     if (startDate) p.set("startDate", startDate);
@@ -216,7 +220,7 @@ export default function NetProfitReport() {
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
   const grossProfit = lp?.grossProfit ?? 0;
   const periodNetProfit = lp?.netProfit ?? 0;
-  const balanceSheetPosition = data?.netPosition ?? 0;
+  const balanceSheetPosition = dashboardData?.netPosition ?? data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
   return (
