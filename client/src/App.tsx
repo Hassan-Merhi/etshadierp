@@ -707,6 +707,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
                     <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
+                    <Route path="/factory/bale-ledger" component={BaleLedger} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}

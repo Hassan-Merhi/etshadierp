@@ -33,6 +33,7 @@ import {
   Award,
   Beaker,
   Trash2,
+  Layers,
   DollarSign,
   Camera,
   Link,
@@ -94,6 +95,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
       { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
+      { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
     ],
   },
   {
