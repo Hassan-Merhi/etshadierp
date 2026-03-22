@@ -37457,7 +37457,7 @@ if (asOfDate) {
         const net = bal.debit - bal.credit;
         purchaseTotal += net;
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      });
+      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
       // Direct Incomes
       const directIncomeAccounts = companyAccounts.filter((acc: any) =>
@@ -37470,7 +37470,7 @@ if (asOfDate) {
         const net = bal.credit - bal.debit;
         directIncomeTotal += net;
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      });
+      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
       // Direct Expenses
       const importChargesParent = companyAccounts.find((acc: any) => acc.code === "IMPORT_CHARGES");
@@ -37490,7 +37490,7 @@ if (asOfDate) {
         const net = bal.debit - bal.credit;
         directExpenseTotal += net;
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      });
+      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
       // Sales
       const salesConditions: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
@@ -37526,7 +37526,7 @@ if (asOfDate) {
         const net = bal.debit - bal.credit;
         indirectExpenseTotal += net;
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      });
+      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
       // Indirect Incomes
       const indirectIncomeAccounts = companyAccounts.filter((acc: any) =>
@@ -37538,11 +37538,24 @@ if (asOfDate) {
         const net = bal.credit - bal.debit;
         indirectIncomeTotal += net;
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      });
+      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
       const netProfit = grossProfit + indirectIncomeTotal - indirectExpenseTotal;
       const totalExpenses = purchaseTotal + directExpenseTotal + indirectExpenseTotal;
       const totalIncomes = salesTotal + directIncomeTotal + indirectIncomeTotal;
+
+      // Net Position = Assets - Liabilities
+      let netPositionAssets = 0;
+      let netPositionLiabilities = 0;
+      for (const acc of companyAccounts) {
+        const opening = parseFloat((acc as any).openingBalance || '0');
+        const openingSigned = (acc as any).openingBalanceSide === 'Dr' ? opening : -opening;
+        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (net >= 0) netPositionAssets += net;
+        else netPositionLiabilities += Math.abs(net);
+      }
+      const netPositionValue = Math.round((netPositionAssets - netPositionLiabilities) * 100) / 100;
 
       // === Build Excel Workbook ===
       const ExcelJS = await import("exceljs");
@@ -37588,15 +37601,15 @@ if (asOfDate) {
         ["Total Indirect Expenses", fmt(indirectExpenseTotal)],
         ["Total All Expenses", fmt(totalExpenses)],
         ["Gross Profit", fmt(grossProfit)],
-        ["Net Profit / (Loss)", fmt(netProfit)],
+        ["Net Position", fmt(netPositionValue)],
       ];
       for (const [label, value] of kpiData) {
         const row = ws.addRow(["", label, "", "", value]);
-        row.getCell(2).font = { bold: label === "Net Profit / (Loss)" || label === "Gross Profit" };
-        row.getCell(5).font = { bold: label === "Net Profit / (Loss)" || label === "Gross Profit", color: { argb: (value as number) >= 0 ? "FF16A34A" : "FFDC2626" } };
-        row.getCell(5).numFmt = '#,##0.00';
+        row.getCell(2).font = { bold: label === "Net Position" || label === "Gross Profit" };
+        row.getCell(5).font = { bold: label === "Net Position" || label === "Gross Profit", color: { argb: (value as number) >= 0 ? "FF16A34A" : "FFDC2626" } };
+        row.getCell(5).numFmt = '$#,##0';
         ws.mergeCells(`B${row.number}:D${row.number}`);
-        if (label === "Net Profit / (Loss)") {
+        if (label === "Net Position") {
           row.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: (value as number) >= 0 ? "FFD1FAE5" : "FFFEE2E2" } }; });
         }
       }
@@ -37616,9 +37629,9 @@ if (asOfDate) {
 
         for (const r of rows) {
           const dataRow = ws.addRow(["", r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
-          dataRow.getCell(3).numFmt = '#,##0.00';
-          dataRow.getCell(4).numFmt = '#,##0.00';
-          dataRow.getCell(5).numFmt = '#,##0.00';
+          dataRow.getCell(3).numFmt = '$#,##0';
+          dataRow.getCell(4).numFmt = '$#,##0';
+          dataRow.getCell(5).numFmt = '$#,##0';
           dataRow.getCell(5).font = { color: { argb: r.balance >= 0 ? "FF16A34A" : "FFDC2626" } };
         }
 
@@ -37629,7 +37642,7 @@ if (asOfDate) {
 
         const totRow = ws.addRow(["", `Total ${totalLabel}`, "", "", fmt(totalValue)]);
         totRow.eachCell(cell => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; });
-        totRow.getCell(5).numFmt = '#,##0.00';
+        totRow.getCell(5).numFmt = '$#,##0';
         totRow.getCell(5).font = { bold: true, color: { argb: totalValue >= 0 ? "FF16A34A" : "FFDC2626" } };
         ws.addRow([]);
       };
@@ -37639,7 +37652,7 @@ if (asOfDate) {
       const salesSectionRow = ws.getRow(ws.rowCount - 2);
       salesSectionRow.getCell(2).value = "Total Sales (POS & Revenue)";
       salesSectionRow.getCell(5).value = fmt(salesTotal);
-      salesSectionRow.getCell(5).numFmt = '#,##0.00';
+      salesSectionRow.getCell(5).numFmt = '$#,##0';
 
       addSection("DIRECT INCOMES", "FF059669", directIncomeDetails, "Direct Incomes", directIncomeTotal);
       addSection("PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
@@ -37648,13 +37661,13 @@ if (asOfDate) {
       addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpenseDetails, "Indirect Expenses", indirectExpenseTotal);
 
       // Final Net Profit row
-      const finalRow = ws.addRow(["NET PROFIT / (LOSS)", "", "", "", fmt(netProfit)]);
+      const finalRow = ws.addRow(["NET POSITION", "", "", "", fmt(netPositionValue)]);
       finalRow.eachCell(cell => {
         cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netProfit >= 0 ? "FF16A34A" : "FFDC2626" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netPositionValue >= 0 ? "FF16A34A" : "FFDC2626" } };
         cell.alignment = { horizontal: "center" };
       });
-      finalRow.getCell(5).numFmt = '#,##0.00';
+      finalRow.getCell(5).numFmt = '$#,##0';
       ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
       ws.getRow(finalRow.number).height = 30;
 

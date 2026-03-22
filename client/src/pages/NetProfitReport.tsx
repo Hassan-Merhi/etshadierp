@@ -58,7 +58,7 @@ function getDateRange(period: Period): { startDate: string | null; endDate: stri
 }
 
 function formatAmount(n: number) {
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
 }
 
 function AmountCell({ value }: { value: number }) {
@@ -105,7 +105,7 @@ function AccountSection({
   badgeColor: string;
 }) {
   const [open, setOpen] = useState(false);
-  const isPositive = type === "income" ? total >= 0 : total <= 0;
+  const filteredAccounts = accounts.filter((a: any) => a.debit !== 0 || a.credit !== 0);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -114,7 +114,7 @@ function AccountSection({
           <div className="flex items-center gap-2">
             {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
             <Badge className={badgeColor}>{title}</Badge>
-            <span className="text-xs text-muted-foreground">{accounts.length} account{accounts.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-muted-foreground">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? "s" : ""}</span>
           </div>
           <span className={`font-semibold text-sm ${type === "income" ? (total >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400") : (total > 0 ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400")}`}>
             {formatAmount(Math.abs(total))}
@@ -123,8 +123,8 @@ function AccountSection({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ml-6 mt-1 mb-2 border rounded-md overflow-hidden">
-          {accounts.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic p-3">No accounts in this category.</p>
+          {filteredAccounts.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic p-3">No accounts with transactions in this category.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -136,7 +136,7 @@ function AccountSection({
                 </tr>
               </thead>
               <tbody>
-                {accounts.map((acc: any, i: number) => (
+                {filteredAccounts.map((acc: any, i: number) => (
                   <tr key={i} className="border-t">
                     <td className="px-3 py-2 text-foreground">{acc.name}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{formatAmount(acc.debit)}</td>
@@ -213,7 +213,7 @@ export default function NetProfitReport() {
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
   const grossProfit = lp?.grossProfit ?? 0;
-  const netProfit = lp?.netProfit ?? 0;
+  const netProfit = data?.netPosition ?? lp?.netProfit ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
   return (
@@ -286,7 +286,7 @@ export default function NetProfitReport() {
               <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
               <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
               <KpiCard title="Gross Profit" value={grossProfit} icon={BarChart3} color="bg-amber-600" />
-              <KpiCard title="Net Profit" value={netProfit} icon={netProfit >= 0 ? TrendingUp : TrendingDown} color={netProfit >= 0 ? "bg-green-600" : "bg-red-600"} />
+              <KpiCard title="Net Position" value={netProfit} icon={netProfit >= 0 ? TrendingUp : TrendingDown} color={netProfit >= 0 ? "bg-green-600" : "bg-red-600"} />
               <KpiCard title="Closing Stock" value={closingStock} icon={DollarSign} color="bg-purple-600" />
             </div>
 
@@ -338,7 +338,7 @@ export default function NetProfitReport() {
                     <AmountCell value={grossProfit} />
                   </div>
                   <div className={`flex justify-between font-bold text-sm rounded-md px-2 py-1 ${netProfit >= 0 ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
-                    <span>Net Profit / (Loss)</span>
+                    <span>Net Position</span>
                     <AmountCell value={netProfit} />
                   </div>
                 </div>
