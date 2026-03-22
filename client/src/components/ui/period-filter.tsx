@@ -30,16 +30,6 @@ interface PeriodFilterProps {
   "data-testid"?: string;
 }
 
-const presetLabels: Record<PeriodPreset, string> = {
-  all_time: "All Time",
-  today: "Today",
-  this_month: "This Month",
-  last_1_month: "Last 1 Month",
-  last_6_months: "Last 6 Months",
-  this_year: "This Year",
-  custom: "Custom Range",
-};
-
 function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: string } {
   const today = new Date();
   const formatDate = (d: Date) => format(d, "yyyy-MM-dd");
@@ -127,12 +117,23 @@ export function PeriodFilter({
     }
   };
 
-  const fromDateObj = value.fromDate ? new Date(value.fromDate) : undefined;
-  const toDateObj = value.toDate ? new Date(value.toDate) : undefined;
+  const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
+  const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
 
-  const displayLabel = value.preset === "custom"
-    ? `${fromDateObj ? formatDisplayDate(fromDateObj) : ""} - ${toDateObj ? formatDisplayDate(toDateObj) : ""}`
-    : presetLabels[value.preset];
+  // Always show actual dates in the button label (not preset names)
+  function buildLabel(): string {
+    if (value.preset === "all_time") return "All Time";
+    if (fromDateObj && toDateObj) {
+      const from = formatDisplayDate(fromDateObj);
+      const to = formatDisplayDate(toDateObj);
+      if (from === to) return from;
+      return `${from} – ${to}`;
+    }
+    if (fromDateObj) return formatDisplayDate(fromDateObj);
+    return "Select period";
+  }
+
+  const displayLabel = buildLabel();
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -144,9 +145,9 @@ export function PeriodFilter({
             className="gap-1"
             data-testid={testId || "period-filter-dropdown"}
           >
-            <CalendarIcon className="h-4 w-4" />
-            <span className="max-w-[180px] truncate">{displayLabel}</span>
-            <ChevronDown className="h-3 w-3 opacity-50" />
+            <CalendarIcon className="h-4 w-4 shrink-0" />
+            <span className="max-w-[200px] truncate">{displayLabel}</span>
+            <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
@@ -197,51 +198,50 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {value.preset === "custom" && (
-        <div className="flex items-center gap-1">
-          <Popover open={showFromCalendar} onOpenChange={setShowFromCalendar}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-[110px] justify-start text-left font-normal"
-                data-testid="period-from-date"
-              >
-                {fromDateObj ? formatDisplayDate(fromDateObj) : "From"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDateObj}
-                onSelect={handleFromDateChange}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <span className="text-muted-foreground">-</span>
-          <Popover open={showToCalendar} onOpenChange={setShowToCalendar}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-[110px] justify-start text-left font-normal"
-                data-testid="period-to-date"
-              >
-                {toDateObj ? formatDisplayDate(toDateObj) : "To"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={toDateObj}
-                onSelect={handleToDateChange}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
+      {/* Custom date pickers — always visible so user can adjust dates directly */}
+      <div className="flex items-center gap-1">
+        <Popover open={showFromCalendar} onOpenChange={setShowFromCalendar}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-[110px] justify-start text-left font-normal"
+              data-testid="period-from-date"
+            >
+              {fromDateObj ? formatDisplayDate(fromDateObj) : "From"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={fromDateObj}
+              onSelect={handleFromDateChange}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <span className="text-muted-foreground text-sm">–</span>
+        <Popover open={showToCalendar} onOpenChange={setShowToCalendar}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-[110px] justify-start text-left font-normal"
+              data-testid="period-to-date"
+            >
+              {toDateObj ? formatDisplayDate(toDateObj) : "To"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={toDateObj}
+              onSelect={handleToDateChange}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

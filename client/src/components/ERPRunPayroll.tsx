@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const AVATAR_COLORS = [
   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
@@ -117,6 +118,8 @@ interface PayrollRunItem {
 export default function ERPRunPayroll() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
 
   const [activeTab, setActiveTab] = useState<"run" | "history">("run");
 
@@ -137,10 +140,12 @@ export default function ERPRunPayroll() {
   const [deleteRunId, setDeleteRunId] = useState<number | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
-  const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({ queryKey: ["/api/employees"] });
+  const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
+    queryKey: ["/api/employees", companyId],
+  });
 
   const { data: workerGroupsRaw = [], isLoading: groupsLoading } = useQuery<WorkerGroup[]>({
-    queryKey: ["/api/worker-groups/with-members"],
+    queryKey: ["/api/worker-groups/with-members", companyId],
     queryFn: async () => {
       const res = await fetch("/api/worker-groups/with-members", { credentials: "include" });
       if (!res.ok) return [];
@@ -149,7 +154,7 @@ export default function ERPRunPayroll() {
   });
 
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", companyId],
     queryFn: async () => {
       const res = await fetch("/api/ledger-accounts", { credentials: "include" });
       if (!res.ok) return [];
@@ -158,7 +163,7 @@ export default function ERPRunPayroll() {
   });
 
   const { data: salaryAdvances = [] } = useQuery<SalaryAdvance[]>({
-    queryKey: ["/api/salary-advances"],
+    queryKey: ["/api/salary-advances", companyId],
     queryFn: async () => {
       const res = await fetch("/api/salary-advances", { credentials: "include" });
       if (!res.ok) return [];
@@ -167,7 +172,7 @@ export default function ERPRunPayroll() {
   });
 
   const { data: payrollRuns = [], isLoading: runsLoading } = useQuery<PayrollRun[]>({
-    queryKey: ["/api/payroll/runs"],
+    queryKey: ["/api/payroll/runs", companyId],
     queryFn: async () => {
       const res = await fetch("/api/payroll/runs", { credentials: "include" });
       if (!res.ok) return [];

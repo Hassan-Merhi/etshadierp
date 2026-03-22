@@ -849,24 +849,39 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [vouchers, accountNameCache]);
 
-  // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
+  // Keyboard date navigation: "-" = back 1 day, "=" (Shift or no shift) / "+" = forward 1 day
+  // Works on Mac (Minus/Equal keys) and Windows
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      const fmt = "yyyy-MM-dd";
-      if (e.key === "-") {
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      // Only block when user is typing in a real text/number input or textarea
+      if (tag === "textarea") return;
+      if (tag === "input") {
+        const inputType = (target as HTMLInputElement).type || "text";
+        // Allow if it's a date/button-like element, block if text entry
+        if (["text", "number", "email", "password", "search", "tel", "url"].includes(inputType)) return;
+      }
+      if (tag === "select") return;
+
+      const dateFmt = "yyyy-MM-dd";
+      // Back one day: Minus key (Mac: e.code="Minus", Windows: e.key="-")
+      const isBack = e.key === "-" || e.code === "Minus";
+      // Forward one day: Plus key via Shift+= (Mac/Windows: e.key="+") or just "=" key
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+
+      if (isBack) {
         e.preventDefault();
         setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate), -1), fmt),
-          toDate: format(addDays(new Date(prev.toDate), -1), fmt),
+          fromDate: format(addDays(new Date(prev.fromDate), -1), dateFmt),
+          toDate: format(addDays(new Date(prev.toDate), -1), dateFmt),
           preset: "custom",
         }));
-      } else if (e.key === "+" && e.shiftKey) {
+      } else if (isForward) {
         e.preventDefault();
         setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate), 1), fmt),
-          toDate: format(addDays(new Date(prev.toDate), 1), fmt),
+          fromDate: format(addDays(new Date(prev.fromDate), 1), dateFmt),
+          toDate: format(addDays(new Date(prev.toDate), 1), dateFmt),
           preset: "custom",
         }));
       }

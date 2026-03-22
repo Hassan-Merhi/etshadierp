@@ -502,6 +502,27 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS waste_dispatch_id integer`,
+    // ERP Payroll Runs tables (Mar 2026)
+    `CREATE TABLE IF NOT EXISTS erp_payroll_runs (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      status text NOT NULL DEFAULT 'DRAFT',
+      date text NOT NULL,
+      notes text,
+      payment_account_id integer,
+      paid_at text,
+      created_at text NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS erp_payroll_run_items (
+      id serial PRIMARY KEY,
+      run_id integer NOT NULL,
+      employee_id integer NOT NULL,
+      employee_name text NOT NULL,
+      group_name text,
+      base_salary decimal(18,2) NOT NULL,
+      deduction decimal(18,2) NOT NULL DEFAULT 0,
+      net_pay decimal(18,2) NOT NULL
+    )`,
     // Waste Dispatch tables (Mar 2026)
     `CREATE TABLE IF NOT EXISTS waste_dispatches (
       id serial PRIMARY KEY,
