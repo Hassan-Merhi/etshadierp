@@ -18,7 +18,7 @@ import {
   Scale,
 } from "lucide-react";
 
-type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time";
+type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "today", label: "Today" },
@@ -26,9 +26,19 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "this_month", label: "This Month" },
   { value: "this_year", label: "This Year" },
   { value: "all_time", label: "All Time" },
+  { value: "specific_month", label: "Monthly" },
 ];
 
-function getDateRange(period: Period): { startDate: string | null; endDate: string | null } {
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function getDateRange(
+  period: Period,
+  specificMonth?: number,
+  specificYear?: number
+): { startDate: string | null; endDate: string | null } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -50,6 +60,13 @@ function getDateRange(period: Period): { startDate: string | null; endDate: stri
 
   if (period === "this_year") {
     return { startDate: `${now.getFullYear()}-01-01`, endDate: today };
+  }
+
+  if (period === "specific_month" && specificMonth !== undefined && specificYear !== undefined) {
+    const lastDay = new Date(specificYear, specificMonth, 0).getDate();
+    const start = `${specificYear}-${pad(specificMonth)}-01`;
+    const end = `${specificYear}-${pad(specificMonth)}-${pad(lastDay)}`;
+    return { startDate: start, endDate: end };
   }
 
   return { startDate: null, endDate: null };
@@ -159,11 +176,23 @@ export default function NetProfitReport() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
 
+  const now = new Date();
   const [period, setPeriod] = useState<Period>("this_month");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("current");
+  const [specificMonth, setSpecificMonth] = useState<number>(now.getMonth() + 1);
+  const [specificYear, setSpecificYear] = useState<number>(now.getFullYear());
 
-  const { startDate, endDate } = useMemo(() => getDateRange(period), [period]);
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label || "This Month";
+  const { startDate, endDate } = useMemo(
+    () => getDateRange(period, specificMonth, specificYear),
+    [period, specificMonth, specificYear]
+  );
+
+  const periodLabel = useMemo(() => {
+    if (period === "specific_month") {
+      return `${MONTH_NAMES[specificMonth - 1]} ${specificYear}`;
+    }
+    return PERIODS.find((p) => p.value === period)?.label || "This Month";
+  }, [period, specificMonth, specificYear]);
 
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/companies"],
@@ -190,10 +219,6 @@ export default function NetProfitReport() {
     },
   });
 
-  const { data: dashboardData } = useQuery<any>({
-    queryKey: ["/api/stats/net-profit"],
-  });
-
   const handleExport = () => {
     const p = new URLSearchParams();
     if (startDate) p.set("startDate", startDate);
@@ -216,9 +241,12 @@ export default function NetProfitReport() {
   const directIncTotal = rp?.directIncomes?.total ?? 0;
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
-  const grossProfit = lp?.grossProfit ?? (salesTotal + closingStock + directIncTotal - openingStock - purchasesTotal - directExpTotal);
-  const balanceSheetPosition = dashboardData?.netPosition ?? data?.netPosition ?? 0;
+  // Use net position from the same endpoint so it matches the Excel export
+  const balanceSheetPosition = data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
+
+  // Year options for month picker (5 years back)
+  const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -260,6 +288,34 @@ export default function NetProfitReport() {
               ))}
             </SelectContent>
           </Select>
+          {period === "specific_month" && (
+            <>
+              <Select value={String(specificMonth)} onValueChange={(v) => setSpecificMonth(Number(v))}>
+                <SelectTrigger className="w-36" data-testid="select-month">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTH_NAMES.map((name, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)} data-testid={`option-month-${i + 1}`}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(specificYear)} onValueChange={(v) => setSpecificYear(Number(v))}>
+                <SelectTrigger className="w-28" data-testid="select-year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)} data-testid={`option-year-${y}`}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
           <Button onClick={handleExport} data-testid="button-export-excel" disabled={isLoading}>
             <Download className="w-4 h-4 mr-2" />
             Export Excel
