@@ -5464,10 +5464,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const mixBatchAllocationsArr = Array.isArray(reqMixBatchAllocations) ? reqMixBatchAllocations : [];
 
       let fxRate: number;
-      try {
-        fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, offloadDate));
-      } catch {
-        fxRate = parseFloat(reqFxRate || container.fxRateToUsd || "1");
+      if (reqFxRate && parseFloat(reqFxRate) > 0) {
+        // User explicitly set the FX rate — always honour it
+        fxRate = parseFloat(reqFxRate);
+      } else {
+        try {
+          fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, offloadDate));
+        } catch {
+          fxRate = parseFloat(container.fxRateToUsd || "1");
+        }
       }
 
       const declaredKg = container.totalKg || "0";
