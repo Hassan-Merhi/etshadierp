@@ -15656,24 +15656,28 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .where(eq(factoryBaleWasteDispatches.companyId, companyId))
         .orderBy(desc(factoryBaleWasteDispatches.id));
 
-      const dispatchIds = dispatches.map((d: any) => d.id);
-      const linkedBales = dispatchIds.length > 0
-        ? await db
-            .select({
-              id: factoryBales.id,
-              referenceNumber: factoryBales.referenceNumber,
-              productName: factoryBales.productName,
-              weightKg: factoryBales.weightKg,
-              totalCost: factoryBales.totalCost,
-              wasteDispatchId: sql<number>`${factoryBales}.waste_dispatch_id`,
-            })
-            .from(factoryBales)
-            .where(sql`${factoryBales}.waste_dispatch_id = ANY(${dispatchIds})`)
-        : [];
+      // Fetch all removed bales for this company that have a waste_dispatch_id set.
+      // Using raw SQL to avoid Drizzle array serialization issues with ANY().
+      const linkedBalesRaw = await db.execute(sql`
+        SELECT
+          id,
+          reference_number       AS "referenceNumber",
+          product_name           AS "productName",
+          COALESCE(weight_kg, 0)::float   AS "weightKg",
+          COALESCE(total_cost, 0)::float  AS "totalCost",
+          waste_dispatch_id      AS "wasteDispatchId"
+        FROM factory_bales
+        WHERE company_id = ${companyId}
+          AND waste_dispatch_id IS NOT NULL
+        ORDER BY waste_dispatch_id, id
+      `);
+      const linkedBales: any[] = Array.isArray(linkedBalesRaw)
+        ? linkedBalesRaw
+        : (linkedBalesRaw as any).rows || [];
 
       const balesByDispatch = new Map<number, any[]>();
       for (const bale of linkedBales) {
-        const did = bale.wasteDispatchId;
+        const did = Number(bale.wasteDispatchId);
         if (!balesByDispatch.has(did)) balesByDispatch.set(did, []);
         balesByDispatch.get(did)!.push(bale);
       }

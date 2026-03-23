@@ -24,11 +24,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Trash2,
   Search,
   Printer,
@@ -88,7 +83,7 @@ export default function WasteDispatch() {
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [showHistory, setShowHistory] = useState(false);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<Set<number>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [printData, setPrintData] = useState<any | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -106,13 +101,65 @@ export default function WasteDispatch() {
 
   const { data: history = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/waste-dispatch/history"],
-    enabled: showHistory,
     queryFn: async () => {
       const r = await fetch("/api/factory/waste-dispatch/history", { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
   });
+
+  const toggleHistoryItem = (id: number) => {
+    setExpandedHistoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleHistoryPrint = (d: any) => {
+    const bales: any[] = d.bales || [];
+    const totalWeight = bales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0);
+    const totalCost = bales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0);
+    const baleRows = bales
+      .map((b: any) =>
+        `<tr>
+          <td style="border:1px solid #ccc;padding:5px 8px;font-family:monospace">${b.referenceNumber}</td>
+          <td style="border:1px solid #ccc;padding:5px 8px">${b.productName || ""}</td>
+          <td style="border:1px solid #ccc;padding:5px 8px;text-align:right">${fmtKg(parseFloat(b.weightKg || 0))}</td>
+          <td style="border:1px solid #ccc;padding:5px 8px;text-align:right">${fmt(parseFloat(b.totalCost || 0))}</td>
+        </tr>`
+      )
+      .join("");
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<html><head><title>Waste Disposal — ${d.dispatchNumber}</title>
+      <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
+      h1{font-size:18px;margin-bottom:4px}.sub{color:#555;font-size:11px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}
+      th{background:#f3f4f6;font-weight:bold}.footer{margin-top:24px;font-size:10px;color:#777}</style>
+      </head><body>
+      <h1>Waste Disposal Record</h1>
+      <p class="sub">Dispatch No: ${d.dispatchNumber}&nbsp;|&nbsp;Date: ${d.dispatchDate}${d.notes ? `&nbsp;|&nbsp;Note: ${d.notes}` : ""}</p>
+      <table><thead><tr>
+        <th>Reference</th><th>Product</th>
+        <th style="text-align:right">Weight (kg)</th>
+        <th style="text-align:right">Cost Written Off</th>
+      </tr></thead>
+      <tbody>${baleRows}</tbody>
+      <tfoot><tr>
+        <td style="border:1px solid #ccc;padding:6px 8px;font-weight:bold" colspan="2">TOTAL — ${bales.length} bale(s)</td>
+        <td style="border:1px solid #ccc;padding:6px 8px;text-align:right;font-weight:bold">${fmtKg(totalWeight)}</td>
+        <td style="border:1px solid #ccc;padding:6px 8px;text-align:right;font-weight:bold;color:#dc2626">${fmt(totalCost)}</td>
+      </tr></tfoot></table>
+      <p class="footer">This document confirms the waste disposal of factory bales. A daybook expense entry has been created automatically.</p>
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+  };
 
   const bales: Bale[] = data?.bales || [];
 
@@ -285,81 +332,9 @@ export default function WasteDispatch() {
           </h1>
           <p className="text-xs text-muted-foreground">Select Garbage or Wiper bales to write off as waste</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)} data-testid="button-toggle-history" className="gap-2">
-          <History className="w-4 h-4" />
-          {showHistory ? "Hide History" : "View History"}
-        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* History Panel */}
-        {showHistory && (
-          <Card>
-            <CardHeader className="pb-2 px-4 pt-3">
-              <CardTitle className="text-sm">Dispatch History</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {history.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
-              ) : (
-                <div className="divide-y">
-                  {history.map((d: any) => (
-                    <Collapsible key={d.id}>
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between px-4 py-2.5 hover-elevate cursor-pointer" data-testid={`row-dispatch-${d.id}`}>
-                          <div className="flex items-center gap-2">
-                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium text-xs">{d.dispatchNumber}</p>
-                              <p className="text-xs text-muted-foreground">{d.dispatchDate}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs">
-                            <span className="text-muted-foreground">{d.totalBales} bales</span>
-                            <span className="text-muted-foreground">{fmtKg(parseFloat(d.totalWeightKg || "0"))} kg</span>
-                            <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">
-                              {fmt(parseFloat(d.totalCostWrittenOff || "0"))}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="bg-muted/30 px-4 pb-3">
-                          {d.notes && <p className="text-xs text-muted-foreground mb-2 pt-2">Note: {d.notes}</p>}
-                          {d.bales && d.bales.length > 0 ? (
-                            <table className="w-full text-xs mt-2">
-                              <thead>
-                                <tr className="text-muted-foreground">
-                                  <th className="text-left py-1 font-medium">Reference</th>
-                                  <th className="text-left py-1 font-medium">Product</th>
-                                  <th className="text-right py-1 font-medium">Weight (kg)</th>
-                                  <th className="text-right py-1 font-medium">Cost</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {d.bales.map((b: any) => (
-                                  <tr key={b.id}>
-                                    <td className="py-0.5 font-mono">{b.referenceNumber}</td>
-                                    <td className="py-0.5">{b.productName}</td>
-                                    <td className="py-0.5 text-right">{fmtKg(parseFloat(b.weightKg || "0"))}</td>
-                                    <td className="py-0.5 text-right">{fmt(parseFloat(b.totalCost || "0"))}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : (
-                            <p className="text-xs text-muted-foreground pt-2">No bale details available.</p>
-                          )}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Dispatch Details + Scan — top bar */}
         <div className="flex flex-wrap gap-3">
           {/* Date + Notes */}
@@ -608,6 +583,115 @@ export default function WasteDispatch() {
             </CardContent>
           </Card>
         )}
+
+        {/* Dispatch History — always visible */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-3 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <History className="w-4 h-4 text-muted-foreground" />
+              Dispatch History
+            </CardTitle>
+            {history.length > 0 && (
+              <span className="text-xs text-muted-foreground">{history.length} dispatch{history.length !== 1 ? "es" : ""}</span>
+            )}
+          </CardHeader>
+          <CardContent className="p-0">
+            {history.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
+            ) : (
+              <div className="divide-y">
+                {history.map((d: any) => {
+                  const isOpen = expandedHistoryIds.has(d.id);
+                  const dispatchBales: any[] = d.bales || [];
+                  return (
+                    <div key={d.id}>
+                      {/* Condensed row — always visible */}
+                      <div
+                        className="flex items-center justify-between px-4 py-2.5 hover-elevate cursor-pointer"
+                        onClick={() => toggleHistoryItem(d.id)}
+                        data-testid={`row-dispatch-${d.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
+                          />
+                          <div>
+                            <p className="font-semibold text-xs">{d.dispatchNumber}</p>
+                            <p className="text-xs text-muted-foreground">{d.dispatchDate}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="text-muted-foreground">{d.totalBales} bale{d.totalBales !== 1 ? "s" : ""}</span>
+                          <span className="text-muted-foreground">{fmtKg(parseFloat(d.totalWeightKg || "0"))} kg</span>
+                          <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">
+                            {fmt(parseFloat(d.totalCostWrittenOff || "0"))}
+                          </Badge>
+                          {/* Reprint button — visible inline to always allow quick reprint */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 h-6 px-2 text-xs"
+                            onClick={(e) => { e.stopPropagation(); handleHistoryPrint(d); }}
+                            data-testid={`button-reprint-${d.id}`}
+                          >
+                            <Printer className="w-3 h-3" />
+                            Print
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Expanded detail */}
+                      {isOpen && (
+                        <div className="bg-muted/30 px-4 pb-4 pt-1">
+                          {d.notes && (
+                            <p className="text-xs text-muted-foreground mb-2">
+                              <span className="font-medium">Note:</span> {d.notes}
+                            </p>
+                          )}
+                          {dispatchBales.length > 0 ? (
+                            <table className="w-full text-xs mt-1 border-collapse">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">Reference</th>
+                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">Product</th>
+                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">Weight (kg)</th>
+                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">Cost W/O</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dispatchBales.map((b: any) => (
+                                  <tr key={b.id} className="border-b border-border/40 last:border-0">
+                                    <td className="py-1 font-mono text-primary">{b.referenceNumber}</td>
+                                    <td className="py-1">{b.productName}</td>
+                                    <td className="py-1 text-right">{fmtKg(parseFloat(b.weightKg || "0"))}</td>
+                                    <td className="py-1 text-right">{fmt(parseFloat(b.totalCost || "0"))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t font-semibold">
+                                  <td className="pt-1.5" colSpan={2}>TOTAL — {dispatchBales.length} bale{dispatchBales.length !== 1 ? "s" : ""}</td>
+                                  <td className="pt-1.5 text-right">
+                                    {fmtKg(dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0))}
+                                  </td>
+                                  <td className="pt-1.5 text-right text-destructive">
+                                    {fmt(dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0))}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No bale details available.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Confirm Dialog */}
