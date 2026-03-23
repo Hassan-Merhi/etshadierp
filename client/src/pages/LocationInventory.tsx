@@ -240,7 +240,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [allInventoryData]);
 
-  // Build combined rows: one per stock item, with qty-by-location map
+  // Build combined rows: one per stock item, with qty-by-location map + avg cost + total value
   const combinedStockRows = useMemo(() => {
     const itemMap = new Map<number, {
       stockItemId: number;
@@ -250,6 +250,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       stockGroupName: string;
       qtyByLocation: Record<number, number>;
       totalQty: number;
+      weightedCostSum: number; // sum(qty * avgRate) for weighted average
+      totalValue: number;      // sum of totalValue across locations
     }>();
     allInventoryData.forEach((item: any) => {
       const qty = parseFloat(item.quantity || "0");
@@ -263,13 +265,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           stockGroupName: item.stockGroupName || "Unassigned",
           qtyByLocation: {},
           totalQty: 0,
+          weightedCostSum: 0,
+          totalValue: 0,
         });
       }
       const row = itemMap.get(item.stockItemId)!;
       row.qtyByLocation[item.locationId] = (row.qtyByLocation[item.locationId] || 0) + qty;
       row.totalQty += qty;
+      const avgRate = parseFloat(item.averageRate || "0");
+      const itemValue = parseFloat(item.totalValue || "0");
+      row.weightedCostSum += qty * avgRate;
+      row.totalValue += itemValue;
     });
-    return [...itemMap.values()];
+    return [...itemMap.values()].map((row) => ({
+      ...row,
+      avgCost: row.totalQty > 0 ? row.weightedCostSum / row.totalQty : 0,
+    }));
   }, [allInventoryData]);
 
   // Apply search + group filter, then sort by group → item name
@@ -1216,22 +1227,37 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* View All Stock — cross-location table */}
       {showAllStock && !selectedLocationLocal && (
         <div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-            <h1 className="text-xl md:text-3xl font-bold">All Stock — All Locations</h1>
+          {/* Page header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">All Stock — All Locations</h1>
+              {!allInventoryLoading && filteredCombinedRows.length > 0 && (
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {filteredCombinedRows.length} item{filteredCombinedRows.length !== 1 ? "s" : ""}
+                  {" · "}
+                  {allInventoryLocations.length} location{allInventoryLocations.length !== 1 ? "s" : ""}
+                  {" · "}
+                  Total value:{" "}
+                  <span className="font-medium">
+                    {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
+                  </span>
+                </p>
+              )}
+            </div>
             <Button
               variant="outline"
               onClick={() => setShowAllStock(false)}
               data-testid="button-back-from-all-stock-header"
-              className="gap-2"
+              className="gap-2 shrink-0"
             >
               <X className="w-4 h-4" />
               Back to Locations
             </Button>
           </div>
 
-          <Card className="p-4 w-full">
+          <Card className="w-full">
             {/* Filters row */}
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 p-4 border-b">
               <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -1277,53 +1303,137 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {allInventoryLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+              <div className="p-4 space-y-2">
+                {[1,2,3,4,5].map((i) => (
+                  <Skeleton key={i} className="h-9 w-full" />
+                ))}
               </div>
             ) : filteredCombinedRows.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-12 text-muted-foreground">
                 {allInventoryData.length === 0 ? "No stock found across any location." : "No items match your search."}
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="h-10">
-                      <th className="text-left px-3 font-medium whitespace-nowrap">Item Name</th>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-muted/60 border-b">
+                      <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/60 z-10">
+                        Item Name
+                      </th>
                       {allInventoryLocations.map((loc) => (
-                        <th key={loc.id} className="text-right px-3 font-medium whitespace-nowrap">
+                        <th key={loc.id} className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
                           {loc.name}
                         </th>
                       ))}
-                      <th className="text-right px-3 font-medium whitespace-nowrap">Total</th>
+                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap border-l">
+                        Total
+                      </th>
+                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
+                        Avg Cost
+                      </th>
+                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
+                        Total Value
+                      </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {filteredCombinedRows.map((row) => (
-                      <tr key={row.stockItemId} className="border-t hover-elevate" data-testid={`row-allstock-${row.stockItemId}`}>
-                        <td className="px-3 py-2 font-medium whitespace-nowrap">{row.stockItemName}</td>
-                        {allInventoryLocations.map((loc) => (
-                          <td key={loc.id} className="px-3 py-2 text-right font-mono whitespace-nowrap">
-                            {row.qtyByLocation[loc.id] != null
-                              ? row.qtyByLocation[loc.id].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                              : "—"}
-                          </td>
-                        ))}
-                        <td className="px-3 py-2 text-right font-mono font-semibold whitespace-nowrap">
-                          {row.totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-border">
+                    {(() => {
+                      const rows: JSX.Element[] = [];
+                      let lastGroup = "";
+                      for (const row of filteredCombinedRows) {
+                        // Group separator when group changes
+                        if (!allStockGroupFilter && row.stockGroupName !== lastGroup) {
+                          lastGroup = row.stockGroupName;
+                          const groupRows = filteredCombinedRows.filter(r => r.stockGroupName === row.stockGroupName);
+                          const groupTotal = groupRows.reduce((s, r) => s + r.totalQty, 0);
+                          const groupValue = groupRows.reduce((s, r) => s + r.totalValue, 0);
+                          rows.push(
+                            <tr key={`group-${row.stockGroupName}`} className="bg-muted/30">
+                              <td
+                                colSpan={allInventoryLocations.length + 4}
+                                className="px-4 py-1.5 sticky left-0 bg-muted/30 z-10"
+                              >
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                    {row.stockGroupName}
+                                    <span className="ml-2 font-normal normal-case text-muted-foreground/70">
+                                      ({groupRows.length} item{groupRows.length !== 1 ? "s" : ""})
+                                    </span>
+                                  </span>
+                                  <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                                    {groupTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} units
+                                    {groupValue > 0 && (
+                                      <span className="ml-3">{formatAmount(groupValue)}</span>
+                                    )}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                        rows.push(
+                          <tr
+                            key={row.stockItemId}
+                            className="hover-elevate"
+                            data-testid={`row-allstock-${row.stockItemId}`}
+                          >
+                            <td className="px-4 py-2 font-medium whitespace-nowrap sticky left-0 bg-background z-10">
+                              {row.stockItemName}
+                            </td>
+                            {allInventoryLocations.map((loc) => (
+                              <td key={loc.id} className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground">
+                                {row.qtyByLocation[loc.id] != null && row.qtyByLocation[loc.id] > 0
+                                  ? row.qtyByLocation[loc.id].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                                  : <span className="text-muted-foreground/30">—</span>}
+                              </td>
+                            ))}
+                            <td className="px-4 py-2 text-right font-mono font-semibold whitespace-nowrap border-l">
+                              {row.totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-2 text-right font-mono text-muted-foreground whitespace-nowrap">
+                              {row.avgCost > 0 ? formatAmount(row.avgCost) : <span className="text-muted-foreground/30">—</span>}
+                            </td>
+                            <td className="px-4 py-2 text-right font-mono whitespace-nowrap">
+                              {row.totalValue > 0 ? (
+                                <span className="font-medium">{formatAmount(row.totalValue)}</span>
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return rows;
+                    })()}
                   </tbody>
+                  {/* Grand total footer */}
+                  <tfoot>
+                    <tr className="bg-muted/50 border-t-2 font-semibold">
+                      <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 bg-muted/50 z-10">
+                        Total ({filteredCombinedRows.length} items)
+                      </td>
+                      {allInventoryLocations.map((loc) => {
+                        const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
+                        return (
+                          <td key={loc.id} className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">
+                            {locTotal > 0
+                              ? locTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                              : <span className="opacity-30">—</span>}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap border-l">
+                        {filteredCombinedRows.reduce((s, r) => s + r.totalQty, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">
+                        —
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                        {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
-              </div>
-            )}
-
-            {!allInventoryLoading && filteredCombinedRows.length > 0 && (
-              <div className="mt-4 text-sm text-muted-foreground">
-                Showing {filteredCombinedRows.length} item{filteredCombinedRows.length !== 1 ? "s" : ""} across {allInventoryLocations.length} location{allInventoryLocations.length !== 1 ? "s" : ""}
               </div>
             )}
           </Card>
