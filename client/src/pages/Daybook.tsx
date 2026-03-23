@@ -2203,10 +2203,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         return (
                                           <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
                                             <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <div className="flex flex-col">
-                                                <span className="text-xs font-mono text-muted-foreground/60">{o.containerNumber || "—"}</span>
-                                                {o.locationName && <span className="text-sm text-foreground">{offloadDesc}</span>}
-                                              </div>
+                                              <span className="text-sm text-foreground">{offloadDesc || "—"}</span>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
@@ -2230,10 +2227,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         return (
                                           <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
                                             <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <div className="flex flex-col">
-                                                <span className="text-xs font-mono text-muted-foreground/60">{voucher.voucherNumber}</span>
-                                                {vDesc && <span className="text-sm text-foreground truncate max-w-xs">{vDesc}</span>}
-                                              </div>
+                                              <span className="text-sm text-foreground truncate max-w-xs">{vDesc || voucher.voucherNumber}</span>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
