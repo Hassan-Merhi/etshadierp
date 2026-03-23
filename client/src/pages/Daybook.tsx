@@ -476,6 +476,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [expandedVoucherId, setExpandedVoucherId] = useState<number | null>(null);
+  const [expandedCondensedGroups, setExpandedCondensedGroups] = useState<Set<string>>(new Set());
 
   // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -2161,23 +2162,84 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               </TableRow>
                               {types.map((type) => {
                                 const g = typeMap.get(type)!;
+                                const groupKey = `${date}-${type}`;
+                                const isGroupExpanded = expandedCondensedGroups.has(groupKey);
                                 const badge = type === "Offload"
                                   ? { variant: "outline" as const, className: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30" }
                                   : getVoucherTypeBadge(type);
                                 return (
-                                  <TableRow key={`${date}-${type}`} className="hover-elevate">
-                                    <TableCell className="sticky left-0 bg-background z-10 pl-8">
-                                      <Badge {...badge}>{type}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right text-muted-foreground text-sm font-mono">
-                                      {g.rows.length}
-                                    </TableCell>
-                                    {!hideAmounts && (
-                                      <TableCell className="text-right font-mono font-medium">
-                                        {formatAmount(g.total)}
+                                  <>
+                                    <TableRow
+                                      key={groupKey}
+                                      className="hover-elevate cursor-pointer"
+                                      onClick={() => setExpandedCondensedGroups((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(groupKey)) next.delete(groupKey);
+                                        else next.add(groupKey);
+                                        return next;
+                                      })}
+                                    >
+                                      <TableCell className="sticky left-0 bg-background z-10 pl-6">
+                                        <div className="flex items-center gap-2">
+                                          {isGroupExpanded
+                                            ? <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                                            : <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
+                                          <Badge {...badge}>{type}</Badge>
+                                        </div>
                                       </TableCell>
-                                    )}
-                                  </TableRow>
+                                      <TableCell className="text-right text-muted-foreground text-sm font-mono">
+                                        {g.rows.length}
+                                      </TableCell>
+                                      {!hideAmounts && (
+                                        <TableCell className="text-right font-mono font-medium">
+                                          {formatAmount(g.total)}
+                                        </TableCell>
+                                      )}
+                                    </TableRow>
+                                    {isGroupExpanded && g.rows.map((row) => {
+                                      if (row._type === "offload") {
+                                        const o = row.data;
+                                        return (
+                                          <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
+                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
+                                              <span className="text-sm font-mono text-muted-foreground">{o.containerNumber || "—"}</span>
+                                            </TableCell>
+                                            <TableCell />
+                                            {!hideAmounts && (
+                                              <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                  <span className="text-sm font-mono font-medium">{formatAmount(Number(o.itemsTotal))}</span>
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); navigate(`/offloads/${o.id}`); }} title="View">
+                                                    <Eye className="w-3 h-3" />
+                                                  </Button>
+                                                </div>
+                                              </TableCell>
+                                            )}
+                                          </TableRow>
+                                        );
+                                      } else {
+                                        const voucher = row.data as Voucher;
+                                        return (
+                                          <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
+                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
+                                              <span className="text-sm font-mono text-muted-foreground">{voucher.voucherNumber}</span>
+                                            </TableCell>
+                                            <TableCell />
+                                            {!hideAmounts && (
+                                              <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                  <span className="text-sm font-mono font-medium">{formatAmount(voucher.totalAmount)}</span>
+                                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleView(voucher); }} title="View">
+                                                    <Eye className="w-3 h-3" />
+                                                  </Button>
+                                                </div>
+                                              </TableCell>
+                                            )}
+                                          </TableRow>
+                                        );
+                                      }
+                                    })}
+                                  </>
                                 );
                               })}
                             </>
