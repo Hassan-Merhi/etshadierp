@@ -286,10 +286,9 @@ export default function NetProfitReport() {
         {!isLoading && !error && data && (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
               <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
-              <KpiCard title="Gross Profit" value={grossProfit} icon={BarChart3} color="bg-amber-600" />
               <KpiCard
                 title="Net Position"
                 subtitle="Balance Sheet (All-Time)"
@@ -335,13 +334,6 @@ export default function NetProfitReport() {
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <Separator className="my-3" />
-
-                <div className="flex justify-between font-bold text-sm">
-                  <span>Gross Profit</span>
-                  <AmountCell value={grossProfit} />
                 </div>
 
                 <Separator className="my-3" />
