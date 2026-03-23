@@ -26746,18 +26746,31 @@ if (asOfDate) {
         else if (net < 0) stmtNpOnUs += Math.abs(net);
       }
 
-      // Add stock on floor (inventory) as asset
-      stmtNpForUs += closingStockValue;
+      // For All Time (no endDate): include inventory, workers, OTW — they are current values that match the dashboard.
+      // For specific periods (endDate set): skip these non-date-bounded components; rely only on
+      // ledger account balances + supplier balances which ARE properly bounded by endDate.
+      const stmtIsAllTime = !endDate;
+      if (stmtIsAllTime) {
+        // Add stock on floor (inventory) as asset
+        stmtNpForUs += closingStockValue;
 
-      // Add worker/employee liabilities
-      const stmtEmployees = await db.select().from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
-      let stmtWorkerBal = 0;
-      for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || '0');
-      if (stmtWorkerBal > 0) stmtNpOnUs += stmtWorkerBal;
-      else if (stmtWorkerBal < 0) stmtNpForUs += Math.abs(stmtWorkerBal);
+        // Add worker/employee liabilities
+        const stmtEmployees = await db.select().from(employees)
+          .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+        let stmtWorkerBal = 0;
+        for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || '0');
+        if (stmtWorkerBal > 0) stmtNpOnUs += stmtWorkerBal;
+        else if (stmtWorkerBal < 0) stmtNpForUs += Math.abs(stmtWorkerBal);
 
-      // Add suppliers (parent company only)
+        // Add OTW containers as assets
+        const stmtOtwContainers = await db.select().from(containers)
+          .where(and(eq(containers.companyId, companyId), eq(containers.status, 'OTW'))).execute();
+        for (const c of stmtOtwContainers) {
+          stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || '0');
+        }
+      }
+
+      // Add suppliers (parent company only) - always included since stmtSupplierBals is already bounded by endDate
       const stmtParentCompanyId = await storage.getParentCompanyId();
       const stmtShouldIncludeSuppliers = stmtParentCompanyId === null || companyId === stmtParentCompanyId;
       if (stmtShouldIncludeSuppliers) {
@@ -26771,13 +26784,6 @@ if (asOfDate) {
             else if (netBalance < 0) stmtNpForUs += Math.abs(netBalance);
           }
         }
-      }
-
-      // Add OTW containers as assets
-      const stmtOtwContainers = await db.select().from(containers)
-        .where(and(eq(containers.companyId, companyId), eq(containers.status, 'OTW'))).execute();
-      for (const c of stmtOtwContainers) {
-        stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || '0');
       }
 
       const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
@@ -37655,18 +37661,30 @@ if (asOfDate) {
         else if (net < 0) npOnUs += Math.abs(net);
       }
 
-      // Add stock on floor (inventory) as asset
-      npForUs += closingStockValue;
+      // For All Time (no endDate): include inventory, workers, OTW — current values match the dashboard.
+      // For specific periods (endDate set): skip these non-date-bounded components.
+      const xlsxIsAllTime = !endDate;
+      if (xlsxIsAllTime) {
+        // Add stock on floor (inventory) as asset
+        npForUs += closingStockValue;
 
-      // Add worker/employee liabilities
-      const xlsxEmployees = await db.select().from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
-      let xlsxWorkerBal = 0;
-      for (const emp of xlsxEmployees) xlsxWorkerBal += parseFloat((emp as any).currentBalance || "0");
-      if (xlsxWorkerBal > 0) npOnUs += xlsxWorkerBal;
-      else if (xlsxWorkerBal < 0) npForUs += Math.abs(xlsxWorkerBal);
+        // Add worker/employee liabilities
+        const xlsxEmployees = await db.select().from(employees)
+          .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+        let xlsxWorkerBal = 0;
+        for (const emp of xlsxEmployees) xlsxWorkerBal += parseFloat((emp as any).currentBalance || "0");
+        if (xlsxWorkerBal > 0) npOnUs += xlsxWorkerBal;
+        else if (xlsxWorkerBal < 0) npForUs += Math.abs(xlsxWorkerBal);
 
-      // Add suppliers (parent company only - same rule as dashboard)
+        // Add OTW containers as assets
+        const xlsxOtwContainers = await db.select().from(containers)
+          .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW"))).execute();
+        for (const c of xlsxOtwContainers) {
+          npForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || "0");
+        }
+      }
+
+      // Add suppliers (always included — xlsxSupplierBals is already bounded by endDate)
       const xlsxParentCompanyId = await storage.getParentCompanyId();
       const xlsxShouldIncludeSuppliers = xlsxParentCompanyId === null || companyId === xlsxParentCompanyId;
       if (xlsxShouldIncludeSuppliers) {
@@ -37680,13 +37698,6 @@ if (asOfDate) {
             else if (netBalance < 0) npForUs += Math.abs(netBalance);
           }
         }
-      }
-
-      // Add OTW containers as assets
-      const xlsxOtwContainers = await db.select().from(containers)
-        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW"))).execute();
-      for (const c of xlsxOtwContainers) {
-        npForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || "0");
       }
 
       const netPositionValue = npRound2(npForUs - npOnUs);
