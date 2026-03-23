@@ -37574,10 +37574,8 @@ if (asOfDate) {
         for (const inv of inventoryData) closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
       }
 
-      // Gross Profit
-      const tradingCredit = salesTotal + closingStockValue + directIncomeTotal;
-      const tradingDebit = openingStockValue + purchaseTotal + directExpenseTotal;
-      const grossProfit = tradingCredit - tradingDebit;
+      // Gross Profit — period-accurate (matches frontend: no Opening/Closing Stock in formula)
+      const grossProfit = salesTotal + directIncomeTotal - purchaseTotal - directExpenseTotal;
 
       // Indirect Expenses
       const indirectExpenseAccounts = companyAccounts.filter((acc: any) =>
@@ -37603,7 +37601,7 @@ if (asOfDate) {
         return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
       }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
-      const netProfit = grossProfit + indirectIncomeTotal - indirectExpenseTotal;
+      const periodNetProfit = grossProfit + indirectIncomeTotal - indirectExpenseTotal;
       const totalExpenses = purchaseTotal + directExpenseTotal + indirectExpenseTotal;
       const totalIncomes = salesTotal + directIncomeTotal + indirectIncomeTotal;
 
@@ -37655,25 +37653,31 @@ if (asOfDate) {
       kpiHeaderRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
       ws.mergeCells(`B${kpiHeaderRow.number}:E${kpiHeaderRow.number}`);
 
-      const kpiData = [
-        ["Total Sales (Revenue)", fmt(salesTotal)],
-        ["Opening Stock", fmt(openingStockValue)],
-        ["Closing Stock", fmt(closingStockValue)],
-        ["Total Purchases", fmt(purchaseTotal)],
-        ["Total Direct Expenses", fmt(directExpenseTotal)],
-        ["Total Indirect Expenses", fmt(indirectExpenseTotal)],
-        ["Total All Expenses", fmt(totalExpenses)],
-        ["Gross Profit", fmt(grossProfit)],
-        ["Net Position", fmt(netPositionValue)],
+      // 5-card KPI layout matching the frontend report
+      const kpiData: [string, number, boolean, boolean][] = [
+        // [label, value, isBold, isHighlighted]
+        ["Total Sales (Revenue)",   salesTotal,       false, false],
+        ["Total Expenses",          totalExpenses,    false, false],
+        ["Gross Profit",            grossProfit,      true,  false],
+        ["Period Net Profit",       periodNetProfit,  true,  false],
+        ["Closing Stock (Current)", closingStockValue,false, false],
+        ["Net Position",            netPositionValue, true,  true ],
       ];
-      for (const [label, value] of kpiData) {
-        const row = ws.addRow(["", label, "", "", value]);
-        row.getCell(2).font = { bold: label === "Net Position" || label === "Gross Profit" };
-        row.getCell(5).font = { bold: label === "Net Position" || label === "Gross Profit", color: { argb: (value as number) >= 0 ? "FF16A34A" : "FFDC2626" } };
-        row.getCell(5).numFmt = '$#,##0';
+      for (const [label, value, isBold, isHighlighted] of kpiData) {
+        const row = ws.addRow(["", label, "", "", fmt(value)]);
+        const isProfit = value >= 0;
+        const profColor = isProfit ? "FF16A34A" : "FFDC2626";
+        row.getCell(2).font = { bold: isBold };
+        row.getCell(5).font = { bold: isBold, color: { argb: profColor } };
+        row.getCell(5).numFmt = '$#,##0.##';
         ws.mergeCells(`B${row.number}:D${row.number}`);
-        if (label === "Net Position") {
-          row.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: (value as number) >= 0 ? "FFD1FAE5" : "FFFEE2E2" } }; });
+        if (isHighlighted) {
+          row.eachCell(cell => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isProfit ? "FFD1FAE5" : "FFFEE2E2" } };
+          });
+        }
+        if (isBold) {
+          row.getCell(2).border = { top: { style: "thin", color: { argb: "FFD1D5DB" } }, bottom: { style: "thin", color: { argb: "FFD1D5DB" } } };
         }
       }
 
@@ -37723,14 +37727,36 @@ if (asOfDate) {
       addSection("INDIRECT INCOMES", "FF0891B2", indirectIncomeDetails, "Indirect Incomes", indirectIncomeTotal);
       addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpenseDetails, "Indirect Expenses", indirectExpenseTotal);
 
-      // Final Net Profit row
-      const finalRow = ws.addRow(["NET POSITION", "", "", "", fmt(netPositionValue)]);
+      // Gross Profit summary row
+      const gpRow = ws.addRow(["GROSS PROFIT", "", "", "", fmt(grossProfit)]);
+      gpRow.eachCell(cell => {
+        cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: grossProfit >= 0 ? "FF0891B2" : "FFDC2626" } };
+        cell.alignment = { horizontal: "center" };
+      });
+      gpRow.getCell(5).numFmt = '$#,##0.##';
+      ws.mergeCells(`A${gpRow.number}:D${gpRow.number}`);
+      ws.getRow(gpRow.number).height = 26;
+
+      // Period Net Profit row
+      const npRow = ws.addRow(["PERIOD NET PROFIT", "", "", "", fmt(periodNetProfit)]);
+      npRow.eachCell(cell => {
+        cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: periodNetProfit >= 0 ? "FF2563EB" : "FFDC2626" } };
+        cell.alignment = { horizontal: "center" };
+      });
+      npRow.getCell(5).numFmt = '$#,##0.##';
+      ws.mergeCells(`A${npRow.number}:D${npRow.number}`);
+      ws.getRow(npRow.number).height = 26;
+
+      // Net Position row (all-time balance sheet position)
+      const finalRow = ws.addRow(["NET POSITION (All Time)", "", "", "", fmt(netPositionValue)]);
       finalRow.eachCell(cell => {
         cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netPositionValue >= 0 ? "FF16A34A" : "FFDC2626" } };
         cell.alignment = { horizontal: "center" };
       });
-      finalRow.getCell(5).numFmt = '$#,##0';
+      finalRow.getCell(5).numFmt = '$#,##0.##';
       ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
       ws.getRow(finalRow.number).height = 30;
 
