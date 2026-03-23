@@ -2199,10 +2199,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     {isGroupExpanded && g.rows.map((row) => {
                                       if (row._type === "offload") {
                                         const o = row.data;
+                                        const offloadDesc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
                                         return (
                                           <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
                                             <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <span className="text-sm font-mono text-muted-foreground">{o.containerNumber || "—"}</span>
+                                              <div className="flex flex-col">
+                                                <span className="text-xs font-mono text-muted-foreground/60">{o.containerNumber || "—"}</span>
+                                                {o.locationName && <span className="text-sm text-foreground">{offloadDesc}</span>}
+                                              </div>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
@@ -2219,10 +2223,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         );
                                       } else {
                                         const voucher = row.data as Voucher;
+                                        const vDesc = voucher.description ||
+                                          ((voucher.voucherType === "Payment" || voucher.voucherType === "Receipt" || voucher.voucherType === "Journal") && accountNameCache[voucher.id]
+                                            ? accountNameCache[voucher.id]
+                                            : null);
                                         return (
                                           <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
                                             <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <span className="text-sm font-mono text-muted-foreground">{voucher.voucherNumber}</span>
+                                              <div className="flex flex-col">
+                                                <span className="text-xs font-mono text-muted-foreground/60">{voucher.voucherNumber}</span>
+                                                {vDesc && <span className="text-sm text-foreground truncate max-w-xs">{vDesc}</span>}
+                                              </div>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
