@@ -45,6 +45,7 @@ interface CombinedRow {
   inHandQty: number;
   totalQty: number;
   inHandValue: number;
+  otwWeightedCostSum: number; // sum(qty * rate) for OTW items
   avgRate: number;
   combinedValue: number;
 }
@@ -107,10 +108,12 @@ export default function CombinedInventory() {
       containerData?.pos?.forEach((po: any) => {
         po.items?.forEach((item: any) => {
           const qty = parseFloat(item.quantity || "0");
+          const rate = parseFloat(item.rate || "0");
           const existing = map.get(item.stockItemId);
           if (existing) {
             existing.otwQty += qty;
             existing.totalQty += qty;
+            existing.otwWeightedCostSum += qty * rate;
           } else {
             map.set(item.stockItemId, {
               stockItemId: item.stockItemId,
@@ -121,6 +124,7 @@ export default function CombinedInventory() {
               inHandQty: 0,
               totalQty: qty,
               inHandValue: 0,
+              otwWeightedCostSum: qty * rate,
               avgRate: 0,
               combinedValue: 0,
             });
@@ -151,6 +155,7 @@ export default function CombinedInventory() {
           inHandQty: qty,
           totalQty: qty,
           inHandValue: value,
+          otwWeightedCostSum: 0,
           avgRate: 0,
           combinedValue: 0,
         });
@@ -169,6 +174,7 @@ export default function CombinedInventory() {
             inHandQty: 0,
             totalQty: 0,
             inHandValue: 0,
+            otwWeightedCostSum: 0,
             avgRate: 0,
             combinedValue: 0,
           });
@@ -176,9 +182,17 @@ export default function CombinedInventory() {
       });
     }
 
-    // Compute avgRate and combinedValue for each row after merging
+    // Compute avgRate and combinedValue:
+    // - Prefer in-hand avg rate (most accurate, reflects actual received cost)
+    // - Fall back to OTW purchase rate when there's no in-hand stock yet
     map.forEach((row) => {
-      row.avgRate = row.inHandQty > 0 ? row.inHandValue / row.inHandQty : 0;
+      if (row.inHandQty > 0) {
+        row.avgRate = row.inHandValue / row.inHandQty;
+      } else if (row.otwQty > 0 && row.otwWeightedCostSum > 0) {
+        row.avgRate = row.otwWeightedCostSum / row.otwQty;
+      } else {
+        row.avgRate = 0;
+      }
       row.combinedValue = row.avgRate * row.totalQty;
     });
 
