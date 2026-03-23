@@ -289,17 +289,10 @@ export default function NetProfitReport() {
         {!isLoading && !error && data && (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
               <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
               <KpiCard title="Gross Profit" value={grossProfit} icon={BarChart3} color="bg-amber-600" />
-              <KpiCard
-                title="Net Profit"
-                subtitle={periodLabel}
-                value={periodNetProfit}
-                icon={periodNetProfit >= 0 ? TrendingUp : TrendingDown}
-                color={periodNetProfit >= 0 ? "bg-green-600" : "bg-red-600"}
-              />
               <KpiCard
                 title="Net Position"
                 subtitle="Balance Sheet"
@@ -352,25 +345,19 @@ export default function NetProfitReport() {
 
                 <Separator className="my-3" />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex justify-between font-semibold text-sm">
-                    <span>Gross Profit</span>
-                    <AmountCell value={grossProfit} />
-                  </div>
-                  <div className={`flex justify-between font-bold text-sm rounded-md px-2 py-1 ${periodNetProfit >= 0 ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
-                    <span>Net Profit ({periodLabel})</span>
-                    <AmountCell value={periodNetProfit} />
-                  </div>
+                <div className="flex justify-between font-semibold text-sm">
+                  <span>Gross Profit</span>
+                  <AmountCell value={grossProfit} />
                 </div>
 
                 <Separator className="my-3" />
 
-                <div className="flex justify-between items-center text-sm rounded-md px-2 py-1 bg-muted/40">
+                <div className={`flex justify-between items-center font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
                   <div>
-                    <span className="font-semibold">Balance Sheet Position</span>
-                    <span className="text-xs text-muted-foreground ml-2">(Assets − Liabilities, cumulative)</span>
+                    <span>Net Position</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-2">(Assets − Liabilities, cumulative)</span>
                   </div>
-                  <span className={`font-bold ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
+                  <span className={balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}>
                     {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
                   </span>
                 </div>
