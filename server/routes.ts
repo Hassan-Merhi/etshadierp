@@ -37567,7 +37567,7 @@ if (asOfDate) {
         return bal;
       }
 
-      function computeStats(balances: Map<number, { debit: number; credit: number }>, salesTotal: number, openingSt: number, closingSt: number) {
+      function computeStats(balances: Map<number, { debit: number; credit: number }>, salesTotal: number, openingSt: number, closingSt: number, monthlyMode = false) {
         const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-"));
         let purchaseTotal = 0;
         const purchaseDetails = purchaseAccounts.map((acc: any) => {
@@ -37596,8 +37596,10 @@ if (asOfDate) {
           return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
-        // Tally-style Gross Profit (Trading Account: Sales + Closing Stock + Direct Inc - Opening Stock - Purchases - Direct Exp)
-        const grossProfit = (salesTotal + closingSt + directIncTotal) - (openingSt + purchaseTotal + directExpTotal);
+        // Gross Profit: Tally Trading Account for summary/single period; revenue-only for per-month (stock bought ≠ stock sold in a single month)
+        const grossProfit = monthlyMode
+          ? salesTotal + directIncTotal - directExpTotal
+          : (salesTotal + closingSt + directIncTotal) - (openingSt + purchaseTotal + directExpTotal);
 
         const indirectExpAccounts = companyAccounts.filter((acc: any) =>
           acc.accountType === "Indirect Expense" && acc.code !== "PRODUCTION_ADJUSTMENT" && acc.code !== "CONSUMPTION_EXPENSE"
@@ -37625,10 +37627,10 @@ if (asOfDate) {
         return { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt };
       }
 
-      function writeSheet(ws: any, stats: ReturnType<typeof computeStats>, sheetLabel: string, showNetPosition: boolean, npValue: number) {
+      function writeSheet(ws: any, stats: ReturnType<typeof computeStats>, sheetLabel: string, showNetPosition: boolean, npValue: number, monthlyMode = false) {
         const { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt } = stats;
 
-        ws.properties = { defaultColWidth: 20 };
+        ws.properties.defaultColWidth = 20;
         ws.mergeCells("A1:E1");
         const titleCell = ws.getCell("A1");
         titleCell.value = `Net Profit Report — ${companyName}`;
@@ -37639,7 +37641,9 @@ if (asOfDate) {
 
         ws.mergeCells("A2:E2");
         const subCell = ws.getCell("A2");
-        subCell.value = `Period: ${sheetLabel}`;
+        subCell.value = monthlyMode
+          ? `Period: ${sheetLabel}  |  Gross Profit = Sales − Direct Expenses (Purchases shown for reference — see Summary tab for full Trading Account)`
+          : `Period: ${sheetLabel}`;
         subCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
         subCell.alignment = { horizontal: "center" };
         ws.getRow(2).height = 22;
@@ -37704,7 +37708,7 @@ if (asOfDate) {
         salesSectionRow.getCell(5).numFmt = '$#,##0';
 
         addSection("DIRECT INCOMES", "FF059669", directIncDetails, "Direct Incomes", directIncTotal);
-        addSection("PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
+        addSection(monthlyMode ? "PURCHASES (Reference Only — not in GP)" : "PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
         addSection("DIRECT EXPENSES", "FFB45309", directExpDetails, "Direct Expenses", directExpTotal);
         addSection("INDIRECT INCOMES", "FF0891B2", indirectIncDetails, "Indirect Incomes", indirectIncTotal);
         addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpDetails, "Indirect Expenses", indirectExpTotal);
@@ -37754,9 +37758,9 @@ if (asOfDate) {
           const monthEntries = monthVIds.flatMap((id) => entriesByVoucherId.get(id) || []);
           const monthBalances = computeBalancesFromEntries(monthEntries);
           const monthSales = salesByMonth.get(mk) || 0;
-          const monthStats = computeStats(monthBalances, monthSales, 0, 0);
+          const monthStats = computeStats(monthBalances, monthSales, 0, 0, true);
           const ws = workbook.addWorksheet(fmtMonthLabel(mk));
-          writeSheet(ws, monthStats, fmtMonthLabel(mk), false, 0);
+          writeSheet(ws, monthStats, fmtMonthLabel(mk), false, 0, true);
         }
         // Summary sheet: full period with proper stock adjustments
         const allBalances = computeBalancesFromEntries(allPeriodEntries);
