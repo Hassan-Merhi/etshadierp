@@ -219,9 +219,6 @@ export default function NetProfitReport() {
     },
   });
 
-  const { data: dashboardData } = useQuery<any>({
-    queryKey: ["/api/stats/net-profit"],
-  });
 
   const handleExport = () => {
     const p = new URLSearchParams();
@@ -245,8 +242,8 @@ export default function NetProfitReport() {
   const directIncTotal = rp?.directIncomes?.total ?? 0;
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
-  // Use net position from the same endpoint as the dashboard (the correct source)
-  const balanceSheetPosition = dashboardData?.netPosition ?? 0;
+  // Net Position from the net-profit-statement (period-aware, matches dashboard logic)
+  const balanceSheetPosition = data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
   // Year options for month picker (5 years back)

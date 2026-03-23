@@ -26698,20 +26698,89 @@ if (asOfDate) {
       // - Then we add indirect incomes and subtract indirect expenses
       const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
-      // 10. Net Position = Assets − Liabilities (balance sheet view)
-      // Uses allTimeAccountBalances (all vouchers up to endDate) so the running balance is accurate
-      // regardless of which period filter is selected for the P&L.
-      let netPositionAssets = 0;
-      let netPositionLiabilities = 0;
+      // 10. Net Position - same calculation as dashboard (/api/stats/net-profit)
+      // Uses allTimeAccountBalances (all vouchers up to endDate) so it reflects the selected period.
+      const npRound2Stmt = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // Build supplier balance map from all-time entries
+      const stmtSupplierBals = new Map<number, { debit: number; credit: number }>();
+      for (const e of allTimeEntries) {
+        if (e.supplierId) {
+          const d = parseFloat(e.debitAmount || '0'), c = parseFloat(e.creditAmount || '0');
+          const cur = stmtSupplierBals.get(e.supplierId) || { debit: 0, credit: 0 };
+          stmtSupplierBals.set(e.supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+        }
+      }
+
+      // Account exclusion rules matching dashboard
+      const stmtExcludedTypes = ['Income', 'Profit', 'Equity', 'EQUITY', 'Fixed Asset'];
+      const stmtExpenseTypes = ['Expense', 'Direct Expense', 'Indirect Expense'];
+      const stmtAssetTypes = ['Asset', 'Current Asset', 'Fixed Asset', 'Bank', 'Cash'];
+      const stmtStockPatterns = ['closing stock', 'opening stock', 'stock in hand', 'stock on hand', 'inventory', 'stock account', 'goods in stock', 'merchandise'];
+      const stmtStockCodes = ['CLOSING_STOCK', 'OPENING_STOCK', 'STOCK', 'INVENTORY', 'STOCK_IN_HAND'];
+      const stmtFixedAssetNames = ['rover', 'toyota', 'mercedes', 'vehicle', 'car', 'truck', 'land', 'property', 'building', 'house', 'rolex', 'watch', 'luxury', 'jewelry', 'guarantee', 'deposit', 'caution'];
+      const isExcludedFromStmtNp = (acc: typeof companyAccounts[0]) => {
+        if (stmtExcludedTypes.includes(acc.accountType || '')) return true;
+        if (acc.code === 'PRODUCTION_ADJUSTMENT' || acc.code === 'CONSUMPTION_EXPENSE') return true;
+        const nameLower = (acc.name || '').toLowerCase();
+        const codeLower = (acc.code || '').toLowerCase();
+        if (stmtAssetTypes.includes(acc.accountType || '')) {
+          if (stmtStockPatterns.some(p => nameLower.includes(p))) return true;
+          if (stmtStockCodes.some(c => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + '_'))) return true;
+          if (stmtFixedAssetNames.some(p => nameLower.includes(p))) return true;
+        }
+        return false;
+      };
+
+      let stmtNpForUs = 0, stmtNpOnUs = 0;
+      const stmtLiabilityTypes = ['Liability', 'Duty Agent', 'Transporter Agent', 'Loan'];
       for (const acc of companyAccounts) {
-        const opening = parseFloat(acc.openingBalance || "0");
-        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
+        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
+        if (acc.accountType === 'Income') continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
         const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
         const net = openingSigned + bal.debit - bal.credit;
-        if (net >= 0) netPositionAssets += net;
-        else netPositionLiabilities += Math.abs(net);
+        if (net > 0) stmtNpForUs += net;
+        else if (net < 0) stmtNpOnUs += Math.abs(net);
       }
-      const netPositionValue = Math.round((netPositionAssets - netPositionLiabilities) * 100) / 100;
+
+      // Add stock on floor (inventory) as asset
+      stmtNpForUs += closingStockValue;
+
+      // Add worker/employee liabilities
+      const stmtEmployees = await db.select().from(employees)
+        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+      let stmtWorkerBal = 0;
+      for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || '0');
+      if (stmtWorkerBal > 0) stmtNpOnUs += stmtWorkerBal;
+      else if (stmtWorkerBal < 0) stmtNpForUs += Math.abs(stmtWorkerBal);
+
+      // Add suppliers (parent company only)
+      const stmtParentCompanyId = await storage.getParentCompanyId();
+      const stmtShouldIncludeSuppliers = stmtParentCompanyId === null || companyId === stmtParentCompanyId;
+      if (stmtShouldIncludeSuppliers) {
+        const stmtAllSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        for (const sup of stmtAllSuppliers) {
+          const balance = stmtSupplierBals.get(sup.id);
+          if (balance) {
+            const opening = parseFloat((sup as any).openingBalance || '0');
+            const netBalance = opening + balance.credit - balance.debit;
+            if (netBalance > 0) stmtNpOnUs += netBalance;
+            else if (netBalance < 0) stmtNpForUs += Math.abs(netBalance);
+          }
+        }
+      }
+
+      // Add OTW containers as assets
+      const stmtOtwContainers = await db.select().from(containers)
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, 'OTW'))).execute();
+      for (const c of stmtOtwContainers) {
+        stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || '0');
+      }
+
+      const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
 
       // Calculate totals for panes (Tally Trading Account format)
       // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
