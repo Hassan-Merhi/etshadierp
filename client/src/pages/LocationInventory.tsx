@@ -7,7 +7,7 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -98,6 +98,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [itemSearchTerm, setItemSearchTerm] = useState("");
   const [asOfDate, setAsOfDate] = useState<string>("");
   const [showNegativeStock, setShowNegativeStock] = useState(false);
+  const [showZeroStock, setShowZeroStock] = useState(false);
   const [negativeSearchTerm, setNegativeSearchTerm] = useState("");
   // All-locations combined stock view
   const [showAllStock, setShowAllStock] = useState(false);
@@ -314,8 +315,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       });
   }, [combinedStockRows, allStockGroupFilter, allStockLocationFilter, allStockSearchTerm]);
 
-  // Filter out items with 0 quantity
-  const inventory = inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
+  // Filter out items with 0 quantity (unless showZeroStock is on)
+  const inventory = showZeroStock
+    ? inventoryData
+    : inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
   // Separate unassigned items (no stock group) — show warning, not as a group
   const unassignedInventoryItems = inventory.filter(item => !item.stockGroupId);
@@ -1485,6 +1488,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <List className="w-4 h-4" />
                 <span className="hidden sm:inline">View All Stock Items</span>
                 <span className="sm:hidden">View All</span>
+              </Button>
+
+              <Button
+                onClick={() => setShowZeroStock(v => !v)}
+                data-testid="button-show-zero-stock"
+                variant={showZeroStock ? "default" : "outline"}
+                className="gap-2 flex-1 md:flex-none"
+              >
+                <Eye className="w-4 h-4" />
+                <span className="hidden sm:inline">{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
+                <span className="sm:hidden">Zero</span>
               </Button>
 
               {!posUser && (

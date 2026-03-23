@@ -32428,49 +32428,72 @@ if (asOfDate) {
       let runningQty = derivedOpeningQty;
       let runningVal = derivedOpeningVal;
       
+      const rate = (val: number, qty: number) => qty > 0 ? val / qty : 0;
+
       const monthlyData: Array<{
         month: number;
         monthName: string;
+        openingQty: number;
+        openingValue: number;
+        openingRate: number;
         inwardQty: number;
         inwardValue: number;
+        inwardRate: number;
         outwardQty: number;
         outwardValue: number;
+        outwardRate: number;
         closingQty: number;
         closingValue: number;
+        closingRate: number;
       }> = [];
       
       for (let m = 1; m <= 12; m++) {
         const bucket = monthBuckets[m];
+        const openingQty = runningQty;
+        const openingVal = runningVal;
         runningQty += bucket.inQty - bucket.outQty;
         runningVal += bucket.inVal - bucket.outVal;
+        const closingQty = Math.round(runningQty * 1000) / 1000;
+        const closingVal = runningVal;
         
         monthlyData.push({
           month: m,
           monthName: monthNames[m - 1],
+          openingQty: Math.round(openingQty * 1000) / 1000,
+          openingValue: openingVal,
+          openingRate: rate(openingVal, openingQty),
           inwardQty: bucket.inQty,
           inwardValue: bucket.inVal,
+          inwardRate: rate(bucket.inVal, bucket.inQty),
           outwardQty: bucket.outQty,
           outwardValue: bucket.outVal,
-          closingQty: Math.round(runningQty * 1000) / 1000,
-          closingValue: runningVal,
+          outwardRate: rate(bucket.outVal, bucket.outQty),
+          closingQty,
+          closingValue: closingVal,
+          closingRate: rate(closingVal, closingQty),
         });
       }
       
       // For current year: force December closing to match actual inventory
-      // This ensures the final closing reconciles to inventory
       if (year === currentYear) {
         monthlyData[11].closingQty = Math.round(actualQty * 1000) / 1000;
         monthlyData[11].closingValue = actualValue;
+        monthlyData[11].closingRate = rate(actualValue, actualQty);
       }
       
-      // Grand total closing should match actual inventory for current year
       const grandTotal = {
+        openingQty: Math.round(derivedOpeningQty * 1000) / 1000,
+        openingValue: derivedOpeningVal,
+        openingRate: rate(derivedOpeningVal, derivedOpeningQty),
         inwardQty: totalYearInQty,
         inwardValue: totalYearInVal,
+        inwardRate: rate(totalYearInVal, totalYearInQty),
         outwardQty: totalYearOutQty,
         outwardValue: totalYearOutVal,
+        outwardRate: rate(totalYearOutVal, totalYearOutQty),
         closingQty: year === currentYear ? Math.round(actualQty * 1000) / 1000 : Math.round(runningQty * 1000) / 1000,
         closingValue: year === currentYear ? actualValue : runningVal,
+        closingRate: year === currentYear ? rate(actualValue, actualQty) : rate(runningVal, runningQty),
       };
       
       res.json({

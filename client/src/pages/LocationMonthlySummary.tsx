@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
-import { ArrowLeft, MapPin, Globe } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -9,26 +9,22 @@ import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/compon
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 
 interface MonthlyData {
   month: number;
   monthName: string;
+  openingQty: number;
+  openingValue: number;
+  openingRate: number;
   inwardQty: number;
   inwardValue: number;
+  inwardRate: number;
   outwardQty: number;
   outwardValue: number;
+  outwardRate: number;
   closingQty: number;
   closingValue: number;
+  closingRate: number;
 }
 
 interface LocationMonthlySummaryData {
@@ -46,12 +42,18 @@ interface LocationMonthlySummaryData {
   year: number;
   monthlyData: MonthlyData[];
   grandTotal: {
+    openingQty: number;
+    openingValue: number;
+    openingRate: number;
     inwardQty: number;
     inwardValue: number;
+    inwardRate: number;
     outwardQty: number;
     outwardValue: number;
+    outwardRate: number;
     closingQty: number;
     closingValue: number;
+    closingRate: number;
   };
 }
 
@@ -62,81 +64,60 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
   const [_location, navigate] = useLocation();
-  
+
   const isAllLocationsMode = locationId === 0;
-  
+
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
-  
+
   const apiUrl = isAllLocationsMode
     ? `/api/stock-items/${stockItemId}/monthly-summary?startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`
     : `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`;
-  
+
   const queryKey = isAllLocationsMode
     ? [`/api/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }]
     : [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }];
-  
+
   const { data, isLoading } = useQuery<LocationMonthlySummaryData>({
     queryKey,
     queryFn: async () => {
-      const response = await fetch(apiUrl, {
-        credentials: 'include',
-      });
+      const response = await fetch(apiUrl, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch');
       return response.json();
     },
     enabled: stockItemId > 0,
   });
-  
-  const chartData = data?.monthlyData.map(m => ({
-    name: m.monthName.substring(0, 3),
-    Inwards: m.inwardQty,
-    Outwards: m.outwardQty,
-  })) || [];
-  
+
+  const hasActivity = (m: MonthlyData) =>
+    m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0;
+
+  const visibleRows = useMemo(() => {
+    if (!data?.monthlyData) return [];
+    return showAllMonths ? data.monthlyData : data.monthlyData.filter(hasActivity);
+  }, [data?.monthlyData, showAllMonths]);
+
   const handleMonthClick = (month: number) => {
     if (!isAllLocationsMode) {
       const year = new Date(periodFilter.fromDate).getFullYear();
       navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`);
     }
   };
-  
-  const formatNumber = (num: number, decimals = 2) => {
-    if (num === 0) return "";
-    return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+  const fmtQty = (n: number) => {
+    if (n === 0) return "—";
+    return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
-  const handleTableKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      if (hasAnyOpenDialog()) return;
-      e.preventDefault();
-      window.history.back();
-      return;
-    }
-    if (hasAnyOpenDialog()) return;
-    if (!data?.monthlyData?.length) return;
-    
-    const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
-    if (rows.length === 0) return;
-    
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedRowIndex(prev => Math.max(-1, prev - 1));
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (selectedRowIndex === -1) {
-        setSelectedRowIndex(0);
-      } else if (selectedRowIndex < rows.length - 1) {
-        setSelectedRowIndex(prev => prev + 1);
-      }
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (!isAllLocationsMode && selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
-        const month = rows[selectedRowIndex].month;
-        handleMonthClick(month);
-      }
-    }
+  const fmtRate = (n: number) => {
+    if (n === 0) return "—";
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const fmtVal = (n: number) => {
+    if (n === 0) return "—";
+    return formatAmount(n);
   };
 
   useEffect(() => {
@@ -148,238 +129,228 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
         return;
       }
       if (hasAnyOpenDialog()) return;
-      if (!data?.monthlyData?.length) return;
-      
-      const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
-      if (rows.length === 0) return;
-      
+      if (!visibleRows.length) return;
+
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedRowIndex(prev => Math.max(-1, prev - 1));
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (selectedRowIndex === -1) {
-          setSelectedRowIndex(0);
-        } else if (selectedRowIndex < rows.length - 1) {
-          setSelectedRowIndex(prev => prev + 1);
-        }
+        if (selectedRowIndex === -1) setSelectedRowIndex(0);
+        else if (selectedRowIndex < visibleRows.length - 1) setSelectedRowIndex(prev => prev + 1);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (!isAllLocationsMode && selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
-          const month = rows[selectedRowIndex].month;
-          handleMonthClick(month);
+        if (!isAllLocationsMode && selectedRowIndex >= 0) {
+          handleMonthClick(visibleRows[selectedRowIndex].month);
         }
       }
     };
-    
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [selectedRowIndex, data, isAllLocationsMode]);
+  }, [selectedRowIndex, visibleRows, isAllLocationsMode]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
     const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
-    if (rowElement) {
-      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
+    if (rowElement) rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [selectedRowIndex]);
 
-  const navigableMonthRows = useMemo(() => {
-    if (!data?.monthlyData) return [];
-    return data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
-  }, [data?.monthlyData]);
-
   useEffect(() => {
-    const rows = navigableMonthRows;
     registerCursorNav({
       canNavigateUp: selectedRowIndex > -1,
-      canNavigateDown: rows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < rows.length - 1),
+      canNavigateDown: visibleRows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < visibleRows.length - 1),
       onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
       onDown: () => setSelectedRowIndex(prev => {
         if (prev === -1) return 0;
-        if (prev < rows.length - 1) return prev + 1;
+        if (prev < visibleRows.length - 1) return prev + 1;
         return prev;
       }),
     });
     return () => clearCursorNav();
-  }, [selectedRowIndex, navigableMonthRows]);
+  }, [selectedRowIndex, visibleRows]);
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-6 space-y-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
     );
   }
-  
+
+  const uom = data?.stockItem?.uom || "Units";
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => window.history.back()} 
-            data-testid="button-back"
-          >
+    <div className="container mx-auto p-6 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">
-              {isAllLocationsMode ? "Item Monthly Summary" : "Location Monthly Summary"}
+            <h1 className="text-xl font-bold" data-testid="text-page-title">
+              {isAllLocationsMode ? "Item Monthly Summary" : "Stock Movement"}
             </h1>
             {data?.stockItem && (
-              <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
-                <span>{data.stockItem.name} ({data.stockItem.code})</span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-item-location">
+                <span className="font-medium">{data.stockItem.name}</span>
+                <span className="text-muted-foreground/50">({data.stockItem.code})</span>
                 <span>•</span>
                 {isAllLocationsMode ? (
-                  <>
-                    <Globe className="h-4 w-4" />
-                    <span>All Locations</span>
-                  </>
+                  <><Globe className="h-3.5 w-3.5" /><span>All Locations</span></>
                 ) : (
-                  <>
-                    <MapPin className="h-4 w-4" />
-                    <span>{data.location?.name || 'Unknown Location'}</span>
-                  </>
+                  <><MapPin className="h-3.5 w-3.5" /><span>{data.location?.name || 'Unknown'}</span></>
                 )}
               </div>
             )}
           </div>
         </div>
-        
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showAllMonths ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowAllMonths(v => !v)}
+            data-testid="button-show-all-months"
+          >
+            <Eye className="h-4 w-4 mr-1.5" />
+            {showAllMonths ? "Hide empty months" : "Show all months"}
+          </Button>
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+        </div>
       </div>
-      
-      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+
+      {/* Tally-style Stock Movement Table */}
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 220px)' }}>
         <CardHeader className="pb-2 flex-shrink-0">
-          <CardTitle className="text-lg">Monthly Summary</CardTitle>
+          <CardTitle className="text-base">
+            Monthly Stock Movement
+            <span className="ml-2 text-sm font-normal text-muted-foreground">({uom})</span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
-          <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-10 bg-muted">
+          <table className="w-full text-sm border-collapse" style={{ minWidth: '900px' }}>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-muted border-b">
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
-                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
-                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
-                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 bg-muted font-medium">Closing Balance</th>
+                <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
               </tr>
-              <tr className="bg-muted/80 border-b">
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium border-r">Quantity</th>
-                {!posUser && <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>}
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium border-r">Quantity</th>
-                {!posUser && <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>}
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
-                {!posUser && <th className="text-right px-4 py-2 bg-muted/80 font-medium">Value</th>}
+              <tr className="bg-muted/70 border-b text-xs">
+                <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
+                {!posUser && <><th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th><th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th></>}
+                <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Qty</th>
+                {!posUser && <><th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Rate</th><th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Value</th></>}
+                <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
+                {!posUser && <><th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th><th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th></>}
+                <th className="text-right px-3 py-1.5 font-medium text-primary">Qty</th>
+                {!posUser && <><th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th><th className="text-right px-3 py-1.5 font-medium text-primary">Value</th></>}
               </tr>
             </thead>
             <tbody>
-                {data?.monthlyData.map((month, idx) => {
-                  const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
-                  const displayIndex = data.monthlyData.slice(0, idx).filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0).length;
-                  const isSelected = hasData && selectedRowIndex === displayIndex;
-                  const isClickable = !isAllLocationsMode;
-                  
-                  return hasData ? (
-                    <tr 
-                      key={month.month}
-                      className={`border-b ${isClickable ? 'cursor-pointer' : ''} ${isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : isClickable ? "hover:bg-muted/50" : ""}`}
-                      onClick={() => isClickable && handleMonthClick(month.month)}
-                      data-testid={`row-month-${month.month}`}
-                      data-row-index={displayIndex}
-                    >
-                      <td className="font-medium px-4 py-3 border-r">{month.monthName}</td>
-                      <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatNumber(month.inwardQty, 0)}
-                      </td>
-                      {!posUser && (
-                        <td className="text-right px-4 py-3 tabular-nums border-r">
-                          {formatAmount(month.inwardValue)}
-                        </td>
-                      )}
-                      <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatNumber(month.outwardQty, 0)}
-                      </td>
-                      {!posUser && (
-                        <td className="text-right px-4 py-3 tabular-nums border-r">
-                          {formatAmount(month.outwardValue)}
-                        </td>
-                      )}
-                      <td className="text-right px-4 py-3 tabular-nums font-medium">
-                        {formatNumber(month.closingQty, 0)}
-                      </td>
-                      {!posUser && (
-                        <td className="text-right px-4 py-3 tabular-nums font-medium">
-                          {formatAmount(month.closingValue)}
-                        </td>
-                      )}
-                    </tr>
-                  ) : null;
-                })}
-                
-                <tr className="bg-muted/50 font-bold border-t">
-                  <td className="px-4 py-3 border-r">Grand Total</td>
-                  <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td colSpan={posUser ? 5 : 13} className="text-center py-12 text-muted-foreground">
+                    No stock movement for this period
                   </td>
-                  {!posUser && (
-                    <td className="text-right px-4 py-3 tabular-nums border-r">
-                      {formatAmount(data?.grandTotal.inwardValue || 0)}
-                    </td>
-                  )}
-                  <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
-                  </td>
-                  {!posUser && (
-                    <td className="text-right px-4 py-3 tabular-nums border-r">
-                      {formatAmount(data?.grandTotal.outwardValue || 0)}
-                    </td>
-                  )}
-                  <td className="text-right px-4 py-3 tabular-nums">
-                    {formatNumber(data?.grandTotal.closingQty || 0, 0)}
-                  </td>
-                  {!posUser && (
-                    <td className="text-right px-4 py-3 tabular-nums">
-                      {formatAmount(data?.grandTotal.closingValue || 0)}
-                    </td>
-                  )}
                 </tr>
-              </tbody>
-            </table>
+              )}
+              {visibleRows.map((month, idx) => {
+                const isSelected = selectedRowIndex === idx;
+                const isClickable = !isAllLocationsMode;
+                const isActive = hasActivity(month);
+
+                return (
+                  <tr
+                    key={month.month}
+                    className={`border-b transition-colors ${isClickable ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary' : isActive && isClickable ? 'hover:bg-muted/40' : 'text-muted-foreground/60'}`}
+                    onClick={() => isClickable && isActive && handleMonthClick(month.month)}
+                    data-testid={`row-month-${month.month}`}
+                    data-row-index={idx}
+                  >
+                    <td className="font-medium px-3 py-2.5 border-r">{month.monthName}</td>
+
+                    {/* Opening */}
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtQty(month.openingQty)}</td>
+                    {!posUser && <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtRate(month.openingRate)}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtVal(month.openingValue)}</td>
+                    </>}
+
+                    {/* Stock In */}
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400 font-medium">{fmtQty(month.inwardQty)}</td>
+                    {!posUser && <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(month.inwardRate)}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(month.inwardValue)}</td>
+                    </>}
+
+                    {/* Stock Out */}
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400 font-medium">{fmtQty(month.outwardQty)}</td>
+                    {!posUser && <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(month.outwardRate)}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(month.outwardValue)}</td>
+                    </>}
+
+                    {/* Closing */}
+                    <td className="text-right px-3 py-2.5 tabular-nums font-semibold text-foreground">{fmtQty(month.closingQty)}</td>
+                    {!posUser && <>
+                      <td className="text-right px-3 py-2.5 tabular-nums font-medium">{fmtRate(month.closingRate)}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums font-medium">{fmtVal(month.closingValue)}</td>
+                    </>}
+                  </tr>
+                );
+              })}
+            </tbody>
+
+            {/* Grand Total */}
+            {data?.grandTotal && (
+              <tfoot className="sticky bottom-0 z-10">
+                <tr className="bg-muted font-bold border-t-2">
+                  <td className="px-3 py-2.5 border-r">Total</td>
+
+                  {/* Opening total */}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtQty(data.grandTotal.openingQty)}</td>
+                  {!posUser && <>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtRate(data.grandTotal.openingRate)}</td>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtVal(data.grandTotal.openingValue)}</td>
+                  </>}
+
+                  {/* In total */}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtQty(data.grandTotal.inwardQty)}</td>
+                  {!posUser && <>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(data.grandTotal.inwardRate)}</td>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(data.grandTotal.inwardValue)}</td>
+                  </>}
+
+                  {/* Out total */}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtQty(data.grandTotal.outwardQty)}</td>
+                  {!posUser && <>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(data.grandTotal.outwardRate)}</td>
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(data.grandTotal.outwardValue)}</td>
+                  </>}
+
+                  {/* Closing total */}
+                  <td className="text-right px-3 py-2.5 tabular-nums text-foreground">{fmtQty(data.grandTotal.closingQty)}</td>
+                  {!posUser && <>
+                    <td className="text-right px-3 py-2.5 tabular-nums">{fmtRate(data.grandTotal.closingRate)}</td>
+                    <td className="text-right px-3 py-2.5 tabular-nums">{fmtVal(data.grandTotal.closingValue)}</td>
+                  </>}
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Monthly Activity Chart</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="name" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    borderColor: 'hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                  }} 
-                />
-                <Legend />
-                <Bar dataKey="Inwards" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Outwards" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+
+      {/* Legend */}
+      {!isAllLocationsMode && (
+        <p className="text-xs text-muted-foreground text-center">
+          Click any month to see detailed transactions
+        </p>
+      )}
     </div>
   );
 }
