@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ import {
   Trash2,
   Search,
   Printer,
+  ChevronDown,
   ChevronRight,
   Loader2,
   Package,
@@ -39,53 +40,65 @@ import {
   DollarSign,
   History,
   CheckSquare,
+  ScanLine,
+  X,
 } from "lucide-react";
 
 function fmt(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  if (n === 0) return "$0";
+  const r = Math.round(n * 100) / 100;
+  if (r % 1 === 0) return "$" + new Intl.NumberFormat("en-US").format(r);
+  return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(r);
 }
 function fmtKg(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(n);
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
 }
 
 function today() {
   return new Date().toISOString().split("T")[0];
 }
 
+interface Bale {
+  id: number;
+  referenceNumber: string;
+  productName: string;
+  categoryName: string;
+  locationName: string;
+  weightKg: number;
+  totalCost: number;
+}
+
+interface ProductGroup {
+  key: string;
+  productName: string;
+  categoryName: string;
+  bales: Bale[];
+  totalWeight: number;
+  totalCost: number;
+  avgRate: number;
+}
+
 export default function WasteDispatch() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [scanInput, setScanInput] = useState("");
+  const scanInputRef = useRef<HTMLInputElement>(null);
 
   const [dispatchDate, setDispatchDate] = useState(today());
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [printData, setPrintData] = useState<any | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handleSearchChange = (val: string) => {
-    setSearch(val);
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
-  };
-
-  const { data, isLoading } = useQuery<{ bales: any[]; categories: any[] }>({
-    queryKey: ["/api/factory/waste-dispatch/bales", debouncedSearch],
+  const { data, isLoading } = useQuery<{ bales: Bale[]; categories: any[] }>({
+    queryKey: ["/api/factory/waste-dispatch/bales", search],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      const r = await fetch(`/api/factory/waste-dispatch/bales?${params}`, {
-        credentials: "include",
-      });
+      if (search) params.set("search", search);
+      const r = await fetch(`/api/factory/waste-dispatch/bales?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
@@ -95,15 +108,49 @@ export default function WasteDispatch() {
     queryKey: ["/api/factory/waste-dispatch/history"],
     enabled: showHistory,
     queryFn: async () => {
-      const r = await fetch("/api/factory/waste-dispatch/history", {
-        credentials: "include",
-      });
+      const r = await fetch("/api/factory/waste-dispatch/history", { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
   });
 
-  const bales = data?.bales || [];
+  const bales: Bale[] = data?.bales || [];
+
+  // Group bales by product
+  const productGroups: ProductGroup[] = useMemo(() => {
+    const map = new Map<string, ProductGroup>();
+    for (const b of bales) {
+      const key = `${b.productName}__${b.categoryName}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.bales.push(b);
+        existing.totalWeight += b.weightKg;
+        existing.totalCost += b.totalCost;
+      } else {
+        map.set(key, {
+          key,
+          productName: b.productName,
+          categoryName: b.categoryName,
+          bales: [b],
+          totalWeight: b.weightKg,
+          totalCost: b.totalCost,
+          avgRate: 0,
+        });
+      }
+    }
+    const groups = Array.from(map.values());
+    for (const g of groups) {
+      g.avgRate = g.bales.length > 0 ? g.totalCost / g.bales.length : 0;
+    }
+    return groups.sort((a, b) => a.productName.localeCompare(b.productName));
+  }, [bales]);
+
+  // Totals across all bales
+  const grandTotals = useMemo(() => ({
+    bales: bales.length,
+    weight: bales.reduce((s, b) => s + b.weightKg, 0),
+    cost: bales.reduce((s, b) => s + b.totalCost, 0),
+  }), [bales]);
 
   const toggleBale = (id: number) => {
     setSelected((prev) => {
@@ -114,11 +161,58 @@ export default function WasteDispatch() {
     });
   };
 
+  const toggleGroup = (group: ProductGroup) => {
+    const allSelected = group.bales.every((b) => selected.has(b.id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        group.bales.forEach((b) => next.delete(b.id));
+      } else {
+        group.bales.forEach((b) => next.add(b.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleExpandGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const toggleAll = () => {
     if (selected.size === bales.length) {
       setSelected(new Set());
     } else {
       setSelected(new Set(bales.map((b) => b.id)));
+    }
+  };
+
+  // Scan handler — match ref number exactly, select the bale
+  const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const ref = scanInput.trim().toUpperCase();
+    if (!ref) return;
+    const match = bales.find((b) => b.referenceNumber.toUpperCase() === ref);
+    if (match) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.add(match.id);
+        return next;
+      });
+      // Auto-expand the group that contains this bale
+      const group = productGroups.find((g) => g.bales.some((b) => b.id === match.id));
+      if (group) {
+        setExpandedGroups((prev) => new Set(prev).add(group.key));
+      }
+      setScanInput("");
+      toast({ title: "Bale added", description: `${match.referenceNumber} — ${match.productName}` });
+    } else {
+      toast({ title: "Not found", description: `No bale with ref "${ref}"`, variant: "destructive" });
+      setScanInput("");
     }
   };
 
@@ -136,12 +230,8 @@ export default function WasteDispatch() {
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/factory/waste-dispatch/bales"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/factory/waste-dispatch/history"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/waste-dispatch/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/waste-dispatch/history"] });
       setSelected(new Set());
       setNotes("");
       setConfirming(false);
@@ -187,33 +277,26 @@ export default function WasteDispatch() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Page Header */}
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b flex-wrap">
+      <div className="flex items-center justify-between gap-3 px-6 py-3 border-b flex-wrap">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Trash2 className="w-5 h-5 text-destructive" />
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-destructive" />
             Waste Dispatch
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Select Garbage or Wiper bales to write off as waste
-          </p>
+          <p className="text-xs text-muted-foreground">Select Garbage or Wiper bales to write off as waste</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowHistory((v) => !v)}
-          data-testid="button-toggle-history"
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)} data-testid="button-toggle-history" className="gap-2">
           <History className="w-4 h-4" />
           {showHistory ? "Hide History" : "View History"}
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* History Panel */}
         {showHistory && (
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Dispatch History</CardTitle>
+            <CardHeader className="pb-2 px-4 pt-3">
+              <CardTitle className="text-sm">Dispatch History</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {history.length === 0 ? (
@@ -223,23 +306,18 @@ export default function WasteDispatch() {
                   {history.map((d: any) => (
                     <Collapsible key={d.id}>
                       <CollapsibleTrigger asChild>
-                        <div
-                          className="flex items-center justify-between px-4 py-3 hover-elevate cursor-pointer"
-                          data-testid={`row-dispatch-${d.id}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center justify-between px-4 py-2.5 hover-elevate cursor-pointer" data-testid={`row-dispatch-${d.id}`}>
+                          <div className="flex items-center gap-2">
+                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                             <div>
-                              <p className="font-medium text-sm">{d.dispatchNumber}</p>
+                              <p className="font-medium text-xs">{d.dispatchNumber}</p>
                               <p className="text-xs text-muted-foreground">{d.dispatchDate}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-3 text-xs">
                             <span className="text-muted-foreground">{d.totalBales} bales</span>
-                            <span className="text-muted-foreground">
-                              {fmtKg(parseFloat(d.totalWeightKg || "0"))} kg
-                            </span>
-                            <Badge variant="outline" className="text-destructive border-destructive/30">
+                            <span className="text-muted-foreground">{fmtKg(parseFloat(d.totalWeightKg || "0"))} kg</span>
+                            <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">
                               {fmt(parseFloat(d.totalCostWrittenOff || "0"))}
                             </Badge>
                           </div>
@@ -247,11 +325,7 @@ export default function WasteDispatch() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="bg-muted/30 px-4 pb-3">
-                          {d.notes && (
-                            <p className="text-xs text-muted-foreground mb-2 pt-2">
-                              Note: {d.notes}
-                            </p>
-                          )}
+                          {d.notes && <p className="text-xs text-muted-foreground mb-2 pt-2">Note: {d.notes}</p>}
                           {d.bales && d.bales.length > 0 ? (
                             <table className="w-full text-xs mt-2">
                               <thead>
@@ -267,20 +341,14 @@ export default function WasteDispatch() {
                                   <tr key={b.id}>
                                     <td className="py-0.5 font-mono">{b.referenceNumber}</td>
                                     <td className="py-0.5">{b.productName}</td>
-                                    <td className="py-0.5 text-right">
-                                      {fmtKg(parseFloat(b.weightKg || "0"))}
-                                    </td>
-                                    <td className="py-0.5 text-right">
-                                      {fmt(parseFloat(b.totalCost || "0"))}
-                                    </td>
+                                    <td className="py-0.5 text-right">{fmtKg(parseFloat(b.weightKg || "0"))}</td>
+                                    <td className="py-0.5 text-right">{fmt(parseFloat(b.totalCost || "0"))}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           ) : (
-                            <p className="text-xs text-muted-foreground pt-2">
-                              No bale details available.
-                            </p>
+                            <p className="text-xs text-muted-foreground pt-2">No bale details available.</p>
                           )}
                         </div>
                       </CollapsibleContent>
@@ -292,56 +360,76 @@ export default function WasteDispatch() {
           </Card>
         )}
 
-        {/* Dispatch Settings */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Dispatch Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Dispatch Date
-                </label>
-                <Input
-                  type="date"
-                  value={dispatchDate}
-                  onChange={(e) => setDispatchDate(e.target.value)}
-                  className="w-44"
-                  data-testid="input-dispatch-date"
-                />
+        {/* Dispatch Details + Scan — top bar */}
+        <div className="flex flex-wrap gap-3">
+          {/* Date + Notes */}
+          <Card className="flex-1 min-w-60">
+            <CardContent className="p-3">
+              <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dispatch Date</label>
+                  <Input type="date" value={dispatchDate} onChange={(e) => setDispatchDate(e.target.value)} className="w-40" data-testid="input-dispatch-date" />
+                </div>
+                <div className="flex flex-col gap-1 flex-1 min-w-40">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes (optional)</label>
+                  <Textarea placeholder="Reason for disposal..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="resize-none" data-testid="input-notes" />
+                </div>
               </div>
-              <div className="flex flex-col gap-1 flex-1 min-w-48">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Notes (optional)
-                </label>
-                <Textarea
-                  placeholder="Reason for disposal..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={1}
-                  className="resize-none"
-                  data-testid="input-notes"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Bale Selection Table */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <CardTitle className="text-base">Available Waste Bales</CardTitle>
+          {/* Scan input */}
+          <Card className="min-w-56">
+            <CardContent className="p-3 h-full flex flex-col justify-center">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                <ScanLine className="w-3 h-3" /> Scan / Enter Ref
+              </label>
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <ScanLine className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search bales..."
-                  value={search}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-9 w-56"
-                  data-testid="input-search-bales"
+                  ref={scanInputRef}
+                  value={scanInput}
+                  onChange={(e) => setScanInput(e.target.value)}
+                  onKeyDown={handleScan}
+                  placeholder="REF123456 + Enter"
+                  className="pl-9 font-mono text-sm"
+                  data-testid="input-scan-ref"
+                  autoComplete="off"
                 />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Press Enter to select a bale</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Bale Groups Table */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-sm">Available Waste Bales</CardTitle>
+                {!isLoading && (
+                  <Badge variant="outline" className="text-xs">
+                    {bales.length} bales · {productGroups.length} products
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Filter products..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-8 w-48 h-8 text-xs"
+                    data-testid="input-search-bales"
+                  />
+                </div>
+                {bales.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={toggleAll} className="text-xs h-8 px-3">
+                    {selected.size === bales.length ? "Deselect All" : "Select All"}
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -350,62 +438,134 @@ export default function WasteDispatch() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : bales.length === 0 ? (
+            ) : productGroups.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-25" />
                 <p className="text-sm">No Garbage or Wiper bales in stock.</p>
-                <p className="text-xs mt-1">
-                  Only bales with Garbage or Wiper category are eligible for waste disposal.
-                </p>
+                <p className="text-xs mt-1">Only bales with Garbage or Wiper category are eligible.</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={bales.length > 0 && selected.size === bales.length}
-                        onCheckedChange={toggleAll}
-                        data-testid="checkbox-select-all"
-                      />
-                    </TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-8 py-2 px-3"></TableHead>
+                    <TableHead className="py-2 px-3 text-xs">Product</TableHead>
+                    <TableHead className="py-2 px-3 text-xs">Category</TableHead>
+                    <TableHead className="py-2 px-3 text-right text-xs">Bales</TableHead>
+                    <TableHead className="py-2 px-3 text-right text-xs">Weight (kg)</TableHead>
+                    <TableHead className="py-2 px-3 text-right text-xs">Avg Rate</TableHead>
+                    <TableHead className="py-2 px-3 text-right text-xs">Total Cost</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {bales.map((b) => (
-                    <TableRow
-                      key={b.id}
-                      className={`cursor-pointer ${selected.has(b.id) ? "bg-destructive/5" : ""}`}
-                      onClick={() => toggleBale(b.id)}
-                      data-testid={`row-bale-${b.id}`}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selected.has(b.id)}
-                          onCheckedChange={() => toggleBale(b.id)}
-                          data-testid={`checkbox-bale-${b.id}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{b.referenceNumber}</TableCell>
-                      <TableCell className="text-sm">{b.productName}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {b.categoryName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {b.locationName}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">{fmtKg(b.weightKg)}</TableCell>
-                      <TableCell className="text-right text-sm">{fmt(b.totalCost)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {productGroups.map((group) => {
+                    const isExpanded = expandedGroups.has(group.key);
+                    const groupSelectedCount = group.bales.filter((b) => selected.has(b.id)).length;
+                    const allGroupSelected = groupSelectedCount === group.bales.length;
+                    const someGroupSelected = groupSelectedCount > 0 && !allGroupSelected;
+
+                    return (
+                      <>
+                        {/* Product group header row */}
+                        <TableRow
+                          key={group.key}
+                          className={`cursor-pointer font-medium ${allGroupSelected ? "bg-destructive/5" : someGroupSelected ? "bg-destructive/3" : ""} hover:bg-muted/30`}
+                          data-testid={`row-group-${group.key}`}
+                        >
+                          <TableCell className="py-2 px-3">
+                            <Checkbox
+                              checked={allGroupSelected}
+                              data-state={someGroupSelected ? "indeterminate" : allGroupSelected ? "checked" : "unchecked"}
+                              onCheckedChange={() => toggleGroup(group)}
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid={`checkbox-group-${group.key}`}
+                            />
+                          </TableCell>
+                          <TableCell
+                            className="py-2 px-3"
+                            onClick={() => toggleExpandGroup(group.key)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? (
+                                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              )}
+                              <span className="text-sm font-semibold">{group.productName}</span>
+                              {groupSelectedCount > 0 && (
+                                <Badge variant="outline" className="text-xs text-destructive border-destructive/30 ml-1">
+                                  {groupSelectedCount} selected
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 px-3" onClick={() => toggleExpandGroup(group.key)}>
+                            <Badge variant="outline" className="text-xs">{group.categoryName}</Badge>
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-sm" onClick={() => toggleExpandGroup(group.key)}>
+                            {group.bales.length}
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-sm" onClick={() => toggleExpandGroup(group.key)}>
+                            {fmtKg(group.totalWeight)}
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground" onClick={() => toggleExpandGroup(group.key)}>
+                            {group.avgRate > 0 ? fmt(group.avgRate) : "—"}
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-sm font-medium" onClick={() => toggleExpandGroup(group.key)}>
+                            {group.totalCost > 0 ? fmt(group.totalCost) : "—"}
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Expanded bale ref rows */}
+                        {isExpanded && group.bales.map((b) => (
+                          <TableRow
+                            key={b.id}
+                            className={`cursor-pointer text-xs ${selected.has(b.id) ? "bg-destructive/8" : "bg-muted/10"} hover:bg-muted/20`}
+                            onClick={() => toggleBale(b.id)}
+                            data-testid={`row-bale-${b.id}`}
+                          >
+                            <TableCell className="py-1.5 px-3 pl-5" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selected.has(b.id)}
+                                onCheckedChange={() => toggleBale(b.id)}
+                                data-testid={`checkbox-bale-${b.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 pl-8" colSpan={2}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-semibold text-primary">{b.referenceNumber}</span>
+                                <span className="text-xs text-muted-foreground">{b.locationName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 text-right text-xs">1</TableCell>
+                            <TableCell className="py-1.5 px-3 text-right text-xs">{fmtKg(b.weightKg)}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-right text-xs text-muted-foreground">
+                              {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 text-right text-xs">
+                              {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    );
+                  })}
+
+                  {/* Grand total row */}
+                  <TableRow className="bg-muted/50 font-bold border-t-2">
+                    <TableCell className="py-2 px-3"></TableCell>
+                    <TableCell className="py-2 px-3 text-xs" colSpan={2}>
+                      TOTAL — {productGroups.length} product{productGroups.length !== 1 ? "s" : ""}
+                    </TableCell>
+                    <TableCell className="py-2 px-3 text-right text-xs">{grandTotals.bales}</TableCell>
+                    <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(grandTotals.weight)}</TableCell>
+                    <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
+                      {grandTotals.bales > 0 && grandTotals.cost > 0 ? fmt(grandTotals.cost / grandTotals.bales) : "—"}
+                    </TableCell>
+                    <TableCell className="py-2 px-3 text-right text-xs">
+                      {grandTotals.cost > 0 ? fmt(grandTotals.cost) : "—"}
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             )}
@@ -414,41 +574,36 @@ export default function WasteDispatch() {
 
         {/* Selection Summary + Dispatch Button */}
         {selected.size > 0 && (
-          <Card className="border-destructive/30">
-            <CardContent className="p-4">
+          <Card className="border-destructive/30 bg-destructive/3">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center gap-5 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium" data-testid="text-selected-count">
+                    <CheckSquare className="w-4 h-4 text-destructive" />
+                    <span className="text-sm font-semibold text-destructive" data-testid="text-selected-count">
                       {selected.size} bale{selected.size !== 1 ? "s" : ""} selected
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Weight className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm" data-testid="text-total-weight">
-                      {fmtKg(totalWeight)} kg
-                    </span>
+                  <div className="flex items-center gap-1.5">
+                    <Weight className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-sm" data-testid="text-total-weight">{fmtKg(totalWeight)} kg</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <span
-                      className="text-sm text-destructive font-medium"
-                      data-testid="text-total-cost"
-                    >
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-sm font-medium" data-testid="text-total-cost">
                       {fmt(totalCost)} write-off
                     </span>
                   </div>
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={() => setConfirming(true)}
-                  data-testid="button-dispatch-waste"
-                  className="gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Dispatch Waste
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelected(new Set())} className="gap-1.5">
+                    <X className="w-3.5 h-3.5" /> Clear
+                  </Button>
+                  <Button variant="destructive" onClick={() => setConfirming(true)} data-testid="button-dispatch-waste" className="gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    Dispatch {selected.size} Bale{selected.size !== 1 ? "s" : ""}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -498,29 +653,14 @@ export default function WasteDispatch() {
             </p>
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setConfirming(false)}
-              disabled={submitMutation.isPending}
-            >
+            <Button variant="outline" onClick={() => setConfirming(false)} disabled={submitMutation.isPending}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => submitMutation.mutate()}
-              disabled={submitMutation.isPending}
-              data-testid="button-confirm-dispatch"
-            >
+            <Button variant="destructive" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-confirm-dispatch">
               {submitMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Processing...
-                </>
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing...</>
               ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Confirm Disposal
-                </>
+                <><Trash2 className="w-4 h-4 mr-2" />Confirm Disposal</>
               )}
             </Button>
           </DialogFooter>
@@ -537,16 +677,11 @@ export default function WasteDispatch() {
                 Disposal Complete — {printData.dispatch.dispatchNumber}
               </DialogTitle>
             </DialogHeader>
-
-            {/* Printable region */}
             <div ref={printRef} className="space-y-3">
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>
-                  Waste Disposal Record
-                </h1>
+                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>Waste Disposal Record</h1>
                 <p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>
-                  Dispatch No: {printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date:{" "}
-                  {printData.dispatch.dispatchDate}
+                  Dispatch No: {printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date: {printData.dispatch.dispatchDate}
                   {printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {printData.dispatch.notes}</>}
                 </p>
               </div>
@@ -554,16 +689,7 @@ export default function WasteDispatch() {
                 <thead>
                   <tr>
                     {["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => (
-                      <th
-                        key={h}
-                        style={{
-                          border: "1px solid #ccc",
-                          padding: "6px 8px",
-                          background: "#f3f4f6",
-                          textAlign: i === 0 ? "left" : "right",
-                          fontWeight: "bold",
-                        }}
-                      >
+                      <th key={h} style={{ border: "1px solid #ccc", padding: "6px 8px", background: "#f3f4f6", textAlign: i === 0 ? "left" : "right", fontWeight: "bold" }}>
                         {h}
                       </th>
                     ))}
@@ -572,15 +698,9 @@ export default function WasteDispatch() {
                 <tbody>
                   {printData.bales.map((b: any) => (
                     <tr key={b.id}>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>
-                        {b.referenceNumber}
-                      </td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
-                        {fmtKg(b.weightKg)}
-                      </td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
-                        {fmt(b.totalCost)}
-                      </td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>{b.referenceNumber}</td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmtKg(b.weightKg)}</td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmt(b.totalCost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -599,20 +719,12 @@ export default function WasteDispatch() {
                 </tfoot>
               </table>
               <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>
-                This document confirms the waste disposal of factory bales. A daybook expense entry has
-                been created automatically.
+                This document confirms the waste disposal of factory bales. A daybook expense entry has been created automatically.
               </p>
             </div>
-
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setPrintData(null)}>
-                Close
-              </Button>
-              <Button
-                onClick={handlePrint}
-                data-testid="button-print-receipt"
-                className="gap-2"
-              >
+              <Button variant="outline" onClick={() => setPrintData(null)}>Close</Button>
+              <Button onClick={handlePrint} data-testid="button-print-receipt" className="gap-2">
                 <Printer className="w-4 h-4" />
                 Print Receipt
               </Button>
