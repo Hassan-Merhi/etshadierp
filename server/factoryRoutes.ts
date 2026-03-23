@@ -4585,7 +4585,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           updatedAt: factoryContainers.updatedAt,
           supplierName: factorySuppliers.name,
           additionalChargesSum: sql<string>`COALESCE((
-            SELECT SUM(foac.amount::numeric)
+            SELECT SUM(
+              CASE
+                WHEN COALESCE(foac.currency_code, 'USD') = COALESCE(${factoryContainers.currencyCode}, 'USD')
+                  THEN foac.amount::numeric
+                WHEN COALESCE(foac.currency_code, 'USD') = 'USD'
+                  THEN foac.amount::numeric / NULLIF(COALESCE(${factoryContainers.fxRateToUsd}, '1')::numeric, 0)
+                ELSE foac.amount::numeric * COALESCE(foac.fx_rate_to_usd, '1')::numeric
+                     / NULLIF(COALESCE(${factoryContainers.fxRateToUsd}, '1')::numeric, 0)
+              END
+            )
             FROM factory_offload_additional_charges foac
             WHERE foac.container_id = ${factoryContainers.id}
             AND foac.company_id = ${factoryContainers.companyId}
@@ -5470,7 +5479,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const freightVal = parseFloat(reqFreight || "0");
       const otherChargesVal = parseFloat(reqOtherCharges || "0");
       const additionalChargesArr = Array.isArray(reqAdditionalCharges) ? reqAdditionalCharges : [];
-      const additionalChargesTotal = additionalChargesArr.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
+      // Each charge may be in its own currency; convert each to container currency for totalCost
+      const additionalChargesTotal = additionalChargesArr.reduce((sum: number, c: any) => {
+        const amt = parseFloat(c.amount || "0");
+        const chargeCcy = c.currencyCode || currencyCode;
+        const chargeFx = parseFloat(c.fxRateToUsd || String(fxRate));
+        if (chargeCcy === currencyCode) return sum + amt;
+        const amtUsd = chargeCcy === "USD" ? amt : amt * chargeFx;
+        const amtInContainerCcy = currencyCode === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd);
+        return sum + amtInContainerCcy;
+      }, 0);
       const dutyVal = reqDutyStatus === "CONFIRMED" ? parseFloat(reqDutyAmount || "0") : 0;
       const dutyStatus = reqDutyStatus || "NONE";
 
@@ -5528,7 +5546,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const commUsd = commCurrencyForUsd === "USD" ? commTotalVal : commTotalVal * commFxRateForUsd;
 
       const baseMaterialUsd = currencyCode === "USD" ? basePayable : basePayable * fxRate;
-      const addlUsd = currencyCode === "USD" ? additionalChargesTotal : additionalChargesTotal * fxRate;
+      const addlUsd = additionalChargesArr.reduce((sum: number, c: any) => {
+        const amt = parseFloat(c.amount || "0");
+        const chargeCcy = c.currencyCode || currencyCode;
+        const chargeFx = parseFloat(c.fxRateToUsd || String(fxRate));
+        return sum + (chargeCcy === "USD" ? amt : amt * chargeFx);
+      }, 0);
       const dutyUsd = currencyCode === "USD" ? dutyVal : dutyVal * fxRate;
 
       const totalUsd = baseMaterialUsd + freightUsd + commUsd + ocUsd + addlUsd + dutyUsd;
@@ -5604,6 +5627,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 containerId,
                 description: charge.description,
                 amount: String(charge.amount),
+                currencyCode: charge.currencyCode || currencyCode,
+                fxRateToUsd: String(charge.fxRateToUsd || (currencyCode === "USD" ? "1" : String(fxRate))),
                 ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
                 supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
               })

@@ -577,16 +577,12 @@ export default function ProductionRawStock() {
       additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => {
         const p = parseAccountValue(c.ledgerAccountId);
         const chargeCcy = c.currencyCode || currencyCode;
-        const chargeFx = parseFloat(c.fxRate || "1");
-        // Convert amount to container currency for backend cost calculation
-        let amountInContainerCcy = parseFloat(c.amount || "0");
-        if (chargeCcy !== currencyCode) {
-          const amtUsd = chargeCcy === "USD" ? amountInContainerCcy : amountInContainerCcy * chargeFx;
-          amountInContainerCcy = currencyCode === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd);
-        }
+        const chargeFx = c.fxRate || "1";
         return {
           description: c.description.trim(),
-          amount: String(amountInContainerCcy),
+          amount: c.amount,
+          currencyCode: chargeCcy,
+          fxRateToUsd: chargeFx,
           ledgerAccountId: p?.type === "ledger" ? p.id : null,
           supplierId: p?.type === "supplier" ? p.id : null,
         };

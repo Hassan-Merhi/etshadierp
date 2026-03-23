@@ -2419,6 +2419,8 @@ export const factoryOffloadAdditionalCharges = pgTable("factory_offload_addition
   containerId: integer("container_id").notNull(),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  currencyCode: text("currency_code").default("USD"),
+  fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 6 }).default("1"),
   ledgerAccountId: integer("ledger_account_id"),
   supplierId: integer("supplier_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

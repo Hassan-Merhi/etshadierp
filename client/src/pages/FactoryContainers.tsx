@@ -644,7 +644,7 @@ export default function FactoryContainers() {
                                 <div>Other: {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
                               )}
                               {additionalAmt > 0 && (
-                                <div>Additional: {formatNumber(additionalAmt)}</div>
+                                <div>Additional: {ccy} {formatNumber(additionalAmt)}</div>
                               )}
                             </div>
                           </div>
