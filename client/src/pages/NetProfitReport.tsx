@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  TrendingUp,
   Download,
   ChevronDown,
   ChevronRight,
@@ -218,7 +217,6 @@ export default function NetProfitReport() {
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
   const grossProfit = lp?.grossProfit ?? (salesTotal + closingStock + directIncTotal - openingStock - purchasesTotal - directExpTotal);
-  const periodNetProfit = lp?.netProfit ?? (grossProfit + indirectIncTotal - indirectExpTotal);
   const balanceSheetPosition = dashboardData?.netPosition ?? data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
@@ -288,17 +286,10 @@ export default function NetProfitReport() {
         {!isLoading && !error && data && (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
               <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
               <KpiCard title="Gross Profit" value={grossProfit} icon={BarChart3} color="bg-amber-600" />
-              <KpiCard
-                title="Net Profit"
-                subtitle="This Period"
-                value={periodNetProfit}
-                icon={TrendingUp}
-                color={periodNetProfit >= 0 ? "bg-blue-600" : "bg-red-600"}
-              />
               <KpiCard
                 title="Net Position"
                 subtitle="Balance Sheet (All-Time)"
@@ -355,25 +346,14 @@ export default function NetProfitReport() {
 
                 <Separator className="my-3" />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${periodNetProfit >= 0 ? "bg-blue-50 dark:bg-blue-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
-                    <div>
-                      <span>Net Profit</span>
-                      <p className="text-xs font-normal text-muted-foreground mt-0.5">Income − Expenses for {periodLabel}</p>
-                    </div>
-                    <span className={`ml-4 shrink-0 ${periodNetProfit >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}>
-                      {periodNetProfit < 0 ? "-" : ""}{formatAmount(Math.abs(periodNetProfit))}
-                    </span>
+                <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
+                  <div>
+                    <span>Net Position</span>
+                    <p className="text-xs font-normal text-muted-foreground mt-0.5">Assets − Liabilities, all-time cumulative</p>
                   </div>
-                  <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
-                    <div>
-                      <span>Net Position</span>
-                      <p className="text-xs font-normal text-muted-foreground mt-0.5">Assets − Liabilities, all-time cumulative</p>
-                    </div>
-                    <span className={`ml-4 shrink-0 ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
-                      {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
-                    </span>
-                  </div>
+                  <span className={`ml-4 shrink-0 ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
+                    {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
+                  </span>
                 </div>
               </CardContent>
             </Card>
