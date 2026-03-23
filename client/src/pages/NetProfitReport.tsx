@@ -219,8 +219,10 @@ export default function NetProfitReport() {
   const directIncTotal = rp?.directIncomes?.total ?? 0;
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
-  const grossProfit = lp?.grossProfit ?? 0;
-  const periodNetProfit = lp?.netProfit ?? 0;
+  // Compute gross profit on the frontend from period-accurate values only
+  // (excludes Opening/Closing Stock which are never period-filtered)
+  const grossProfit = salesTotal + directIncTotal - purchasesTotal - directExpTotal;
+  const periodNetProfit = grossProfit + indirectIncTotal - indirectExpTotal;
   const balanceSheetPosition = dashboardData?.netPosition ?? data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
@@ -318,7 +320,6 @@ export default function NetProfitReport() {
                       { label: "Sales (Revenue)", value: salesTotal },
                       { label: "Direct Incomes", value: directIncTotal },
                       { label: "Indirect Incomes", value: indirectIncTotal },
-                      { label: "Closing Stock Value", value: closingStock },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{label}</span>
@@ -331,7 +332,6 @@ export default function NetProfitReport() {
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Expenses</p>
                     {[
-                      { label: "Opening Stock", value: openingStock },
                       { label: "Purchases", value: purchasesTotal },
                       { label: "Direct Expenses", value: directExpTotal },
                       { label: "Indirect Expenses", value: indirectExpTotal },
