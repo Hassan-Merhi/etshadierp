@@ -346,14 +346,25 @@ export default function NetProfitReport() {
 
                 <Separator className="my-3" />
 
-                <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
-                  <div>
-                    <span>Net Position</span>
-                    <p className="text-xs font-normal text-muted-foreground mt-0.5">Assets − Liabilities, all-time cumulative</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${grossProfit >= 0 ? "bg-amber-50 dark:bg-amber-950/30" : "bg-red-50 dark:bg-red-950/30"}`}>
+                    <div>
+                      <span>Gross Profit</span>
+                      <p className="text-xs font-normal text-muted-foreground mt-0.5">Income − Expenses for {periodLabel}</p>
+                    </div>
+                    <span className={`ml-4 shrink-0 ${grossProfit >= 0 ? "text-amber-700 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                      {grossProfit < 0 ? "-" : ""}{formatAmount(Math.abs(grossProfit))}
+                    </span>
                   </div>
-                  <span className={`ml-4 shrink-0 ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
-                    {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
-                  </span>
+                  <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
+                    <div>
+                      <span>Net Position</span>
+                      <p className="text-xs font-normal text-muted-foreground mt-0.5">Assets − Liabilities, all-time cumulative</p>
+                    </div>
+                    <span className={`ml-4 shrink-0 ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
+                      {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
