@@ -345,6 +345,8 @@ async function upsertIntercompanyVoucher(opts: {
           narration,
         });
       }
+      // Keep voucher totalAmount in sync with the running total
+      await db.update(vouchers).set({ totalAmount: totalCr.toFixed(2) }).where(eq(vouchers.id, existing.id));
     } else {
       // ── DEST MODE ─────────────────────────────────────────────────────────
       // DR side = per-sale cash outlet (many accounts, one entry each, specific amount)
@@ -396,6 +398,8 @@ async function upsertIntercompanyVoucher(opts: {
           narration,
         });
       }
+      // Keep voucher totalAmount in sync with the running total
+      await db.update(vouchers).set({ totalAmount: totalDr.toFixed(2) }).where(eq(vouchers.id, existing.id));
     }
   } else {
     // ── CREATE new voucher with initial two entries ────────────────────────
