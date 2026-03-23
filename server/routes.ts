@@ -37438,336 +37438,339 @@ if (asOfDate) {
     try {
       const user = req.session.user as any;
       const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
-
-      // Allow admin/dev to pass a specific companyId, others use session company
       const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
       const companyId = (isAdminOrDev && requestedCompanyId) ? requestedCompanyId : req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
-      // Get company name for the report header
       const allCompanies = await storage.getAllCompanies();
       const company = allCompanies.find((c: any) => c.id === companyId);
       const companyName = company?.name || "Company";
 
-      // Date range from query params
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
       const periodLabel = (req.query.periodLabel as string) || "All Time";
 
-      // === Reuse the same calculation logic as /api/reports/net-profit-statement ===
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-      const voucherConditions: any[] = [
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(vouchers.optional, false),
-      ];
+      // Fetch period vouchers WITH their dates for monthly grouping
+      const voucherConditions: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
       if (startDate) voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
       if (endDate) voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
 
-      const companyVouchers = await db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherConditions)).execute();
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const allPeriodVouchers = await db.select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
+        .from(vouchers).where(and(...voucherConditions)).execute();
 
-      const companyEntries = companyVoucherIds.length > 0
-        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, companyVoucherIds)).execute()
+      // Group voucher IDs by YYYY-MM
+      const vouchersByMonth = new Map<string, number[]>();
+      for (const v of allPeriodVouchers) {
+        const d = new Date(v.voucherDate);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        if (!vouchersByMonth.has(mk)) vouchersByMonth.set(mk, []);
+        vouchersByMonth.get(mk)!.push(v.id);
+      }
+      const sortedMonths = Array.from(vouchersByMonth.keys()).sort();
+
+      // Fetch ALL entries for ALL period vouchers at once
+      const allPeriodVoucherIds = allPeriodVouchers.map((v) => v.id);
+      const allPeriodEntries = allPeriodVoucherIds.length > 0
+        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, allPeriodVoucherIds)).execute()
         : [];
 
-      const accountBalances = new Map<number, { debit: number; credit: number }>();
-      for (const entry of companyEntries) {
-        if (entry.ledgerAccountId) {
-          const debit = parseFloat(entry.debitAmount || "0");
-          const credit = parseFloat(entry.creditAmount || "0");
-          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
-        }
+      // Map entries by voucherId for fast monthly lookup
+      const entriesByVoucherId = new Map<number, any[]>();
+      for (const e of allPeriodEntries) {
+        if (!entriesByVoucherId.has(e.voucherId)) entriesByVoucherId.set(e.voucherId, []);
+        entriesByVoucherId.get(e.voucherId)!.push(e);
       }
 
-      // allTimeAccountBalances for Net Position (all vouchers up to endDate, no startDate filter)
-      const allTimeVoucherConditionsXlsx: any[] = [
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(vouchers.optional, false),
-      ];
-      if (endDate) allTimeVoucherConditionsXlsx.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
-      const allTimeVouchersXlsx = await db.select({ id: vouchers.id }).from(vouchers).where(and(...allTimeVoucherConditionsXlsx)).execute();
-      const allTimeVoucherIdsXlsx = allTimeVouchersXlsx.map((v) => v.id);
-      const allTimeEntriesXlsx = allTimeVoucherIdsXlsx.length > 0
-        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, allTimeVoucherIdsXlsx)).execute()
+      // Fetch ALL sales with dates for the period
+      const salesConditions: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
+      if (startDate) salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
+      if (endDate) salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
+      const allSalesRows = await db.select({ voucherDate: vouchers.voucherDate, total: salesItems.totalSales })
+        .from(salesItems).innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id)).where(and(...salesConditions)).execute();
+
+      // Group sales by month
+      const salesByMonth = new Map<string, number>();
+      let totalSalesAll = 0;
+      for (const s of allSalesRows) {
+        const d = new Date(s.voucherDate);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const v = parseFloat(s.total || "0");
+        salesByMonth.set(mk, (salesByMonth.get(mk) || 0) + v);
+        totalSalesAll += v;
+      }
+
+      // allTimeAccountBalances for Net Position (no startDate filter)
+      const allTimeConds: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
+      if (endDate) allTimeConds.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
+      const allTimeVsXlsx = await db.select({ id: vouchers.id }).from(vouchers).where(and(...allTimeConds)).execute();
+      const allTimeIdsXlsx = allTimeVsXlsx.map((v) => v.id);
+      const allTimeEntriesXlsx = allTimeIdsXlsx.length > 0
+        ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, allTimeIdsXlsx)).execute()
         : [];
-      const allTimeAccountBalancesXlsx = new Map<number, { debit: number; credit: number }>();
-      for (const entry of allTimeEntriesXlsx) {
-        if (entry.ledgerAccountId) {
-          const debit = parseFloat(entry.debitAmount || "0");
-          const credit = parseFloat(entry.creditAmount || "0");
-          const current = allTimeAccountBalancesXlsx.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          allTimeAccountBalancesXlsx.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
+      const allTimeBalsXlsx = new Map<number, { debit: number; credit: number }>();
+      for (const e of allTimeEntriesXlsx) {
+        if (e.ledgerAccountId) {
+          const d = parseFloat(e.debitAmount || "0"), c = parseFloat(e.creditAmount || "0");
+          const cur = allTimeBalsXlsx.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
+          allTimeBalsXlsx.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
         }
       }
 
       // Opening Stock
       const allStockItems = await storage.getAllStockItems(companyId);
       let openingStockValue = 0;
-      for (const item of allStockItems) openingStockValue += parseFloat(item.openingValue || "0");
+      for (const item of allStockItems) openingStockValue += parseFloat((item as any).openingValue || "0");
 
-      // Purchase Accounts
-      const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-"));
-      let purchaseTotal = 0;
-      const purchaseDetails: any[] = purchaseAccounts.map((acc: any) => {
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = bal.debit - bal.credit;
-        purchaseTotal += net;
-        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+      // Closing Stock (current inventory)
+      const activeLocData = await db.select({ id: locations.id }).from(locations)
+        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
+      const activeLocIds = activeLocData.map((l) => l.id);
+      let closingStockValue = 0;
+      if (activeLocIds.length > 0) {
+        const invData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+          .from(inventory).where(inArray(inventory.locationId, activeLocIds)).execute();
+        for (const inv of invData) closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+      }
 
-      // Direct Incomes
-      const directIncomeAccounts = companyAccounts.filter((acc: any) =>
-        acc.accountType === "Income" && acc.subType === "Direct Income" &&
-        !acc.code?.includes("SALES") && !acc.name?.toLowerCase().includes("sales")
-      );
-      let directIncomeTotal = 0;
-      const directIncomeDetails: any[] = directIncomeAccounts.map((acc: any) => {
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = bal.credit - bal.debit;
-        directIncomeTotal += net;
-        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+      // Net Position
+      let npAssets = 0, npLiabilities = 0;
+      for (const acc of companyAccounts) {
+        const opening = parseFloat((acc as any).openingBalance || "0");
+        const openingSigned = (acc as any).openingBalanceSide === "Dr" ? opening : -opening;
+        const bal = allTimeBalsXlsx.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (net >= 0) npAssets += net; else npLiabilities += Math.abs(net);
+      }
+      const netPositionValue = Math.round((npAssets - npLiabilities) * 100) / 100;
 
-      // Direct Expenses
+      // Import charges IDs
       const importChargesParent = companyAccounts.find((acc: any) => acc.code === "IMPORT_CHARGES");
       const importChargesIds = new Set<number>();
       if (importChargesParent) {
-        importChargesIds.add(importChargesParent.id);
-        companyAccounts.forEach((acc: any) => { if (acc.parentId === importChargesParent.id) importChargesIds.add(acc.id); });
-      }
-      const directExpenseAccounts = companyAccounts.filter((acc: any) =>
-        acc.accountType === "Direct Expense" ||
-        (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
-        importChargesIds.has(acc.id)
-      );
-      let directExpenseTotal = 0;
-      const directExpenseDetails: any[] = directExpenseAccounts.map((acc: any) => {
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = bal.debit - bal.credit;
-        directExpenseTotal += net;
-        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
-
-      // Sales
-      const salesConditions: any[] = [eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)];
-      if (startDate) salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
-      if (endDate) salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
-      const salesData = await db.select({ total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)` })
-        .from(salesItems).innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id)).where(and(...salesConditions)).execute();
-      const salesTotal = parseFloat(salesData[0]?.total || "0");
-
-      // Closing Stock
-      const activeLocationsData = await db.select({ id: locations.id }).from(locations)
-        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
-      const activeLocationIds = activeLocationsData.map((l) => l.id);
-      let closingStockValue = 0;
-      if (activeLocationIds.length > 0) {
-        const inventoryData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-          .from(inventory).where(inArray(inventory.locationId, activeLocationIds)).execute();
-        for (const inv of inventoryData) closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+        importChargesIds.add((importChargesParent as any).id);
+        companyAccounts.forEach((acc: any) => { if (acc.parentId === (importChargesParent as any).id) importChargesIds.add(acc.id); });
       }
 
-      // Gross Profit — period-accurate (matches frontend: no Opening/Closing Stock in formula)
-      const grossProfit = salesTotal + directIncomeTotal - purchaseTotal - directExpenseTotal;
+      const fmt = (n: number) => parseFloat(n.toFixed(2));
 
-      // Indirect Expenses
-      const indirectExpenseAccounts = companyAccounts.filter((acc: any) =>
-        acc.accountType === "Indirect Expense" && acc.code !== "PRODUCTION_ADJUSTMENT" && acc.code !== "CONSUMPTION_EXPENSE"
-      );
-      let indirectExpenseTotal = 0;
-      const indirectExpenseDetails: any[] = indirectExpenseAccounts.map((acc: any) => {
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = bal.debit - bal.credit;
-        indirectExpenseTotal += net;
-        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
-
-      // Indirect Incomes
-      const indirectIncomeAccounts = companyAccounts.filter((acc: any) =>
-        acc.accountType === "Income" && acc.subType === "Indirect Income"
-      );
-      let indirectIncomeTotal = 0;
-      const indirectIncomeDetails: any[] = indirectIncomeAccounts.map((acc: any) => {
-        const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const net = bal.credit - bal.debit;
-        indirectIncomeTotal += net;
-        return { name: acc.name, debit: bal.debit, credit: bal.credit, balance: net };
-      }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
-
-      const periodNetProfit = grossProfit + indirectIncomeTotal - indirectExpenseTotal;
-      const totalExpenses = purchaseTotal + directExpenseTotal + indirectExpenseTotal;
-      const totalIncomes = salesTotal + directIncomeTotal + indirectIncomeTotal;
-
-      // Net Position = Assets - Liabilities (uses allTimeAccountBalancesXlsx for accurate running balance)
-      let netPositionAssets = 0;
-      let netPositionLiabilities = 0;
-      for (const acc of companyAccounts) {
-        const opening = parseFloat((acc as any).openingBalance || '0');
-        const openingSigned = (acc as any).openingBalanceSide === 'Dr' ? opening : -opening;
-        const bal = allTimeAccountBalancesXlsx.get(acc.id) || { debit: 0, credit: 0 };
-        const net = openingSigned + bal.debit - bal.credit;
-        if (net >= 0) netPositionAssets += net;
-        else netPositionLiabilities += Math.abs(net);
+      function computeBalancesFromEntries(entries: any[]): Map<number, { debit: number; credit: number }> {
+        const bal = new Map<number, { debit: number; credit: number }>();
+        for (const e of entries) {
+          if (e.ledgerAccountId) {
+            const d = parseFloat(e.debitAmount || "0"), c = parseFloat(e.creditAmount || "0");
+            const cur = bal.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
+            bal.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
+          }
+        }
+        return bal;
       }
-      const netPositionValue = Math.round((netPositionAssets - netPositionLiabilities) * 100) / 100;
 
-      // === Build Excel Workbook ===
+      function computeStats(balances: Map<number, { debit: number; credit: number }>, salesTotal: number, openingSt: number, closingSt: number) {
+        const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-"));
+        let purchaseTotal = 0;
+        const purchaseDetails = purchaseAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.debit - b.credit; purchaseTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        const directIncAccounts = companyAccounts.filter((acc: any) =>
+          acc.accountType === "Income" && acc.subType === "Direct Income" && !acc.code?.includes("SALES") && !acc.name?.toLowerCase().includes("sales")
+        );
+        let directIncTotal = 0;
+        const directIncDetails = directIncAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.credit - b.debit; directIncTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        const directExpAccounts = companyAccounts.filter((acc: any) =>
+          acc.accountType === "Direct Expense" || (acc.accountType === "Expense" && acc.subType === "Direct Expense") || importChargesIds.has(acc.id)
+        );
+        let directExpTotal = 0;
+        const directExpDetails = directExpAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.debit - b.credit; directExpTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        // Tally-style Gross Profit (Trading Account: Sales + Closing Stock + Direct Inc - Opening Stock - Purchases - Direct Exp)
+        const grossProfit = (salesTotal + closingSt + directIncTotal) - (openingSt + purchaseTotal + directExpTotal);
+
+        const indirectExpAccounts = companyAccounts.filter((acc: any) =>
+          acc.accountType === "Indirect Expense" && acc.code !== "PRODUCTION_ADJUSTMENT" && acc.code !== "CONSUMPTION_EXPENSE"
+        );
+        let indirectExpTotal = 0;
+        const indirectExpDetails = indirectExpAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.debit - b.credit; indirectExpTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        const indirectIncAccounts = companyAccounts.filter((acc: any) =>
+          acc.accountType === "Income" && acc.subType === "Indirect Income"
+        );
+        let indirectIncTotal = 0;
+        const indirectIncDetails = indirectIncAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.credit - b.debit; indirectIncTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        const periodNetProfit = grossProfit + indirectIncTotal - indirectExpTotal;
+        const totalExpenses = purchaseTotal + directExpTotal + indirectExpTotal;
+
+        return { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt };
+      }
+
+      function writeSheet(ws: any, stats: ReturnType<typeof computeStats>, sheetLabel: string, showNetPosition: boolean, npValue: number) {
+        const { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt } = stats;
+
+        ws.properties = { defaultColWidth: 20 };
+        ws.mergeCells("A1:E1");
+        const titleCell = ws.getCell("A1");
+        titleCell.value = `Net Profit Report — ${companyName}`;
+        titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+        titleCell.alignment = { horizontal: "center", vertical: "middle" };
+        ws.getRow(1).height = 36;
+
+        ws.mergeCells("A2:E2");
+        const subCell = ws.getCell("A2");
+        subCell.value = `Period: ${sheetLabel}`;
+        subCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
+        subCell.alignment = { horizontal: "center" };
+        ws.getRow(2).height = 22;
+        ws.addRow([]);
+
+        const kpiHeaderRow = ws.addRow(["", "SUMMARY", "", "", ""]);
+        kpiHeaderRow.getCell(2).font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+        kpiHeaderRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+        ws.mergeCells(`B${kpiHeaderRow.number}:E${kpiHeaderRow.number}`);
+
+        const kpiData: [string, number, boolean, boolean][] = [
+          ["Total Sales (Revenue)", salesTotal, false, false],
+          ["Total Expenses", totalExpenses, false, false],
+          ["Gross Profit", grossProfit, true, false],
+          ["Period Net Profit", periodNetProfit, true, false],
+          ["Closing Stock (Current)", closingSt, false, false],
+        ];
+        if (showNetPosition) kpiData.push(["Net Position", npValue, true, true]);
+
+        for (const [label, value, isBold, isHighlighted] of kpiData) {
+          const row = ws.addRow(["", label, "", "", fmt(value)]);
+          const profColor = value >= 0 ? "FF16A34A" : "FFDC2626";
+          row.getCell(2).font = { bold: isBold };
+          row.getCell(5).font = { bold: isBold, color: { argb: profColor } };
+          row.getCell(5).numFmt = '$#,##0.##';
+          ws.mergeCells(`B${row.number}:D${row.number}`);
+          if (isHighlighted) row.eachCell((cell: any) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: value >= 0 ? "FFD1FAE5" : "FFFEE2E2" } }; });
+          if (isBold) row.getCell(2).border = { top: { style: "thin", color: { argb: "FFD1D5DB" } }, bottom: { style: "thin", color: { argb: "FFD1D5DB" } } };
+        }
+        ws.addRow([]);
+
+        const addSection = (title: string, colorArgb: string, rows: any[], totalLabel: string, totalValue: number) => {
+          const hRow = ws.addRow([title, "Account Name", "Debit", "Credit", "Net Balance"]);
+          hRow.eachCell((cell: any, col: number) => {
+            cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colorArgb } };
+            cell.alignment = { horizontal: col === 1 ? "left" : "right" };
+          });
+          hRow.getCell(2).alignment = { horizontal: "left" };
+          for (const r of rows) {
+            const dataRow = ws.addRow(["", r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
+            dataRow.getCell(3).numFmt = '$#,##0';
+            dataRow.getCell(4).numFmt = '$#,##0';
+            dataRow.getCell(5).numFmt = '$#,##0';
+            dataRow.getCell(5).font = { color: { argb: r.balance >= 0 ? "FF16A34A" : "FFDC2626" } };
+          }
+          if (rows.length === 0) {
+            const emptyRow = ws.addRow(["", "(No accounts)", "", "", ""]);
+            emptyRow.getCell(2).font = { italic: true, color: { argb: "FF888888" } };
+          }
+          const totRow = ws.addRow(["", `Total ${totalLabel}`, "", "", fmt(totalValue)]);
+          totRow.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; });
+          totRow.getCell(5).numFmt = '$#,##0';
+          totRow.getCell(5).font = { bold: true, color: { argb: totalValue >= 0 ? "FF16A34A" : "FFDC2626" } };
+          ws.addRow([]);
+        };
+
+        addSection("SALES", "FF1E3A5F", [], "Sales", salesTotal);
+        const salesSectionRow = ws.getRow(ws.rowCount - 2);
+        salesSectionRow.getCell(2).value = "Total Sales (POS & Revenue)";
+        salesSectionRow.getCell(5).value = fmt(salesTotal);
+        salesSectionRow.getCell(5).numFmt = '$#,##0';
+
+        addSection("DIRECT INCOMES", "FF059669", directIncDetails, "Direct Incomes", directIncTotal);
+        addSection("PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
+        addSection("DIRECT EXPENSES", "FFB45309", directExpDetails, "Direct Expenses", directExpTotal);
+        addSection("INDIRECT INCOMES", "FF0891B2", indirectIncDetails, "Indirect Incomes", indirectIncTotal);
+        addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpDetails, "Indirect Expenses", indirectExpTotal);
+
+        const gpRow = ws.addRow(["GROSS PROFIT", "", "", "", fmt(grossProfit)]);
+        gpRow.eachCell((cell: any) => { cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: grossProfit >= 0 ? "FF0891B2" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
+        gpRow.getCell(5).numFmt = '$#,##0.##';
+        ws.mergeCells(`A${gpRow.number}:D${gpRow.number}`);
+        ws.getRow(gpRow.number).height = 26;
+
+        const npRow = ws.addRow(["PERIOD NET PROFIT", "", "", "", fmt(periodNetProfit)]);
+        npRow.eachCell((cell: any) => { cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: periodNetProfit >= 0 ? "FF2563EB" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
+        npRow.getCell(5).numFmt = '$#,##0.##';
+        ws.mergeCells(`A${npRow.number}:D${npRow.number}`);
+        ws.getRow(npRow.number).height = 26;
+
+        if (showNetPosition) {
+          const finalRow = ws.addRow(["NET POSITION (All Time)", "", "", "", fmt(npValue)]);
+          finalRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: npValue >= 0 ? "FF16A34A" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
+          finalRow.getCell(5).numFmt = '$#,##0.##';
+          ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
+          ws.getRow(finalRow.number).height = 30;
+        }
+
+        ws.getColumn(1).width = 26;
+        ws.getColumn(2).width = 36;
+        ws.getColumn(3).width = 18;
+        ws.getColumn(4).width = 18;
+        ws.getColumn(5).width = 18;
+      }
+
+      function fmtMonthLabel(mk: string) {
+        const [yr, mo] = mk.split("-");
+        const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${names[parseInt(mo) - 1]} ${yr}`;
+      }
+
       const ExcelJS = await import("exceljs");
       const workbook = new ExcelJS.default.Workbook();
       workbook.creator = "ERP System";
       workbook.created = new Date();
 
-      const ws = workbook.addWorksheet("Net Profit Report");
-      ws.properties.defaultColWidth = 20;
-
-      const fmt = (n: number) => parseFloat(n.toFixed(2));
-
-      // Header
-      ws.mergeCells("A1:E1");
-      const titleCell = ws.getCell("A1");
-      titleCell.value = `Net Profit Report — ${companyName}`;
-      titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
-      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
-      titleCell.alignment = { horizontal: "center", vertical: "middle" };
-      ws.getRow(1).height = 36;
-
-      ws.mergeCells("A2:E2");
-      const subCell = ws.getCell("A2");
-      subCell.value = `Period: ${periodLabel}${startDate ? `  |  From: ${startDate.toISOString().split("T")[0]}` : ""}${endDate ? `  To: ${endDate.toISOString().split("T")[0]}` : ""}`;
-      subCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
-      subCell.alignment = { horizontal: "center" };
-      ws.getRow(2).height = 22;
-
-      ws.addRow([]); // spacer
-
-      // KPI Summary
-      const kpiHeaderRow = ws.addRow(["", "SUMMARY", "", "", ""]);
-      kpiHeaderRow.getCell(2).font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
-      kpiHeaderRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
-      ws.mergeCells(`B${kpiHeaderRow.number}:E${kpiHeaderRow.number}`);
-
-      // 5-card KPI layout matching the frontend report
-      const kpiData: [string, number, boolean, boolean][] = [
-        // [label, value, isBold, isHighlighted]
-        ["Total Sales (Revenue)",   salesTotal,       false, false],
-        ["Total Expenses",          totalExpenses,    false, false],
-        ["Gross Profit",            grossProfit,      true,  false],
-        ["Period Net Profit",       periodNetProfit,  true,  false],
-        ["Closing Stock (Current)", closingStockValue,false, false],
-        ["Net Position",            netPositionValue, true,  true ],
-      ];
-      for (const [label, value, isBold, isHighlighted] of kpiData) {
-        const row = ws.addRow(["", label, "", "", fmt(value)]);
-        const isProfit = value >= 0;
-        const profColor = isProfit ? "FF16A34A" : "FFDC2626";
-        row.getCell(2).font = { bold: isBold };
-        row.getCell(5).font = { bold: isBold, color: { argb: profColor } };
-        row.getCell(5).numFmt = '$#,##0.##';
-        ws.mergeCells(`B${row.number}:D${row.number}`);
-        if (isHighlighted) {
-          row.eachCell(cell => {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isProfit ? "FFD1FAE5" : "FFFEE2E2" } };
-          });
+      if (sortedMonths.length > 1) {
+        // One sheet per month (no opening/closing stock per month — just cash flow)
+        for (const mk of sortedMonths) {
+          const monthVIds = vouchersByMonth.get(mk)!;
+          const monthEntries = monthVIds.flatMap((id) => entriesByVoucherId.get(id) || []);
+          const monthBalances = computeBalancesFromEntries(monthEntries);
+          const monthSales = salesByMonth.get(mk) || 0;
+          const monthStats = computeStats(monthBalances, monthSales, 0, 0);
+          const ws = workbook.addWorksheet(fmtMonthLabel(mk));
+          writeSheet(ws, monthStats, fmtMonthLabel(mk), false, 0);
         }
-        if (isBold) {
-          row.getCell(2).border = { top: { style: "thin", color: { argb: "FFD1D5DB" } }, bottom: { style: "thin", color: { argb: "FFD1D5DB" } } };
-        }
+        // Summary sheet: full period with proper stock adjustments
+        const allBalances = computeBalancesFromEntries(allPeriodEntries);
+        const summaryStats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue);
+        const summaryWs = workbook.addWorksheet("Summary");
+        writeSheet(summaryWs, summaryStats, `${periodLabel} (Summary)`, true, netPositionValue);
+      } else {
+        // Single sheet
+        const allBalances = computeBalancesFromEntries(allPeriodEntries);
+        const stats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue);
+        const ws = workbook.addWorksheet("Net Profit Report");
+        writeSheet(ws, stats, periodLabel, true, netPositionValue);
       }
 
-      ws.addRow([]);
-
-      // Helper to add a section
-      const addSection = (title: string, colorArgb: string, rows: any[], totalLabel: string, totalValue: number) => {
-        const hRow = ws.addRow([title, "Account Name", "Debit", "Credit", "Net Balance"]);
-        ws.mergeCells(`A${hRow.number}:A${hRow.number}`);
-        hRow.eachCell((cell, col) => {
-          cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colorArgb } };
-          cell.alignment = { horizontal: col === 1 ? "left" : "right" };
-        });
-        hRow.getCell(2).alignment = { horizontal: "left" };
-
-        for (const r of rows) {
-          const dataRow = ws.addRow(["", r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
-          dataRow.getCell(3).numFmt = '$#,##0';
-          dataRow.getCell(4).numFmt = '$#,##0';
-          dataRow.getCell(5).numFmt = '$#,##0';
-          dataRow.getCell(5).font = { color: { argb: r.balance >= 0 ? "FF16A34A" : "FFDC2626" } };
-        }
-
-        if (rows.length === 0) {
-          const emptyRow = ws.addRow(["", "(No accounts)", "", "", ""]);
-          emptyRow.getCell(2).font = { italic: true, color: { argb: "FF888888" } };
-        }
-
-        const totRow = ws.addRow(["", `Total ${totalLabel}`, "", "", fmt(totalValue)]);
-        totRow.eachCell(cell => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; });
-        totRow.getCell(5).numFmt = '$#,##0';
-        totRow.getCell(5).font = { bold: true, color: { argb: totalValue >= 0 ? "FF16A34A" : "FFDC2626" } };
-        ws.addRow([]);
-      };
-
-      addSection("SALES", "FF1E3A5F", [], "Sales", salesTotal);
-      // Replace empty sales section with actual sales row
-      const salesSectionRow = ws.getRow(ws.rowCount - 2);
-      salesSectionRow.getCell(2).value = "Total Sales (POS & Revenue)";
-      salesSectionRow.getCell(5).value = fmt(salesTotal);
-      salesSectionRow.getCell(5).numFmt = '$#,##0';
-
-      addSection("DIRECT INCOMES", "FF059669", directIncomeDetails, "Direct Incomes", directIncomeTotal);
-      addSection("PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
-      addSection("DIRECT EXPENSES", "FFB45309", directExpenseDetails, "Direct Expenses", directExpenseTotal);
-      addSection("INDIRECT INCOMES", "FF0891B2", indirectIncomeDetails, "Indirect Incomes", indirectIncomeTotal);
-      addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpenseDetails, "Indirect Expenses", indirectExpenseTotal);
-
-      // Gross Profit summary row
-      const gpRow = ws.addRow(["GROSS PROFIT", "", "", "", fmt(grossProfit)]);
-      gpRow.eachCell(cell => {
-        cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: grossProfit >= 0 ? "FF0891B2" : "FFDC2626" } };
-        cell.alignment = { horizontal: "center" };
-      });
-      gpRow.getCell(5).numFmt = '$#,##0.##';
-      ws.mergeCells(`A${gpRow.number}:D${gpRow.number}`);
-      ws.getRow(gpRow.number).height = 26;
-
-      // Period Net Profit row
-      const npRow = ws.addRow(["PERIOD NET PROFIT", "", "", "", fmt(periodNetProfit)]);
-      npRow.eachCell(cell => {
-        cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: periodNetProfit >= 0 ? "FF2563EB" : "FFDC2626" } };
-        cell.alignment = { horizontal: "center" };
-      });
-      npRow.getCell(5).numFmt = '$#,##0.##';
-      ws.mergeCells(`A${npRow.number}:D${npRow.number}`);
-      ws.getRow(npRow.number).height = 26;
-
-      // Net Position row (all-time balance sheet position)
-      const finalRow = ws.addRow(["NET POSITION (All Time)", "", "", "", fmt(netPositionValue)]);
-      finalRow.eachCell(cell => {
-        cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netPositionValue >= 0 ? "FF16A34A" : "FFDC2626" } };
-        cell.alignment = { horizontal: "center" };
-      });
-      finalRow.getCell(5).numFmt = '$#,##0.##';
-      ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
-      ws.getRow(finalRow.number).height = 30;
-
-      // Set column widths
-      ws.getColumn(1).width = 26;
-      ws.getColumn(2).width = 36;
-      ws.getColumn(3).width = 18;
-      ws.getColumn(4).width = 18;
-      ws.getColumn(5).width = 18;
-
-      // Stream response
       const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, "_");
       const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

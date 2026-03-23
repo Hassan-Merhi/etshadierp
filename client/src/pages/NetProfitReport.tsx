@@ -219,10 +219,10 @@ export default function NetProfitReport() {
   const directIncTotal = rp?.directIncomes?.total ?? 0;
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
-  // Compute gross profit on the frontend from period-accurate values only
-  // (excludes Opening/Closing Stock which are never period-filtered)
-  const grossProfit = salesTotal + directIncTotal - purchasesTotal - directExpTotal;
-  const periodNetProfit = grossProfit + indirectIncTotal - indirectExpTotal;
+  // Use backend's gross profit (Trading Account style: includes Opening & Closing Stock)
+  // This correctly handles All Time view where opening/closing stock must be included
+  const grossProfit = lp?.grossProfit ?? (salesTotal + closingStock + directIncTotal - openingStock - purchasesTotal - directExpTotal);
+  const periodNetProfit = lp?.netProfit ?? (grossProfit + indirectIncTotal - indirectExpTotal);
   const balanceSheetPosition = dashboardData?.netPosition ?? data?.netPosition ?? 0;
   const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
