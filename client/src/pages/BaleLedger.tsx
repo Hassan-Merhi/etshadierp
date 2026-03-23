@@ -26,6 +26,7 @@ import {
   ChevronRight,
   RefreshCw,
   Layers,
+  Tag,
 } from "lucide-react";
 
 interface BucketRow {
@@ -36,6 +37,7 @@ interface BucketRow {
   baleCount: number;
   totalWeightKg: number;
   totalCost: number;
+  referenceNumbers: string[];
 }
 
 interface SectionTotal {
@@ -58,12 +60,15 @@ interface LedgerData {
   };
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+function fmtMoney(n: number): string {
+  if (n === 0) return "$0";
+  const rounded = Math.round(n * 100) / 100;
+  if (rounded % 1 === 0) {
+    return "$" + new Intl.NumberFormat("en-US").format(rounded);
+  }
+  return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rounded);
 }
+
 function fmtKg(n: number) {
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 1,
@@ -86,17 +91,32 @@ interface SectionProps {
 
 function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultOpen = false }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
+
+  function toggleRefs(key: string) {
+    setExpandedRefs((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  const avgRate = total.baleCount > 0 ? total.totalCost / total.baleCount : 0;
 
   return (
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader
-            className="cursor-pointer hover-elevate select-none"
+            className="cursor-pointer hover-elevate select-none py-3 px-4"
             data-testid={`section-toggle-${title.replace(/\s+/g, "-").toLowerCase()}`}
           >
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {open ? (
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 ) : (
@@ -105,21 +125,20 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                 <div className="flex items-center gap-2">
                   {icon}
                   <div>
-                    <CardTitle className="text-base">{title}</CardTitle>
+                    <CardTitle className="text-sm">{title}</CardTitle>
                     <p className="text-xs text-muted-foreground font-normal mt-0.5">{subtitle}</p>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-sm flex-wrap">
+              <div className="flex items-center gap-3 text-xs flex-wrap">
                 <Badge variant="outline" className={`text-xs ${badgeColor}`}>
                   {fmtN(total.baleCount)} bales
                 </Badge>
-                <span className="text-muted-foreground text-xs">
-                  {fmtKg(total.totalWeightKg)} kg
-                </span>
-                <span className="font-medium text-xs">
-                  {fmt(total.totalCost)}
-                </span>
+                <span className="text-muted-foreground">{fmtKg(total.totalWeightKg)} kg</span>
+                <span className="font-semibold">{fmtMoney(total.totalCost)}</span>
+                {avgRate > 0 && (
+                  <span className="text-muted-foreground">avg {fmtMoney(avgRate)}/bale</span>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -132,39 +151,93 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Article Code</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Bales</TableHead>
-                    <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right">Total Cost</TableHead>
+                    <TableHead className="text-xs py-2 px-3">Product</TableHead>
+                    <TableHead className="text-xs py-2 px-3">Article Code</TableHead>
+                    <TableHead className="text-xs py-2 px-3">Category</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Bales</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Weight (kg)</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Avg Rate</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Total Cost</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r, i) => (
-                    <TableRow key={`${r.productId ?? "null"}-${i}`} data-testid={`row-product-${r.productId ?? i}`}>
-                      <TableCell className="font-medium text-sm">{r.productName}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {r.articleCode}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {r.categoryName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-sm">{fmtN(r.baleCount)}</TableCell>
-                      <TableCell className="text-right text-sm">{fmtKg(r.totalWeightKg)}</TableCell>
-                      <TableCell className="text-right text-sm">{fmt(r.totalCost)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {rows.map((r, i) => {
+                    const rowKey = `${r.productId ?? "null"}-${i}`;
+                    const refsOpen = expandedRefs.has(rowKey);
+                    const rowAvgRate = r.baleCount > 0 ? r.totalCost / r.baleCount : 0;
+
+                    return (
+                      <>
+                        <TableRow key={rowKey} data-testid={`row-product-${r.productId ?? i}`}>
+                          <TableCell className="py-2 px-3">
+                            <button
+                              className="text-xs font-medium text-left hover:underline cursor-pointer flex items-center gap-1 group"
+                              onClick={() => toggleRefs(rowKey)}
+                              data-testid={`btn-expand-refs-${r.productId ?? i}`}
+                              title="Click to see bale ref numbers"
+                            >
+                              {r.referenceNumbers.length > 0 && (
+                                <Tag className="w-3 h-3 text-muted-foreground group-hover:text-primary shrink-0" />
+                              )}
+                              {r.productName}
+                            </button>
+                          </TableCell>
+                          <TableCell className="py-2 px-3 font-mono text-xs text-muted-foreground">
+                            {r.articleCode}
+                          </TableCell>
+                          <TableCell className="py-2 px-3">
+                            <Badge variant="outline" className="text-xs">
+                              {r.categoryName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-xs">{fmtN(r.baleCount)}</TableCell>
+                          <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(r.totalWeightKg)}</TableCell>
+                          <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
+                            {rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}
+                          </TableCell>
+                          <TableCell className="py-2 px-3 text-right text-xs font-medium">
+                            {r.totalCost > 0 ? fmtMoney(r.totalCost) : "—"}
+                          </TableCell>
+                        </TableRow>
+                        {refsOpen && r.referenceNumbers.length > 0 && (
+                          <TableRow key={`${rowKey}-refs`} className="bg-muted/20">
+                            <TableCell colSpan={7} className="py-2 px-3">
+                              <div className="flex items-start gap-2">
+                                <span className="text-xs text-muted-foreground shrink-0 pt-0.5">Ref #s:</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {r.referenceNumbers.map((ref) => (
+                                    <Badge key={ref} variant="outline" className="text-xs font-mono px-1.5 py-0">
+                                      {ref}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {refsOpen && r.referenceNumbers.length === 0 && (
+                          <TableRow key={`${rowKey}-refs-empty`} className="bg-muted/20">
+                            <TableCell colSpan={7} className="py-2 px-3 text-xs text-muted-foreground italic">
+                              No reference numbers recorded for this product.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                   {/* Section subtotal */}
                   <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell colSpan={3} className="text-sm">
+                    <TableCell colSpan={3} className="text-xs py-2 px-3">
                       Subtotal
                     </TableCell>
-                    <TableCell className="text-right text-sm">{fmtN(total.baleCount)}</TableCell>
-                    <TableCell className="text-right text-sm">{fmtKg(total.totalWeightKg)}</TableCell>
-                    <TableCell className="text-right text-sm">{fmt(total.totalCost)}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">{fmtN(total.baleCount)}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">{fmtKg(total.totalWeightKg)}</TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">
+                      {avgRate > 0 ? fmtMoney(avgRate) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right text-xs py-2 px-3">
+                      {total.totalCost > 0 ? fmtMoney(total.totalCost) : "—"}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -214,21 +287,21 @@ export default function BaleLedger() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 space-y-3">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-64" />
-                  <Skeleton className="h-4 w-48 mt-1" />
+                <CardHeader className="py-3 px-4">
+                  <Skeleton className="h-5 w-64" />
+                  <Skeleton className="h-3 w-48 mt-1" />
                 </CardHeader>
               </Card>
             ))}
           </div>
         ) : (
           <>
-            {/* Table 1: Current Stock */}
+            {/* Table 1: Current Stock — collapsed by default */}
             <SectionTable
               title="Current Stock — In Hand"
               subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
@@ -236,7 +309,7 @@ export default function BaleLedger() {
               badgeColor="text-green-700 border-green-200"
               rows={data?.currentStock || []}
               total={data?.totals.currentStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
-              defaultOpen
+              defaultOpen={false}
             />
 
             {/* Table 2: Wipers & Garbages */}
@@ -247,7 +320,7 @@ export default function BaleLedger() {
               badgeColor="text-amber-700 border-amber-200"
               rows={data?.wasteStock || []}
               total={data?.totals.wasteStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
-              defaultOpen
+              defaultOpen={false}
             />
 
             {/* Table 3: Sold */}
@@ -258,7 +331,7 @@ export default function BaleLedger() {
               badgeColor="text-blue-700 border-blue-200"
               rows={data?.sold || []}
               total={data?.totals.sold || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
-              defaultOpen
+              defaultOpen={false}
             />
 
             {/* Table 4: Waste Dispatched */}
@@ -269,39 +342,47 @@ export default function BaleLedger() {
               badgeColor="text-destructive border-destructive/30"
               rows={data?.wasteDispatched || []}
               total={data?.totals.wasteDispatched || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
-              defaultOpen
+              defaultOpen={false}
             />
 
-            {/* Table 5: Grand Total */}
+            {/* Grand Total card */}
             {grand && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="font-bold text-base">Total Production (All Time)</p>
+                      <p className="font-bold text-sm">Total Production (All Time)</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Sum of tables 1 + 2 + 3 + 4 — tracks the complete production output
+                        Sum of all sections — complete production output
                       </p>
                     </div>
                     <div className="flex items-center gap-6 flex-wrap">
                       <div className="text-center">
-                        <p className="text-2xl font-bold" data-testid="grand-total-bales">
+                        <p className="text-xl font-bold" data-testid="grand-total-bales">
                           {fmtN(grand.baleCount)}
                         </p>
                         <p className="text-xs text-muted-foreground">total bales</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold" data-testid="grand-total-weight">
+                        <p className="text-xl font-bold" data-testid="grand-total-weight">
                           {fmtKg(grand.totalWeightKg)}
                         </p>
                         <p className="text-xs text-muted-foreground">kg produced</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold" data-testid="grand-total-cost">
-                          {fmt(grand.totalCost)}
+                        <p className="text-xl font-bold" data-testid="grand-total-cost">
+                          {fmtMoney(grand.totalCost)}
                         </p>
                         <p className="text-xs text-muted-foreground">total cost</p>
                       </div>
+                      {grand.baleCount > 0 && grand.totalCost > 0 && (
+                        <div className="text-center">
+                          <p className="text-xl font-bold">
+                            {fmtMoney(grand.totalCost / grand.baleCount)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">avg/bale</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -313,32 +394,39 @@ export default function BaleLedger() {
                           label: "In Hand (Regular)",
                           bales: data.totals.currentStock.baleCount,
                           kg: data.totals.currentStock.totalWeightKg,
+                          cost: data.totals.currentStock.totalCost,
                           color: "text-green-600",
                         },
                         {
                           label: "In Hand (Waste Cat.)",
                           bales: data.totals.wasteStock.baleCount,
                           kg: data.totals.wasteStock.totalWeightKg,
+                          cost: data.totals.wasteStock.totalCost,
                           color: "text-amber-600",
                         },
                         {
                           label: "Sold",
                           bales: data.totals.sold.baleCount,
                           kg: data.totals.sold.totalWeightKg,
+                          cost: data.totals.sold.totalCost,
                           color: "text-blue-600",
                         },
                         {
                           label: "Waste Dispatched",
                           bales: data.totals.wasteDispatched.baleCount,
                           kg: data.totals.wasteDispatched.totalWeightKg,
+                          cost: data.totals.wasteDispatched.totalCost,
                           color: "text-destructive",
                         },
                       ].map((s) => (
-                        <div key={s.label} className="text-sm">
-                          <p className={`font-medium ${s.color}`}>{s.label}</p>
-                          <p className="text-muted-foreground text-xs">
+                        <div key={s.label} className="text-xs">
+                          <p className={`font-semibold ${s.color}`}>{s.label}</p>
+                          <p className="text-muted-foreground">
                             {fmtN(s.bales)} bales · {fmtKg(s.kg)} kg
                           </p>
+                          {s.cost > 0 && (
+                            <p className="text-muted-foreground">{fmtMoney(s.cost)}</p>
+                          )}
                         </div>
                       ))}
                     </div>

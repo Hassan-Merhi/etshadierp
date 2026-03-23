@@ -15428,6 +15428,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             fb.product_name AS "productName",
             fb.article_code AS "articleCode",
             fb.status,
+            fb.reference_number AS "referenceNumber",
             COALESCE(fb.weight_kg, 0)::float AS "weightKg",
             COALESCE(fb.total_cost, 0)::float AS "totalCost",
             fb.waste_dispatch_id AS "wasteDispatchId"
@@ -15474,7 +15475,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }
 
       // Group bales into buckets
-      type BucketRow = { productId: number | null; productName: string; articleCode: string; categoryName: string; baleCount: number; totalWeightKg: number; totalCost: number };
+      type BucketRow = { productId: number | null; productName: string; articleCode: string; categoryName: string; baleCount: number; totalWeightKg: number; totalCost: number; referenceNumbers: string[] };
       const buckets: { currentStock: Map<string, BucketRow>; wasteStock: Map<string, BucketRow>; sold: Map<string, BucketRow>; wasteDispatched: Map<string, BucketRow> } = {
         currentStock: new Map(),
         wasteStock: new Map(),
@@ -15486,12 +15487,14 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         const existing = bucket.get(key);
         const w = parseFloat(bale.weightKg) || 0;
         const c = parseFloat(bale.totalCost) || 0;
+        const ref: string = bale.referenceNumber || "";
         if (existing) {
           existing.baleCount++;
           existing.totalWeightKg += w;
           existing.totalCost += c;
+          if (ref) existing.referenceNumbers.push(ref);
         } else {
-          bucket.set(key, { ...label, baleCount: 1, totalWeightKg: w, totalCost: c });
+          bucket.set(key, { ...label, baleCount: 1, totalWeightKg: w, totalCost: c, referenceNumbers: ref ? [ref] : [] });
         }
       }
 
