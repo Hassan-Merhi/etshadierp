@@ -5494,6 +5494,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let commissionRecord = null;
       let commTotalVal = 0;
+      let commInContainerCcy = 0;
       let commCurrencyForUsd = currencyCode;
       let commFxRateForUsd = fxRate;
       if (commission && commission.personName && commission.commissionRate) {
@@ -5508,6 +5509,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         commCurrencyForUsd = commCurrency;
         commFxRateForUsd = commFxRate;
         const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * commFxRate;
+        // Convert commission to container currency for totalCost
+        commInContainerCcy = commCurrency === currencyCode ? commTotalVal : (fxRate > 0 ? commTotalUsd / fxRate : commTotalUsd);
 
         [commissionRecord] = await db
           .insert(factoryContainerCommissions)
@@ -5539,7 +5542,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Convert OC to container currency for totalCost
       const ocInContainerCcy = (ocCcy === currencyCode) ? otherChargesVal : (fxRate > 0 ? ocUsd / fxRate : otherChargesVal);
 
-      const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commTotalVal + dutyVal;
+      const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commInContainerCcy + dutyVal;
       const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
       const finalPayableAmount = String(totalCost);
 

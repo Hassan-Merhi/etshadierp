@@ -143,8 +143,6 @@ interface AdditionalChargeRow {
   amount: string;
   ledgerAccountId: string;
   supplierId: string;
-  currencyCode: string;
-  fxRate: string;
 }
 
 interface RawStockRow {
@@ -209,8 +207,6 @@ export default function ProductionRawStock() {
   const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionLedgerAccountId, setCommissionLedgerAccountId] = useState("");
-  const [commissionCurrencyCode, setCommissionCurrencyCode] = useState("USD");
-  const [commissionFxRate, setCommissionFxRate] = useState("1");
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [fxRateToUsd, setFxRateToUsd] = useState("1");
   const [freight, setFreight] = useState("");
@@ -407,67 +403,42 @@ export default function ProductionRawStock() {
   const costDifference = differenceKg * rate;
   const hasWeightDiff = actualKg > 0 && declaredKg > 0 && actualKg !== declaredKg;
 
+  // Commission is entered and displayed in USD
   const commRateNum = parseFloat(commissionRate || "0");
-  const commissionTotal = commissionType === "PER_KG"
+  const commissionTotalUsd = commissionType === "PER_KG"
     ? commRateNum * actualKg
     : commRateNum;
 
   const fxRate = parseFloat(fxRateToUsd || "1");
-
   const freightVal = parseFloat(freight || "0");
   const otherChargesVal = parseFloat(otherCharges || "0");
-  const dutyVal = dutyPending ? 0 : parseFloat(dutyAmount || "0");
+  // Duty is entered in USD
+  const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
 
-  // Convert freight to container currency when it uses its own currency via a supplier
-  const isFreightSupplier = parseAccountValue(freightAccountId)?.type === "supplier";
-  const freightFxRateNum = parseFloat(freightFxRate || "1");
-  const freightInContainerCcy = (isFreightSupplier && freightCurrencyCode !== currencyCode && fxRate > 0)
-    ? (freightVal * freightFxRateNum) / fxRate
-    : freightVal;
+  // Additional charges are all entered in USD
+  const additionalChargesTotalUsd = additionalCharges.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
 
-  // Convert other charges to container currency when it uses its own currency via a supplier
-  const isOcSupplier = parseAccountValue(otherChargesAccountId)?.type === "supplier";
-  const ocFxRateNum = parseFloat(otherChargesFxRate || "1");
-  const otherChargesInContainerCcy = (isOcSupplier && otherChargesCurrencyCode !== currencyCode && fxRate > 0)
-    ? (otherChargesVal * ocFxRateNum) / fxRate
-    : otherChargesVal;
+  // Freight is from the container import (in container currency) → convert to USD for display
+  const freightUsd = freightVal * (currencyCode === "USD" ? 1 : fxRate);
 
-  // Convert commission to container currency (commission may be in a different currency)
-  const commFxRateNum = parseFloat(commissionFxRate || "1");
-  const commissionInContainerCcy = (() => {
-    if (commissionCurrencyCode === currencyCode) return commissionTotal;
-    const commUsd = commissionCurrencyCode === "USD" ? commissionTotal : commissionTotal * commFxRateNum;
-    return currencyCode === "USD" ? commUsd : (fxRate > 0 ? commUsd / fxRate : commUsd);
-  })();
+  // Other charges: entered in USD directly
+  const otherChargesUsd = otherChargesVal;
 
-  // Convert each additional charge to container currency (each may have its own currency)
-  const additionalChargesInContainerCcy = additionalCharges.reduce((sum, c) => {
-    const amt = parseFloat(c.amount || "0");
-    const chargeCcy = c.currencyCode || currencyCode;
-    const chargeFx = parseFloat(c.fxRate || "1");
-    if (chargeCcy === currencyCode) return sum + amt;
-    const amtUsd = chargeCcy === "USD" ? amt : amt * chargeFx;
-    return sum + (currencyCode === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd));
-  }, 0);
-
-  const totalCharges = freightInContainerCcy + otherChargesInContainerCcy + additionalChargesInContainerCcy + commissionInContainerCcy + dutyVal;
-  const grandTotal = totalPayable + totalCharges;
-  const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
-
+  // Base material in USD
   const rateUsd = currencyCode === "USD" ? rate : rate * fxRate;
   const totalPayableUsd = actualKg * rateUsd;
-  // Each component converted to USD individually (handles cross-currency)
-  const freightUsdFe = isFreightSupplier ? freightVal * freightFxRateNum : freightVal * (currencyCode === "USD" ? 1 : fxRate);
-  const ocUsdFe = isOcSupplier ? otherChargesVal * ocFxRateNum : otherChargesVal * (currencyCode === "USD" ? 1 : fxRate);
-  const commUsdFe = commissionCurrencyCode === "USD" ? commissionTotal : commissionTotal * commFxRateNum;
-  const addlUsdFe = additionalCharges.reduce((sum, c) => {
-    const amt = parseFloat(c.amount || "0");
-    const chargeCcy = c.currencyCode || currencyCode;
-    const chargeFx = parseFloat(c.fxRate || "1");
-    return sum + (chargeCcy === "USD" ? amt : chargeCcy !== currencyCode ? amt * chargeFx : amt * (currencyCode === "USD" ? 1 : fxRate));
-  }, 0);
-  const dutyUsdFe = dutyVal * (currencyCode === "USD" ? 1 : fxRate);
-  const grandTotalUsd = totalPayableUsd + freightUsdFe + ocUsdFe + commUsdFe + addlUsdFe + dutyUsdFe;
+
+  // Grand total in USD = base + freight_usd + other_usd + commission_usd + addl_usd + duty_usd
+  const grandTotalUsd = totalPayableUsd + freightUsd + otherChargesUsd + commissionTotalUsd + additionalChargesTotalUsd + dutyUsd;
+
+  // Also maintain a container-currency total for display (base + freight are in container ccy; rest convert from USD)
+  const commissionInContainerCcy = fxRate > 0 ? commissionTotalUsd / fxRate : commissionTotalUsd;
+  const additionalChargesInContainerCcy = fxRate > 0 ? additionalChargesTotalUsd / fxRate : additionalChargesTotalUsd;
+  const otherChargesInContainerCcy = fxRate > 0 ? otherChargesUsd / fxRate : otherChargesUsd;
+  const dutyInContainerCcy = fxRate > 0 ? dutyUsd / fxRate : dutyUsd;
+  const totalCharges = freightVal + otherChargesInContainerCcy + additionalChargesInContainerCcy + commissionInContainerCcy + dutyInContainerCcy;
+  const grandTotal = totalPayable + totalCharges;
+  const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
 
   const offloadMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -527,9 +498,6 @@ export default function ProductionRawStock() {
 
     // Pre-populate commission from the container's pre-registered data
     const commAmt = parseFloat(container?.commissionAmount || "0");
-    const commCcy = container?.commissionCurrencyCode || ccy;
-    setCommissionCurrencyCode(commCcy);
-    setCommissionFxRate(commCcy === "USD" ? "1" : (container?.fxRateToUsd || "1"));
     if (commAmt > 0) {
       setCommissionType("FIXED");
       setCommissionRate(String(commAmt));
@@ -568,21 +536,35 @@ export default function ProductionRawStock() {
       fxRateToUsd,
       freight: freight || "0",
       ...((() => { const p = parseAccountValue(freightAccountId); return p?.type === "supplier" ? { freightSupplierId: p.id, freightCurrencyCode, freightFxRate } : { freightAccountId: p?.id ?? null }; })()),
-      otherCharges: otherCharges || "0",
-      ...((() => { const p = parseAccountValue(otherChargesAccountId); return p?.type === "supplier" ? { otherChargesSupplierId: p.id, otherChargesCurrencyCode, otherChargesFxRate } : { otherChargesAccountId: p?.id ?? null }; })()),
-      dutyAmount: dutyAmount || "0",
+      ...((() => {
+        const p = parseAccountValue(otherChargesAccountId);
+        if (p?.type === "supplier") {
+          // Supplier: send raw USD amount with USD currency → backend converts to container ccy
+          return { otherChargesSupplierId: p.id, otherCharges: otherCharges || "0", otherChargesCurrencyCode: "USD", otherChargesFxRate: "1" };
+        } else {
+          // Ledger account: convert USD input to container currency before sending
+          const ocContainerCcy = currencyCode === "USD" ? (otherCharges || "0") : String(otherChargesVal / (fxRate || 1));
+          return { otherChargesAccountId: p?.id ?? null, otherCharges: ocContainerCcy };
+        }
+      })()),
+      // Duty entered in USD → convert to container currency for backend (raw USD for pending)
+      dutyAmount: (() => {
+        const rawAmt = parseFloat(dutyAmount || "0");
+        if (rawAmt === 0) return "0";
+        if (currencyCode === "USD") return dutyAmount || "0";
+        return String(rawAmt / (fxRate || 1));
+      })(),
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
       dutyNotes: dutyNotes || null,
+      // Additional charges entered in USD → send as USD so backend converts correctly
       additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => {
         const p = parseAccountValue(c.ledgerAccountId);
-        const chargeCcy = c.currencyCode || currencyCode;
-        const chargeFx = c.fxRate || "1";
         return {
           description: c.description.trim(),
           amount: c.amount,
-          currencyCode: chargeCcy,
-          fxRateToUsd: chargeFx,
+          currencyCode: "USD",
+          fxRateToUsd: "1",
           ledgerAccountId: p?.type === "ledger" ? p.id : null,
           supplierId: p?.type === "supplier" ? p.id : null,
         };
@@ -598,8 +580,8 @@ export default function ProductionRawStock() {
         personName: commissionPersonName.trim(),
         commissionType,
         commissionRate: commissionRate,
-        currencyCode: commissionCurrencyCode,
-        fxRateToUsd: commissionFxRate,
+        currencyCode: "USD",
+        fxRateToUsd: "1",
         ledgerAccountId: commissionLedgerAccountId || null,
       };
     }
@@ -617,8 +599,6 @@ export default function ProductionRawStock() {
     setCommissionType("PER_KG");
     setCommissionRate("");
     setCommissionLedgerAccountId("");
-    setCommissionCurrencyCode("USD");
-    setCommissionFxRate("1");
     setCurrencyCode("USD");
     setFxRateToUsd("1");
     setFreight("");
@@ -1370,40 +1350,46 @@ export default function ProductionRawStock() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Currency</Label>
-                    <Select value={currencyCode} onValueChange={setCurrencyCode}>
-                      <SelectTrigger data-testid="select-currency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="AUD">AUD</SelectItem>
-                        <SelectItem value="LBP">LBP</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                  <p className="text-xs text-muted-foreground">Set the exchange rate below — it converts the base material cost from the container currency to USD. All offload charges are entered in USD.</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">Container Currency</Label>
+                      <Select value={currencyCode} onValueChange={setCurrencyCode}>
+                        <SelectTrigger data-testid="select-currency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="AUD">AUD</SelectItem>
+                          <SelectItem value="LBP">LBP</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-xs">
+                        {currencyCode !== "USD" ? `FX Rate (1 ${currencyCode} = ? USD)` : "FX Rate"}
+                      </Label>
+                      <Input
+                        type="number"
+                        value={fxRateToUsd}
+                        onChange={(e) => setFxRateToUsd(e.target.value)}
+                        placeholder="1.0"
+                        step="0.0001"
+                        disabled={currencyCode === "USD"}
+                        data-testid="input-fx-rate"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                    <Input
-                      type="number"
-                      value={fxRateToUsd}
-                      onChange={(e) => setFxRateToUsd(e.target.value)}
-                      placeholder="1.0"
-                      step="0.0001"
-                      disabled={currencyCode === "USD"}
-                      data-testid="input-fx-rate"
-                    />
-                  </div>
+                  {currencyCode !== "USD" && rate > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      Base rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
+                      {actualKg > 0 && <> · Base payable: <span className="font-mono font-medium">${formatNumber(totalPayableUsd)}</span></>}
+                    </div>
+                  )}
                 </div>
-                {currencyCode !== "USD" && rate > 0 && (
-                  <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
-                    Rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
-                  </div>
-                )}
 
                 {hasWeightDiff && (
                   <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${differenceKg > 0 ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : "text-blue-600 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
@@ -1432,7 +1418,7 @@ export default function ProductionRawStock() {
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Other Charges Amount</Label>
+                          <Label className="text-muted-foreground text-xs">Other Charges (USD)</Label>
                           <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
                         </div>
                         <div className="space-y-1">
@@ -1474,7 +1460,7 @@ export default function ProductionRawStock() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "", supplierId: "", currencyCode: currencyCode, fxRate: "1" }])}
+                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "", supplierId: "" }])}
                       data-testid="button-add-additional-charge"
                     >
                       <Plus className="h-3 w-3 mr-1" /> Add Row
@@ -1484,7 +1470,7 @@ export default function ProductionRawStock() {
                     <div className="space-y-3 mt-2">
                       {additionalCharges.map((charge, idx) => (
                         <div key={charge.id} className="space-y-1 p-2 border border-border rounded-md">
-                          <div className="grid grid-cols-[1fr_90px_80px_1fr_auto] gap-2 items-end">
+                          <div className="grid grid-cols-[1fr_120px_1fr_auto] gap-2 items-end">
                             <div className="space-y-1">
                               <Label className="text-muted-foreground text-xs">Description</Label>
                               <Input
@@ -1495,7 +1481,7 @@ export default function ProductionRawStock() {
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Amount</Label>
+                              <Label className="text-muted-foreground text-xs">Amount (USD)</Label>
                               <Input
                                 type="number"
                                 value={charge.amount}
@@ -1504,16 +1490,6 @@ export default function ProductionRawStock() {
                                 step="0.01"
                                 data-testid={`input-addl-amount-${idx}`}
                               />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Currency</Label>
-                              <Select
-                                value={charge.currencyCode || currencyCode}
-                                onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v, fxRate: v === "USD" ? "1" : c.fxRate } : c))}
-                              >
-                                <SelectTrigger data-testid={`select-addl-currency-${idx}`}><SelectValue /></SelectTrigger>
-                                <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(cc => <SelectItem key={cc} value={cc}>{cc}</SelectItem>)}</SelectContent>
-                              </Select>
                             </div>
                             <div className="space-y-1">
                               <Label className="text-muted-foreground text-xs">Account / Broker</Label>
@@ -1535,21 +1511,6 @@ export default function ProductionRawStock() {
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          {(charge.currencyCode || currencyCode) !== "USD" && (charge.currencyCode || currencyCode) !== currencyCode && (
-                            <div className="grid grid-cols-2 gap-2 pl-2">
-                              <div className="space-y-1">
-                                <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                                <Input
-                                  type="number"
-                                  value={charge.fxRate}
-                                  onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, fxRate: e.target.value } : c))}
-                                  placeholder="1.0"
-                                  step="0.0001"
-                                  data-testid={`input-addl-fx-${idx}`}
-                                />
-                              </div>
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -1570,7 +1531,7 @@ export default function ProductionRawStock() {
                         data-testid="input-commission-person"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">Commission Type</Label>
                         <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
@@ -1585,7 +1546,7 @@ export default function ProductionRawStock() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-muted-foreground text-xs">
-                          {commissionType === "PER_KG" ? `Rate per KG (${commissionCurrencyCode})` : `Fixed Amount (${commissionCurrencyCode})`}
+                          {commissionType === "PER_KG" ? "Rate per KG (USD)" : "Fixed Amount (USD)"}
                         </Label>
                         <Input
                           type="number"
@@ -1596,37 +1557,12 @@ export default function ProductionRawStock() {
                           data-testid="input-commission-rate"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Currency</Label>
-                        <Select
-                          value={commissionCurrencyCode}
-                          onValueChange={(v) => { setCommissionCurrencyCode(v); setCommissionFxRate(v === "USD" ? "1" : ""); }}
-                        >
-                          <SelectTrigger data-testid="select-commission-currency"><SelectValue /></SelectTrigger>
-                          <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(cc => <SelectItem key={cc} value={cc}>{cc}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
                     </div>
-                    {commissionCurrencyCode !== "USD" && (
-                      <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">FX Rate to USD ({commissionCurrencyCode} → USD)</Label>
-                          <Input
-                            type="number"
-                            value={commissionFxRate}
-                            onChange={(e) => setCommissionFxRate(e.target.value)}
-                            placeholder="e.g. 1.08"
-                            step="0.0001"
-                            data-testid="input-commission-fx-rate"
-                          />
-                        </div>
-                      </div>
-                    )}
                     {commissionPersonName && commRateNum > 0 && (
                       <>
                         <div className="text-sm text-muted-foreground">
-                          Commission Total: <span className="font-mono font-medium text-foreground">{commissionCurrencyCode} {formatNumber(commissionTotal)}</span>
-                          {commissionCurrencyCode !== currencyCode && (
+                          Commission Total: <span className="font-mono font-medium text-foreground">$ {formatNumber(commissionTotalUsd)}</span>
+                          {currencyCode !== "USD" && (
                             <span className="ml-2 text-xs">≈ {currencyCode} {formatNumber(commissionInContainerCcy)}</span>
                           )}
                         </div>
@@ -1725,68 +1661,55 @@ export default function ProductionRawStock() {
                   </div>
                   <Separator className="my-1" />
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Payable ({actualKg} kg x {rate.toFixed(4)})</span>
-                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(totalPayable)}</span>
+                    <span className="text-muted-foreground">
+                      Base Payable ({actualKg} kg × {currencyCode !== "USD" ? `${currencyCode} ` : "$"}{rate.toFixed(4)}{currencyCode !== "USD" && fxRate !== 1 ? ` @ ${fxRate}` : ""})
+                    </span>
+                    <span className="font-mono">$ {formatNumber(totalPayableUsd)}</span>
                   </div>
                   {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight{isFreightSupplier && freightCurrencyCode !== currencyCode ? ` (${freightCurrencyCode})` : ""}</span>
-                      <span className="font-mono">
-                        {isFreightSupplier && freightCurrencyCode !== currencyCode
-                          ? `${freightCurrencyCode === "USD" ? "$" : freightCurrencyCode + " "}${formatNumber(freightVal)}`
-                          : `${currencyCode === "USD" ? "$" : currencyCode + " "}${formatNumber(freightVal)}`}
-                      </span>
+                      <span>Freight (from container, converted @ {fxRate})</span>
+                      <span className="font-mono">$ {formatNumber(freightUsd)}</span>
                     </div>
                   )}
                   {otherChargesVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Other Charges{isOcSupplier && otherChargesCurrencyCode !== currencyCode ? ` (${otherChargesCurrencyCode})` : ""}</span>
-                      <span className="font-mono">
-                        {isOcSupplier && otherChargesCurrencyCode !== currencyCode
-                          ? `${otherChargesCurrencyCode === "USD" ? "$" : otherChargesCurrencyCode + " "}${formatNumber(otherChargesVal)}`
-                          : `${currencyCode === "USD" ? "$" : currencyCode + " "}${formatNumber(otherChargesVal)}`}
-                      </span>
+                      <span>Other Charges</span>
+                      <span className="font-mono">$ {formatNumber(otherChargesUsd)}</span>
                     </div>
                   )}
-                  {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => {
-                    const chargeCcy = c.currencyCode || currencyCode;
-                    return (
-                      <div key={c.id} className="flex justify-between text-muted-foreground">
-                        <span>{c.description || `Additional #${i + 1}`}{chargeCcy !== currencyCode ? ` (${chargeCcy})` : ""}</span>
-                        <span className="font-mono">{chargeCcy === "USD" ? "$" : chargeCcy + " "}{formatNumber(parseFloat(c.amount))}</span>
-                      </div>
-                    );
-                  })}
+                  {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
+                    <div key={c.id} className="flex justify-between text-muted-foreground">
+                      <span>{c.description || `Additional #${i + 1}`}</span>
+                      <span className="font-mono">$ {formatNumber(parseFloat(c.amount))}</span>
+                    </div>
+                  ))}
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Commission ({commissionPersonName}){commissionCurrencyCode !== currencyCode ? ` (${commissionCurrencyCode})` : ""}</span>
-                      <span className="font-mono">{commissionCurrencyCode === "USD" ? "$" : commissionCurrencyCode + " "}{formatNumber(commissionTotal)}</span>
+                      <span>Commission ({commissionPersonName})</span>
+                      <span className="font-mono">$ {formatNumber(commissionTotalUsd)}</span>
                     </div>
                   )}
-                  {dutyVal > 0 && (
+                  {dutyUsd > 0 && !dutyPending && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Duty</span>
-                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(dutyVal)}</span>
+                      <span className="font-mono">$ {formatNumber(dutyUsd)}</span>
                     </div>
                   )}
                   {dutyPending && parseFloat(dutyAmount || "0") > 0 && (
                     <div className="flex justify-between text-amber-600">
                       <span>Duty (Pending)</span>
-                      <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(parseFloat(dutyAmount))}</span>
+                      <span className="font-mono">$ {formatNumber(parseFloat(dutyAmount))}</span>
                     </div>
                   )}
                   <Separator className="my-1" />
                   <div className="flex justify-between font-medium">
-                    <span>Grand Total (Inclusive)</span>
-                    <span className="font-mono text-base">{currencyCode === "USD" ? "$" : currencyCode + " "}{formatNumber(grandTotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Inclusive Cost/KG</span>
-                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{inclusiveCostPerKg.toFixed(4)}/kg</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
                     <span>Grand Total (USD)</span>
-                    <span className="font-mono font-medium">${formatNumber(grandTotalUsd)}</span>
+                    <span className="font-mono text-base">$ {formatNumber(grandTotalUsd)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Inclusive Cost/KG (USD)</span>
+                    <span className="font-mono">$ {(grandTotalUsd / (actualKg || 1)).toFixed(4)}/kg</span>
                   </div>
                 </div>
 
