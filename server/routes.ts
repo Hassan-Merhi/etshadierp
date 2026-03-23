@@ -26642,7 +26642,12 @@ if (asOfDate) {
       // - Gross Profit = Credit side - Debit side
       const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
       const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
-      const grossProfit = tradingCreditSide - tradingDebitSide;
+      // For period-filtered views (e.g. "Today", "This Week"), opening/closing stock are all-time
+      // values — including them distorts the result. Only apply the Trading Account stock adjustment
+      // for "All Time" (no startDate filter). Period-filtered P&L uses simple revenue minus expenses.
+      const grossProfit = startDate
+        ? salesAccountsTotal + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
+        : tradingCreditSide - tradingDebitSide;
 
       // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
       // Exclude PRODUCTION_ADJUSTMENT and CONSUMPTION_EXPENSE — their inventory effect
