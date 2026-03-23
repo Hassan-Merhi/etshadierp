@@ -42,6 +42,9 @@ const formatNumericValue = (value: string | number): string => {
   return formatNumber(num);
 };
 
+const profitColor = (v: number) =>
+  v > 0 ? "text-green-600 dark:text-green-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
+
 export default function SalesReportDetail() {
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
@@ -211,8 +214,8 @@ export default function SalesReportDetail() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="text-xs">Cost Profit</CardDescription>
-                <CardTitle className={`text-lg ${costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {costProfit < 0 ? "-" : ""}{formatAmount(costProfit)}
+                <CardTitle className={`text-lg ${profitColor(costProfit)}`}>
+                  {formatAmount(Math.abs(costProfit))}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -225,8 +228,8 @@ export default function SalesReportDetail() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="text-xs">Hassan's Profit</CardDescription>
-                <CardTitle className={`text-lg ${configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {configuredProfit < 0 ? "-" : ""}{formatAmount(configuredProfit)}
+                <CardTitle className={`text-lg ${profitColor(configuredProfit)}`}>
+                  {formatAmount(Math.abs(configuredProfit))}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -286,21 +289,21 @@ export default function SalesReportDetail() {
                           <TableCell className="text-right font-mono">{formatAmount(item.actualSellingPrice)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(item.costPrice)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(item.configuredSellingPrice)}</TableCell>
-                          <TableCell className={`text-right font-mono ${unitProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {unitProfit < 0 ? "-" : ""}{formatAmount(unitProfit)}
+                          <TableCell className={`text-right font-mono ${profitColor(unitProfit)}`}>
+                            {formatAmount(Math.abs(unitProfit))}
                           </TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(item.totalCost)}</TableCell>
-                          <TableCell className={`text-right font-mono ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {parseFloat(item.costProfit) < 0 ? "-" : ""}{formatAmount(item.costProfit)}
+                          <TableCell className={`text-right font-mono ${profitColor(parseFloat(item.costProfit))}`}>
+                            {formatAmount(Math.abs(parseFloat(item.costProfit)))}
                           </TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${item.costProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {item.costProfitPercentage.toFixed(1)}%
+                          <TableCell className={`text-right font-mono text-sm ${profitColor(item.costProfitPercentage)}`}>
+                            {Math.abs(item.costProfitPercentage).toFixed(1)}%
                           </TableCell>
-                          <TableCell className={`text-right font-mono ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {item.configuredProfit < 0 ? "-" : ""}{formatAmount(item.configuredProfit)}
+                          <TableCell className={`text-right font-mono ${profitColor(item.configuredProfit)}`}>
+                            {formatAmount(Math.abs(item.configuredProfit))}
                           </TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${item.configuredProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {item.configuredProfitPercentage.toFixed(1)}%
+                          <TableCell className={`text-right font-mono text-sm ${profitColor(item.configuredProfitPercentage)}`}>
+                            {Math.abs(item.configuredProfitPercentage).toFixed(1)}%
                           </TableCell>
                         </TableRow>
                       );
@@ -315,12 +318,12 @@ export default function SalesReportDetail() {
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(totalCost)}</TableCell>
-                      <TableCell className={`text-right font-mono ${costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {costProfit < 0 ? "-" : ""}{formatAmount(costProfit)}
+                      <TableCell className={`text-right font-mono ${profitColor(costProfit)}`}>
+                        {formatAmount(Math.abs(costProfit))}
                       </TableCell>
                       <TableCell></TableCell>
-                      <TableCell className={`text-right font-mono ${configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {configuredProfit < 0 ? "-" : ""}{formatAmount(configuredProfit)}
+                      <TableCell className={`text-right font-mono ${profitColor(configuredProfit)}`}>
+                        {formatAmount(Math.abs(configuredProfit))}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -365,11 +368,11 @@ export default function SalesReportDetail() {
                           <div><span className="text-muted-foreground">Total Cost: </span><span className="font-mono">{formatAmount(item.totalCost)}</span></div>
                         </div>
                         <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
-                          <span className={`font-mono font-semibold ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            Cost: {parseFloat(item.costProfit) < 0 ? "-" : ""}{formatAmount(item.costProfit)} ({item.costProfitPercentage.toFixed(1)}%)
+                          <span className={`font-mono font-semibold ${profitColor(parseFloat(item.costProfit))}`}>
+                            Cost: {formatAmount(Math.abs(parseFloat(item.costProfit)))} ({Math.abs(item.costProfitPercentage).toFixed(1)}%)
                           </span>
-                          <span className={`font-mono font-semibold ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            Config: {item.configuredProfit < 0 ? "-" : ""}{formatAmount(item.configuredProfit)} ({item.configuredProfitPercentage.toFixed(1)}%)
+                          <span className={`font-mono font-semibold ${profitColor(item.configuredProfit)}`}>
+                            Config: {formatAmount(Math.abs(item.configuredProfit))} ({Math.abs(item.configuredProfitPercentage).toFixed(1)}%)
                           </span>
                         </div>
                       </CardContent>
