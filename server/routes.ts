@@ -37539,16 +37539,88 @@ if (asOfDate) {
         for (const inv of invData) closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
       }
 
-      // Net Position
-      let npAssets = 0, npLiabilities = 0;
+      // Net Position - same calculation as dashboard (/api/stats/net-profit)
+      const npRound2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // Build supplier balance map from all-time entries
+      const xlsxSupplierBals = new Map<number, { debit: number; credit: number }>();
+      for (const e of allTimeEntriesXlsx) {
+        if ((e as any).supplierId) {
+          const d = parseFloat((e as any).debitAmount || "0"), c = parseFloat((e as any).creditAmount || "0");
+          const cur = xlsxSupplierBals.get((e as any).supplierId) || { debit: 0, credit: 0 };
+          xlsxSupplierBals.set((e as any).supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+        }
+      }
+
+      // Account exclusion rules matching dashboard
+      const npExcludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
+      const npExpenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+      const npLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
+      const npAssetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
+      const npStockPatterns = ["closing stock", "opening stock", "stock in hand", "stock on hand", "inventory", "stock account", "goods in stock", "merchandise"];
+      const npStockCodes = ["CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"];
+      const npFixedAssetNames = ["rover", "toyota", "mercedes", "vehicle", "car", "truck", "land", "property", "building", "house", "rolex", "watch", "luxury", "jewelry", "guarantee", "deposit", "caution"];
+      const isExcludedFromNp = (acc: any) => {
+        if (npExcludedTypes.includes(acc.accountType || "")) return true;
+        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
+        const nameLower = (acc.name || "").toLowerCase();
+        const codeLower = (acc.code || "").toLowerCase();
+        if (npAssetTypes.includes(acc.accountType || "")) {
+          if (npStockPatterns.some((p: string) => nameLower.includes(p))) return true;
+          if (npStockCodes.some((c: string) => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + "_"))) return true;
+          if (npFixedAssetNames.some((p: string) => nameLower.includes(p))) return true;
+        }
+        return false;
+      };
+
+      let npForUs = 0, npOnUs = 0;
       for (const acc of companyAccounts) {
+        if (npExpenseTypes.includes(acc.accountType || "")) continue;
+        if (acc.accountType === "Income") continue;
+        if (isExcludedFromNp(acc)) continue;
         const opening = parseFloat((acc as any).openingBalance || "0");
         const openingSigned = (acc as any).openingBalanceSide === "Dr" ? opening : -opening;
         const bal = allTimeBalsXlsx.get(acc.id) || { debit: 0, credit: 0 };
         const net = openingSigned + bal.debit - bal.credit;
-        if (net >= 0) npAssets += net; else npLiabilities += Math.abs(net);
+        if (net > 0) npForUs += net;
+        else if (net < 0) npOnUs += Math.abs(net);
       }
-      const netPositionValue = Math.round((npAssets - npLiabilities) * 100) / 100;
+
+      // Add stock on floor (inventory) as asset
+      npForUs += closingStockValue;
+
+      // Add worker/employee liabilities
+      const xlsxEmployees = await db.select().from(employees)
+        .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+      let xlsxWorkerBal = 0;
+      for (const emp of xlsxEmployees) xlsxWorkerBal += parseFloat((emp as any).currentBalance || "0");
+      if (xlsxWorkerBal > 0) npOnUs += xlsxWorkerBal;
+      else if (xlsxWorkerBal < 0) npForUs += Math.abs(xlsxWorkerBal);
+
+      // Add suppliers (parent company only - same rule as dashboard)
+      const xlsxParentCompanyId = await storage.getParentCompanyId();
+      const xlsxShouldIncludeSuppliers = xlsxParentCompanyId === null || companyId === xlsxParentCompanyId;
+      if (xlsxShouldIncludeSuppliers) {
+        const xlsxAllSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        for (const sup of xlsxAllSuppliers) {
+          const balance = xlsxSupplierBals.get((sup as any).id);
+          if (balance) {
+            const opening = parseFloat((sup as any).openingBalance || "0");
+            const netBalance = opening + balance.credit - balance.debit;
+            if (netBalance > 0) npOnUs += netBalance;
+            else if (netBalance < 0) npForUs += Math.abs(netBalance);
+          }
+        }
+      }
+
+      // Add OTW containers as assets
+      const xlsxOtwContainers = await db.select().from(containers)
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW"))).execute();
+      for (const c of xlsxOtwContainers) {
+        npForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || "0");
+      }
+
+      const netPositionValue = npRound2(npForUs - npOnUs);
 
       // Import charges IDs
       const importChargesParent = companyAccounts.find((acc: any) => acc.code === "IMPORT_CHARGES");
