@@ -239,7 +239,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/sales-report/detail" component={SalesReportDetail} />
-      <Route path="/net-profit-report" component={NetProfitReport} />
+      {user?.role === "Developer" && <Route path="/net-profit-report" component={NetProfitReport} />}
       <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
       <Route path="/bale-ledger" component={BaleLedger} />
       <Route path="/pos-daybook" component={POSDaybook} />

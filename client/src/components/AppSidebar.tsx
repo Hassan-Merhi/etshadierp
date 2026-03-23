@@ -196,6 +196,11 @@ export function AppSidebar({ user }: { user?: any }) {
       if (!isFactoryCompany) return false;
     }
 
+    // Net Profit Report is dev-only until finalized
+    if (item.url === "/net-profit-report") {
+      return isDeveloper;
+    }
+
     // Chat is always visible to all non-POS users
     if (item.url === "/chat") {
       return !isPOSUser;
