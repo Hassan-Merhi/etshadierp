@@ -157,55 +157,6 @@ function AccountSection({
   );
 }
 
-function TallyRow({
-  label,
-  count,
-  total,
-  accounts,
-  sectionKey,
-  expandedSections,
-  toggleSection,
-}: {
-  label: string;
-  count: number;
-  total: number;
-  accounts: any[];
-  sectionKey: string;
-  expandedSections: Set<string>;
-  toggleSection: (k: string) => void;
-}) {
-  const nonZero = accounts.filter((a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
-  const isOpen = expandedSections.has(sectionKey);
-  return (
-    <div>
-      <div
-        className="flex justify-between items-center px-4 py-3 cursor-pointer hover-elevate"
-        onClick={() => toggleSection(sectionKey)}
-        data-testid={`row-${sectionKey}`}
-      >
-        <span className="flex items-center gap-2 text-sm">
-          {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-          {label}
-          {count > 0 && <span className="text-xs text-muted-foreground">({count})</span>}
-        </span>
-        <span className="font-mono text-sm">{formatAmount(total)}</span>
-      </div>
-      {isOpen && nonZero.length > 0 && (
-        <div className="bg-muted/30 divide-y">
-          {nonZero.map((acc: any) => (
-            <div key={acc.id} className="flex justify-between items-center px-8 py-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2">
-                <ChevronRight className="h-3 w-3" />
-                {acc.name}
-              </span>
-              <span className="font-mono">Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function NetProfitReport() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -213,13 +164,6 @@ export default function NetProfitReport() {
 
   const [period, setPeriod] = useState<Period>("this_month");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("current");
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const toggleSection = (key: string) =>
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
 
   const { startDate, endDate } = useMemo(() => getDateRange(period), [period]);
   const periodLabel = PERIODS.find((p) => p.value === period)?.label || "This Month";
@@ -308,18 +252,18 @@ export default function NetProfitReport() {
               </SelectContent>
             </Select>
           )}
-          <div className="flex items-center border rounded-md overflow-hidden">
-            {PERIODS.map((p) => (
-              <button
-                key={p.value}
-                data-testid={`button-period-${p.value}`}
-                onClick={() => setPeriod(p.value)}
-                className={`px-3 py-1.5 text-sm transition-colors ${period === p.value ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <SelectTrigger className="w-36" data-testid="select-period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((p) => (
+                <SelectItem key={p.value} value={p.value} data-testid={`option-period-${p.value}`}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button onClick={handleExport} data-testid="button-export-excel" disabled={isLoading}>
             <Download className="w-4 h-4 mr-2" />
             Export Excel
@@ -360,122 +304,110 @@ export default function NetProfitReport() {
               <KpiCard title="Closing Stock" value={closingStock} icon={DollarSign} color="bg-purple-600" />
             </div>
 
-            {/* Tally Two-Pane P&L Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Pane — Debit side */}
-              <div className="border rounded-md overflow-hidden">
-                <div className="bg-muted/50 px-4 py-3 border-b">
-                  <span className="font-semibold text-sm">Particulars (Debit)</span>
-                </div>
-                <div className="divide-y">
-                  <div className="flex justify-between items-center px-4 py-3">
-                    <span className="flex items-center gap-2 text-sm">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      Opening Stock
-                    </span>
-                    <span className="font-mono text-sm">{formatAmount(openingStock)}</span>
+            {/* Profit Summary Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Profit Summary — {periodLabel}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Income side */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Income</p>
+                    {[
+                      { label: "Sales (Revenue)", value: salesTotal },
+                      { label: "Direct Incomes", value: directIncTotal },
+                      { label: "Indirect Incomes", value: indirectIncTotal },
+                      { label: "Closing Stock Value", value: closingStock },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{label}</span>
+                        <AmountCell value={value} />
+                      </div>
+                    ))}
                   </div>
-                  <TallyRow
-                    label="Purchase Accounts"
-                    count={lp?.purchaseAccounts?.accounts?.filter((a: any) => a.debit !== 0 || a.credit !== 0).length || 0}
-                    total={purchasesTotal}
-                    accounts={lp?.purchaseAccounts?.accounts || []}
-                    sectionKey="purchaseAccounts"
-                    expandedSections={expandedSections}
-                    toggleSection={toggleSection}
-                  />
-                  {directIncTotal > 0 && (
-                    <TallyRow
-                      label="Direct Incomes"
-                      count={rp?.directIncomes?.accounts?.filter((a: any) => a.debit !== 0 || a.credit !== 0).length || 0}
-                      total={directIncTotal}
-                      accounts={rp?.directIncomes?.accounts || []}
-                      sectionKey="directIncomes"
-                      expandedSections={expandedSections}
-                      toggleSection={toggleSection}
-                    />
-                  )}
-                  {directExpTotal > 0 && (
-                    <TallyRow
-                      label="Direct Expenses"
-                      count={lp?.directExpenses?.accounts?.filter((a: any) => a.debit !== 0 || a.credit !== 0).length || 0}
-                      total={directExpTotal}
-                      accounts={lp?.directExpenses?.accounts || []}
-                      sectionKey="directExpenses"
-                      expandedSections={expandedSections}
-                      toggleSection={toggleSection}
-                    />
-                  )}
-                  <div className="flex justify-between items-center px-4 py-3 bg-primary/10 font-semibold border-t-2">
-                    <span className="text-sm">Total</span>
-                    <span className="font-mono text-sm">{formatAmount(lp?.tradingTotal ?? (openingStock + purchasesTotal + directExpTotal))}</span>
-                  </div>
-                  <div className="h-4 bg-muted/30" />
-                  <TallyRow
-                    label="Indirect Expenses"
-                    count={lp?.indirectExpenses?.accounts?.filter((a: any) => a.debit !== 0 || a.credit !== 0).length || 0}
-                    total={indirectExpTotal}
-                    accounts={lp?.indirectExpenses?.accounts || []}
-                    sectionKey="indirectExpenses"
-                    expandedSections={expandedSections}
-                    toggleSection={toggleSection}
-                  />
-                  <div className="flex justify-between items-center px-4 py-3 bg-primary/20 font-bold">
-                    <span className="text-sm">Net Position</span>
-                    <span className={`font-mono text-sm ${balanceSheetPosition >= 0 ? "text-teal-600 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
-                      {formatAmount(Math.abs(balanceSheetPosition))}
-                      {balanceSheetPosition < 0 && " (Loss)"}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Right Pane — Credit side */}
-              <div className="border rounded-md overflow-hidden">
-                <div className="bg-muted/50 px-4 py-3 border-b">
-                  <span className="font-semibold text-sm">Particulars (Credit)</span>
-                </div>
-                <div className="divide-y">
-                  <div className="flex justify-between items-center px-4 py-3">
-                    <span className="flex items-center gap-2 text-sm">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      Sales Accounts
-                    </span>
-                    <span className="font-mono text-sm">{formatAmount(salesTotal)}</span>
-                  </div>
-                  <div className="flex justify-between items-center px-4 py-3">
-                    <span className="flex items-center gap-2 text-sm">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      Closing Stock
-                    </span>
-                    <span className="font-mono text-sm">{formatAmount(closingStock)}</span>
-                  </div>
-                  {directIncTotal > 0 && <div className="h-[49px] bg-muted/10" />}
-                  {directExpTotal > 0 && <div className="h-[49px] bg-muted/10" />}
-                  <div className="flex justify-between items-center px-4 py-3 bg-primary/10 font-semibold border-t-2">
-                    <span className="text-sm">Total</span>
-                    <span className="font-mono text-sm">{formatAmount(rp?.total ?? (salesTotal + closingStock))}</span>
-                  </div>
-                  <div className="h-4 bg-muted/30" />
-                  <TallyRow
-                    label="Indirect Incomes"
-                    count={rp?.indirectIncomes?.accounts?.filter((a: any) => a.debit !== 0 || a.credit !== 0).length || 0}
-                    total={indirectIncTotal}
-                    accounts={rp?.indirectIncomes?.accounts || []}
-                    sectionKey="indirectIncomes"
-                    expandedSections={expandedSections}
-                    toggleSection={toggleSection}
-                  />
-                  <div className="flex justify-between items-center px-4 py-3 bg-primary/20 font-bold">
-                    <span className="text-sm">Net Position</span>
-                    <span className={`font-mono text-sm ${balanceSheetPosition >= 0 ? "text-teal-600 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
-                      {formatAmount(Math.abs(balanceSheetPosition))}
-                      {balanceSheetPosition < 0 && " (Loss)"}
-                    </span>
+                  {/* Expense side */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Expenses</p>
+                    {[
+                      { label: "Opening Stock", value: openingStock },
+                      { label: "Purchases", value: purchasesTotal },
+                      { label: "Direct Expenses", value: directExpTotal },
+                      { label: "Indirect Expenses", value: indirectExpTotal },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="text-red-600 dark:text-red-400">{formatAmount(value)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
+
+                <Separator className="my-3" />
+
+                <div className="flex justify-between font-bold text-sm">
+                  <span>Gross Profit</span>
+                  <AmountCell value={grossProfit} />
+                </div>
+
+                <Separator className="my-3" />
+
+                <div className={`flex justify-between items-center font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
+                  <div>
+                    <span>Net Position</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-2">(Assets − Liabilities, cumulative)</span>
+                  </div>
+                  <span className={balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}>
+                    {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Account Breakdown */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Account Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <AccountSection
+                  title="Purchases"
+                  accounts={lp?.purchaseAccounts?.accounts || []}
+                  total={purchasesTotal}
+                  type="expense"
+                  badgeColor="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                />
+                <AccountSection
+                  title="Direct Incomes"
+                  accounts={rp?.directIncomes?.accounts || []}
+                  total={directIncTotal}
+                  type="income"
+                  badgeColor="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                />
+                <AccountSection
+                  title="Direct Expenses"
+                  accounts={lp?.directExpenses?.accounts || []}
+                  total={directExpTotal}
+                  type="expense"
+                  badgeColor="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                />
+                <AccountSection
+                  title="Indirect Incomes"
+                  accounts={rp?.indirectIncomes?.accounts || []}
+                  total={indirectIncTotal}
+                  type="income"
+                  badgeColor="bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300"
+                />
+                <AccountSection
+                  title="Indirect Expenses"
+                  accounts={lp?.indirectExpenses?.accounts || []}
+                  total={indirectExpTotal}
+                  type="expense"
+                  badgeColor="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
+                />
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
