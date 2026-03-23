@@ -12013,7 +12013,7 @@ if (asOfDate) {
           errors: error.errors 
         });
       }
-      res.status(500).json({ message: error.message });
+      return res.status(500).json({ message: error.message });
     }
   });
 
@@ -37559,7 +37559,7 @@ if (asOfDate) {
         const bal = new Map<number, { debit: number; credit: number }>();
         for (const e of entries) {
           if (e.ledgerAccountId) {
-            const d = parseFloat(e.debitAmount || "0"), c = parseFloat(e.creditAmount || "0");
+            const d = parseFloat(e.debitAmount || '0'), c = parseFloat(e.creditAmount || '0');
             const cur = bal.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
             bal.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
           }
@@ -37568,16 +37568,10 @@ if (asOfDate) {
       }
 
       function computeStats(balances: Map<number, { debit: number; credit: number }>, salesTotal: number, openingSt: number, closingSt: number, monthlyMode = false) {
-        const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-"));
-        let purchaseTotal = 0;
-        const purchaseDetails = purchaseAccounts.map((acc: any) => {
-          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
-          const net = b.debit - b.credit; purchaseTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
-        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
-
+        // Direct Incomes (non-sales income accounts)
         const directIncAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === "Income" && acc.subType === "Direct Income" && !acc.code?.includes("SALES") && !acc.name?.toLowerCase().includes("sales")
+          acc.accountType === 'Income' && acc.subType === 'Direct Income' &&
+          !acc.code?.includes('SALES') && !acc.name?.toLowerCase().includes('sales')
         );
         let directIncTotal = 0;
         const directIncDetails = directIncAccounts.map((acc: any) => {
@@ -37586,8 +37580,20 @@ if (asOfDate) {
           return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
+        const totalIncome = salesTotal + directIncTotal;
+
+        // Purchases
+        const purchaseAccounts = companyAccounts.filter((acc: any) => acc.code === 'PURCHASES' || acc.code?.startsWith('PURCHASES-'));
+        let purchaseTotal = 0;
+        const purchaseDetails = purchaseAccounts.map((acc: any) => {
+          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
+          const net = b.debit - b.credit; purchaseTotal += net;
+          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
+        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+
+        // Direct Expenses
         const directExpAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === "Direct Expense" || (acc.accountType === "Expense" && acc.subType === "Direct Expense") || importChargesIds.has(acc.id)
+          acc.accountType === 'Direct Expense' || (acc.accountType === 'Expense' && acc.subType === 'Direct Expense') || importChargesIds.has(acc.id)
         );
         let directExpTotal = 0;
         const directExpDetails = directExpAccounts.map((acc: any) => {
@@ -37596,13 +37602,9 @@ if (asOfDate) {
           return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
-        // Gross Profit: Tally Trading Account for summary/single period; revenue-only for per-month (stock bought ≠ stock sold in a single month)
-        const grossProfit = monthlyMode
-          ? salesTotal + directIncTotal - directExpTotal
-          : (salesTotal + closingSt + directIncTotal) - (openingSt + purchaseTotal + directExpTotal);
-
+        // Indirect Expenses
         const indirectExpAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === "Indirect Expense" && acc.code !== "PRODUCTION_ADJUSTMENT" && acc.code !== "CONSUMPTION_EXPENSE"
+          acc.accountType === 'Indirect Expense' && acc.code !== 'PRODUCTION_ADJUSTMENT' && acc.code !== 'CONSUMPTION_EXPENSE'
         );
         let indirectExpTotal = 0;
         const indirectExpDetails = indirectExpAccounts.map((acc: any) => {
@@ -37611,178 +37613,391 @@ if (asOfDate) {
           return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
         }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
 
-        const indirectIncAccounts = companyAccounts.filter((acc: any) =>
-          acc.accountType === "Income" && acc.subType === "Indirect Income"
-        );
-        let indirectIncTotal = 0;
-        const indirectIncDetails = indirectIncAccounts.map((acc: any) => {
-          const b = balances.get(acc.id) || { debit: 0, credit: 0 };
-          const net = b.credit - b.debit; indirectIncTotal += net;
-          return { name: acc.name, debit: b.debit, credit: b.credit, balance: net };
-        }).filter((r: any) => r.debit !== 0 || r.credit !== 0);
+        // COGS: Opening + Purchases + Direct + Indirect - Closing (monthlyMode: no opening/closing)
+        const totalCOGS = monthlyMode
+          ? purchaseTotal + directExpTotal + indirectExpTotal
+          : openingSt + purchaseTotal + directExpTotal + indirectExpTotal - closingSt;
 
-        const periodNetProfit = grossProfit + indirectIncTotal - indirectExpTotal;
-        const totalExpenses = purchaseTotal + directExpTotal + indirectExpTotal;
+        const grossProfit = totalIncome - totalCOGS;
+        const netProfit = grossProfit;
+        const grossMarginPct = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+        const netMarginPct = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
 
-        return { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt };
+        return {
+          salesTotal, directIncTotal, directIncDetails, totalIncome,
+          purchaseTotal, purchaseDetails, directExpTotal, directExpDetails,
+          indirectExpTotal, indirectExpDetails,
+          openingSt, closingSt, totalCOGS, grossProfit, netProfit, grossMarginPct, netMarginPct,
+          monthlyMode
+        };
       }
 
-      function writeSheet(ws: any, stats: ReturnType<typeof computeStats>, sheetLabel: string, showNetPosition: boolean, npValue: number, monthlyMode = false) {
-        const { salesTotal, purchaseTotal, purchaseDetails, directIncTotal, directIncDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, indirectIncTotal, indirectIncDetails, grossProfit, periodNetProfit, totalExpenses, closingSt } = stats;
+      function writeSheet(ws: any, stats: ReturnType<typeof computeStats>, sheetLabel: string, showNetPosition: boolean, npValue: number) {
+        const { salesTotal, directIncTotal, directIncDetails, totalIncome, purchaseTotal, purchaseDetails, directExpTotal, directExpDetails, indirectExpTotal, indirectExpDetails, openingSt, closingSt, totalCOGS, grossProfit, netProfit, grossMarginPct, netMarginPct, monthlyMode } = stats;
 
         ws.properties.defaultColWidth = 20;
-        ws.mergeCells("A1:E1");
-        const titleCell = ws.getCell("A1");
-        titleCell.value = `Net Profit Report — ${companyName}`;
-        titleCell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
-        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
-        titleCell.alignment = { horizontal: "center", vertical: "middle" };
+
+        // Title
+        ws.mergeCells('A1:E1');
+        const titleCell = ws.getCell('A1');
+        titleCell.value = `Profit & Loss — ${companyName}`;
+        titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+        titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
         ws.getRow(1).height = 36;
 
-        ws.mergeCells("A2:E2");
-        const subCell = ws.getCell("A2");
-        subCell.value = monthlyMode
-          ? `Period: ${sheetLabel}  |  Gross Profit = Sales − Direct Expenses (Purchases shown for reference — see Summary tab for full Trading Account)`
-          : `Period: ${sheetLabel}`;
-        subCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
-        subCell.alignment = { horizontal: "center" };
+        ws.mergeCells('A2:E2');
+        const subCell = ws.getCell('A2');
+        subCell.value = `Period: ${sheetLabel}${monthlyMode ? '  |  COGS = Purchases + Direct + Indirect Expenses (no stock adjustment for individual months)' : ''}`;
+        subCell.font = { italic: true, size: 11, color: { argb: 'FF555555' } };
+        subCell.alignment = { horizontal: 'center' };
         ws.getRow(2).height = 22;
         ws.addRow([]);
 
-        const kpiHeaderRow = ws.addRow(["", "SUMMARY", "", "", ""]);
-        kpiHeaderRow.getCell(2).font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
-        kpiHeaderRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
-        ws.mergeCells(`B${kpiHeaderRow.number}:E${kpiHeaderRow.number}`);
+        // KPI Summary block
+        const kpiHdr = ws.addRow(['', 'SUMMARY', '', '', '']);
+        kpiHdr.getCell(2).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+        kpiHdr.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+        ws.mergeCells(`B${kpiHdr.number}:E${kpiHdr.number}`);
 
-        const kpiData: [string, number, boolean, boolean][] = [
-          ["Total Sales (Revenue)", salesTotal, false, false],
-          ["Total Expenses", totalExpenses, false, false],
-          ["Gross Profit", grossProfit, true, false],
-          ["Period Net Profit", periodNetProfit, true, false],
-          ["Closing Stock (Current)", closingSt, false, false],
+        const kpiRows: [string, string | number, boolean][] = [
+          ['Total Income (Sales + Direct Inc)', fmt(totalIncome), false],
+          ['Total COGS', fmt(totalCOGS), false],
+          ['Gross Profit', fmt(grossProfit), true],
+          ['Net Profit', fmt(netProfit), true],
+          ['Gross Margin %', grossMarginPct.toFixed(1) + '%', false],
+          ['Net Margin %', netMarginPct.toFixed(1) + '%', false],
         ];
-        if (showNetPosition) kpiData.push(["Net Position", npValue, true, true]);
+        if (showNetPosition) kpiRows.push(['Net Position (Balance Sheet)', fmt(npValue), true]);
 
-        for (const [label, value, isBold, isHighlighted] of kpiData) {
-          const row = ws.addRow(["", label, "", "", fmt(value)]);
-          const profColor = value >= 0 ? "FF16A34A" : "FFDC2626";
+        for (const [label, value, isBold] of kpiRows) {
+          const row = ws.addRow(['', label, '', '', value]);
+          const numVal = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+          const profColor = numVal >= 0 ? 'FF16A34A' : 'FFDC2626';
           row.getCell(2).font = { bold: isBold };
-          row.getCell(5).font = { bold: isBold, color: { argb: profColor } };
-          row.getCell(5).numFmt = '$#,##0.##';
+          row.getCell(5).font = { bold: isBold, color: { argb: isBold ? profColor : 'FF374151' } };
+          if (typeof value === 'number' || (!String(value).includes('%'))) row.getCell(5).numFmt = '$#,##0.##';
           ws.mergeCells(`B${row.number}:D${row.number}`);
-          if (isHighlighted) row.eachCell((cell: any) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: value >= 0 ? "FFD1FAE5" : "FFFEE2E2" } }; });
-          if (isBold) row.getCell(2).border = { top: { style: "thin", color: { argb: "FFD1D5DB" } }, bottom: { style: "thin", color: { argb: "FFD1D5DB" } } };
+          if (isBold) {
+            row.eachCell((cell: any) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: numVal >= 0 ? 'FFD1FAE5' : 'FFFEE2E2' } }; });
+            row.getCell(2).font = { bold: true };
+            row.getCell(5).font = { bold: true, color: { argb: profColor } };
+          }
         }
         ws.addRow([]);
 
-        const addSection = (title: string, colorArgb: string, rows: any[], totalLabel: string, totalValue: number) => {
-          const hRow = ws.addRow([title, "Account Name", "Debit", "Credit", "Net Balance"]);
+        // Helper: section header row
+        const secHeader = (title: string, color: string) => {
+          const hRow = ws.addRow([title, 'Account', 'Debit', 'Credit', 'Net']);
           hRow.eachCell((cell: any, col: number) => {
-            cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colorArgb } };
-            cell.alignment = { horizontal: col === 1 ? "left" : "right" };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+            cell.alignment = { horizontal: col <= 2 ? 'left' : 'right' };
           });
-          hRow.getCell(2).alignment = { horizontal: "left" };
-          for (const r of rows) {
-            const dataRow = ws.addRow(["", r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
-            dataRow.getCell(3).numFmt = '$#,##0';
-            dataRow.getCell(4).numFmt = '$#,##0';
-            dataRow.getCell(5).numFmt = '$#,##0';
-            dataRow.getCell(5).font = { color: { argb: r.balance >= 0 ? "FF16A34A" : "FFDC2626" } };
-          }
+        };
+
+        // Helper: account detail rows
+        const addAccRows = (rows: any[]) => {
           if (rows.length === 0) {
-            const emptyRow = ws.addRow(["", "(No accounts)", "", "", ""]);
-            emptyRow.getCell(2).font = { italic: true, color: { argb: "FF888888" } };
+            const empty = ws.addRow(['', '(none)', '', '', '']);
+            empty.getCell(2).font = { italic: true, color: { argb: 'FF888888' } };
+            return;
           }
-          const totRow = ws.addRow(["", `Total ${totalLabel}`, "", "", fmt(totalValue)]);
-          totRow.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; });
-          totRow.getCell(5).numFmt = '$#,##0';
-          totRow.getCell(5).font = { bold: true, color: { argb: totalValue >= 0 ? "FF16A34A" : "FFDC2626" } };
+          for (const r of rows) {
+            const dr = ws.addRow(['', r.name, fmt(r.debit), fmt(r.credit), fmt(r.balance)]);
+            dr.getCell(3).numFmt = '$#,##0'; dr.getCell(4).numFmt = '$#,##0'; dr.getCell(5).numFmt = '$#,##0';
+            dr.getCell(5).font = { color: { argb: r.balance >= 0 ? 'FF16A34A' : 'FFDC2626' } };
+          }
+        };
+
+        // Helper: subtotal row
+        const subTot = (label: string, value: number) => {
+          const r = ws.addRow(['', label, '', '', fmt(value)]);
+          r.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } }; });
+          r.getCell(5).numFmt = '$#,##0'; r.getCell(5).font = { bold: true, color: { argb: value >= 0 ? 'FF16A34A' : 'FFDC2626' } };
           ws.addRow([]);
         };
 
-        addSection("SALES", "FF1E3A5F", [], "Sales", salesTotal);
-        const salesSectionRow = ws.getRow(ws.rowCount - 2);
-        salesSectionRow.getCell(2).value = "Total Sales (POS & Revenue)";
-        salesSectionRow.getCell(5).value = fmt(salesTotal);
-        salesSectionRow.getCell(5).numFmt = '$#,##0';
+        // === INCOME SECTION ===
+        secHeader('INCOME', 'FF1E3A5F');
+        // Sales row
+        const salesRow = ws.addRow(['', 'Total Sales (POS & Revenue)', '', '', fmt(salesTotal)]);
+        salesRow.getCell(5).numFmt = '$#,##0'; salesRow.getCell(5).font = { color: { argb: 'FF16A34A' } };
+        // Direct Incomes
+        if (directIncDetails.length > 0) {
+          const diHdr = ws.addRow(['', '— Direct Incomes', '', '', '']);
+          diHdr.getCell(2).font = { italic: true, color: { argb: 'FF555555' } };
+          addAccRows(directIncDetails);
+        }
+        subTot('Total Income', totalIncome);
 
-        addSection("DIRECT INCOMES", "FF059669", directIncDetails, "Direct Incomes", directIncTotal);
-        addSection(monthlyMode ? "PURCHASES (Reference Only — not in GP)" : "PURCHASES", "FFDC2626", purchaseDetails, "Purchases", purchaseTotal);
-        addSection("DIRECT EXPENSES", "FFB45309", directExpDetails, "Direct Expenses", directExpTotal);
-        addSection("INDIRECT INCOMES", "FF0891B2", indirectIncDetails, "Indirect Incomes", indirectIncTotal);
-        addSection("INDIRECT EXPENSES", "FF7C3AED", indirectExpDetails, "Indirect Expenses", indirectExpTotal);
-
-        const gpRow = ws.addRow(["GROSS PROFIT", "", "", "", fmt(grossProfit)]);
-        gpRow.eachCell((cell: any) => { cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: grossProfit >= 0 ? "FF0891B2" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
-        gpRow.getCell(5).numFmt = '$#,##0.##';
-        ws.mergeCells(`A${gpRow.number}:D${gpRow.number}`);
-        ws.getRow(gpRow.number).height = 26;
-
-        const npRow = ws.addRow(["PERIOD NET PROFIT", "", "", "", fmt(periodNetProfit)]);
-        npRow.eachCell((cell: any) => { cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: periodNetProfit >= 0 ? "FF2563EB" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
-        npRow.getCell(5).numFmt = '$#,##0.##';
-        ws.mergeCells(`A${npRow.number}:D${npRow.number}`);
-        ws.getRow(npRow.number).height = 26;
-
-        if (showNetPosition) {
-          const finalRow = ws.addRow(["NET POSITION (All Time)", "", "", "", fmt(npValue)]);
-          finalRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: npValue >= 0 ? "FF16A34A" : "FFDC2626" } }; cell.alignment = { horizontal: "center" }; });
-          finalRow.getCell(5).numFmt = '$#,##0.##';
-          ws.mergeCells(`A${finalRow.number}:D${finalRow.number}`);
-          ws.getRow(finalRow.number).height = 30;
+        // === COST OF GOODS SOLD ===
+        secHeader('COST OF GOODS SOLD (COGS)', 'FFDC2626');
+        if (!monthlyMode && openingSt > 0) {
+          const osRow = ws.addRow(['', 'Opening Stock', '', '', fmt(openingSt)]);
+          osRow.getCell(5).numFmt = '$#,##0'; osRow.getCell(5).font = { color: { argb: 'FFDC2626' } };
         }
 
-        ws.getColumn(1).width = 26;
-        ws.getColumn(2).width = 36;
-        ws.getColumn(3).width = 18;
-        ws.getColumn(4).width = 18;
-        ws.getColumn(5).width = 18;
+        // Purchases sub-section
+        const pHdr = ws.addRow(['', '— Purchases', '', '', '']);
+        pHdr.getCell(2).font = { italic: true, bold: true, color: { argb: 'FFDC2626' } };
+        addAccRows(purchaseDetails);
+        const pTotRow = ws.addRow(['', 'Total Purchases', '', '', fmt(purchaseTotal)]);
+        pTotRow.getCell(2).font = { bold: true }; pTotRow.getCell(5).numFmt = '$#,##0'; pTotRow.getCell(5).font = { bold: true, color: { argb: 'FFDC2626' } };
+
+        // Direct Expenses sub-section
+        const deHdr = ws.addRow(['', '— Direct Expenses', '', '', '']);
+        deHdr.getCell(2).font = { italic: true, bold: true, color: { argb: 'FFB45309' } };
+        addAccRows(directExpDetails);
+        const deTotRow = ws.addRow(['', 'Total Direct Expenses', '', '', fmt(directExpTotal)]);
+        deTotRow.getCell(2).font = { bold: true }; deTotRow.getCell(5).numFmt = '$#,##0'; deTotRow.getCell(5).font = { bold: true, color: { argb: 'FFDC2626' } };
+
+        // Indirect Expenses sub-section
+        const ieHdr = ws.addRow(['', '— Indirect Expenses', '', '', '']);
+        ieHdr.getCell(2).font = { italic: true, bold: true, color: { argb: 'FF7C3AED' } };
+        addAccRows(indirectExpDetails);
+        const ieTotRow = ws.addRow(['', 'Total Indirect Expenses', '', '', fmt(indirectExpTotal)]);
+        ieTotRow.getCell(2).font = { bold: true }; ieTotRow.getCell(5).numFmt = '$#,##0'; ieTotRow.getCell(5).font = { bold: true, color: { argb: 'FFDC2626' } };
+
+        if (!monthlyMode && closingSt > 0) {
+          const csRow = ws.addRow(['', 'Less: Closing Stock', '', '', fmt(-closingSt)]);
+          csRow.getCell(5).numFmt = '$#,##0'; csRow.getCell(5).font = { color: { argb: 'FF16A34A' } };
+        }
+
+        // COGS total
+        const cogsRow = ws.addRow(['TOTAL COGS', '', '', '', fmt(totalCOGS)]);
+        cogsRow.eachCell((cell: any) => { cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } }; cell.alignment = { horizontal: 'center' }; });
+        cogsRow.getCell(5).numFmt = '$#,##0.##';
+        ws.mergeCells(`A${cogsRow.number}:D${cogsRow.number}`);
+        ws.getRow(cogsRow.number).height = 24;
+        ws.addRow([]);
+
+        // GROSS PROFIT
+        const gpRow = ws.addRow(['GROSS PROFIT', '', '', '', fmt(grossProfit)]);
+        gpRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: grossProfit >= 0 ? 'FF059669' : 'FFDC2626' } }; cell.alignment = { horizontal: 'center' }; });
+        gpRow.getCell(5).numFmt = '$#,##0.##';
+        ws.mergeCells(`A${gpRow.number}:D${gpRow.number}`);
+        ws.getRow(gpRow.number).height = 28;
+
+        // NET PROFIT (= Gross Profit since all expenses are in COGS)
+        const npRow = ws.addRow(['NET PROFIT', '', '', '', fmt(netProfit)]);
+        npRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: netProfit >= 0 ? 'FF2563EB' : 'FFDC2626' } }; cell.alignment = { horizontal: 'center' }; });
+        npRow.getCell(5).numFmt = '$#,##0.##';
+        ws.mergeCells(`A${npRow.number}:D${npRow.number}`);
+        ws.getRow(npRow.number).height = 28;
+        ws.addRow([]);
+
+        // RATIOS
+        const ratioHdr = ws.addRow(['RATIOS', '', '', '', '']);
+        ratioHdr.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        ratioHdr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4B5563' } };
+
+        const gmRow = ws.addRow(['', 'Gross Margin %', '', '', grossMarginPct.toFixed(2) + '%']);
+        gmRow.getCell(2).font = { bold: false }; gmRow.getCell(5).font = { bold: true };
+        ws.mergeCells(`B${gmRow.number}:D${gmRow.number}`);
+
+        const nmRow = ws.addRow(['', 'Net Margin %', '', '', netMarginPct.toFixed(2) + '%']);
+        nmRow.getCell(2).font = { bold: false }; nmRow.getCell(5).font = { bold: true };
+        ws.mergeCells(`B${nmRow.number}:D${nmRow.number}`);
+
+        if (showNetPosition) {
+          ws.addRow([]);
+          const bsRow = ws.addRow(['NET POSITION (Balance Sheet)', '', '', '', fmt(npValue)]);
+          bsRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: npValue >= 0 ? 'FF16A34A' : 'FFDC2626' } }; cell.alignment = { horizontal: 'center' }; });
+          bsRow.getCell(5).numFmt = '$#,##0.##';
+          ws.mergeCells(`A${bsRow.number}:D${bsRow.number}`);
+          ws.getRow(bsRow.number).height = 30;
+          const bsNote = ws.addRow(['', 'Assets − Liabilities, all-time cumulative (not period-filtered)', '', '', '']);
+          bsNote.getCell(2).font = { italic: true, size: 9, color: { argb: 'FF888888' } };
+          ws.mergeCells(`B${bsNote.number}:E${bsNote.number}`);
+        }
+
+        ws.getColumn(1).width = 28;
+        ws.getColumn(2).width = 38;
+        ws.getColumn(3).width = 16;
+        ws.getColumn(4).width = 16;
+        ws.getColumn(5).width = 16;
+      }
+
+      function writeSummarySheet(ws: any, monthStatsList: ReturnType<typeof computeStats>[], totalStats: ReturnType<typeof computeStats>, monthLabels: string[], npValue: number) {
+        const numMonths = monthLabels.length;
+        const totalCol = numMonths + 2; // col B = month1, ..., last month col = B+numMonths-1, total = B+numMonths
+
+        ws.properties.defaultColWidth = 16;
+
+        // Title
+        ws.mergeCells(1, 1, 1, totalCol);
+        const titleCell = ws.getCell(1, 1);
+        titleCell.value = `P&L Summary — ${companyName}`;
+        titleCell.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+        titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getRow(1).height = 36;
+
+        // Header row: [blank] | Month1 | Month2 | ... | TOTAL
+        const hdrRowData: any[] = [''];
+        for (const ml of monthLabels) hdrRowData.push(ml);
+        hdrRowData.push('TOTAL');
+        const hdrRow = ws.addRow(hdrRowData);
+        hdrRow.eachCell((cell: any, col: number) => {
+          if (col === 1) return;
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: col === totalCol ? 'FF1E3A5F' : 'FF374151' } };
+          cell.alignment = { horizontal: 'right' };
+        });
+        ws.getRow(2).height = 22;
+
+        // Helper: write a data row
+        const numFmt = '$#,##0';
+        const pctFmt = '0.00%';
+
+        const writeRow = (label: string, monthVals: number[], totalVal: number, opts: { bold?: boolean; highlight?: boolean; colorize?: boolean; pct?: boolean; labelColor?: string; indent?: boolean } = {}) => {
+          const rowData: any[] = [opts.indent ? '  ' + label : label];
+          for (const v of monthVals) rowData.push(opts.pct ? v / 100 : fmt(v));
+          rowData.push(opts.pct ? fmt(totalVal) / 100 : fmt(totalVal));
+          const row = ws.addRow(rowData);
+          if (opts.bold) row.getCell(1).font = { bold: true };
+          if (opts.labelColor) row.getCell(1).font = { bold: opts.bold, color: { argb: opts.labelColor } };
+
+          for (let c = 2; c <= totalCol; c++) {
+            const cell = row.getCell(c);
+            const val = c === totalCol ? totalVal : monthVals[c - 2];
+            cell.numFmt = opts.pct ? '0.00%' : numFmt;
+            if (opts.bold) cell.font = { bold: true };
+            if (opts.colorize) cell.font = { bold: opts.bold, color: { argb: val >= 0 ? 'FF16A34A' : 'FFDC2626' } };
+            if (opts.highlight) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: val >= 0 ? 'FFD1FAE5' : 'FFFEE2E2' } };
+          }
+          return row;
+        };
+
+        const writeSectionHdr = (label: string, color: string) => {
+          const rowData: any[] = [label];
+          for (let i = 0; i <= numMonths; i++) rowData.push('');
+          const row = ws.addRow(rowData);
+          row.eachCell((cell: any) => { cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }; });
+          ws.mergeCells(row.number, 1, row.number, totalCol);
+          ws.getRow(row.number).height = 20;
+        };
+
+        const blankRow = () => ws.addRow(Array(totalCol).fill(''));
+
+        // === INCOME ===
+        writeSectionHdr('INCOME', 'FF1E3A5F');
+        writeRow('Sales Revenue', monthStatsList.map(s => s.salesTotal), totalStats.salesTotal, { colorize: true });
+        writeRow('Direct Incomes', monthStatsList.map(s => s.directIncTotal), totalStats.directIncTotal, { colorize: true });
+        writeRow('TOTAL INCOME', monthStatsList.map(s => s.totalIncome), totalStats.totalIncome, { bold: true, colorize: true, highlight: true });
+        blankRow();
+
+        // === COGS ===
+        writeSectionHdr('COST OF GOODS SOLD (COGS)', 'FFDC2626');
+        // Opening Stock: only show in total column (not per-month)
+        {
+          const rowData: any[] = ['Opening Stock'];
+          for (let i = 0; i < numMonths; i++) rowData.push('—');
+          rowData.push(fmt(totalStats.openingSt));
+          const row = ws.addRow(rowData);
+          row.getCell(1).font = { italic: true };
+          row.getCell(totalCol).numFmt = numFmt;
+          row.getCell(totalCol).font = { color: { argb: 'FFDC2626' } };
+        }
+        writeRow('Purchases', monthStatsList.map(s => s.purchaseTotal), totalStats.purchaseTotal, { colorize: true, indent: true });
+        writeRow('Direct Expenses', monthStatsList.map(s => s.directExpTotal), totalStats.directExpTotal, { colorize: true, indent: true });
+        writeRow('Indirect Expenses', monthStatsList.map(s => s.indirectExpTotal), totalStats.indirectExpTotal, { colorize: true, indent: true });
+        // Closing Stock: only show in total column (negative, reduces COGS)
+        {
+          const rowData: any[] = ['Less: Closing Stock'];
+          for (let i = 0; i < numMonths; i++) rowData.push('—');
+          rowData.push(fmt(-totalStats.closingSt));
+          const row = ws.addRow(rowData);
+          row.getCell(1).font = { italic: true };
+          row.getCell(totalCol).numFmt = numFmt;
+          row.getCell(totalCol).font = { color: { argb: 'FF16A34A' } };
+        }
+        writeRow('TOTAL COGS', monthStatsList.map(s => s.totalCOGS), totalStats.totalCOGS, { bold: true, colorize: true, highlight: true });
+        blankRow();
+
+        // === GROSS PROFIT ===
+        writeSectionHdr('GROSS PROFIT', 'FF059669');
+        writeRow('Gross Profit', monthStatsList.map(s => s.grossProfit), totalStats.grossProfit, { bold: true, colorize: true, highlight: true });
+        blankRow();
+
+        // === NET PROFIT ===
+        writeSectionHdr('NET PROFIT', 'FF2563EB');
+        writeRow('Net Profit', monthStatsList.map(s => s.netProfit), totalStats.netProfit, { bold: true, colorize: true, highlight: true });
+        blankRow();
+
+        // === RATIOS ===
+        writeSectionHdr('RATIOS', 'FF4B5563');
+        writeRow('Gross Margin %', monthStatsList.map(s => s.grossMarginPct), totalStats.grossMarginPct, { pct: true });
+        writeRow('Net Margin %', monthStatsList.map(s => s.netMarginPct), totalStats.netMarginPct, { pct: true });
+        blankRow();
+
+        // Net Position (balance sheet - only total column meaningful)
+        {
+          const rowData: any[] = ['Net Position (Balance Sheet — All-Time)'];
+          for (let i = 0; i < numMonths; i++) rowData.push('—');
+          rowData.push(fmt(npValue));
+          const row = ws.addRow(rowData);
+          row.getCell(1).font = { bold: true };
+          row.eachCell((cell: any) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: npValue >= 0 ? 'FFD1FAE5' : 'FFFEE2E2' } }; });
+          row.getCell(totalCol).numFmt = numFmt;
+          row.getCell(totalCol).font = { bold: true, color: { argb: npValue >= 0 ? 'FF16A34A' : 'FFDC2626' } };
+        }
+
+        // Column widths
+        ws.getColumn(1).width = 36;
+        for (let c = 2; c <= totalCol; c++) ws.getColumn(c).width = 14;
       }
 
       function fmtMonthLabel(mk: string) {
-        const [yr, mo] = mk.split("-");
-        const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const [yr, mo] = mk.split('-');
+        const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return `${names[parseInt(mo) - 1]} ${yr}`;
       }
 
-      const ExcelJS = await import("exceljs");
+      const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.default.Workbook();
-      workbook.creator = "ERP System";
+      workbook.creator = 'ERP System';
       workbook.created = new Date();
 
       if (sortedMonths.length > 1) {
-        // One sheet per month (no opening/closing stock per month — just cash flow)
-        for (const mk of sortedMonths) {
+        // Summary sheet first (one column per month + grand total)
+        const allBalances = computeBalancesFromEntries(allPeriodEntries);
+        const totalStats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue, false);
+        const monthStatsList = sortedMonths.map((mk) => {
           const monthVIds = vouchersByMonth.get(mk)!;
           const monthEntries = monthVIds.flatMap((id) => entriesByVoucherId.get(id) || []);
           const monthBalances = computeBalancesFromEntries(monthEntries);
           const monthSales = salesByMonth.get(mk) || 0;
-          const monthStats = computeStats(monthBalances, monthSales, 0, 0, true);
+          return computeStats(monthBalances, monthSales, 0, 0, true);
+        });
+        const monthLabels = sortedMonths.map(fmtMonthLabel);
+
+        const summaryWs = workbook.addWorksheet('Summary');
+        writeSummarySheet(summaryWs, monthStatsList, totalStats, monthLabels, netPositionValue);
+
+        // One detail sheet per month
+        for (let i = 0; i < sortedMonths.length; i++) {
+          const mk = sortedMonths[i];
           const ws = workbook.addWorksheet(fmtMonthLabel(mk));
-          writeSheet(ws, monthStats, fmtMonthLabel(mk), false, 0, true);
+          writeSheet(ws, monthStatsList[i], fmtMonthLabel(mk), false, 0);
         }
-        // Summary sheet: full period with proper stock adjustments
-        const allBalances = computeBalancesFromEntries(allPeriodEntries);
-        const summaryStats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue);
-        const summaryWs = workbook.addWorksheet("Summary");
-        writeSheet(summaryWs, summaryStats, `${periodLabel} (Summary)`, true, netPositionValue);
       } else {
         // Single sheet
         const allBalances = computeBalancesFromEntries(allPeriodEntries);
-        const stats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue);
-        const ws = workbook.addWorksheet("Net Profit Report");
+        const stats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue, false);
+        const ws = workbook.addWorksheet('Net Profit Report');
         writeSheet(ws, stats, periodLabel, true, netPositionValue);
       }
 
-      const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, "_");
-      const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
+      const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, '_');
+      const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, '_');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {
-      console.error("Net profit Excel export error:", error);
+      console.error('Net profit Excel export error:', error);
       res.status(500).json({ message: error.message });
     }
   });
