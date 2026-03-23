@@ -26,8 +26,13 @@ import {
   ChevronRight,
   RefreshCw,
   Layers,
-  Tag,
 } from "lucide-react";
+
+interface BaleDetail {
+  ref: string;
+  weightKg: number;
+  totalCost: number;
+}
 
 interface BucketRow {
   productId: number | null;
@@ -37,7 +42,7 @@ interface BucketRow {
   baleCount: number;
   totalWeightKg: number;
   totalCost: number;
-  referenceNumbers: string[];
+  baleDetails: BaleDetail[];
 }
 
 interface SectionTotal {
@@ -87,25 +92,35 @@ interface SectionProps {
   rows: BucketRow[];
   total: SectionTotal;
   defaultOpen?: boolean;
+  showSoldPrice?: boolean;
 }
 
-function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultOpen = false }: SectionProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [expandedRefs, setExpandedRefs] = useState<Set<string>>(new Set());
+function groupByCategory(rows: BucketRow[]): { category: string; items: BucketRow[] }[] {
+  const map = new Map<string, BucketRow[]>();
+  for (const row of rows) {
+    const cat = row.categoryName || "—";
+    if (!map.has(cat)) map.set(cat, []);
+    map.get(cat)!.push(row);
+  }
+  return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+}
 
-  function toggleRefs(key: string) {
-    setExpandedRefs((prev) => {
+function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultOpen = false, showSoldPrice = false }: SectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  function toggleRow(key: string) {
+    setExpandedRows((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
-  const avgRate = total.baleCount > 0 ? total.totalCost / total.baleCount : 0;
+  const avgRate = total.baleCount > 0 && total.totalCost > 0 ? total.totalCost / total.baleCount : 0;
+  const groups = groupByCategory(rows);
+  const colSpan = showSoldPrice ? 7 : 5;
 
   return (
     <Card>
@@ -152,84 +167,143 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs py-2 px-3">Product</TableHead>
-                    <TableHead className="text-xs py-2 px-3">Article Code</TableHead>
-                    <TableHead className="text-xs py-2 px-3">Category</TableHead>
                     <TableHead className="text-xs py-2 px-3 text-right">Bales</TableHead>
                     <TableHead className="text-xs py-2 px-3 text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Avg Rate</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">Avg Cost/Bale</TableHead>
                     <TableHead className="text-xs py-2 px-3 text-right">Total Cost</TableHead>
+                    {showSoldPrice && (
+                      <>
+                        <TableHead className="text-xs py-2 px-3 text-right">Avg Sold Rate</TableHead>
+                        <TableHead className="text-xs py-2 px-3 text-right">Total Sold</TableHead>
+                      </>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((r, i) => {
-                    const rowKey = `${r.productId ?? "null"}-${i}`;
-                    const refsOpen = expandedRefs.has(rowKey);
-                    const rowAvgRate = r.baleCount > 0 ? r.totalCost / r.baleCount : 0;
+                  {groups.map(({ category, items }) => {
+                    const catBales = items.reduce((s, r) => s + r.baleCount, 0);
+                    const catWeight = items.reduce((s, r) => s + r.totalWeightKg, 0);
+                    const catCost = items.reduce((s, r) => s + r.totalCost, 0);
+                    const catAvg = catBales > 0 && catCost > 0 ? catCost / catBales : 0;
 
-                    return (
-                      <>
-                        <TableRow key={rowKey} data-testid={`row-product-${r.productId ?? i}`}>
-                          <TableCell className="py-2 px-3">
-                            <button
-                              className="text-xs font-medium text-left hover:underline cursor-pointer flex items-center gap-1 group"
-                              onClick={() => toggleRefs(rowKey)}
-                              data-testid={`btn-expand-refs-${r.productId ?? i}`}
-                              title="Click to see bale ref numbers"
-                            >
-                              {r.referenceNumbers.length > 0 && (
-                                <Tag className="w-3 h-3 text-muted-foreground group-hover:text-primary shrink-0" />
-                              )}
-                              {r.productName}
-                            </button>
-                          </TableCell>
-                          <TableCell className="py-2 px-3 font-mono text-xs text-muted-foreground">
-                            {r.articleCode}
-                          </TableCell>
-                          <TableCell className="py-2 px-3">
-                            <Badge variant="outline" className="text-xs">
-                              {r.categoryName}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-2 px-3 text-right text-xs">{fmtN(r.baleCount)}</TableCell>
-                          <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(r.totalWeightKg)}</TableCell>
-                          <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
-                            {rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}
-                          </TableCell>
-                          <TableCell className="py-2 px-3 text-right text-xs font-medium">
-                            {r.totalCost > 0 ? fmtMoney(r.totalCost) : "—"}
-                          </TableCell>
-                        </TableRow>
-                        {refsOpen && r.referenceNumbers.length > 0 && (
-                          <TableRow key={`${rowKey}-refs`} className="bg-muted/20">
-                            <TableCell colSpan={7} className="py-2 px-3">
-                              <div className="flex items-start gap-2">
-                                <span className="text-xs text-muted-foreground shrink-0 pt-0.5">Ref #s:</span>
-                                <div className="flex flex-wrap gap-1">
-                                  {r.referenceNumbers.map((ref) => (
-                                    <Badge key={ref} variant="outline" className="text-xs font-mono px-1.5 py-0">
-                                      {ref}
-                                    </Badge>
-                                  ))}
+                    return [
+                      <TableRow key={`cat-${category}`} className="bg-muted/40">
+                        <TableCell
+                          colSpan={colSpan}
+                          className="py-1.5 px-3 text-xs font-semibold text-muted-foreground tracking-wide"
+                        >
+                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <span>{category}</span>
+                            <div className="flex items-center gap-4 font-normal">
+                              <span>{fmtN(catBales)} bales</span>
+                              <span>{fmtKg(catWeight)} kg</span>
+                              {catAvg > 0 && <span>avg {fmtMoney(catAvg)}/bale</span>}
+                              {catCost > 0 && <span className="font-semibold">{fmtMoney(catCost)}</span>}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>,
+                      ...items.flatMap((r, i) => {
+                        const rowKey = `${category}-${r.productId ?? "null"}-${i}`;
+                        const isOpen = expandedRows.has(rowKey);
+                        const rowAvgRate = r.baleCount > 0 && r.totalCost > 0 ? r.totalCost / r.baleCount : 0;
+                        const hasBaleDetails = r.baleDetails.some((d) => d.ref || d.totalCost > 0);
+
+                        return [
+                          <TableRow
+                            key={rowKey}
+                            data-testid={`row-product-${r.productId ?? i}`}
+                            className={isOpen ? "bg-muted/10" : ""}
+                          >
+                            <TableCell className="py-2 px-3 pl-5">
+                              <button
+                                className="text-xs font-medium text-left hover:underline cursor-pointer flex items-center gap-1 group"
+                                onClick={() => toggleRow(rowKey)}
+                                data-testid={`btn-expand-${r.productId ?? i}`}
+                                title="Click to see individual bale details"
+                              >
+                                {isOpen ? (
+                                  <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                                )}
+                                {r.productName}
+                              </button>
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs">{fmtN(r.baleCount)}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(r.totalWeightKg)}</TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
+                              {rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}
+                            </TableCell>
+                            <TableCell className="py-2 px-3 text-right text-xs font-medium">
+                              {r.totalCost > 0 ? fmtMoney(r.totalCost) : "—"}
+                            </TableCell>
+                            {showSoldPrice && (
+                              <>
+                                <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">—</TableCell>
+                                <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">—</TableCell>
+                              </>
+                            )}
+                          </TableRow>,
+                          isOpen && hasBaleDetails ? (
+                            <TableRow key={`${rowKey}-detail`} className="bg-muted/20">
+                              <TableCell colSpan={colSpan} className="py-0 px-0">
+                                <div className="pl-8 pr-3 py-2">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="border-b border-border/50">
+                                        <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Weight (kg)</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Qty</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Avg Cost/Bale</th>
+                                        <th className="text-right py-1 font-medium text-muted-foreground">Total Cost</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {r.baleDetails.map((d, di) => (
+                                        <tr key={di} className="border-b border-border/20 last:border-0">
+                                          <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">{fmtKg(d.weightKg)}</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">
+                                            {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
+                                          </td>
+                                          <td className="py-1 text-right font-medium">
+                                            {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                      {r.baleDetails.length > 1 && (
+                                        <tr className="font-semibold border-t border-border/50">
+                                          <td className="py-1 pr-4 text-muted-foreground">Total</td>
+                                          <td className="py-1 pr-4 text-right">{fmtKg(r.totalWeightKg)}</td>
+                                          <td className="py-1 pr-4 text-right">{r.baleCount}</td>
+                                          <td className="py-1 pr-4 text-right">
+                                            {rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}
+                                          </td>
+                                          <td className="py-1 text-right">
+                                            {r.totalCost > 0 ? fmtMoney(r.totalCost) : "—"}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table>
                                 </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                        {refsOpen && r.referenceNumbers.length === 0 && (
-                          <TableRow key={`${rowKey}-refs-empty`} className="bg-muted/20">
-                            <TableCell colSpan={7} className="py-2 px-3 text-xs text-muted-foreground italic">
-                              No reference numbers recorded for this product.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    );
+                              </TableCell>
+                            </TableRow>
+                          ) : isOpen ? (
+                            <TableRow key={`${rowKey}-empty`} className="bg-muted/20">
+                              <TableCell colSpan={colSpan} className="py-2 px-5 text-xs text-muted-foreground italic">
+                                No individual bale records found.
+                              </TableCell>
+                            </TableRow>
+                          ) : null,
+                        ].filter(Boolean);
+                      }),
+                    ];
                   })}
-                  {/* Section subtotal */}
                   <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell colSpan={3} className="text-xs py-2 px-3">
-                      Subtotal
-                    </TableCell>
+                    <TableCell className="text-xs py-2 px-3">Subtotal</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3">{fmtN(total.baleCount)}</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3">{fmtKg(total.totalWeightKg)}</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">
@@ -238,6 +312,12 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                     <TableCell className="text-right text-xs py-2 px-3">
                       {total.totalCost > 0 ? fmtMoney(total.totalCost) : "—"}
                     </TableCell>
+                    {showSoldPrice && (
+                      <>
+                        <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">—</TableCell>
+                        <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">—</TableCell>
+                      </>
+                    )}
                   </TableRow>
                 </TableBody>
               </Table>
@@ -264,7 +344,6 @@ export default function BaleLedger() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between gap-3 px-6 py-4 border-b flex-wrap">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -301,7 +380,6 @@ export default function BaleLedger() {
           </div>
         ) : (
           <>
-            {/* Table 1: Current Stock — collapsed by default */}
             <SectionTable
               title="Current Stock — In Hand"
               subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
@@ -312,7 +390,6 @@ export default function BaleLedger() {
               defaultOpen={false}
             />
 
-            {/* Table 2: Wipers & Garbages */}
             <SectionTable
               title="Wipers & Garbages — In Hand"
               subtitle="Waste-category bales currently in stock (IN_STOCK / FINALIZED)"
@@ -323,7 +400,6 @@ export default function BaleLedger() {
               defaultOpen={false}
             />
 
-            {/* Table 3: Sold */}
             <SectionTable
               title="Stock Sold"
               subtitle="Bales that have been dispatched and sold to customers"
@@ -332,9 +408,9 @@ export default function BaleLedger() {
               rows={data?.sold || []}
               total={data?.totals.sold || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
               defaultOpen={false}
+              showSoldPrice={true}
             />
 
-            {/* Table 4: Waste Dispatched */}
             <SectionTable
               title="Waste Dispatched"
               subtitle="Bales removed from stock via waste disposal (Waste Dispatch records)"
@@ -345,7 +421,6 @@ export default function BaleLedger() {
               defaultOpen={false}
             />
 
-            {/* Grand Total card */}
             {grand && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardContent className="p-4">
@@ -386,7 +461,6 @@ export default function BaleLedger() {
                     </div>
                   </div>
 
-                  {/* Breakdown row */}
                   {data && (
                     <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 sm:grid-cols-4">
                       {[
