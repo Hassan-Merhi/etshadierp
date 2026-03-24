@@ -28646,6 +28646,26 @@ if (asOfDate) {
     }
   });
 
+  // Reorder dashboard cash accounts
+  app.patch("/api/dashboard-cash-accounts/reorder", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { dashboardCashAccounts } = await import("@shared/schema");
+      const { orderedIds } = req.body as { orderedIds: number[] };
+      if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
+      await Promise.all(orderedIds.map((id, index) =>
+        db.update(dashboardCashAccounts)
+          .set({ displayOrder: index })
+          .where(and(eq(dashboardCashAccounts.id, id), eq(dashboardCashAccounts.companyId, companyId)))
+          .execute()
+      ));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Dashboard Payable Accounts - user-selected payable accounts for dashboard display
   app.get("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
     try {
@@ -28780,6 +28800,26 @@ if (asOfDate) {
         )
         .execute();
 
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reorder dashboard payable accounts
+  app.patch("/api/dashboard-payable-accounts/reorder", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { dashboardPayableAccounts } = await import("@shared/schema");
+      const { orderedIds } = req.body as { orderedIds: number[] };
+      if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
+      await Promise.all(orderedIds.map((id, index) =>
+        db.update(dashboardPayableAccounts)
+          .set({ displayOrder: index })
+          .where(and(eq(dashboardPayableAccounts.id, id), eq(dashboardPayableAccounts.companyId, companyId)))
+          .execute()
+      ));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
