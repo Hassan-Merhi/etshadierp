@@ -2371,8 +2371,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
-          if (freightAmt > 0) {
-            byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
+          // Only add freight to byCurrency if same currency as container;
+          // cross-currency freight stays hidden until the user does an FX conversion
+          if (freightAmt > 0 && freightCc === cc) {
+            byCurrency[cc] = (byCurrency[cc] || 0) + freightAmt;
           }
         }
         // Add commission amounts (in their own currency) for containers where this supplier is the broker
@@ -2721,13 +2723,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
           byCurrency[commCc].totalDirectCommission += directCommAmt;
         }
-        // If freight is in a different currency, add it to that currency group's total value
-        const freightAmt = parseFloat(s.freight || "0");
-        const freightCc = s.freightCurrencyCode || cc;
-        if (freightAmt > 0 && freightCc !== cc) {
-          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
-          byCurrency[freightCc].totalValue += freightAmt;
-        }
+        // Cross-currency freight stays hidden until the user does an FX conversion; not added to byCurrency here.
       }
 
       // Fetch FX transfers involving this supplier (as source or destination)
@@ -3209,18 +3205,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
       });
 
-      // Freight row in a different currency section (when freight currency differs from container currency)
-      if (freight > 0 && !freightSameCcy) {
-        addRow(freightCc, {
-          date: dateVal,
-          type: "freight",
-          description: `Freight — ${c.containerNumber} - ${supplierName}`,
-          ref: c.containerNumber,
-          amount: freight,
-          commissionAmount: null,
-          commissionCurrency: null,
-        });
-      }
+      // Cross-currency freight stays hidden in the ledger until the user does an FX conversion.
 
       // Commission row in different currency section
       if (commAmt > 0 && commCc !== cc) {
