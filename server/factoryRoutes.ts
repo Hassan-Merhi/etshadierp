@@ -2039,7 +2039,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          const freightCc = c.freightCurrencyCode || c.currencyCode || fromCurrencyCode;
+          // Only treat freight as cross-currency when it's assigned to a freight supplier
+          const containerCcy = c.currencyCode || fromCurrencyCode;
+          const freightCc = c.freightSupplierId ? (c.freightCurrencyCode || "USD") : containerCcy;
           // Only include freight if it shares the container's currency
           return s + (kg * rate + (freightCc === fromCurrencyCode ? freight : 0));
         }, 0);
@@ -2595,7 +2597,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const rate = parseFloat(c.ratePerKg || "0");
         const freight = parseFloat(c.freight || "0");
         const containerCc = c.currencyCode || "USD";
-        const freightCc = c.freightCurrencyCode || containerCc;
+        // Only treat freight as cross-currency when it's assigned to a freight supplier.
+        // The DB default for freightCurrencyCode is "USD", so we must not rely on that field
+        // alone — without a freightSupplierId the freight is simply in the container's currency.
+        const freightCc = (c as any).freightSupplierId ? (c.freightCurrencyCode || "USD") : containerCc;
         // Only include freight in value when it shares the container's currency; cross-currency freight is a separate obligation.
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
@@ -2866,7 +2871,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat((c as any).freight || "0");
           const cc = c.currencyCode || "USD";
-          const freightCc = (c as any).freightCurrencyCode || cc;
+          // Only treat freight as cross-currency when it's assigned to a freight supplier
+          const freightCc = (c as any).freightSupplierId ? ((c as any).freightCurrencyCode || "USD") : cc;
           const freightSameCcy = freightCc === cc;
           // Only include freight in this currency's value when it shares the container's currency
           const value = kg * rate + (freightSameCcy ? freight : 0);
@@ -3130,7 +3136,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
       const freight = parseFloat(c.freight || "0");
-      const freightCc = c.freightCurrencyCode || cc;
+      // Only treat freight as cross-currency when it's assigned to a freight supplier
+      const freightCc = c.freightSupplierId ? (c.freightCurrencyCode || "USD") : cc;
       const freightSameCcy = freightCc === cc;
       // Only include freight in the container row amount when it shares the container's currency
       const mainAmt = kg * rate + (freightSameCcy ? freight : 0);

@@ -496,11 +496,10 @@ export default function ProductionRawStock() {
     // Pre-fill freight from container (amount + account — not editable during offload)
     const freightVal = parseFloat(container?.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
-    // Freight from container is always treated as USD.
-    // Some older containers may have freightCurrencyCode incorrectly set to the
-    // container's own currency — override those to USD so no double-conversion occurs.
-    const storedFreightCcy = container?.freightCurrencyCode || "USD";
-    const effectiveFreightCcy = storedFreightCcy === ccy && ccy !== "USD" ? "USD" : storedFreightCcy;
+    // Use the stored freight currency, falling back to the container's own currency (not USD).
+    // Only a container that explicitly has a freight supplier uses a cross-currency rate.
+    const storedFreightCcy = container?.freightCurrencyCode;
+    const effectiveFreightCcy = storedFreightCcy || ccy;
     setFreightCurrencyCode(effectiveFreightCcy);
     setFreightFxRate("1");
     if (container?.freightSupplierId) {
