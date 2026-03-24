@@ -1,6 +1,7 @@
   import { useState, useEffect, Fragment, useRef } from "react";
   import { useConnectivity } from "@/contexts/ConnectivityContext";
   import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
   import { useForm } from "react-hook-form";
   import { zodResolver } from "@hookform/resolvers/zod";
   import { z } from "zod";
@@ -5255,7 +5256,16 @@ function OfflineSyncPanel() {
             </div>
           )}
 
-          {activeSection === "offline" && <OfflineSyncPanel />}
+          {activeSection === "offline" && (
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="pt-5">
+                  <OfflinePrepPanel />
+                </CardContent>
+              </Card>
+              <OfflineSyncPanel />
+            </div>
+          )}
         </div>
 
         {/* Initialize Accounting Balances Dialog */}

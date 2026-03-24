@@ -86,6 +86,17 @@ export interface CachedEntity {
   fetchedAt: number;
 }
 
+export interface OfflineMeta {
+  id?: number;
+  key: string;
+  preparedAt: number | null;
+  status: "ready" | "partial" | "not_ready";
+  totalDatasets: number;
+  completedDatasets: number;
+  errors: string;
+  packSummary: string;
+}
+
 // ─── Dexie Database ───────────────────────────────────────────────────────────
 
 class ERPDatabase extends Dexie {
@@ -108,6 +119,14 @@ class ERPDatabase extends Dexie {
   fixedAssets!: Table<CachedEntity, string | number>;
   stockItems!: Table<CachedEntity, string | number>;
   inventoryByLocation!: Table<CachedEntity, string | number>;
+  // Factory offline tables
+  factorySuppliers!: Table<CachedEntity, string | number>;
+  factoryCategories!: Table<CachedEntity, string | number>;
+  factoryBaleProducts!: Table<CachedEntity, string | number>;
+  factoryContainers!: Table<CachedEntity, string | number>;
+  factoryRawStock!: Table<CachedEntity, string | number>;
+  // Offline prep metadata
+  offlineMeta!: Table<OfflineMeta, number>;
 
   constructor() {
     super("ERPDatabase");
@@ -156,6 +175,16 @@ class ERPDatabase extends Dexie {
         if (c.conflictReason === undefined) c.conflictReason = c.serverResponse || "";
       })
     );
+
+    // v4 — factory offline tables + offline preparation metadata
+    this.version(4).stores({
+      factorySuppliers:  "id, companyId, fetchedAt",
+      factoryCategories: "id, companyId, fetchedAt",
+      factoryBaleProducts: "id, companyId, fetchedAt",
+      factoryContainers: "id, companyId, fetchedAt",
+      factoryRawStock:   "id, companyId, fetchedAt",
+      offlineMeta:       "++id, &key",
+    });
   }
 }
 

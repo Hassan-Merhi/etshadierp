@@ -2704,10 +2704,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
-      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number }> = {};
+      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number; totalFreight: number }> = {};
       for (const s of statement) {
         const cc = s.currencyCode;
-        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
         byCurrency[cc].containers.push(s);
         byCurrency[cc].totalKg += parseFloat(s.actualReceivedKg || s.totalKg || "0");
         byCurrency[cc].totalValue += parseFloat(s.value);
@@ -2715,21 +2715,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const commCc = s.commissionCurrencyCode || cc;
         const totalCommAmt = parseFloat(s.totalCommission);
         if (totalCommAmt > 0) {
-          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
           byCurrency[commCc].totalCommission += totalCommAmt;
         }
         const directCommAmt = parseFloat(s.commissionAmount || "0");
         if (directCommAmt > 0) {
-          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
           byCurrency[commCc].totalDirectCommission += directCommAmt;
         }
         // Freight always shows in its own currency bucket in the balance totals (currencyGroups);
         // it just doesn't create individual ledger rows until the user does an FX conversion.
         const freightAmt = parseFloat(s.freight || "0");
         const freightCc = s.freightCurrencyCode || cc;
-        if (freightAmt > 0 && freightCc !== cc) {
-          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
-          byCurrency[freightCc].totalValue += freightAmt;
+        if (freightAmt > 0) {
+          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
+          byCurrency[freightCc].totalFreight += freightAmt;
+          if (freightCc !== cc) {
+            byCurrency[freightCc].totalValue += freightAmt;
+          }
         }
       }
 
@@ -2822,6 +2825,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalPaid: paid.toFixed(2),
           netPayable: netPayable.toFixed(2),
           totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
+          totalFreight: data.totalFreight.toFixed(2),
         };
       }).filter(g => parseFloat(g.netPayable) > 0.005);
 
