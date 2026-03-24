@@ -355,9 +355,14 @@ export default function FactoryContainerCreate() {
             </div>
           </div>
 
-          {currency !== "USD" && ratePerKg && fxRate && (
+          {currency !== "USD" && fxRate && parseFloat(fxRate) > 0 && (
             <p className="text-sm text-muted-foreground">
-              Computed USD Rate/Kg: {formatNumber(parseFloat(ratePerKg) * parseFloat(fxRate))} USD
+              1 {currency} = {formatNumber(parseFloat(fxRate))} USD
+              &nbsp;&nbsp;·&nbsp;&nbsp;
+              1 USD = {formatNumber(1 / parseFloat(fxRate))} {currency}
+              {ratePerKg && (
+                <span> &nbsp;&nbsp;·&nbsp;&nbsp; Rate/Kg ≈ {formatNumber(parseFloat(ratePerKg) * parseFloat(fxRate))} USD</span>
+              )}
             </p>
           )}
 
@@ -525,8 +530,11 @@ export default function FactoryContainerCreate() {
               </div>
             ))}
             {otherChargeLines.length > 0 && (
-              <div className="text-xs text-muted-foreground text-right pt-1">
-                Total: {otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0).toFixed(2)}
+              <div className="text-xs text-muted-foreground text-right pt-1 space-y-0.5">
+                <div>Total: {currency} {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0))}</div>
+                {currency !== "USD" && fxRate && parseFloat(fxRate) > 0 && (
+                  <div>= {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0) * parseFloat(fxRate))} USD</div>
+                )}
               </div>
             )}
           </div>

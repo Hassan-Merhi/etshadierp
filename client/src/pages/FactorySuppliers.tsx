@@ -2230,15 +2230,16 @@ export default function FactorySuppliers() {
             )}
 
             <div>
-              <Label>Paid From Account (optional)</Label>
+              <Label>Paid From Account <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
               <Select
-                value={paymentForm.paidFromAccountId}
-                onValueChange={(v) => setPaymentForm(prev => ({ ...prev, paidFromAccountId: v }))}
+                value={paymentForm.paidFromAccountId || "__none__"}
+                onValueChange={(v) => setPaymentForm(prev => ({ ...prev, paidFromAccountId: v === "__none__" ? "" : v }))}
               >
                 <SelectTrigger data-testid="select-payment-from-account">
-                  <SelectValue placeholder="Select account..." />
+                  <SelectValue placeholder="Skip (no account)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Skip (no account)</SelectItem>
                   {(ledgerAccounts || []).map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
                       {a.code ? `${a.code} — ` : ""}{a.name}
