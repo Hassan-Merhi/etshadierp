@@ -3138,6 +3138,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .orderBy(factorySupplierPayments.date)
       : [];
 
+    // Voucher-based payments (from general accounting, linked via factorySupplierId)
+    const allVoucherPayments = allSupplierIds.length > 0
+      ? await db.select({
+          id: voucherEntries.id,
+          debitAmount: voucherEntries.debitAmount,
+          supplierId: voucherEntries.factorySupplierId,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          voucherNumber: vouchers.voucherNumber,
+          currency: vouchers.currency,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(
+          inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
+          sql`${voucherEntries.debitAmount}::numeric > 0`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+        ))
+        .orderBy(vouchers.voucherDate)
+      : [];
+
     // FX transfers (involving any of the suppliers)
     const allFx = allSupplierIds.length > 0
       ? await db.select().from(factorySupplierFxTransfers)
@@ -3238,6 +3259,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         description: `Payment — ${supplierName}`,
         ref: p.notes || "Payment",
         amount: -parseFloat(p.amount || "0"),
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
+    // Voucher-based payment rows (general accounting payments linked to factory suppliers)
+    for (const p of allVoucherPayments as any[]) {
+      const cc = p.currency || "USD";
+      const suppId = p.supplierId;
+      const supplierName = suppId ? (supplierNameMap[suppId] || "Unknown") : "Unknown";
+      addRow(cc, {
+        date: p.voucherDate ? String(p.voucherDate) : null,
+        type: "payment",
+        description: `Payment — ${supplierName}`,
+        ref: p.voucherNumber || "Voucher Payment",
+        amount: -parseFloat(p.debitAmount || "0"),
         commissionAmount: null,
         commissionCurrency: null,
       });
