@@ -1777,6 +1777,19 @@ export default function FactorySuppliers() {
     );
   }
 
+  // Overpayment computation for the payment dialog
+  const _payFxR = parseFloat(paymentForm.fxRateToUsd) || 1;
+  const _payAmt = parseFloat(paymentForm.amount) || 0;
+  const paymentAmtUsd = paymentForm.currencyCode === "USD" ? _payAmt : _payAmt / _payFxR;
+  const paymentSelectedSup = paymentDialogSupplier
+    ? (paymentForm.supplierId === paymentDialogSupplier.id
+        ? paymentDialogSupplier
+        : (suppliers || []).find((s: any) => s.id === paymentForm.supplierId) ?? paymentDialogSupplier)
+    : null;
+  const paymentBalanceUsd = parseFloat(paymentSelectedSup?.totalValue || "0");
+  const isOverpayment = _payAmt > 0 && paymentAmtUsd > paymentBalanceUsd + 0.005;
+  const overpaymentUsd = isOverpayment ? paymentAmtUsd - paymentBalanceUsd : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -2258,15 +2271,31 @@ export default function FactorySuppliers() {
                 data-testid="input-payment-notes"
               />
             </div>
+
+            {isOverpayment && (
+              <div
+                className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 space-y-0.5"
+                data-testid="alert-overpayment"
+              >
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Overpayment — ${formatNum(overpaymentUsd.toFixed(2))} USD over current balance
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Outstanding balance: ${formatNum(paymentBalanceUsd.toFixed(2))} USD.
+                  The excess will create a credit balance on this supplier.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogSupplier(null)}>Cancel</Button>
             <Button
               onClick={() => paymentMutation.mutate(paymentForm)}
               disabled={!paymentForm.amount || !paymentForm.date || paymentMutation.isPending}
+              variant={isOverpayment ? "destructive" : "default"}
               data-testid="button-submit-payment"
             >
-              {paymentMutation.isPending ? "Saving..." : "Record Payment"}
+              {paymentMutation.isPending ? "Saving..." : isOverpayment ? "Record Overpayment" : "Record Payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
