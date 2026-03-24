@@ -418,8 +418,21 @@ export default function ProductionRawStock() {
   // Additional charges are all entered in USD
   const additionalChargesTotalUsd = additionalCharges.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
 
-  // Freight is from the container import (in container currency) → convert to USD for display
-  const freightUsd = freightVal * (currencyCode === "USD" ? 1 : fxRate);
+  // Freight: convert to USD using the freight's own currency code
+  // - If freight currency is USD → use directly
+  // - If freight currency matches container currency → multiply by container fxRate
+  // - Otherwise → use freightFxRate for the conversion
+  const freightFxRateVal = parseFloat(freightFxRate || "1");
+  const freightUsd = freightCurrencyCode === "USD"
+    ? freightVal
+    : freightCurrencyCode === currencyCode
+      ? freightVal * fxRate
+      : freightVal * freightFxRateVal;
+
+  // Freight converted to container currency (for the container-ccy subtotal display)
+  const freightInContainerCcy = freightCurrencyCode === currencyCode
+    ? freightVal
+    : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
   // Other charges: entered in USD directly
   const otherChargesUsd = otherChargesVal;
@@ -431,12 +444,12 @@ export default function ProductionRawStock() {
   // Grand total in USD = base + freight_usd + other_usd + commission_usd + addl_usd + duty_usd
   const grandTotalUsd = totalPayableUsd + freightUsd + otherChargesUsd + commissionTotalUsd + additionalChargesTotalUsd + dutyUsd;
 
-  // Also maintain a container-currency total for display (base + freight are in container ccy; rest convert from USD)
+  // Also maintain a container-currency total for display (base + freight converted to container ccy; rest convert from USD)
   const commissionInContainerCcy = fxRate > 0 ? commissionTotalUsd / fxRate : commissionTotalUsd;
   const additionalChargesInContainerCcy = fxRate > 0 ? additionalChargesTotalUsd / fxRate : additionalChargesTotalUsd;
   const otherChargesInContainerCcy = fxRate > 0 ? otherChargesUsd / fxRate : otherChargesUsd;
   const dutyInContainerCcy = fxRate > 0 ? dutyUsd / fxRate : dutyUsd;
-  const totalCharges = freightVal + otherChargesInContainerCcy + additionalChargesInContainerCcy + commissionInContainerCcy + dutyInContainerCcy;
+  const totalCharges = freightInContainerCcy + otherChargesInContainerCcy + additionalChargesInContainerCcy + commissionInContainerCcy + dutyInContainerCcy;
   const grandTotal = totalPayable + totalCharges;
   const inclusiveCostPerKg = actualKg > 0 ? grandTotal / actualKg : 0;
 
@@ -473,7 +486,7 @@ export default function ProductionRawStock() {
     // Pre-fill freight from container (amount + account — not editable during offload)
     const freightVal = parseFloat(container?.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
-    setFreightCurrencyCode(ccy);
+    setFreightCurrencyCode(container?.freightCurrencyCode || "USD");
     setFreightFxRate("1");
     if (container?.freightSupplierId) {
       setFreightAccountId(`SUP:${container.freightSupplierId}`);
@@ -1412,7 +1425,7 @@ export default function ProductionRawStock() {
                     {freightVal > 0 && (
                       <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
                         <span className="text-muted-foreground">Freight (from container)</span>
-                        <span className="font-mono font-medium">{currencyCode} {formatNumber(freightVal)}</span>
+                        <span className="font-mono font-medium">{freightCurrencyCode} {formatNumber(freightVal)}</span>
                       </div>
                     )}
                     <div className="space-y-2">
@@ -1668,7 +1681,11 @@ export default function ProductionRawStock() {
                   </div>
                   {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight (from container, converted @ {fxRate})</span>
+                      <span>
+                        {freightCurrencyCode === "USD"
+                          ? "Freight (from container)"
+                          : `Freight (from container, ${freightCurrencyCode} converted @ ${freightCurrencyCode === currencyCode ? fxRate : freightFxRateVal})`}
+                      </span>
                       <span className="font-mono">$ {formatNumber(freightUsd)}</span>
                     </div>
                   )}
