@@ -79,6 +79,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useFormDraft } from "@/hooks/useFormDraft";
+import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
 import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
@@ -837,6 +839,22 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Draft autosave for new vouchers (not edit mode)
+  const paymentDraftMode = isFactoryMode ? "factory" : "erp";
+  const paymentDraftType = activeTab === "payment" ? "voucher-payment" : "voucher-receipt";
+  const { hasDraft: hasPaymentDraft, draftAge: paymentDraftAge, draft: paymentDraft, scheduleSave: schedulePaymentSave, discardDraft: discardPaymentDraft } = useFormDraft({
+    entityType: paymentDraftType,
+    mode: paymentDraftMode,
+    companyId: selectedCompany?.id ?? null,
+    enabled: !voucherIdToEdit,
+  });
+
+  const allFormValues = form.watch();
+  useEffect(() => {
+    if (voucherIdToEdit) return;
+    schedulePaymentSave(allFormValues);
+  }, [JSON.stringify(allFormValues), voucherIdToEdit]);
+
   // Pre-populate form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
@@ -1258,6 +1276,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
+      discardPaymentDraft();
       
       // Invalidate only essential queries for faster saves
       // Balances are updated via voucher-sidebar, full account lists don't change
@@ -1670,6 +1689,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Draft autosave for journal form (new journals only)
+  const journalDraftMode = isFactoryMode ? "factory" : "erp";
+  const { hasDraft: hasJournalDraft, draftAge: journalDraftAge, draft: journalDraft, scheduleSave: scheduleJournalSave, discardDraft: discardJournalDraft } = useFormDraft({
+    entityType: "voucher-journal",
+    mode: journalDraftMode,
+    companyId: selectedCompany?.id ?? null,
+    enabled: !voucherIdToEdit,
+  });
+
+  const allJournalValues = journalForm.watch();
+  useEffect(() => {
+    if (voucherIdToEdit) return;
+    scheduleJournalSave(allJournalValues);
+  }, [JSON.stringify(allJournalValues), voucherIdToEdit]);
+
   // Journal sidebar state for account selection (like Stock Transfer's item sidebar)
   const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
   const [showAccountSidebar, setShowAccountSidebar] = useState(false);
@@ -1892,6 +1926,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         title: "Success",
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
+      discardJournalDraft();
       
       // Invalidate only essential queries for faster saves
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -3824,6 +3859,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         <div className="flex-1 min-w-0">
         {!isPOS && activeTab === "payment" && (
           <div className="space-y-4">
+            {hasPaymentDraft && !voucherIdToEdit && paymentDraftAge && (
+              <DraftRestorePrompt
+                draftAge={paymentDraftAge}
+                label="Unsaved payment draft found"
+                onRestore={() => {
+                  if (paymentDraft?.data) {
+                    const d = paymentDraft.data as any;
+                    form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
+                  }
+                  discardPaymentDraft();
+                }}
+                onDiscard={discardPaymentDraft}
+              />
+            )}
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
@@ -3872,6 +3921,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {!isPOS && activeTab === "receipt" && (
           <div className="space-y-4">
+            {hasPaymentDraft && !voucherIdToEdit && paymentDraftAge && (
+              <DraftRestorePrompt
+                draftAge={paymentDraftAge}
+                label="Unsaved receipt draft found"
+                onRestore={() => {
+                  if (paymentDraft?.data) {
+                    const d = paymentDraft.data as any;
+                    form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
+                  }
+                  discardPaymentDraft();
+                }}
+                onDiscard={discardPaymentDraft}
+              />
+            )}
             {/* Exchange Rate Input for multi-currency transactions */}
             {selectedCurrency === "CFA" && (
               <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
@@ -3939,6 +4002,22 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <CardTitle className="text-base sm:text-lg">Journal Voucher</CardTitle>
                 </CardHeader>
                 <CardContent>
+                {hasJournalDraft && !voucherIdToEdit && journalDraftAge && (
+                  <div className="mb-4">
+                    <DraftRestorePrompt
+                      draftAge={journalDraftAge}
+                      label="Unsaved journal draft found"
+                      onRestore={() => {
+                        if (journalDraft?.data) {
+                          const d = journalDraft.data as any;
+                          journalForm.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
+                        }
+                        discardJournalDraft();
+                      }}
+                      onDiscard={discardJournalDraft}
+                    />
+                  </div>
+                )}
                 <Form {...journalForm}>
                   <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
                     {/* Header section */}

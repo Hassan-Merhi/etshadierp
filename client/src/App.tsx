@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
 import { ConnectivityProvider } from "@/contexts/ConnectivityContext";
 import { usePresence } from "@/hooks/use-presence";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
@@ -537,18 +538,21 @@ function AuthenticatedApp() {
             <div className="flex flex-col flex-1 min-w-0">
               <header className="flex items-center justify-between gap-2 p-2 border-b h-12">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-1.5 text-muted-foreground"
-                  onClick={() => setPaletteOpen(true)}
-                  data-testid="button-open-palette"
-                >
-                  <Search className="h-4 w-4" />
-                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                    Ctrl K
-                  </kbd>
-                </Button>
+                <div className="flex items-center gap-2 ml-auto">
+                  <PendingSyncIndicator />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1.5 text-muted-foreground"
+                    onClick={() => setPaletteOpen(true)}
+                    data-testid="button-open-palette"
+                  >
+                    <Search className="h-4 w-4" />
+                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                      Ctrl K
+                    </kbd>
+                  </Button>
+                </div>
               </header>
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
@@ -630,6 +634,7 @@ function AuthenticatedApp() {
                       Ctrl K
                     </kbd>
                   </Button>
+                  <PendingSyncIndicator />
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                     <LogOut className="h-4 w-4" />

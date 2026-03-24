@@ -88,6 +88,24 @@ The app has a layered offline-first foundation:
 - `pendingCount`/`failedCount` aggregate both IndexedDB and localStorage queues
 - Listens for `erp:sync` events from the sync engine to update UI state
 
+### Offline Queue Safe Patterns (`client/src/lib/offlineQueue.ts`)
+- SAFE_PATTERNS now covers: POS sales/drafts, ERP vouchers (payment, receipt, journal, sales), all factory endpoints (stock-entry, bale-products, customer-orders loading/bales/finalize, vouchers, mix-batches, daybook), stock adjustments, stock transfers, bale transfers
+- `getDescriptionForRequest()` returns human-readable descriptions for all queued operations
+
+### Draft Autosave System (Part 2, Mar 2026)
+- **`client/src/lib/offlineDraft.ts`**: CRUD helpers using Dexie `localDrafts` table (`saveDraft`, `loadDraft`, `deleteDraft`, `getDraftAge`)
+- **`client/src/hooks/useFormDraft.ts`**: React hook — debounced autosave (1.5s), load draft on mount, `scheduleSave`, `saveNow`, `discardDraft`, `hasDraft`, `draftAge`
+- **`client/src/components/DraftRestorePrompt.tsx`**: Amber banner shown when a draft exists — "Restore" / "Discard" actions
+- **`client/src/components/SyncStatusBadge.tsx`**: Per-record status badge — synced / pending / local / failed / conflict
+- **`client/src/components/PendingSyncIndicator.tsx`**: Global header badge showing queued/syncing/failed count from ConnectivityContext
+
+### Draft Integration
+- **Vouchers.tsx** (payment + receipt + journal): autosaves on every keystroke (debounced), restores via `DraftRestorePrompt`, clears on successful submit; draft scoped by `entityType` + `mode` (erp/factory) + `companyId`
+- **BaleStockEntry.tsx** (factory stock entry cart): autosaves cart + location on change; restores location from draft
+
+### PendingSyncIndicator in App Headers
+- ERP header and Factory header both show `<PendingSyncIndicator />` — reflects real-time pending/syncing/failed state from ConnectivityContext
+
 ### OfflineBanner (`client/src/components/OfflineBanner.tsx`)
 - Now uses `useConnectivity()` for `isOnline`/`isSyncing`/`lastSyncedAt`
 - Retains its own legacy localStorage queue replay logic for the Sheet drawer

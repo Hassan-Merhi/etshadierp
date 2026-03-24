@@ -23,6 +23,9 @@
   import { queryClient } from "@/lib/queryClient";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
+  import { useCompany } from "@/contexts/CompanyContext";
+  import { useFormDraft } from "@/hooks/useFormDraft";
+  import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
   import { formatNumber } from "@/lib/formatNumber";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
@@ -53,6 +56,19 @@
     const { toast } = useToast();
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
+    const { selectedCompany } = useCompany();
+
+    const { hasDraft: hasCartDraft, draftAge: cartDraftAge, draft: cartDraft, scheduleSave: scheduleCartSave, discardDraft: discardCartDraft } = useFormDraft({
+      entityType: "factory-stock-entry-cart",
+      mode: "factory",
+      companyId: selectedCompany?.id ?? null,
+    });
+
+    useEffect(() => {
+      if (cart.length > 0 || selectedLocationId) {
+        scheduleCartSave({ cart: cart.map(i => ({ productId: i.productId, productName: i.product.name, qty: i.qty, weightPerBaleKg: i.weightPerBaleKg })), selectedLocationId });
+      }
+    }, [cart, selectedLocationId]);
 
     const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
       queryKey: ["/api/factory/bale-products"],
@@ -347,6 +363,7 @@
           description: `${result.bales.length} bale(s) entered into stock. Preparing labels...`,
         });
 
+        discardCartDraft();
         setConfirmDialogOpen(false);
         setCart([]);
 
@@ -368,6 +385,19 @@
 
     return (
       <div className="space-y-4">
+        {hasCartDraft && cartDraftAge && (
+          <DraftRestorePrompt
+            draftAge={cartDraftAge}
+            label="Unsaved stock entry cart found"
+            onRestore={() => {
+              const d = cartDraft?.data as any;
+              if (d?.selectedLocationId) setSelectedLocationId(d.selectedLocationId);
+              discardCartDraft();
+              toast({ title: "Draft restored", description: "Location was restored. Re-add items via scan." });
+            }}
+            onDiscard={discardCartDraft}
+          />
+        )}
         <div className="max-w-sm">
           <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
           <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
