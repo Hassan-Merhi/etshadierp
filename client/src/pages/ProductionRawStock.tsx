@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { Button } from "@/components/ui/button";
@@ -265,6 +265,15 @@ export default function ProductionRawStock() {
 
   const { data: rawStock, isLoading } = useQuery<RawStockRow[]>({
     queryKey: ["/api/factory/raw-stock"],
+  });
+
+  const recalculateMutation = useMutation({
+    mutationFn: () => modeApiRequest("POST", "/api/factory/raw-stock/recalculate-used").then(r => r.json()),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      toast({ title: "Used kg recalculated", description: data.message });
+    },
+    onError: (err: any) => toast({ title: "Recalculate failed", description: err.message, variant: "destructive" }),
   });
 
   const { data: availableContainers } = useQuery<ContainerOption[]>({
@@ -858,8 +867,18 @@ export default function ProductionRawStock() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
           <CardTitle>Raw Stock by Supplier</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            data-testid="button-recalculate-used-kg"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
+            Recalculate Used kg
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (

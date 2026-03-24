@@ -6724,7 +6724,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  // Recalculate usedKg for all factory_raw_stock records based on finalized bales
+  // Recalculate usedKg for all factory_raw_stock records based on active mix batch sources
   app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
@@ -6739,52 +6739,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const containerIds = allRawStock.map((r: any) => r.containerId);
 
-      // Get mix batch sources that reference these containers
-      const sources = await db
+      // Sum used kg from active mix batch source records (only existing batches, deleted batches have no sources)
+      const sourceSums = await db
         .select({
           containerId: factoryMixBatchSources.containerId,
-          mixBatchId: factoryMixBatchSources.mixBatchId,
-          weightKg: factoryMixBatchSources.weightKg,
+          totalUsedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
         })
         .from(factoryMixBatchSources)
-        .where(inArray(factoryMixBatchSources.containerId, containerIds));
+        .where(inArray(factoryMixBatchSources.containerId, containerIds))
+        .groupBy(factoryMixBatchSources.containerId);
 
-      // Get finalized bales per mix batch
-      const mixBatchIds = [...new Set(sources.map((s: any) => s.mixBatchId))] as number[];
-      let baleWeightByMix: Record<number, number> = {};
-      if (mixBatchIds.length > 0) {
-        const bales = await db
-          .select({ mixBatchId: factoryBales.mixBatchId, weightKg: factoryBales.weightKg })
-          .from(factoryBales)
-          .where(and(
-            eq(factoryBales.companyId, companyId),
-            eq(factoryBales.status, "FINALIZED"),
-            inArray(factoryBales.mixBatchId, mixBatchIds)
-          ));
-        for (const b of bales) {
-          if (!b.mixBatchId) continue;
-          baleWeightByMix[b.mixBatchId] = (baleWeightByMix[b.mixBatchId] || 0) + parseFloat(b.weightKg);
-        }
+      const usedByContainer: Record<number, number> = {};
+      for (const row of sourceSums) {
+        if (row.containerId) usedByContainer[row.containerId] = parseFloat(row.totalUsedKg || "0");
       }
 
-      // Compute used KG per raw stock record proportionally
       let updated = 0;
       const now = new Date();
       for (const rs of allRawStock) {
-        const relatedSources = sources.filter((s: any) => s.containerId === rs.containerId);
-        let usedKg = 0;
-        for (const src of relatedSources) {
-          const mixTotal = sources.filter((s: any) => s.mixBatchId === src.mixBatchId)
-            .reduce((sum: number, s: any) => sum + parseFloat(s.weightKg), 0);
-          const baleWeight = baleWeightByMix[src.mixBatchId] || 0;
-          if (mixTotal > 0) {
-            const proportion = parseFloat(src.weightKg) / mixTotal;
-            usedKg += proportion * baleWeight;
-          }
-        }
+        const usedKg = usedByContainer[rs.containerId] || 0;
         await db
           .update(factoryRawStock)
-          .set({ usedKg: String(usedKg.toFixed(3)), updatedAt: now } as any)
+          .set({ usedKg: usedKg.toFixed(3), updatedAt: now } as any)
           .where(eq(factoryRawStock.id, rs.id));
         updated++;
       }
@@ -6917,6 +6893,34 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
                 .update(factoryRawStock)
                 .set({ usedKg: newUsed.toFixed(3) })
                 .where(eq(factoryRawStock.id, rsRow.id));
+            }
+          } else if (src.supplierId && !src.sourceBatchId) {
+            // Legacy: source stored only supplierId (no containerId). Reverse FIFO from supplier's raw stock.
+            const supplierRawStocks = await tx
+              .select({
+                id: factoryRawStock.id,
+                usedKg: factoryRawStock.usedKg,
+                offloadedAt: factoryRawStock.offloadedAt,
+              })
+              .from(factoryRawStock)
+              .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+              .where(and(
+                eq(factoryRawStock.companyId, companyId),
+                eq(factoryContainers.supplierId, src.supplierId)
+              ))
+              .orderBy(desc(factoryRawStock.offloadedAt), desc(factoryRawStock.id));
+
+            let toRestore = parseFloat(src.weightKg);
+            for (const rs of supplierRawStocks) {
+              if (toRestore <= 0.001) break;
+              const usedNow = parseFloat(rs.usedKg);
+              if (usedNow <= 0) continue;
+              const restore = Math.min(toRestore, usedNow);
+              await tx
+                .update(factoryRawStock)
+                .set({ usedKg: Math.max(0, usedNow - restore).toFixed(3) })
+                .where(eq(factoryRawStock.id, rs.id));
+              toRestore -= restore;
             }
           } else if (src.sourceBatchId) {
             // Reverse used_kg on source batch and restore to ACTIVE
@@ -7054,6 +7058,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             weightedCostWeight += avail;
           }
 
+          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
+
+          // Track per-raw-stock deductions so we can store containerId in each source record
+          const perRsDeductions: Array<{ containerId: number; deduct: number }> = [];
           let remaining = weight;
           for (const rs of supplierRawStocks) {
             if (remaining <= 0.001) break;
@@ -7066,6 +7074,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               .set({ usedKg: sql`${factoryRawStock.usedKg} + ${deduct}` })
               .where(eq(factoryRawStock.id, rs.id));
 
+            perRsDeductions.push({ containerId: rs.containerId, deduct });
             remaining -= deduct;
           }
 
@@ -7075,18 +7084,25 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               .update(factoryRawStock)
               .set({ usedKg: sql`${factoryRawStock.usedKg} + ${remaining}` })
               .where(eq(factoryRawStock.id, lastRs.id));
+            // Add to the last deduction entry if it already exists, otherwise push a new one
+            const existing = perRsDeductions.find(d => d.containerId === lastRs.containerId);
+            if (existing) existing.deduct += remaining;
+            else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
             remaining = 0;
           }
 
-          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
           totalWeightKg += weight;
           totalCost += weight * costPerKg;
-          sourceRecords.push({
-            supplierId,
-            weightKg: String(weight),
-            costPerKg: String(costPerKg),
-            totalCost: String(weight * costPerKg),
-          });
+          // Push one source record per raw stock container so deletion can correctly reverse each one
+          for (const d of perRsDeductions) {
+            sourceRecords.push({
+              supplierId,
+              containerId: d.containerId,
+              weightKg: String(d.deduct),
+              costPerKg: String(costPerKg),
+              totalCost: String(d.deduct * costPerKg),
+            });
+          }
         }
 
         for (const source of sources) {
