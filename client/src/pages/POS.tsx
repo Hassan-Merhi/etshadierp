@@ -141,7 +141,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Transform API inventory to POS format with stockItemId
   // Coalesce null/undefined names and codes to prevent toLowerCase() errors
-  const inventory: (InventoryItem & { stockItemId: number })[] = apiInventory.map((item) => ({
+  const inventory: (InventoryItem & { stockItemId: number })[] = (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
     code: (item.stockItemCode || "").trim(),
     name: (item.stockItemName || "Unknown Item").trim(),
     stock: parseFloat(item.quantity),
@@ -163,7 +163,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
 
   // Filter cash ledger accounts
-  const cashLedgerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Cash");
+  const cashLedgerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash");
 
   // Fetch assigned cash account for POS users
   const { data: assignedCashAccount } = useQuery<any>({
@@ -203,7 +203,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
 
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
-  const customerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Asset");
+  const customerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset");
 
   // Fetch voucher details if in edit mode
   const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
@@ -306,7 +306,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Populate form when editing existing voucher
   useEffect(() => {
-    if (editVoucher && editVoucher.salesItems && editVoucher.salesItems.length > 0) {
+    if (editVoucher && Array.isArray(editVoucher.salesItems) && editVoucher.salesItems.length > 0) {
       console.log('[POS Edit] Loading voucher for edit:', editVoucher);
       console.log('[POS Edit] Sales items:', editVoucher.salesItems);
       
@@ -729,7 +729,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <p className="text-sm md:text-base text-muted-foreground">Select a location to begin</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full max-w-4xl">
-          {allLocations.map((location) => (
+          {(Array.isArray(allLocations) ? allLocations : []).map((location) => (
             <Card 
               key={location.id} 
               className="cursor-pointer hover-elevate"
@@ -862,9 +862,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     { key: "delete", label: "", width: "w-9 sm:w-12" },
   ];
 
-  const normalize = async (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
+  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
 
-  const getFilteredInventory = async () => {
+  const getFilteredInventory = () => {
     if (!searchTerm) return inventory;
     const searchNorm = normalize(searchTerm);
     return inventory.filter((item) =>
@@ -1228,7 +1228,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setMobileRowEditOpen(true);
   };
 
-  const getMobileFilteredInventory = async () => {
+  const getMobileFilteredInventory = () => {
     if (!mobileItemSearchTerm) return inventory;
     const searchNorm = (mobileItemSearchTerm || "").toLowerCase().replace(/[.\-\s]/g, "");
     return inventory.filter((item) =>
@@ -1509,7 +1509,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {posAssignedLocations.map((loc) => (
+                  {(Array.isArray(posAssignedLocations) ? posAssignedLocations : []).map((loc) => (
                     <SelectItem key={loc.id} value={loc.id.toString()}>
                       {loc.name}
                     </SelectItem>
@@ -1535,7 +1535,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {allLocations.map((loc) => (
+                {(Array.isArray(allLocations) ? allLocations : []).map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
                     {loc.name}
                   </SelectItem>
@@ -1582,7 +1582,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   </SelectTrigger>
                   <SelectContent>
                     {paymentAccountType === "bank" ? (
-                      bankAccounts.map((acc: any) => (
+                      (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
                         <SelectItem key={acc.id} value={String(acc.id)}>
                           {acc.name} ({acc.code})
                         </SelectItem>
@@ -2333,11 +2333,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </AlertDialogHeader>
           
           <div className="max-h-96 overflow-y-auto">
-            {drafts.length === 0 ? (
+            {!Array.isArray(drafts) || drafts.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No drafts available</p>
             ) : (
               <div className="space-y-2">
-                {drafts.map((draft: any) => (
+                {(Array.isArray(drafts) ? drafts : []).map((draft: any) => (
                   <div key={draft.id} className="flex items-center justify-between p-4 border rounded-md hover-elevate">
                     <div className="flex-1">
                       <p className="font-medium">
