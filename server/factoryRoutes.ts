@@ -1967,6 +1967,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         actualReceivedKg: factoryContainers.actualReceivedKg,
         ratePerKg: factoryContainers.ratePerKg,
         freight: factoryContainers.freight,
+        freightCurrencyCode: factoryContainers.freightCurrencyCode,
+        currencyCode: factoryContainers.currencyCode,
         createdAt: factoryContainers.createdAt,
         arrivalDate: factoryContainers.arrivalDate,
       })
@@ -2037,7 +2039,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          return s + (kg * rate + freight);
+          const freightCc = c.freightCurrencyCode || c.currencyCode || fromCurrencyCode;
+          // Only include freight if it shares the container's currency
+          return s + (kg * rate + (freightCc === fromCurrencyCode ? freight : 0));
         }, 0);
         const paid = paymentsBySupplier[sup.id] || 0;
         const fxOut = fxOutBySupplier[sup.id] || 0;
@@ -2682,8 +2686,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         byCurrency[cc].containers.push(s);
         byCurrency[cc].totalKg += parseFloat(s.actualReceivedKg || s.totalKg || "0");
         byCurrency[cc].totalValue += parseFloat(s.value);
-        byCurrency[cc].totalCommission += parseFloat(s.totalCommission);
-        byCurrency[cc].totalDirectCommission += parseFloat(s.commissionAmount || "0");
+        // Commission goes into its own currency bucket (not necessarily the container's currency)
+        const commCc = s.commissionCurrencyCode || cc;
+        const totalCommAmt = parseFloat(s.totalCommission);
+        if (totalCommAmt > 0) {
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          byCurrency[commCc].totalCommission += totalCommAmt;
+        }
+        const directCommAmt = parseFloat(s.commissionAmount || "0");
+        if (directCommAmt > 0) {
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          byCurrency[commCc].totalDirectCommission += directCommAmt;
+        }
         // If freight is in a different currency, add it to that currency group's total value
         const freightAmt = parseFloat(s.freight || "0");
         const freightCc = s.freightCurrencyCode || cc;
@@ -2851,29 +2865,42 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat((c as any).freight || "0");
-          // Supplier payable = kg × rate + freight (freight is an agreed charge to the supplier).
-          const value = kg * rate + freight;
+          const cc = c.currencyCode || "USD";
+          const freightCc = (c as any).freightCurrencyCode || cc;
+          const freightSameCcy = freightCc === cc;
+          // Only include freight in this currency's value when it shares the container's currency
+          const value = kg * rate + (freightSameCcy ? freight : 0);
           const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
           const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
-          const cc = c.currencyCode || "USD";
+          const commCc = (c as any).commissionCurrencyCode || "USD";
           if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };
           linkedByCurrency[cc].containers.push({
             id: c.id,
             containerNumber: c.containerNumber,
             date: (c as any).arrivalDate || c.createdAt,
             freight: freight.toFixed(2),
+            freightCurrencyCode: freightCc,
             value: value.toFixed(2),
             currencyCode: cc,
             fxRateToUsd: c.fxRateToUsd || "1",
             status: c.status,
             commissionAmount: c.commissionAmount || "0",
-            commissionCurrencyCode: c.commissionCurrencyCode || "USD",
+            commissionCurrencyCode: commCc,
             commissionSupplierId: (c as any).commissionSupplierId || null,
             commissionNotes: (c as any).commissionNotes || null,
             notes: c.notes,
           });
           linkedByCurrency[cc].totalValue += value;
-          linkedByCurrency[cc].totalCommission += totalComm;
+          // Cross-currency freight gets its own bucket
+          if (freight > 0 && !freightSameCcy) {
+            if (!linkedByCurrency[freightCc]) linkedByCurrency[freightCc] = { containers: [], totalValue: 0, totalCommission: 0 };
+            linkedByCurrency[freightCc].totalValue += freight;
+          }
+          // Commission goes into its own currency bucket
+          if (totalComm > 0) {
+            if (!linkedByCurrency[commCc]) linkedByCurrency[commCc] = { containers: [], totalValue: 0, totalCommission: 0 };
+            linkedByCurrency[commCc].totalCommission += totalComm;
+          }
         }
 
         const linkedPaidByCurrency: Record<string, number> = {};
