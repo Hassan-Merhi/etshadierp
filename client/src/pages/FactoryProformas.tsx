@@ -62,6 +62,8 @@ export default function FactoryProformas() {
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
   const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "" });
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
+  const [renamingProforma, setRenamingProforma] = useState<Proforma | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -109,6 +111,21 @@ export default function FactoryProformas() {
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma deleted" });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const renameProformaMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      return await modeApiRequest("PUT", `/api/factory/customer-proformas/${id}`, { name });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Proforma renamed successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      setRenamingProforma(null);
+      setRenameValue("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -314,6 +331,18 @@ export default function FactoryProformas() {
                         variant="ghost"
                         size="icon"
                         onClick={() => {
+                          setRenamingProforma(proforma);
+                          setRenameValue(proforma.name);
+                        }}
+                        data-testid={`button-rename-proforma-${proforma.id}`}
+                        title="Rename proforma"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
                           setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id));
                         }}
                         disabled={deleteProformaMutation.isPending}
@@ -509,6 +538,40 @@ export default function FactoryProformas() {
                 data-testid="button-confirm-create"
               >
                 Create Proforma
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renamingProforma} onOpenChange={(open) => { if (!open) { setRenamingProforma(null); setRenameValue(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Proforma</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">New Name</label>
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="e.g. Summer 2024 Pricing"
+                data-testid="input-rename-proforma"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameValue.trim() && renameValue.trim() !== renamingProforma?.name) {
+                    renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() });
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setRenamingProforma(null); setRenameValue(""); }} data-testid="button-cancel-rename">Cancel</Button>
+              <Button
+                onClick={() => renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() })}
+                disabled={renameProformaMutation.isPending || !renameValue.trim() || renameValue.trim() === renamingProforma?.name}
+                data-testid="button-submit-rename"
+              >
+                {renameProformaMutation.isPending ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>

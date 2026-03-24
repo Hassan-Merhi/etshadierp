@@ -10668,6 +10668,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const parsed = insertCustomerProformaSchema.parse({ ...req.body, companyId });
 
+      const [duplicate] = await db.select({ id: customerProformas.id }).from(customerProformas)
+        .where(and(
+          eq(customerProformas.companyId, companyId),
+          eq(customerProformas.customerId, parsed.customerId),
+          eq(customerProformas.name, parsed.name)
+        ));
+      if (duplicate) {
+        return res.status(409).json({ message: `A proforma named "${parsed.name}" already exists for this customer. Please choose a different name.` });
+      }
+
       if (parsed.isActive) {
         await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
           .where(and(eq(customerProformas.companyId, companyId), eq(customerProformas.customerId, parsed.customerId)));
@@ -10690,6 +10700,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const [existing] = await db.select().from(customerProformas)
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Proforma not found" });
+
+      if (req.body.name && req.body.name !== existing.name) {
+        const [duplicate] = await db.select({ id: customerProformas.id }).from(customerProformas)
+          .where(and(
+            eq(customerProformas.companyId, companyId),
+            eq(customerProformas.customerId, existing.customerId),
+            eq(customerProformas.name, req.body.name)
+          ));
+        if (duplicate) {
+          return res.status(409).json({ message: `A proforma named "${req.body.name}" already exists for this customer. Please choose a different name.` });
+        }
+      }
 
       if (req.body.isActive === true) {
         await db.update(customerProformas).set({ isActive: false, updatedAt: new Date() })
