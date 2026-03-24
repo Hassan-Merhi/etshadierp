@@ -1203,7 +1203,7 @@ export default function FactorySuppliers() {
                                   <TableHead className="h-8 text-xs">Date</TableHead>
                                   <TableHead className="h-8 text-xs">Container</TableHead>
                                   <TableHead className="h-8 text-xs">Status</TableHead>
-                                  <TableHead className="h-8 text-xs text-right">Freight ({cg.currencyCode})</TableHead>
+                                  <TableHead className="h-8 text-xs text-right">Freight</TableHead>
                                   <TableHead className="h-8 text-xs text-right">Value ({cg.currencyCode})</TableHead>
                                   <TableHead className="h-8 text-xs text-right">Commission</TableHead>
                                   <TableHead className="h-8 text-xs">Notes</TableHead>
@@ -1218,7 +1218,11 @@ export default function FactorySuppliers() {
                                       <Badge variant={statusColor(c.status)} className="text-xs">{c.status}</Badge>
                                     </TableCell>
                                     <TableCell className="py-1 text-right tabular-nums text-amber-600 dark:text-amber-400">
-                                      {parseFloat(c.freight || "0") > 0 ? formatNum(c.freight) : "—"}
+                                      {parseFloat(c.freight || "0") > 0
+                                        ? (c.freightCurrencyCode && c.freightCurrencyCode !== cg.currencyCode
+                                            ? `${c.freightCurrencyCode} ${formatNum(c.freight)}`
+                                            : formatNum(c.freight))
+                                        : "—"}
                                     </TableCell>
                                     <TableCell className="py-1 text-right tabular-nums font-medium">{formatNum(c.value)}</TableCell>
                                     <TableCell className="py-1 text-right tabular-nums text-destructive">

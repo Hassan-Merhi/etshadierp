@@ -2357,11 +2357,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         // Per-currency balances (original currency, not converted).
         // Use kg * ratePerKg + freight (exclude offload charges which are our cost, not supplier's).
+        // Freight is tracked in its own currency (freightCurrencyCode) which may differ from the container currency.
         const byCurrency: Record<string, number> = {};
         for (const c of supplierContainers) {
           const cc = c.currencyCode || "USD";
-          const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0");
-          byCurrency[cc] = (byCurrency[cc] || 0) + val;
+          const baseVal = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+          const freightAmt = parseFloat(c.freight || "0");
+          const freightCc = c.freightCurrencyCode || cc;
+          byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
+          if (freightAmt > 0) {
+            byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
+          }
         }
         // Add commission amounts (in their own currency) for containers where this supplier is the broker
         for (const c of commissionContainers) {
@@ -2584,8 +2590,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
         const freight = parseFloat(c.freight || "0");
-        // Supplier payable = kg × rate + freight (freight is an agreed charge to the supplier).
-        const value = kg * rate + freight;
+        const containerCc = c.currencyCode || "USD";
+        const freightCc = c.freightCurrencyCode || containerCc;
+        // Only include freight in value when it shares the container's currency; cross-currency freight is a separate obligation.
+        const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce((sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"), 0);
 
@@ -2595,7 +2603,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           date: c.arrivalDate || c.createdAt,
           origin: c.origin,
           status: c.status,
-          currencyCode: c.currencyCode || "USD",
+          currencyCode: containerCc,
           fxRateToUsd: c.fxRateToUsd || "1",
           declaredKg: c.declaredKg,
           actualReceivedKg: c.actualReceivedKg,
@@ -2603,6 +2611,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           ratePerKg: c.ratePerKg,
           differenceKg: c.differenceKg,
           freight: freight.toFixed(2),
+          freightCurrencyCode: freightCc,
           value: value.toFixed(2),
           finalPayableAmount: c.finalPayableAmount,
           commissionAmount: c.commissionAmount || "0",
@@ -2675,6 +2684,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         byCurrency[cc].totalValue += parseFloat(s.value);
         byCurrency[cc].totalCommission += parseFloat(s.totalCommission);
         byCurrency[cc].totalDirectCommission += parseFloat(s.commissionAmount || "0");
+        // If freight is in a different currency, add it to that currency group's total value
+        const freightAmt = parseFloat(s.freight || "0");
+        const freightCc = s.freightCurrencyCode || cc;
+        if (freightAmt > 0 && freightCc !== cc) {
+          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          byCurrency[freightCc].totalValue += freightAmt;
+        }
       }
 
       // Fetch FX transfers involving this supplier (as source or destination)
@@ -3066,7 +3082,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
     type LedgerRow = {
       date: string | null;
-      type: "container" | "payment" | "fx_out" | "fx_in" | "commission";
+      type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight";
       description: string;
       ref: string;
       amount: number;
@@ -3087,7 +3103,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
       const freight = parseFloat(c.freight || "0");
-      const mainAmt = kg * rate + freight;
+      const freightCc = c.freightCurrencyCode || cc;
+      const freightSameCcy = freightCc === cc;
+      // Only include freight in the container row amount when it shares the container's currency
+      const mainAmt = kg * rate + (freightSameCcy ? freight : 0);
       const commAmt = parseFloat(c.commissionAmount || "0");
       const commCc = c.commissionCurrencyCode || "USD";
       const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
@@ -3095,7 +3114,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       addRow(cc, {
         date: dateVal,
         type: "container",
-        description: freight > 0
+        description: freight > 0 && freightSameCcy
           ? `${c.containerNumber} - ${supplierName} (incl. freight ${cc !== "USD" ? cc + " " : "$"}${freight.toFixed(2)})`
           : `${c.containerNumber} - ${supplierName}`,
         ref: c.containerNumber,
@@ -3103,6 +3122,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         commissionAmount: commAmt > 0 && commCc === cc ? commAmt : null,
         commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
       });
+
+      // Freight row in a different currency section (when freight currency differs from container currency)
+      if (freight > 0 && !freightSameCcy) {
+        addRow(freightCc, {
+          date: dateVal,
+          type: "freight",
+          description: `Freight — ${c.containerNumber} - ${supplierName}`,
+          ref: c.containerNumber,
+          amount: freight,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
 
       // Commission row in different currency section
       if (commAmt > 0 && commCc !== cc) {
