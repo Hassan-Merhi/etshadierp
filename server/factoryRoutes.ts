@@ -2039,9 +2039,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          // Only treat freight as cross-currency when it's assigned to a freight supplier
+          // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
           const containerCcy = c.currencyCode || fromCurrencyCode;
-          const freightCc = c.freightSupplierId ? (c.freightCurrencyCode || "USD") : containerCcy;
+          const freightCc = c.freightCurrencyCode || containerCcy;
           // Only include freight if it shares the container's currency
           return s + (kg * rate + (freightCc === fromCurrencyCode ? freight : 0));
         }, 0);
@@ -2615,10 +2615,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const rate = parseFloat(c.ratePerKg || "0");
         const freight = parseFloat(c.freight || "0");
         const containerCc = c.currencyCode || "USD";
-        // Only treat freight as cross-currency when it's assigned to a freight supplier.
-        // The DB default for freightCurrencyCode is "USD", so we must not rely on that field
-        // alone — without a freightSupplierId the freight is simply in the container's currency.
-        const freightCc = (c as any).freightSupplierId ? (c.freightCurrencyCode || "USD") : containerCc;
+        // Use freightCurrencyCode to determine which pool freight belongs to.
+        // The DB default is "USD", so AUD containers with USD freight (even no explicit setting) correctly
+        // exclude freight from the AUD value. AUD freight on an AUD container has freightCurrencyCode = "AUD".
+        const freightCc = c.freightCurrencyCode || containerCc;
         // Only include freight in value when it shares the container's currency; cross-currency freight is a separate obligation.
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
@@ -2889,8 +2889,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat((c as any).freight || "0");
           const cc = c.currencyCode || "USD";
-          // Only treat freight as cross-currency when it's assigned to a freight supplier
-          const freightCc = (c as any).freightSupplierId ? ((c as any).freightCurrencyCode || "USD") : cc;
+          // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
+          const freightCc = (c as any).freightCurrencyCode || cc;
           const freightSameCcy = freightCc === cc;
           // Only include freight in this currency's value when it shares the container's currency
           const value = kg * rate + (freightSameCcy ? freight : 0);
@@ -3188,8 +3188,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
       const freight = parseFloat(c.freight || "0");
-      // Only treat freight as cross-currency when it's assigned to a freight supplier
-      const freightCc = c.freightSupplierId ? (c.freightCurrencyCode || "USD") : cc;
+      // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
+      const freightCc = c.freightCurrencyCode || cc;
       const freightSameCcy = freightCc === cc;
       // Only include freight in the container row amount when it shares the container's currency
       const mainAmt = kg * rate + (freightSameCcy ? freight : 0);
