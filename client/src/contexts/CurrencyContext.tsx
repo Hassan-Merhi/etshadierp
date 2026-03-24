@@ -82,7 +82,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     enabled: !!selectedCompany?.id && !!displayCurrency,
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
   });
 

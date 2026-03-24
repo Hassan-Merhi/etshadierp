@@ -141,7 +141,7 @@ export function AppSidebar({ user }: { user?: any }) {
 
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-count"],
-    refetchInterval: 10000,
+    refetchInterval: 60000,
     enabled: !!user,
   });
 

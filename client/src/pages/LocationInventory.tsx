@@ -160,7 +160,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
     enabled: !posUser,
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
     refetchOnMount: true,
   });
 

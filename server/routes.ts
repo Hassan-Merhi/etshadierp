@@ -116,6 +116,36 @@ import {
   companies,
   wasteDispatches,
   wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
+  insertDashboardAccountSelectionSchema,
+  insertCompanySettingsSchema,
+  insertBaleSchema,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  productionRawStock,
+  mixBatches,
+  mixBatchSources,
+  insertMixBatchSourceSchema,
+  baleProductCategories,
+  insertBaleProductCategorySchema,
+  baleProducts,
+  insertBaleProductSchema,
+  baleSequences,
+  pressingBatches,
+  productionBales,
+  insertProductionBaleSchema,
+  baleTransfers,
+  baleTransferItems,
+  referenceSequences,
+  factoryBaleSequences,
+  baleLabelPrints,
+  factoryDaybookEntries,
+  factorySettings,
+  FEATURE_KEYS,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -1740,7 +1770,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
         }
-        const { locations } = await import("@shared/schema");
         const userLocs = await db
           .select({
             id: locations.id,
@@ -11653,11 +11682,32 @@ if (asOfDate) {
 
       const supplier = await storage.getSupplierById(container.supplierId);
       const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
-      
-      const posWithItems = await Promise.all(purchaseOrders.map(async (po) => {
-        const lineItems = await storage.getLineItemsByPO(po.id);
-        const itemsWithNames = await Promise.all(lineItems.map(async (item) => {
-          const stockItem = item.stockItemId ? await storage.getStockItemById(item.stockItemId) : null;
+
+      // Batch-fetch all line items and stock items in 2 queries instead of N*M
+      const poIds = purchaseOrders.map(po => po.id);
+      const [allLineItems, allStockItems] = poIds.length > 0 ? await Promise.all([
+        db.select().from(poLineItems).where(inArray(poLineItems.purchaseOrderId, poIds)).execute(),
+        db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+          .from(stockItems)
+          .where(inArray(stockItems.id,
+            [...new Set((await db.select({ id: poLineItems.stockItemId }).from(poLineItems)
+              .where(inArray(poLineItems.purchaseOrderId, poIds)).execute())
+              .map(r => r.id).filter(Boolean) as number[])]
+          )).execute(),
+      ]) : [[], []];
+
+      const stockItemMap = new Map(allStockItems.map(s => [s.id, s]));
+      const lineItemsByPO = new Map<number, typeof allLineItems>();
+      for (const li of allLineItems) {
+        const arr = lineItemsByPO.get(li.purchaseOrderId!) || [];
+        arr.push(li);
+        lineItemsByPO.set(li.purchaseOrderId!, arr);
+      }
+
+      const posWithItems = purchaseOrders.map(po => {
+        const lineItemsForPO = lineItemsByPO.get(po.id) || [];
+        const itemsWithNames = lineItemsForPO.map(item => {
+          const stockItem = item.stockItemId ? stockItemMap.get(item.stockItemId) : null;
           return {
             stockItemCode: stockItem?.code || "",
             stockItemName: stockItem?.name || item.itemName,
@@ -11665,7 +11715,7 @@ if (asOfDate) {
             rate: item.rate,
             lineTotal: item.lineTotal,
           };
-        }));
+        });
         return {
           id: po.id,
           poNumber: po.poNumber,
@@ -11680,7 +11730,7 @@ if (asOfDate) {
           status: po.status,
           lineItems: itemsWithNames,
         };
-      }));
+      });
 
       res.json({
         container: {
@@ -11714,19 +11764,35 @@ if (asOfDate) {
 
       const supplier = await storage.getSupplierById(container.supplierId);
       const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
-      
-      const posWithItems = await Promise.all(purchaseOrders.map(async (po) => {
-        const lineItems = await storage.getLineItemsByPO(po.id);
-        const itemsWithNames = await Promise.all(lineItems.map(async (item) => {
-          const stockItem = item.stockItemId ? await storage.getStockItemById(item.stockItemId) : null;
-          return {
-            stockItemCode: stockItem?.code || "",
-            stockItemName: stockItem?.name || item.itemName,
-            quantity: item.quantity,
-            rate: item.rate,
-            lineTotal: item.lineTotal,
-          };
-        }));
+
+      // Batch-fetch all PO line items and offload items in parallel
+      const poIds = purchaseOrders.map(po => po.id);
+      const [[offloadRecord], allPoLineItems] = await Promise.all([
+        db.select().from(containerOffloads).where(eq(containerOffloads.containerId, containerId)).limit(1).execute(),
+        poIds.length > 0 ? db.select().from(poLineItems).where(inArray(poLineItems.purchaseOrderId, poIds)).execute() : [],
+      ]);
+
+      const poStockIds = [...new Set(allPoLineItems.map(li => li.stockItemId).filter(Boolean) as number[])];
+      const [offloadItems, poStockRows] = await Promise.all([
+        offloadRecord ? db.select().from(containerOffloadItems).where(eq(containerOffloadItems.offloadId, offloadRecord.id)).execute() : [],
+        poStockIds.length > 0 ? db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, poStockIds)).execute() : [],
+      ]);
+
+      const offloadStockIds = [...new Set(offloadItems.map(i => i.stockItemId).filter(Boolean) as number[])];
+      const offloadStockRows = offloadStockIds.length > 0
+        ? await db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, offloadStockIds)).execute()
+        : [];
+
+      const stockMap = new Map([...poStockRows, ...offloadStockRows].map(s => [s.id, s]));
+      const lineItemsByPO = new Map<number, typeof allPoLineItems>();
+      for (const li of allPoLineItems) {
+        const arr = lineItemsByPO.get(li.purchaseOrderId!) || [];
+        arr.push(li);
+        lineItemsByPO.set(li.purchaseOrderId!, arr);
+      }
+
+      const posWithItems = purchaseOrders.map(po => {
+        const lineItemsForPO = lineItemsByPO.get(po.id) || [];
         return {
           poNumber: po.poNumber,
           currency: po.currency,
@@ -11738,34 +11804,16 @@ if (asOfDate) {
           discount: po.discount,
           otherCharges: po.otherCharges,
           status: po.status,
-          lineItems: itemsWithNames,
+          lineItems: lineItemsForPO.map(item => {
+            const stockItem = item.stockItemId ? stockMap.get(item.stockItemId) : null;
+            return { stockItemCode: stockItem?.code || "", stockItemName: stockItem?.name || item.itemName, quantity: item.quantity, rate: item.rate, lineTotal: item.lineTotal };
+          }),
         };
-      }));
+      });
 
-      const [offloadRecord] = await db
-        .select()
-        .from(containerOffloads)
-        .where(eq(containerOffloads.containerId, containerId))
-        .limit(1);
       let offloadDetails = null;
       if (offloadRecord) {
         const location = await storage.getLocationById(offloadRecord.locationId);
-        const offloadItems = await db
-          .select()
-          .from(containerOffloadItems)
-          .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
-        
-        const itemsWithNames = await Promise.all(offloadItems.map(async (item) => {
-          const stockItem = await storage.getStockItemById(item.stockItemId);
-          return {
-            stockItemCode: stockItem?.code || "",
-            stockItemName: stockItem?.name || "",
-            quantity: item.quantity,
-            rate: item.rate,
-            totalValue: item.totalValue,
-          };
-        }));
-
         offloadDetails = {
           locationName: location?.name || "",
           duties: offloadRecord.duties,
@@ -11776,7 +11824,10 @@ if (asOfDate) {
           totalBales: offloadRecord.totalBales,
           additionalCostPerBale: offloadRecord.additionalCostPerBale,
           offloadedAt: offloadRecord.offloadedAt,
-          offloadItems: itemsWithNames,
+          offloadItems: offloadItems.map(item => {
+            const stockItem = item.stockItemId ? stockMap.get(item.stockItemId) : null;
+            return { stockItemCode: stockItem?.code || "", stockItemName: stockItem?.name || "", quantity: item.quantity, rate: item.rate, totalValue: item.totalValue };
+          }),
         };
       }
 
@@ -15482,7 +15533,6 @@ if (asOfDate) {
         // Write to factory daybook if this company has factory settings
         try {
           const cid = req.session.currentCompanyId!;
-          const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
           const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, cid));
           if (fSetting) {
             const vType = result.voucher.voucherType;
@@ -15874,7 +15924,6 @@ if (asOfDate) {
         // Write to factory daybook if this company has factory settings
         try {
           const cid = req.session.currentCompanyId!;
-          const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
           const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, cid));
           if (fSetting) {
             const currency = result.voucher.currency || "USD";
@@ -17943,7 +17992,6 @@ if (asOfDate) {
           .returning();
 
         if (voucher.voucherDate) {
-          const { factoryDaybookEntries: fde } = await import("@shared/schema");
           await db.update(fde)
             .set({ txDate: voucher.voucherDate })
             .where(and(
@@ -17977,7 +18025,6 @@ if (asOfDate) {
 
         // Resync factory daybook entry amounts for this voucher
         const newTotal = Math.max(totalDebits, totalCredits).toFixed(2);
-        const { factoryDaybookEntries: fdeAmt } = await import("@shared/schema");
         await db.update(fdeAmt)
           .set({ amountCurrency: newTotal, amountUsd: newTotal })
           .where(and(
@@ -19447,12 +19494,13 @@ if (asOfDate) {
           .where(and(...conditions))
           .orderBy(sql`${vouchers.voucherDate} DESC, ${vouchers.createdAt} DESC`);
 
-        // For each voucher, get the sales items
-        const transactions = await Promise.all(
-          salesVouchers.map(async (voucher) => {
-            const items = await db
+        // Batch-fetch all sales items for all vouchers in one query
+        const voucherIds = salesVouchers.map(v => v.id);
+        const allSalesItems = voucherIds.length > 0
+          ? await db
               .select({
                 id: salesItems.id,
+                voucherId: salesItems.voucherId,
                 stockItemId: salesItems.stockItemId,
                 stockItemName: stockItems.name,
                 quantity: salesItems.quantity,
@@ -19461,8 +19509,18 @@ if (asOfDate) {
               })
               .from(salesItems)
               .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
-              .where(eq(salesItems.voucherId, voucher.id));
+              .where(inArray(salesItems.voucherId, voucherIds))
+          : [];
 
+        const itemsByVoucher = new Map<number, typeof allSalesItems>();
+        for (const item of allSalesItems) {
+          const arr = itemsByVoucher.get(item.voucherId!) || [];
+          arr.push(item);
+          itemsByVoucher.set(item.voucherId!, arr);
+        }
+
+        const transactions = salesVouchers.map((voucher) => {
+            const items = itemsByVoucher.get(voucher.id) || [];
             const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
             const totalAmt = parseFloat(voucher.totalAmount || "0");
 
@@ -19477,8 +19535,7 @@ if (asOfDate) {
               itemCount: items.length,
               items,
             };
-          })
-        );
+          });
 
         res.json(transactions);
       } catch (error: any) {
@@ -28284,7 +28341,6 @@ if (asOfDate) {
       const offloadedContainers: any[] = [];
       
       // Pre-fetch item counts for all containers
-      const { purchaseOrders, poLineItems } = await import("@shared/schema");
       const containerItemCounts: Record<number, number> = {};
       
       for (const companyId of companyIds) {
@@ -28471,8 +28527,6 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { dashboardCashAccounts, ledgerAccounts, bankAccounts, voucherEntries, vouchers: vouchersTable } = await import("@shared/schema");
-
       const accounts = await db
         .select()
         .from(dashboardCashAccounts)
@@ -28564,8 +28618,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { dashboardCashAccounts, insertDashboardCashAccountSchema } = await import("@shared/schema");
       
       const data = insertDashboardCashAccountSchema.parse({
         ...req.body,
@@ -28590,8 +28642,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { dashboardCashAccounts } = await import("@shared/schema");
       const id = parseInt(req.params.id);
 
       await db
@@ -28615,7 +28665,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { dashboardCashAccounts } = await import("@shared/schema");
       const { orderedIds } = req.body as { orderedIds: number[] };
       if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
       await Promise.all(orderedIds.map((id, index) =>
@@ -28637,8 +28686,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { dashboardPayableAccounts, ledgerAccounts, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
 
       const accounts = await db
         .select()
@@ -28703,8 +28750,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { dashboardPayableAccounts, insertDashboardPayableAccountSchema } = await import("@shared/schema");
       
       const data = insertDashboardPayableAccountSchema.parse({
         ...req.body,
@@ -28729,8 +28774,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { dashboardPayableAccounts } = await import("@shared/schema");
       const accountId = parseInt(req.params.id);
 
       await db
@@ -28754,7 +28797,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { dashboardPayableAccounts } = await import("@shared/schema");
       const { orderedIds } = req.body as { orderedIds: number[] };
       if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
       await Promise.all(orderedIds.map((id, index) =>
@@ -28781,8 +28823,6 @@ if (asOfDate) {
       if (!["availableCash", "cashToPay"].includes(selectionType)) {
         return res.status(400).json({ message: "Invalid selection type" });
       }
-
-      const { dashboardAccountSelections } = await import("@shared/schema");
 
       const [selection] = await db
         .select()
@@ -28870,8 +28910,6 @@ if (asOfDate) {
       if (!Array.isArray(accountIds)) {
         return res.status(400).json({ message: "accountIds must be an array" });
       }
-
-      const { dashboardAccountSelections } = await import("@shared/schema");
 
       // Upsert the selection
       const [existing] = await db
@@ -28977,8 +29015,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertBaleSchema } = await import("@shared/schema");
       const data = insertBaleSchema.parse({ ...req.body, companyId });
 
       // Check for duplicate barcode
@@ -29057,8 +29093,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertBaleSchema } = await import("@shared/schema");
       const balesData = req.body.bales || [];
 
       if (!Array.isArray(balesData)) {
@@ -29116,7 +29150,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const { insertPendingBarcodeSchema } = await import("@shared/schema");
       const data = insertPendingBarcodeSchema.parse({ ...req.body, companyId });
       const barcode = await storage.createPendingBarcode(data);
       res.json(barcode);
@@ -29204,7 +29237,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { insertBaleProductCategorySchema } = await import("@shared/schema");
       const data = insertBaleProductCategorySchema.parse({ ...req.body, companyId });
       const existing = await storage.getBaleProductCategoryByName(data.name, companyId);
       if (existing) return res.status(409).json({ message: `Category "${data.name}" already exists` });
@@ -29280,8 +29312,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertBaleProductSchema } = await import("@shared/schema");
       let articleCode = req.body.articleCode || "";
       if (!articleCode && req.body.itemNumber) {
         const num = parseInt(String(req.body.itemNumber));
@@ -29327,8 +29357,6 @@ if (asOfDate) {
       if (existing.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
       }
-
-      const { insertBaleProductSchema } = await import("@shared/schema");
       const data = insertBaleProductSchema.partial().parse(req.body);
 
       const product = await storage.updateBaleProduct(id, data);
@@ -29383,8 +29411,6 @@ if (asOfDate) {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const rows = sheetToJson(worksheet);
-
-      const { baleProducts, baleProductCategories } = await import("@shared/schema");
 
       let created = 0;
       let updated = 0;
@@ -29477,8 +29503,7 @@ if (asOfDate) {
   // existing factory_bales ref for this company, by taking the max across both
   // sequence tables and the actual data.
   async function generateSafeRef(tx: any, companyId: number): Promise<string> {
-    const { referenceSequences } = await import("@shared/schema");
-    const { factoryBaleSequences } = await import("@shared/schema");
+
 
     // Find the true max numeric ref already in use for this company
     const [maxRow] = await tx
@@ -29529,8 +29554,6 @@ if (asOfDate) {
       if (!bales || !Array.isArray(bales) || bales.length === 0) {
         return res.status(400).json({ message: "No bales provided" });
       }
-
-      const { referenceSequences, baleLabelPrints } = await import("@shared/schema");
 
       const labelPrints = await db.transaction(async (tx) => {
         const results = [];
@@ -29594,7 +29617,6 @@ if (asOfDate) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { baleId } = req.body;
       if (!baleId) return res.status(400).json({ message: "baleId required" });
-      const { baleLabelPrints, referenceSequences } = await import("@shared/schema");
       const [existing] = await db
         .select()
         .from(baleLabelPrints)
@@ -29701,7 +29723,6 @@ if (asOfDate) {
       }
 
       const referenceNumber = decodeURIComponent(req.params.referenceNumber);
-      const { baleLabelPrints } = await import("@shared/schema");
 
       const [updated] = await db
         .update(baleLabelPrints)
@@ -29757,8 +29778,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertCompanySettingsSchema } = await import("@shared/schema");
       const data = insertCompanySettingsSchema.parse({ ...req.body, companyId });
 
       const settings = await storage.upsertCompanySettings(data);
@@ -29774,8 +29793,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const { productionRawStock, containers, suppliers } = await import("@shared/schema");
 
       const rawStockRows = await db
         .select({
@@ -29840,8 +29857,6 @@ if (asOfDate) {
         return res.status(400).json({ message: "Cost per kg is required. Container has no saved Rate per KG - please provide a value." });
       }
 
-      const { productionRawStock } = await import("@shared/schema");
-
       const existing = await db
         .select()
         .from(productionRawStock)
@@ -29873,8 +29888,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const { productionRawStock, containers } = await import("@shared/schema");
 
       const offloadedIds = await db
         .select({ containerId: productionRawStock.containerId })
@@ -29956,8 +29969,6 @@ if (asOfDate) {
       if (!hasSources && !hasBatchSources) {
         return res.status(400).json({ message: "At least one container or batch source is required" });
       }
-
-      const { mixBatches, mixBatchSources, productionRawStock } = await import("@shared/schema");
 
       const result = await db.transaction(async (tx) => {
         const year = new Date().getFullYear();
@@ -30138,8 +30149,6 @@ if (asOfDate) {
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
       }
-      
-      const { insertMixBatchSourceSchema } = await import("@shared/schema");
       const data = insertMixBatchSourceSchema.parse({ 
         ...req.body, 
         mixBatchId 
@@ -30230,7 +30239,6 @@ if (asOfDate) {
       }
 
       // Get product for bale code
-      const { baleProducts } = await import("@shared/schema");
       const [product] = await db.select().from(baleProducts).where(eq(baleProducts.id, productId));
       if (!product || product.companyId !== companyId) {
         return res.status(404).json({ message: "Product not found" });
@@ -30262,7 +30270,6 @@ if (asOfDate) {
       // Wrap everything in a transaction for atomicity
       const result = await db.transaction(async (tx) => {
         const createdBales = [];
-        const { baleSequences, productionBales, mixBatches, pressingBatches } = await import("@shared/schema");
 
         let pressingBatchId: number | null = null;
         if (isPressing) {
@@ -30356,8 +30363,6 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { productionBales, baleProducts, mixBatches } = await import("@shared/schema");
-
       const pending = await db
         .select({
           bale: productionBales,
@@ -30386,7 +30391,6 @@ if (asOfDate) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const barcode = req.params.barcode.trim();
-      const { productionBales, baleProducts, mixBatches } = await import("@shared/schema");
 
       const results = await db
         .select({
@@ -30420,8 +30424,6 @@ if (asOfDate) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const { pressingBatches, baleProducts, mixBatches, productionBales } = await import("@shared/schema");
 
       const batches = await db
         .select({
@@ -30466,7 +30468,6 @@ if (asOfDate) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const batchId = parseInt(req.params.id);
-      const { pressingBatches, baleProducts, mixBatches, productionBales } = await import("@shared/schema");
 
       const [batchRow] = await db
         .select({
@@ -30516,8 +30517,6 @@ if (asOfDate) {
       if (!Array.isArray(scannedBaleIds) || scannedBaleIds.length === 0) {
         return res.status(400).json({ message: "No bale IDs provided" });
       }
-
-      const { productionBales, pressingBatches, mixBatches } = await import("@shared/schema");
 
       const [batch] = await db
         .select()
@@ -30635,8 +30634,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertProductionBaleSchema } = await import("@shared/schema");
       const data = insertProductionBaleSchema.parse({ ...req.body, companyId });
 
       const bale = await storage.createProductionBale(data);
@@ -30653,8 +30650,6 @@ if (asOfDate) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-
-      const { insertProductionBaleSchema } = await import("@shared/schema");
       const balesData = req.body.bales || [];
 
       if (!Array.isArray(balesData)) {
@@ -30805,8 +30800,6 @@ if (asOfDate) {
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
-
-      const { productionBales } = await import("@shared/schema");
       const { db } = await import("./db");
       const { eq, and } = await import("drizzle-orm");
 
@@ -30842,8 +30835,6 @@ if (asOfDate) {
       if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ message: "No bale IDs provided" });
       }
-
-      const { productionBales } = await import("@shared/schema");
       const { db } = await import("./db");
       const { eq, and, inArray } = await import("drizzle-orm");
 
@@ -30879,8 +30870,6 @@ if (asOfDate) {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const rows = sheetToJson(worksheet);
-
-      const { insertProductionBaleSchema } = await import("@shared/schema");
       const mixBatchId = req.body.mixBatchId ? parseInt(req.body.mixBatchId) : undefined;
 
       // Map Excel rows to bale data
@@ -30999,8 +30988,6 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { baleTransfers, baleTransferItems } = await import("@shared/schema");
-
       const transfers = await db
         .select({
           id: baleTransfers.id,
@@ -31039,8 +31026,6 @@ if (asOfDate) {
       if (!sourceLocationId || !destinationLocationId || !transferDate || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields: sourceLocationId, destinationLocationId, transferDate, and items array" });
       }
-
-      const { baleTransfers, baleTransferItems, productionBales } = await import("@shared/schema");
       const createdBy = (req.session as any).username || "system";
 
       const result = await db.transaction(async (tx) => {
@@ -31082,7 +31067,6 @@ if (asOfDate) {
 
       // Write to factory daybook if this company has factory settings
       try {
-        const { factoryDaybookEntries: fde, factorySettings: fSettings } = await import("@shared/schema");
         const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, companyId));
         if (fSetting) {
           const totalCost = items.reduce((s: number, it: any) => s + parseFloat(it.totalCost || "0"), 0);
@@ -31115,8 +31099,6 @@ if (asOfDate) {
     try {
       const transferId = parseInt(req.params.id);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
-
-      const { baleTransfers, baleTransferItems, productionBales, baleProducts } = await import("@shared/schema");
 
       const [transfer] = await db
         .select({
@@ -31174,8 +31156,6 @@ if (asOfDate) {
       const transferId = parseInt(req.params.id);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
 
-      const { baleTransfers } = await import("@shared/schema");
-
       const [transfer] = await db
         .select()
         .from(baleTransfers)
@@ -31204,8 +31184,6 @@ if (asOfDate) {
     try {
       const transferId = parseInt(req.params.id);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
-
-      const { baleTransfers, baleTransferItems, productionBales } = await import("@shared/schema");
 
       const [transfer] = await db
         .select()
@@ -37157,7 +37135,6 @@ if (asOfDate) {
         if (!companyId || !role || !userId) return res.status(400).json({ message: "No company or role selected" });
         const hiddenErpCostFields = await storage.getErpUserHiddenCostFields(userId);
         if (role === "Admin" || role === "Developer") {
-          const { FEATURE_KEYS } = await import("@shared/schema");
           return res.json({ pageKeys: [...FEATURE_KEYS], fullAccess: true, hiddenErpCostFields: [] });
         }
         const pageKeys = await storage.getErpUserPageAccess(companyId, userId);
