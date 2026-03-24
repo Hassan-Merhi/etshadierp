@@ -557,7 +557,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [showPrintDialog]);
 
-  const fmtPrint = async (n: number, prefix = "") => {
+  const fmtPrint = (n: number, prefix = "") => {
     const fixed = Math.abs(n).toFixed(2);
     const clean = fixed.replace(/\.00$/, "");
     const parts = clean.split(".");
