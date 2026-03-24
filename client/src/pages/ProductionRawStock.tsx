@@ -186,6 +186,7 @@ interface ContainerOption {
   currencyCode?: string;
   fxRateToUsd?: string;
   freight?: string | null;
+  freightCurrencyCode?: string | null;
   freightAccountId?: number | null;
   freightSupplierId?: number | null;
   otherCharges?: string | null;
@@ -486,7 +487,12 @@ export default function ProductionRawStock() {
     // Pre-fill freight from container (amount + account — not editable during offload)
     const freightVal = parseFloat(container?.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
-    setFreightCurrencyCode(container?.freightCurrencyCode || "USD");
+    // Freight from container is always treated as USD.
+    // Some older containers may have freightCurrencyCode incorrectly set to the
+    // container's own currency — override those to USD so no double-conversion occurs.
+    const storedFreightCcy = container?.freightCurrencyCode || "USD";
+    const effectiveFreightCcy = storedFreightCcy === ccy && ccy !== "USD" ? "USD" : storedFreightCcy;
+    setFreightCurrencyCode(effectiveFreightCcy);
     setFreightFxRate("1");
     if (container?.freightSupplierId) {
       setFreightAccountId(`SUP:${container.freightSupplierId}`);
