@@ -228,7 +228,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             ) : (
               <div className="rounded-md border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="border-b bg-muted/40">
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
                       <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>

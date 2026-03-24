@@ -951,7 +951,7 @@ export default function StockTransferOrder() {
                 className="overflow-auto max-h-[500px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
               >
                 <table className="w-full caption-bottom text-sm border-collapse">
-                  <thead className="[&_tr]:border-b">
+                  <thead className="[&_tr]:border-b sticky top-0 z-10">
                     <tr className="border-b">
                       <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[200px] sticky top-0 left-0 bg-muted z-50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                         Item

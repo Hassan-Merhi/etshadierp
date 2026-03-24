@@ -414,7 +414,7 @@ export default function FactoryAttendance() {
                   {/* Desktop table */}
                   <div className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-muted/50">
                         <tr className="border-b bg-muted/40">
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground">Worker Name</th>
@@ -829,7 +829,7 @@ function PerWorkerView() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-muted/50">
                   <tr className="border-b bg-muted/40">
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
@@ -1082,7 +1082,7 @@ function generateWeeklyBlankSheetHtml(
   </div>
   <table>
     ${WEEKLY_COLGROUP}
-    <thead>
+    <thead className="sticky top-0 z-10 bg-muted/50">
       <tr>
         <th>#</th>
         <th class="name-col">${L.workerName}</th>
@@ -1190,7 +1190,7 @@ function generateWeeklyResultsSheetHtml(
   </div>
   <table>
     ${WEEKLY_COLGROUP}
-    <thead>
+    <thead className="sticky top-0 z-10 bg-muted/50">
       <tr>
         <th>#</th>
         <th class="name-col">${L.workerName}</th>

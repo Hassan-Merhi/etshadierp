@@ -269,7 +269,7 @@ export default function StockEntryHistory() {
 
       <div className="rounded-md border overflow-hidden">
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-muted/50">
             <tr className="bg-muted/50 text-left">
               <th className="px-3 py-2 w-6"></th>
               <th className="px-3 py-2">Entry Date</th>
@@ -324,7 +324,7 @@ export default function StockEntryHistory() {
                   <tr key={key + "-detail"} className="bg-muted/20">
                     <td colSpan={10} className="px-6 py-3">
                       <table className="w-full text-xs">
-                        <thead>
+                        <thead className="sticky top-0 z-10 bg-muted/50">
                           <tr className="text-muted-foreground">
                             <th className="text-left pb-1 pr-4">Reference</th>
                             <th className="text-left pb-1 pr-4">Product</th>

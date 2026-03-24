@@ -373,7 +373,7 @@ export default function ContainerDashboard() {
           <CardContent className="p-0">
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-muted/50">
+                <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-1 px-2 font-medium">Container #</th>
                     <th className="text-left py-1 px-2 font-medium">Supplier</th>
@@ -448,7 +448,7 @@ export default function ContainerDashboard() {
           <CardContent className="p-0">
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-muted/50">
+                <thead className="bg-muted/50 sticky top-0 z-10">
                   <tr>
                     <th className="text-left py-1 px-2 font-medium">Container #</th>
                     <th className="text-left py-1 px-2 font-medium">Supplier</th>
@@ -709,7 +709,7 @@ export default function ContainerDashboard() {
                               <CardContent className="p-0">
                                 <div className="hidden md:block overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
                                   <table className="w-full text-[11px]">
-                                  <thead className="bg-muted/50">
+                                  <thead className="bg-muted/50 sticky top-0 z-10">
                                     <tr>
                                       <th className="text-left py-0.5 px-0.5 font-medium w-5">#</th>
                                       <th className="text-left py-0.5 px-0.5 font-medium">Container</th>
@@ -996,7 +996,7 @@ export default function ContainerDashboard() {
                     <CardContent className="py-2 px-3">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
-                          <thead className="bg-muted/50">
+                          <thead className="bg-muted/50 sticky top-0 z-10">
                             <tr>
                               <th className="text-left py-1 px-2">Item</th>
                               <th className="text-right py-1 px-2">Qty</th>

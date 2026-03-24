@@ -1318,7 +1318,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-muted/50">
                     <tr className="bg-muted/60 border-b">
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/60 z-10">
                         Item Name
@@ -2309,7 +2309,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                       {/* Print view - Proper table layout */}
                       <table className="print-inventory-table">
-                        <thead>
+                        <thead className="sticky top-0 z-10 bg-muted/50">
                           <tr>
                             <th>Particulars</th>
                             <th className="qty-col">Closing Balance<br/><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span></th>

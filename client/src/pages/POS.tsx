@@ -2223,7 +2223,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
               {/* Items Table */}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums', border: '1px solid #999' }}>
-                <thead>
+                <thead className="sticky top-0 z-10 bg-muted/50">
                   <tr>
                     <th style={{ textAlign: 'left', padding: '2px 5px', width: '30%', fontWeight: '900', fontSize: '7pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Description</th>
                     <th style={{ textAlign: 'center', padding: '2px 5px', width: '6%', fontWeight: '900', fontSize: '7pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Qty</th>

@@ -503,7 +503,7 @@ const PrintTemplate = async ({
         {/* Entries table */}
         <div style={{ padding: "20px 28px" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
+            <thead className="sticky top-0 z-10 bg-muted/50">
               <tr style={{ background: "#f0f0f0" }}>
                 <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "left", width: "40px" }}>#</th>
                 <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "left" }}>Account / Description</th>

@@ -403,7 +403,7 @@ export default function ERPRunPayroll() {
         </div>
       </div>
       <table>
-        <thead><tr>
+        <thead className="sticky top-0 z-10 bg-muted/50"><tr>
           <th>Worker</th>
           <th style="text-align:right">Base Salary</th>
           <th style="text-align:right">Deduction</th>

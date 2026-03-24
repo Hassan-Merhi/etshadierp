@@ -169,7 +169,7 @@ export function VoucherEntriesTable({
   return (
     <div className="border rounded-md overflow-hidden">
       <table className="w-full">
-        <thead className="bg-muted/50">
+        <thead className="bg-muted/50 sticky top-0 z-10">
           <tr>
             <th className="text-left p-3 font-medium w-[60%]">Account</th>
             <th className="text-right p-3 font-medium w-[35%]">Amount</th>

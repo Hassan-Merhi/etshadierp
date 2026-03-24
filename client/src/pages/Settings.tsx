@@ -2028,7 +2028,7 @@ function LoginHistoryTab() {
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="table-login-history">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-muted/50">
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 font-medium">User</th>
                   <th className="text-left p-3 font-medium">Company</th>
