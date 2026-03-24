@@ -402,7 +402,7 @@ export function OffloadDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           {/* Offload Date */}
           <div className="space-y-2">
             <Label htmlFor="offload-date">Offload Date</Label>

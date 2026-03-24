@@ -510,7 +510,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
         </CardHeader>
         <CardContent className="flex-1 overflow-auto">
           <Form {...form}>
-            <form className="space-y-4">
+            <form className="space-y-4" noValidate>
               <div className="grid grid-cols-4 gap-4">
                 <FormField
                   control={form.control}

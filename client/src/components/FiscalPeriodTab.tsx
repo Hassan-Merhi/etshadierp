@@ -192,7 +192,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Close Fiscal Period</h3>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

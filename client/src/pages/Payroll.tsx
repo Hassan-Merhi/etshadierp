@@ -2727,7 +2727,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...depositForm}>
-            <form onSubmit={depositForm.handleSubmit((data) => depositMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={depositForm.handleSubmit((data) = noValidate> depositMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={depositForm.control}
                 name="amount"
@@ -3121,7 +3121,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...withdrawalForm}>
-            <form onSubmit={withdrawalForm.handleSubmit((data) => withdrawalMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={withdrawalForm.handleSubmit((data) = noValidate> withdrawalMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={withdrawalForm.control}
                 name="amount"
@@ -3289,7 +3289,7 @@ export default function Payroll() {
           </div>
 
           <Form {...bulkPaymentForm}>
-            <form onSubmit={bulkPaymentForm.handleSubmit((data) => bulkPaymentMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={bulkPaymentForm.handleSubmit((data) = noValidate> bulkPaymentMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={bulkPaymentForm.control}
                 name="paymentAccountType"
@@ -3418,7 +3418,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...advanceForm}>
-            <form onSubmit={advanceForm.handleSubmit((data) => advanceMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={advanceForm.handleSubmit((data) = noValidate> advanceMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={advanceForm.control}
                 name="employeeId"
@@ -3657,7 +3657,7 @@ export default function Payroll() {
           )}
 
           <Form {...deductionForm}>
-            <form onSubmit={deductionForm.handleSubmit((data) => deductionMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={deductionForm.handleSubmit((data) = noValidate> deductionMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={deductionForm.control}
                 name="deductionAmount"
@@ -3734,7 +3734,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...newWorkerForm}>
-            <form onSubmit={newWorkerForm.handleSubmit((data) => createWorkerMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={newWorkerForm.handleSubmit((data) = noValidate> createWorkerMutation.mutate(data))} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={newWorkerForm.control}
@@ -3859,7 +3859,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...editWorkerForm}>
-            <form onSubmit={editWorkerForm.handleSubmit((data) => {
+            <form onSubmit={editWorkerForm.handleSubmit((data) = noValidate> {
               if (selectedWorkerForEdit) {
                 updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
               }
@@ -4050,7 +4050,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...createEmployeeForm}>
-            <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={createEmployeeForm.handleSubmit((data) = noValidate> createEmployeeMutation.mutate(data))} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={createEmployeeForm.control}
@@ -5062,7 +5062,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Form {...editEmployeeForm}>
-            <form onSubmit={editEmployeeForm.handleSubmit((data) => editEmployeeMutation.mutate(data))} className="space-y-4">
+            <form onSubmit={editEmployeeForm.handleSubmit((data) = noValidate> editEmployeeMutation.mutate(data))} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editEmployeeForm.control}

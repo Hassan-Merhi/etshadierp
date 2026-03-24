@@ -3360,7 +3360,7 @@ function IntercompanyPosTab() {
                   <DialogTitle>{editingCompany ? "Edit Company" : "Create New Company"}</DialogTitle>
                 </DialogHeader>
                 <Form {...companyForm}>
-                  <form onSubmit={companyForm.handleSubmit(handleSubmitCompany)} className="space-y-4">
+                  <form onSubmit={companyForm.handleSubmit(handleSubmitCompany)} className="space-y-4" noValidate>
                     <FormField
                       control={companyForm.control}
                       name="name"
@@ -5556,7 +5556,7 @@ function IntercompanyPosTab() {
               <DialogTitle>{editingRole ? "Edit Role Assignment" : "Add Role Assignment"}</DialogTitle>
             </DialogHeader>
             <Form {...roleForm}>
-              <form onSubmit={roleForm.handleSubmit(handleSubmitRole)} className="space-y-4">
+              <form onSubmit={roleForm.handleSubmit(handleSubmitRole)} className="space-y-4" noValidate>
                 <FormField
                   control={roleForm.control}
                   name="companyId"

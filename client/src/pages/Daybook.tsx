@@ -3460,7 +3460,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
               <form
                 onSubmit={editForm.handleSubmit(handleSaveEdit)}
                 className="space-y-4"
-              >
+               noValidate>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">

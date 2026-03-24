@@ -149,7 +149,7 @@ export function StockItemCreateDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4 py-4" noValidate>
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

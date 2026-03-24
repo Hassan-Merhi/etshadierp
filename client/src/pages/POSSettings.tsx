@@ -69,7 +69,7 @@ export default function POSSettings() {
           <CardDescription>Update your login password. Minimum 4 characters.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1">
               <Label htmlFor="current-password">Current Password</Label>
               <div className="relative">

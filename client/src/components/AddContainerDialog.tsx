@@ -125,7 +125,7 @@ export function AddContainerDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <FormField
               control={form.control}
               name="containerNumber"

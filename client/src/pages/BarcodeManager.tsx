@@ -294,7 +294,7 @@ export default function BarcodeManager() {
 
       <Card className="p-4 md:p-6">
         <h2 className="text-lg font-semibold mb-4">Add Barcode Manually</h2>
-        <form onSubmit={handleManualAdd} className="flex flex-col sm:flex-row gap-2">
+        <form onSubmit={handleManualAdd} className="flex flex-col sm:flex-row gap-2" noValidate>
           <Input
             placeholder="Enter barcode..."
             value={manualBarcode}

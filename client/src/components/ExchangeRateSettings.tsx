@@ -171,7 +171,7 @@ export function ExchangeRateSettings() {
           <Card className="border-dashed">
             <CardContent className="pt-4">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}

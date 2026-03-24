@@ -190,7 +190,7 @@ export default function FactoryWaste() {
             <DialogHeader>
               <DialogTitle>Add Waste Entry</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="waste-date">Date</Label>
                 <Input

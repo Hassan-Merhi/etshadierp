@@ -125,7 +125,7 @@ export function PaymentVoucherTab({
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6"
-              >
+               noValidate>
                 {/* Header section */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-start">
                   {/* Payment account selector */}

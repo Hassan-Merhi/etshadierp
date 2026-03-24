@@ -1470,7 +1470,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...salesForm}>
-              <form onSubmit={salesForm.handleSubmit(onSubmitSales)} className="space-y-6">
+              <form onSubmit={salesForm.handleSubmit(onSubmitSales)} className="space-y-6" noValidate>
                 {/* Header section with date and location */}
                 <div className="flex flex-col md:flex-row items-stretch md:items-start justify-between gap-4">
                   {/* Date picker */}
@@ -1858,7 +1858,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...purchaseForm}>
-              <form onSubmit={purchaseForm.handleSubmit(onSubmitPurchase)} className="space-y-6">
+              <form onSubmit={purchaseForm.handleSubmit(onSubmitPurchase)} className="space-y-6" noValidate>
                 {/* Header section with date and readonly fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
@@ -2266,7 +2266,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...adjustmentForm}>
-              <form onSubmit={adjustmentForm.handleSubmit(onSubmitAdjustment)} className="space-y-6">
+              <form onSubmit={adjustmentForm.handleSubmit(onSubmitAdjustment)} className="space-y-6" noValidate>
                 {/* Header section with date and location */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
@@ -2714,7 +2714,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...transferForm}>
-              <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="space-y-6">
+              <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="space-y-6" noValidate>
                 {/* Header section with date and locations */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date picker */}
@@ -3117,7 +3117,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...paymentForm}>
-              <form onSubmit={paymentForm.handleSubmit(onSubmitPaymentReceipt)} className="space-y-6">
+              <form onSubmit={paymentForm.handleSubmit(onSubmitPaymentReceipt)} className="space-y-6" noValidate>
                 {/* Header section */}
                 <div className="flex flex-col md:flex-row items-stretch md:items-start justify-between gap-4">
                   {/* Left: Payment account selector */}
@@ -3455,7 +3455,7 @@ export default function VoucherEdit() {
           </CardHeader>
           <CardContent>
             <Form {...journalForm}>
-              <form onSubmit={journalForm.handleSubmit(onSubmitJournal)} className="space-y-6">
+              <form onSubmit={journalForm.handleSubmit(onSubmitJournal)} className="space-y-6" noValidate>
                 {/* Date picker */}
                 <FormField
                   control={journalForm.control}

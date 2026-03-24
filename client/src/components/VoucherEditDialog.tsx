@@ -321,7 +321,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
           <div className="text-center py-8">Loading voucher data...</div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
               {/* Voucher Header */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <FormField

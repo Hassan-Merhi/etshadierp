@@ -378,7 +378,7 @@ function LocationForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -559,7 +559,7 @@ function LedgerAccountForm({
     <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -707,7 +707,7 @@ function LedgerAccountForm({
                               handleCreateParent,
                             )}
                             className="space-y-4"
-                          >
+                           noValidate>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <FormField
                                 control={parentForm.control}
@@ -912,7 +912,7 @@ function EmployeeForm({
     <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1065,7 +1065,7 @@ function SupplierForm({
     <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1151,7 +1151,7 @@ function StockGroupForm({
     <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1249,7 +1249,7 @@ function StockItemForm({
     <Card className="p-4 md:p-6">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -200,7 +200,7 @@ export default function Customers() {
               <DialogTitle>Create New Customer</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
                 <FormField
                   control={form.control}
                   name="legalName"
@@ -412,7 +412,7 @@ export default function Customers() {
             <DialogTitle>Edit Customer</DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <FormField
                 control={form.control}
                 name="legalName"

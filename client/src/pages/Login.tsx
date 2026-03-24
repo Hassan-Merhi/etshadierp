@@ -60,7 +60,7 @@ export default function Login() {
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6" noValidate>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input

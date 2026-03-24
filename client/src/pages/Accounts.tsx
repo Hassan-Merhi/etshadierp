@@ -1316,7 +1316,7 @@ export default function Accounts() {
             <form
               onSubmit={bankForm.handleSubmit(onBankSubmit)}
               className="space-y-4"
-            >
+             noValidate>
               <FormField
                 control={bankForm.control}
                 name="code"
@@ -2703,7 +2703,7 @@ export default function Accounts() {
                       <form
                         onSubmit={editForm.handleSubmit(onEditSubmit)}
                         className="space-y-4"
-                      >
+                       noValidate>
                         <FormField
                           control={editForm.control}
                           name="code"
@@ -2903,7 +2903,7 @@ export default function Accounts() {
                       <form
                         onSubmit={bankForm.handleSubmit(onBankSubmit)}
                         className="space-y-4"
-                      >
+                       noValidate>
                         <FormField
                           control={bankForm.control}
                           name="name"
