@@ -28471,8 +28471,8 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { dashboardCashAccounts } = await import("@shared/schema");
-      
+      const { dashboardCashAccounts, ledgerAccounts, bankAccounts, voucherEntries, vouchers: vouchersTable } = await import("@shared/schema");
+
       const accounts = await db
         .select()
         .from(dashboardCashAccounts)
@@ -28480,115 +28480,79 @@ if (asOfDate) {
         .orderBy(dashboardCashAccounts.displayOrder)
         .execute();
 
-      // Helper function to calculate account balance from voucher entries
-      const calculateAccountBalance = async (accountId: number, accountType: string, openingBalance: string, openingBalanceSide: string | null) => {
-        const { voucherEntries, vouchers: vouchersTable } = await import("@shared/schema");
-        
-        let entries: { debitAmount: string | null; creditAmount: string | null }[] = [];
-        if (accountType === "ledger") {
-          entries = await db
-            .select({
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
-            .where(
-              and(
-                eq(voucherEntries.ledgerAccountId, accountId),
-                eq(vouchersTable.companyId, companyId),
-                isNull(vouchersTable.deletedAt),
-                eq(vouchersTable.optional, false)
-              )
-            )
-            .execute();
-        } else if (accountType === "bank") {
-          entries = await db
-            .select({
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
-            .where(
-              and(
-                eq(voucherEntries.bankAccountId, accountId),
-                eq(vouchersTable.companyId, companyId),
-                isNull(vouchersTable.deletedAt),
-                eq(vouchersTable.optional, false)
-              )
-            )
-            .execute();
-        } else {
-          entries = [];
-        }
+      if (accounts.length === 0) return res.json([]);
 
-        // Calculate balance: opening + (debits - credits)
-        let balance = parseFloat(openingBalance || "0");
-        if (openingBalanceSide === "Cr") {
-          balance = -balance;
-        }
-        
-        for (const entry of entries) {
-          const debit = parseFloat(entry.debitAmount || "0");
-          const credit = parseFloat(entry.creditAmount || "0");
-          balance += debit - credit;
-        }
-        
-        return balance;
+      const ledgerIds = accounts.filter(a => a.accountType === "ledger").map(a => a.accountId);
+      const bankIds   = accounts.filter(a => a.accountType === "bank").map(a => a.accountId);
+
+      // Batch-fetch all account details and aggregate entry sums in parallel (4 queries total regardless of account count)
+      const [ledgerRows, bankRows, ledgerSums, bankSums] = await Promise.all([
+        ledgerIds.length > 0 ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute() : [],
+        bankIds.length   > 0 ? db.select().from(bankAccounts).where(inArray(bankAccounts.id, bankIds)).execute()     : [],
+        ledgerIds.length > 0
+          ? db.select({
+              accountId:   voucherEntries.ledgerAccountId,
+              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .where(and(
+              inArray(voucherEntries.ledgerAccountId, ledgerIds),
+              eq(vouchersTable.companyId, companyId),
+              isNull(vouchersTable.deletedAt),
+              eq(vouchersTable.optional, false)
+            ))
+            .groupBy(voucherEntries.ledgerAccountId)
+            .execute()
+          : [],
+        bankIds.length > 0
+          ? db.select({
+              accountId:   voucherEntries.bankAccountId,
+              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .where(and(
+              inArray(voucherEntries.bankAccountId, bankIds),
+              eq(vouchersTable.companyId, companyId),
+              isNull(vouchersTable.deletedAt),
+              eq(vouchersTable.optional, false)
+            ))
+            .groupBy(voucherEntries.bankAccountId)
+            .execute()
+          : [],
+      ]);
+
+      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
+      const bankMap      = new Map(bankRows.map(b => [b.id, b]));
+      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+      const bankBalMap   = new Map(bankSums.map(r => [Number(r.accountId),   { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+
+      const calcBal = (opening: string, side: string | null, sums?: { d: number; c: number }) => {
+        let bal = parseFloat(opening || "0");
+        if (side === "Cr") bal = -bal;
+        if (sums) bal += sums.d - sums.c;
+        return bal;
       };
 
-      // Enrich with account details and calculated balances
-      const enrichedAccounts = await Promise.all(
-        accounts.map(async (account) => {
-          let accountDetails: any = null;
-          if (account.accountType === "ledger") {
-            const { ledgerAccounts } = await import("@shared/schema");
-            const [ledger] = await db
-              .select()
-              .from(ledgerAccounts)
-              .where(eq(ledgerAccounts.id, account.accountId))
-              .execute();
-            if (ledger) {
-              const balance = await calculateAccountBalance(
-                ledger.id,
-                "ledger",
-                ledger.openingBalance || "0",
-                ledger.openingBalanceSide
-              );
-              accountDetails = { ...ledger, type: "Ledger", balance, currentBalance: balance };
-            }
-          } else if (account.accountType === "bank") {
-            const { bankAccounts } = await import("@shared/schema");
-            const [bank] = await db
-              .select()
-              .from(bankAccounts)
-              .where(eq(bankAccounts.id, account.accountId))
-              .execute();
-            if (bank) {
-              const balance = await calculateAccountBalance(
-                bank.id,
-                "bank",
-                bank.openingBalance || "0",
-                bank.openingBalanceSide
-              );
-              accountDetails = { ...bank, type: "Bank", balance, currentBalance: balance };
-            }
-          }
+      const enrichedAccounts = accounts.map(account => {
+        if (account.accountType === "ledger") {
+          const ledger = ledgerMap.get(account.accountId);
+          if (!ledger) return null;
+          const balance = calcBal(ledger.openingBalance || "0", ledger.openingBalanceSide, ledgerBalMap.get(ledger.id));
+          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...ledger, type: "Ledger", balance, currentBalance: balance } };
+        } else if (account.accountType === "bank") {
+          const bank = bankMap.get(account.accountId);
+          if (!bank) return null;
+          const balance = calcBal(bank.openingBalance || "0", bank.openingBalanceSide, bankBalMap.get(bank.id));
+          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...bank, type: "Bank", balance, currentBalance: balance } };
+        }
+        return null;
+      });
 
-          return {
-            id: account.id,
-            accountType: account.accountType,
-            accountId: account.accountId,
-            displayOrder: account.displayOrder,
-            account: accountDetails,
-          };
-        })
-      );
-
-      // Filter out deleted accounts
-      const validAccounts = enrichedAccounts.filter((a) => a.account !== null);
-      res.json(validAccounts);
+      res.json(enrichedAccounts.filter(a => a !== null));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -28675,7 +28639,7 @@ if (asOfDate) {
       }
 
       const { dashboardPayableAccounts, ledgerAccounts, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
-      
+
       const accounts = await db
         .select()
         .from(dashboardPayableAccounts)
@@ -28683,72 +28647,51 @@ if (asOfDate) {
         .orderBy(dashboardPayableAccounts.displayOrder)
         .execute();
 
-      // Helper function to calculate account balance from voucher entries
-      const calculateAccountBalance = async (accountId: number, openingBalance: string, openingBalanceSide: string | null) => {
-        const entries = await db
-          .select({
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
+      if (accounts.length === 0) return res.json([]);
+
+      const ledgerIds = accounts.map(a => a.accountId);
+
+      // Batch-fetch account details and aggregate sums in parallel (2 queries total regardless of account count)
+      const [ledgerRows, ledgerSums] = await Promise.all([
+        db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute(),
+        db.select({
+            accountId:   voucherEntries.ledgerAccountId,
+            totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+            totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
           })
           .from(voucherEntries)
           .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
-          .where(
-            and(
-              eq(voucherEntries.ledgerAccountId, accountId),
-              eq(vouchersTable.companyId, companyId),
-              isNull(vouchersTable.deletedAt),
-              eq(vouchersTable.optional, false)
-            )
-          )
-          .execute();
+          .where(and(
+            inArray(voucherEntries.ledgerAccountId, ledgerIds),
+            eq(vouchersTable.companyId, companyId),
+            isNull(vouchersTable.deletedAt),
+            eq(vouchersTable.optional, false)
+          ))
+          .groupBy(voucherEntries.ledgerAccountId)
+          .execute(),
+      ]);
 
-        // Calculate balance: opening + (debits - credits)
-        let balance = parseFloat(openingBalance || "0");
-        if (openingBalanceSide === "Cr") {
-          balance = -balance;
-        }
-        
-        for (const entry of entries) {
-          const debit = parseFloat(entry.debitAmount || "0");
-          const credit = parseFloat(entry.creditAmount || "0");
-          balance += debit - credit;
-        }
-        
-        return balance;
-      };
+      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
+      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
 
-      // Enrich with ledger account details and calculate balance from voucher entries
-      const enrichedAccounts = await Promise.all(
-        accounts.map(async (account) => {
-          const [ledgerAccount] = await db
-            .select()
-            .from(ledgerAccounts)
-            .where(eq(ledgerAccounts.id, account.accountId))
-            .execute();
-          
-          if (!ledgerAccount) {
-            return null;
-          }
-          
-          const balance = await calculateAccountBalance(
-            ledgerAccount.id,
-            ledgerAccount.openingBalance || "0",
-            ledgerAccount.openingBalanceSide
-          );
-          
-          return {
-            id: account.accountId,
-            accountId: account.accountId,
-            code: ledgerAccount?.code || "",
-            name: ledgerAccount?.name || "",
-            balance,
-          };
-        })
-      );
+      const enrichedAccounts = accounts.map(account => {
+        const ledger = ledgerMap.get(account.accountId);
+        if (!ledger) return null;
+        let balance = parseFloat(ledger.openingBalance || "0");
+        if (ledger.openingBalanceSide === "Cr") balance = -balance;
+        const sums = ledgerBalMap.get(ledger.id);
+        if (sums) balance += sums.d - sums.c;
+        return {
+          id: account.accountId,
+          accountId: account.accountId,
+          displayOrder: account.displayOrder,
+          code: ledger.code || "",
+          name: ledger.name || "",
+          balance,
+        };
+      });
 
-      // Filter out deleted accounts
-      const validAccounts = enrichedAccounts.filter((a) => a !== null);
-      res.json(validAccounts);
+      res.json(enrichedAccounts.filter(a => a !== null));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

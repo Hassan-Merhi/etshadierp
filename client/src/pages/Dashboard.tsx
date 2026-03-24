@@ -244,7 +244,7 @@ export default function Dashboard() {
   const { data: dashboardPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
     enabled: !!selectedCompany,
-    refetchInterval: 30000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   // Add dashboard cash account mutation
