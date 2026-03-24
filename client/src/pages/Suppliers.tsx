@@ -174,13 +174,13 @@ export default function Suppliers() {
       a.legalName.localeCompare(b.legalName)
     );
   
-  const handleSupplierClick = (supplier: SupplierWithStats) => {
+  const handleSupplierClick = async (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
     setCompanyFilter("all"); // Reset filter when opening
     setDialogTab("transactions"); // Reset to transactions tab
   };
   
-  const handleCloseDialog = () => {
+  const handleCloseDialog = async () => {
     setSelectedSupplier(null);
     setCompanyFilter("all");
     setDialogTab("transactions");
@@ -214,7 +214,7 @@ export default function Suppliers() {
     navigate(`/containers/${po.containerId}`);
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (!selectedSupplier || unifiedLedger.length === 0) return;
 
     const exportData = unifiedLedger.map((txn: any) => ({
@@ -231,7 +231,7 @@ export default function Suppliers() {
     utils.book_append_sheet(workbook, worksheet, "Supplier Ledger");
     
     const fileName = `${selectedSupplier.legalName}_Ledger_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    writeFile(workbook, fileName);
+    await writeFile(workbook, fileName);
   };
 
   const openingEntry = unifiedLedger.find((t: any) => t.type === "opening");

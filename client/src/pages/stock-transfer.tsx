@@ -178,7 +178,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     },
   });
 
-  const resetForm = () => {
+  const resetForm = async () => {
     setSelectedDestLocation(null);
     setNotes("");
     setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
@@ -194,7 +194,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     return invItem ? parseFloat(invItem.quantity) : 0;
   };
 
-  const handleItemChange = (index: number, stockItemId: number, stockItemName: string) => {
+  const handleItemChange = async (index: number, stockItemId: number, stockItemName: string) => {
     const availableQty = getAvailableQty(stockItemId);
     
     if (stockItemId > 0 && availableQty === 0) {
@@ -223,13 +223,13 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }, 50);
   };
 
-  const handleQuantityChange = (index: number, quantity: string) => {
+  const handleQuantityChange = async (index: number, quantity: string) => {
     const newEntries = [...entries];
     newEntries[index] = { ...newEntries[index], quantity };
     setEntries(newEntries);
   };
 
-  const handleItemNameChange = (index: number, value: string) => {
+  const handleItemNameChange = async (index: number, value: string) => {
     const newEntries = [...entries];
     newEntries[index] = { ...newEntries[index], stockItemName: value, stockItemId: 0, availableQty: 0 };
     setEntries(newEntries);
@@ -237,29 +237,29 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     setHighlightedIndex(0);
   };
 
-  const handleItemInputFocus = (index: number) => {
+  const handleItemInputFocus = async (index: number) => {
     setActiveRowIndex(index);
     setSearchTerm(entries[index].stockItemName || "");
     setHighlightedIndex(0);
   };
 
-  const handleItemInputBlur = () => {
+  const handleItemInputBlur = async () => {
     setTimeout(() => {
       setActiveRowIndex(null);
     }, 200);
   };
 
-  const addNewRow = () => {
+  const addNewRow = async () => {
     setEntries([...entries, { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
   };
 
-  const removeRow = (index: number) => {
+  const removeRow = async (index: number) => {
     if (entries.length > 1) {
       setEntries(entries.filter((_, i) => i !== index));
     }
   };
 
-  const getFilteredInventory = () => {
+  const getFilteredInventory = async () => {
     if (!searchTerm.trim()) {
       return inventoryItems.map(inv => {
         const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
@@ -291,7 +291,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       .sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  const selectItem = (item: { stockItemId: number; name: string; code: string; stock: number }) => {
+  const selectItem = async (item: { stockItemId: number; name: string; code: string; stock: number }) => {
     if (activeRowIndex === null) return;
     
     if (item.stock === 0) {
@@ -303,7 +303,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     handleItemChange(activeRowIndex, item.stockItemId, item.name);
   };
 
-  const handleItemKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleItemKeyDown = async (e: React.KeyboardEvent, index: number) => {
     const filteredItems = getFilteredInventory();
     
     if (e.key === "ArrowDown") {
@@ -335,7 +335,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   }, [highlightedIndex, activeRowIndex]);
 
-  const validateAndSubmit = (skipWarning = false) => {
+  const validateAndSubmit = async (skipWarning = false) => {
     if (!activeSourceLocation || !selectedDestLocation) {
       toast({ title: "Error", description: "Please select source and destination locations", variant: "destructive" });
       return;
@@ -388,11 +388,11 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     validateAndSubmit(false);
   };
 
-  const handleProceedWithNegative = () => {
+  const handleProceedWithNegative = async () => {
     setNegativeStockWarning(false);
     validateAndSubmit(true);
   };
@@ -420,7 +420,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (allStockTransferVouchers.length === 0) {
       toast({
         title: "No data to export",
@@ -442,7 +442,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     utils.book_append_sheet(workbook, worksheet, "Stock Transfers");
 
     const fileName = `Stock_Transfers_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    writeFile(workbook, fileName);
+    await writeFile(workbook, fileName);
 
     toast({
       title: "Export successful",
@@ -545,7 +545,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       worksheet["!cols"] = colWidths;
 
       const fileName = `Stock_Transfers_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
 
       toast({
         title: "Export successful",
@@ -566,7 +566,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
   const filteredItems = getFilteredInventory();
 
-  const calculateTotal = () => {
+  const calculateTotal = async () => {
     return entries.reduce((sum, entry) => {
       const qty = parseFloat(entry.quantity || "0");
       return sum + (isNaN(qty) ? 0 : qty);

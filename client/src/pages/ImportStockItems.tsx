@@ -34,7 +34,7 @@ export default function ImportStockItems() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     const template = [
       { code: "ITEM001", name: "Cotton Bale Grade A", unit: "Bale", stockGroupCode: "GRP001" },
       { code: "ITEM002", name: "Cotton Bale Grade B", unit: "Bale", stockGroupCode: "GRP001" },
@@ -43,7 +43,7 @@ export default function ImportStockItems() {
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Stock Items");
-    writeFile(wb, "stock_items_template.xlsx");
+    await writeFile(wb, "stock_items_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -213,7 +213,7 @@ export default function ImportStockItems() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     setFile(null);
     setPreviewData([]);
     setErrors([]);

@@ -699,7 +699,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     );
     if (salesItems.length === 0) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
 
@@ -875,7 +875,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // Keyboard date navigation: "-" = back 1 day, "=" (Shift or no shift) / "+" = forward 1 day
   // Works on Mac (Minus/Equal keys) and Windows
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const tag = target?.tagName?.toLowerCase();
       // Only block when user is typing in a real text/number input or textarea
@@ -1169,12 +1169,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
 
   // Handler functions
-  const handleView = (voucher: Voucher) => {
+  const handleView = async (voucher: Voucher) => {
     setSelectedVoucher(voucher);
     setViewDialogOpen(true);
   };
 
-  const handleEdit = (voucher: Voucher) => {
+  const handleEdit = async (voucher: Voucher) => {
     // Sales vouchers use the dedicated edit page
     if (voucher.voucherType === "Sales") {
       navigate(`/vouchers/${voucher.id}/edit?from=daybook`);
@@ -1220,7 +1220,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   };
 
-  const handleSaveEdit = (data: EditVoucherForm) => {
+  const handleSaveEdit = async (data: EditVoucherForm) => {
     if (!voucherToEdit) return;
 
     editMutation.mutate({
@@ -1229,18 +1229,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
     });
   };
 
-  const handleDelete = (voucher: Voucher) => {
+  const handleDelete = async (voucher: Voucher) => {
     setVoucherToDelete(voucher);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (voucherToDelete) {
       deleteMutation.mutate(voucherToDelete.id);
     }
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (filteredVouchers.length === 0) {
       toast({
         title: "No data to export",
@@ -1265,7 +1265,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     utils.book_append_sheet(workbook, worksheet, "Daybook");
 
     const fileName = `Daybook_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    writeFile(workbook, fileName);
+    await writeFile(workbook, fileName);
 
     toast({
       title: "Export successful",
@@ -1461,7 +1461,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       }
 
       const fileName = `Daybook_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
 
       toast({
         title: "Export successful",
@@ -1536,7 +1536,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // ── Track window scroll into ref + patch sessionStorage directly ─────────────
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = async () => {
       scrollYRef.current = window.scrollY;
       // Patch scroll in sessionStorage without triggering a React re-render
       try {
@@ -1565,7 +1565,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // ── Keyboard navigation (Arrow Up/Down, Ctrl+H, Ctrl+U) ─────────────────────
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const handler = async (e: KeyboardEvent) => {
       if (hasAnyOpenDialog()) return;
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isEditable = document.activeElement?.getAttribute("contenteditable");
@@ -1642,7 +1642,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return () => window.removeEventListener("keydown", handler);
   }, [selectedRowId, visibleRows, hiddenRowIds, showHidden, rowId]);
 
-  const clearFilters = () => {
+  const clearFilters = async () => {
     setPeriodFilter(getDefaultPeriodValue("today"));
     setFilters({
       voucherType: "all",

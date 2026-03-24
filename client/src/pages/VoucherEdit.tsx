@@ -745,7 +745,7 @@ export default function VoucherEdit() {
     name: "entries",
   });
 
-  const focusByTestId = (testId: string, select = false) => {
+  const focusByTestId = async (testId: string, select = false) => {
     setTimeout(() => {
       const el = document.querySelector(`[data-testid="${testId}"]`) as HTMLInputElement;
       if (el) { el.focus(); if (select) el.select(); }
@@ -821,7 +821,7 @@ export default function VoucherEdit() {
   });
 
   // Helper function to find account details by ID
-  const findAccountDetails = (entry: VoucherEntry) => {
+  const findAccountDetails = async (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
       const account = ledgerAccounts.find(a => a.id === entry.ledgerAccountId);
       return account ? {
@@ -1266,7 +1266,7 @@ export default function VoucherEdit() {
   };
 
   // Submit handlers
-  const onSubmitPaymentReceipt = (data: VoucherFormData) => {
+  const onSubmitPaymentReceipt = async (data: VoucherFormData) => {
     const voucherUpdates = {
       voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
       voucherType: voucherType,
@@ -1316,7 +1316,7 @@ export default function VoucherEdit() {
     updateMutation.mutate({ voucherUpdates, entries });
   };
 
-  const onSubmitJournal = (data: JournalFormData) => {
+  const onSubmitJournal = async (data: JournalFormData) => {
     const voucherUpdates = {
       voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
       voucherType: "Journal",
@@ -1339,24 +1339,24 @@ export default function VoucherEdit() {
     updateMutation.mutate({ voucherUpdates, entries });
   };
 
-  const onSubmitSales = (data: SalesFormData) => {
+  const onSubmitSales = async (data: SalesFormData) => {
     updateSalesMutation.mutate(data);
   };
 
-  const onSubmitPurchase = (data: PurchaseFormData) => {
+  const onSubmitPurchase = async (data: PurchaseFormData) => {
     updatePurchaseMutation.mutate(data);
   };
 
-  const onSubmitAdjustment = (data: AdjustmentFormData) => {
+  const onSubmitAdjustment = async (data: AdjustmentFormData) => {
     updateAdjustmentMutation.mutate(data);
   };
 
-  const onSubmitTransfer = (data: TransferFormData) => {
+  const onSubmitTransfer = async (data: TransferFormData) => {
     updateTransferMutation.mutate(data);
   };
 
   // Handle cancel - go back to previous page
-  const handleCancel = () => {
+  const handleCancel = async () => {
     window.history.back();
   };
 
@@ -2636,7 +2636,7 @@ export default function VoucherEdit() {
     const destinationLocation = locations.find(l => l.id === transfer.destinationLocationId);
     
     // Excel export function for Stock Transfer
-    const exportToExcel = () => {
+    const exportToExcel = async () => {
       // Using imported excel helper
       
       const transferItems = transferForm.watch("items");
@@ -2671,7 +2671,7 @@ export default function VoucherEdit() {
       utils.book_append_sheet(workbook, worksheet, 'Stock Transfer');
       
       const filename = `Stock_Transfer_${voucher.voucherNumber}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-      writeFile(workbook, filename);
+      await writeFile(workbook, filename);
       
       toast({
         title: "Export Successful",

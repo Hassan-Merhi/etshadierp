@@ -422,7 +422,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   useEffect(() => {
     const hasUnsavedChanges = rows.some(row => row.itemName && row.quantity > 0);
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
         e.returnValue = ''; // Modern browsers require this
@@ -557,7 +557,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [showPrintDialog]);
 
-  const fmtPrint = (n: number, prefix = "") => {
+  const fmtPrint = async (n: number, prefix = "") => {
     const fixed = Math.abs(n).toFixed(2);
     const clean = fixed.replace(/\.00$/, "");
     const parts = clean.split(".");
@@ -862,9 +862,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     { key: "delete", label: "", width: "w-9 sm:w-12" },
   ];
 
-  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
+  const normalize = async (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
 
-  const getFilteredInventory = () => {
+  const getFilteredInventory = async () => {
     if (!searchTerm) return inventory;
     const searchNorm = normalize(searchTerm);
     return inventory.filter((item) =>
@@ -873,7 +873,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   };
 
-  const selectItem = (item: InventoryItem & { stockItemId: number }) => {
+  const selectItem = async (item: InventoryItem & { stockItemId: number }) => {
     const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
     if (item.stock === 0 && !canSellZeroStock) {
       setZeroStockItem(item.name);
@@ -937,7 +937,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }, 0);
   };
 
-  const updateRow = (index: number, field: keyof SaleRow, value: string | number) => {
+  const updateRow = async (index: number, field: keyof SaleRow, value: string | number) => {
     const newRows = [...rows];
     
     // Convert numeric fields properly - keep as number even during typing
@@ -986,7 +986,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   };
 
-  const handleDeleteRow = (index: number) => {
+  const handleDeleteRow = async (index: number) => {
     // Don't allow deleting if it's the only row
     if (rows.length === 1) {
       toast({
@@ -1016,7 +1016,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setRows(newRows);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+  const handleKeyDown = async (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
     const maxCol = columns.length - 4; // Exclude plBale, totalPL, delete from navigation
     const maxRow = rows.length - 1;
     const isItemNameField = columns[colIndex].key === "itemName";
@@ -1177,7 +1177,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   };
 
-  const focusCell = (rowIndex: number, colIndex: number) => {
+  const focusCell = async (rowIndex: number, colIndex: number) => {
     const key = `${rowIndex}-${colIndex}`;
     setTimeout(() => {
       inputRefs.current[key]?.focus();
@@ -1186,14 +1186,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   // Mobile helpers
-  const openMobileItemSearch = (rowIndex: number) => {
+  const openMobileItemSearch = async (rowIndex: number) => {
     setMobileItemSearchTarget(rowIndex);
     setMobileItemSearchTerm("");
     setMobileItemSearchOpen(true);
     setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
   };
 
-  const selectMobileItem = (item: InventoryItem & { stockItemId: number }) => {
+  const selectMobileItem = async (item: InventoryItem & { stockItemId: number }) => {
     const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
     if (item.stock === 0 && !canSellZeroStock) {
       setZeroStockItem(item.name);
@@ -1228,7 +1228,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setMobileRowEditOpen(true);
   };
 
-  const getMobileFilteredInventory = () => {
+  const getMobileFilteredInventory = async () => {
     if (!mobileItemSearchTerm) return inventory;
     const searchNorm = (mobileItemSearchTerm || "").toLowerCase().replace(/[.\-\s]/g, "");
     return inventory.filter((item) =>
@@ -1237,7 +1237,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   };
 
-  const addMobileRow = () => {
+  const addMobileRow = async () => {
     const newRowIndex = rows.length - 1;
     // If the last row already has an item, push a fresh empty row first
     if (rows[newRowIndex].stockItemId) {
@@ -1250,7 +1250,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   // Export current Sale to Excel
-  const handleExportSale = (detailed: boolean) => {
+  const handleExportSale = async (detailed: boolean) => {
     const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
     
     if (validItems.length === 0) {
@@ -1285,7 +1285,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Sales Detailed");
       const fileName = `Sales_Voucher_Detailed_${exportDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -1309,7 +1309,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Sales Summary");
       const fileName = `Sales_Voucher_Summary_${exportDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -1318,7 +1318,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   };
 
-  const handleSaveSale = () => {
+  const handleSaveSale = async () => {
     // Validate
     if (!activeLocation && !editVoucherId) {
       toast({

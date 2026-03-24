@@ -86,7 +86,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Prices");
-    writeFile(wb, "selling_prices_template.xlsx");
+    await writeFile(wb, "selling_prices_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -174,7 +174,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Opening Balances");
-    writeFile(wb, "opening_balances_template.xlsx");
+    await writeFile(wb, "opening_balances_template.xlsx");
 
     toast({
       title: "Template Downloaded",

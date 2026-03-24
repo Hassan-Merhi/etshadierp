@@ -114,7 +114,7 @@ export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
 
-  const editVoucherId = (() => {
+  const editVoucherId = async (() => {
     const params = new URLSearchParams(window.location.search);
     const v = params.get("edit");
     return v ? parseInt(v) : null;
@@ -125,7 +125,7 @@ export default function StockTransferOrder() {
     return saved ? JSON.parse(saved) : [];
   });
   // Restore state from sessionStorage once (when navigating back from history view, only for new transfers)
-  const _sessionSnapshot = (() => {
+  const _sessionSnapshot = async (() => {
     if (editVoucherId !== null) return null; // don't restore when editing existing voucher
     try {
       const ss = sessionStorage.getItem(SESSION_STATE_KEY);
@@ -304,7 +304,7 @@ export default function StockTransferOrder() {
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
   }, [destinationLocationId, orderItems, transferDate, isOptional, editVoucherId]);
 
-  const restoreDraft = () => {
+  const restoreDraft = async () => {
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
@@ -320,7 +320,7 @@ export default function StockTransferOrder() {
     }
   };
 
-  const discardDraft = () => {
+  const discardDraft = async () => {
     localStorage.removeItem(DRAFT_KEY);
     setHasDraft(false);
   };
@@ -346,7 +346,7 @@ export default function StockTransferOrder() {
 
   const availableDestinations = locations;
 
-  const toggleGroup = (groupId: number) => {
+  const toggleGroup = async (groupId: number) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -358,7 +358,7 @@ export default function StockTransferOrder() {
     });
   };
 
-  const toggleLocation = (locationId: number) => {
+  const toggleLocation = async (locationId: number) => {
     setSelectedLocationIds(prev => 
       prev.includes(locationId) 
         ? prev.filter(id => id !== locationId)
@@ -469,7 +469,7 @@ export default function StockTransferOrder() {
     });
   }, [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]);
 
-  const handleCellClick = (
+  const handleCellClick = async (
     item: StockItemData,
     locationId: number,
     locationName: string,
@@ -478,7 +478,7 @@ export default function StockTransferOrder() {
     openQuantityPicker(item, locationId, locationName, availableQty);
   };
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     const qty = parseFloat(pickerQuantity);
     
     if (isNaN(qty) || qty <= 0) {
@@ -543,7 +543,7 @@ export default function StockTransferOrder() {
     });
   };
 
-  const removeFromOrder = (index: number) => {
+  const removeFromOrder = async (index: number) => {
     setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
@@ -570,7 +570,7 @@ export default function StockTransferOrder() {
     return errors;
   };
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
     const errors = validateOrder();
     setValidationErrors(errors);
     
@@ -588,7 +588,7 @@ export default function StockTransferOrder() {
     }
   };
 
-  const handleExportOrder = (detailed: boolean) => {
+  const handleExportOrder = async (detailed: boolean) => {
     if (orderItems.length === 0) {
       toast({
         title: "No data to export",
@@ -619,7 +619,7 @@ export default function StockTransferOrder() {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Transfer Order Detailed");
       const fileName = `Stock_Transfer_Order_Detailed_${exportDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -640,7 +640,7 @@ export default function StockTransferOrder() {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Transfer Order Summary");
       const fileName = `Stock_Transfer_Order_Summary_${exportDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",

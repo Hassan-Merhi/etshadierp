@@ -140,7 +140,7 @@ export default function Containers() {
 
   // Auto-size inputs to fit their text.
   // Defaults are slightly wider so fields don't feel cramped (like Description).
-  const autoSizeStyle = (
+  const autoSizeStyle = async (
     value: unknown,
     placeholder = "",
     minCh = 10,
@@ -340,18 +340,18 @@ export default function Containers() {
     return true;
   });
 
-  const getSupplierName = (supplierId: number) => {
+  const getSupplierName = async (supplierId: number) => {
     const supplier = suppliers.find((s) => s.id === supplierId);
     return supplier ? supplier.legalName : "Unknown";
   };
 
-  const clearFilters = () => {
+  const clearFilters = async () => {
     setStatusFilter("ALL");
     setSupplierFilter("ALL");
     setSearchTerm("");
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     const data = containers.map((container) => ({
       "Container Number": container.containerNumber,
       Supplier: getSupplierName(container.supplierId),
@@ -363,7 +363,7 @@ export default function Containers() {
     const worksheet = utils.json_to_sheet(data);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Containers");
-    writeFile(workbook, "containers.xlsx");
+    await writeFile(workbook, "containers.xlsx");
   };
 
   const exportAllContainersFull = async () => {
@@ -394,7 +394,7 @@ export default function Containers() {
     }
   };
 
-  const exportOtwToExcel = () => {
+  const exportOtwToExcel = async () => {
     const data = filteredOtwContainers.map((c) => ({
       "Container #": c.containerNumber,
       Supplier: getSupplierName(c.supplierId),
@@ -416,7 +416,7 @@ export default function Containers() {
     const worksheet = utils.json_to_sheet(data);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "OTW Containers");
-    writeFile(workbook, "otw_containers.xlsx");
+    await writeFile(workbook, "otw_containers.xlsx");
   };
 
   // Helper function to convert Excel date serial numbers to date strings
@@ -443,7 +443,7 @@ export default function Containers() {
     return String(value);
   };
 
-  const downloadImportTemplate = () => {
+  const downloadImportTemplate = async () => {
     const templateData = [
       {
         "Container #": "EXAMPLE123456",
@@ -465,10 +465,10 @@ export default function Containers() {
     const worksheet = utils.json_to_sheet(templateData);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Import Template");
-    writeFile(workbook, "container_import_template.xlsx");
+    await writeFile(workbook, "container_import_template.xlsx");
   };
 
-  const handleImportClick = () => {
+  const handleImportClick = async () => {
     fileInputRef.current?.click();
   };
 
@@ -581,7 +581,7 @@ export default function Containers() {
     }
   };
 
-  const getEditValue = (container: Container, field: keyof Container) => {
+  const getEditValue = async (container: Container, field: keyof Container) => {
     if (
       trackingEdits[container.id] &&
       trackingEdits[container.id][field] !== undefined
@@ -591,7 +591,7 @@ export default function Containers() {
     return container[field];
   };
 
-  const setEditValue = (
+  const setEditValue = async (
     containerId: number,
     field: keyof Container,
     value: any,
@@ -605,14 +605,14 @@ export default function Containers() {
     }));
   };
 
-  const hasChanges = (containerId: number) => {
+  const hasChanges = async (containerId: number) => {
     return (
       trackingEdits[containerId] &&
       Object.keys(trackingEdits[containerId]).length > 0
     );
   };
 
-  const saveTracking = (containerId: number) => {
+  const saveTracking = async (containerId: number) => {
     const data = trackingEdits[containerId];
     if (!data) return;
 
@@ -667,7 +667,7 @@ export default function Containers() {
       );
       if (containerIndex === -1) return;
 
-      const getInputId = (cIdx: number, fIdx: number) => {
+      const getInputId = async (cIdx: number, fIdx: number) => {
         const container = filteredOtwContainers[cIdx];
         if (!container) return null;
         const field = trackingFields[fIdx];
@@ -675,7 +675,7 @@ export default function Containers() {
         return `tracking-${container.id}-${field}`;
       };
 
-      const focusInput = (inputId: string | null) => {
+      const focusInput = async (inputId: string | null) => {
         if (!inputId) return false;
         const el = document.getElementById(inputId) as HTMLInputElement | null;
         if (el) {

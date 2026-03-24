@@ -380,7 +380,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       queryKey: ["/api/companies"],
     });
 
-    const formatTimeAgo = (dateStr: string) => {
+    const formatTimeAgo = async (dateStr: string) => {
       const date = new Date(dateStr);
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
@@ -394,13 +394,13 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       return `${diffHours} hours ago`;
     };
 
-    const getCompanyName = (companyId: number | null) => {
+    const getCompanyName = async (companyId: number | null) => {
       if (!companyId || !companies) return "—";
       const company = companies.find((c: any) => c.id === companyId);
       return company?.name || "Unknown";
     };
 
-    const getPageLabel = (route: string) => {
+    const getPageLabel = async (route: string) => {
       if (!route || route === "/") return "Dashboard";
       const routeLabels: Record<string, string> = {
         "/": "Dashboard",
@@ -608,7 +608,7 @@ function DataToolsTab() {
   });
 
   // Cost price import functions
-  const downloadCostPriceTemplate = () => {
+  const downloadCostPriceTemplate = async () => {
     const template = [
       { barcode: "ITEM001", costPrice: "125.50" },
       { barcode: "ITEM002", costPrice: "95.75" },
@@ -616,7 +616,7 @@ function DataToolsTab() {
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Cost Price Import");
-    writeFile(wb, "cost_price_import_template.xlsx");
+    await writeFile(wb, "cost_price_import_template.xlsx");
     toast({
       title: "Template Downloaded",
       description: "Use this template to update cost prices",
@@ -710,7 +710,7 @@ function DataToolsTab() {
     }
   };
 
-  const handleCostPriceDialogClose = () => {
+  const handleCostPriceDialogClose = async () => {
     setCostPriceImportOpen(false);
     setCostPriceFile(null);
     setCostPricePreview([]);
@@ -719,7 +719,7 @@ function DataToolsTab() {
   };
 
   // Stock import functions
-  const downloadStockTemplate = () => {
+  const downloadStockTemplate = async () => {
     const template = [
       { Item_barcode: "ITEM-001", stockGroupCode: "GRP01", quantity: "100", rate: "50.00", value: "5000.00" },
       { Item_barcode: "ITEM-002", stockGroupCode: "GRP02", quantity: "50", rate: "100.00", value: "5000.00" },
@@ -727,7 +727,7 @@ function DataToolsTab() {
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Stock Import");
-    writeFile(wb, "stock_import_template.xlsx");
+    await writeFile(wb, "stock_import_template.xlsx");
     toast({ title: "Template Downloaded", description: "Use this template to import stock" });
   };
 
@@ -831,7 +831,7 @@ function DataToolsTab() {
     }
   };
 
-  const handleStockDialogClose = () => {
+  const handleStockDialogClose = async () => {
     setStockImportOpen(false);
     setStockFile(null);
     setStockPreview([]);
@@ -1204,7 +1204,7 @@ function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void }) {
   const isCreate = log.action === "create";
   const isUpdate = log.action === "update";
 
-  const copyJson = (obj: any) => {
+  const copyJson = async (obj: any) => {
     navigator.clipboard.writeText(JSON.stringify(obj, null, 2)).then(() => {
       toast({ title: "Copied", description: "JSON copied to clipboard." });
     });
@@ -1518,7 +1518,7 @@ function FileStorageTab() {
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     uploadMutation.mutate({ file, desc: description });
@@ -1542,7 +1542,7 @@ function FileStorageTab() {
     }
   };
 
-  const formatSize = (bytes: number) => {
+  const formatSize = async (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -1694,7 +1694,7 @@ function BulkRenameTab() {
   const [isSearching, setIsSearching] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
 
-  const buildRegex = () => {
+  const buildRegex = async () => {
     if (!findText.trim()) return null;
     const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = wholeWordOnly ? `\\b${escaped}\\b` : escaped;
@@ -1732,13 +1732,13 @@ function BulkRenameTab() {
     }
   };
 
-  const getPreviewName = (name: string) => {
+  const getPreviewName = async (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
     return name.replace(regex, replaceWith);
   };
 
-  const renderPreviewName = (name: string) => {
+  const renderPreviewName = async (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
     const parts: (string | JSX.Element)[] = [];
@@ -1800,7 +1800,7 @@ function BulkRenameTab() {
     }
   };
 
-  const toggleItem = (id: number) => {
+  const toggleItem = async (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1809,8 +1809,8 @@ function BulkRenameTab() {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(matchingItems.map((m) => m.id)));
-  const clearAll = () => setSelectedIds(new Set());
+  const selectAll = async () => setSelectedIds(new Set(matchingItems.map((m) => m.id)));
+  const clearAll = async () => setSelectedIds(new Set());
 
   return (
     <Card>
@@ -2480,32 +2480,32 @@ function IntercompanyPosTab() {
       onError: (err: Error) => { toast({ title: "Error", description: err.message, variant: "destructive" }); },
     });
 
-    const resetFactoryUserForm = () => {
+    const resetFactoryUserForm = async () => {
       setFactoryUserFormData({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
       setFactoryUserPages(new Set());
       setFactoryUserHiddenCostFields([]);
     };
 
-    const openFactoryUserEdit = (user: any) => {
+    const openFactoryUserEdit = async (user: any) => {
       setFactoryEditingUser(user);
       setFactoryUserFormData({ username: user.username, password: "", displayName: user.displayName || "", hasErpAccess: user.hasErpAccess ?? true, hasFactoryAccess: user.hasFactoryAccess ?? true });
       setFactoryUserPages(new Set(user.pageAccess));
       setFactoryUserHiddenCostFields(user.hiddenCostFields ?? []);
     };
 
-    const isFactoryAdminOrOwner = (user: any) => ["admin", "owner"].includes(user.role?.toLowerCase());
+    const isFactoryAdminOrOwner = async (user: any) => ["admin", "owner"].includes(user.role?.toLowerCase());
 
-    const toggleFactoryUserPage = (pageKey: string) => {
+    const toggleFactoryUserPage = async (pageKey: string) => {
       setFactoryUserPages(prev => { const next = new Set(prev); next.has(pageKey) ? next.delete(pageKey) : next.add(pageKey); return next; });
     };
 
-    const toggleFactoryUserGroup = (group: string) => {
+    const toggleFactoryUserGroup = async (group: string) => {
       const groupPages = ALL_FACTORY_PAGES_SETTINGS.filter(p => p.group === group).map(p => p.key);
       const allSelected = groupPages.every(k => factoryUserPages.has(k));
       setFactoryUserPages(prev => { const next = new Set(prev); groupPages.forEach(k => allSelected ? next.delete(k) : next.add(k)); return next; });
     };
 
-    const handleFactoryUserSubmit = () => {
+    const handleFactoryUserSubmit = async () => {
       if (factoryEditingUser) {
         const privileged = isFactoryAdminOrOwner(factoryEditingUser);
         updateFactoryUserMutation.mutate({
@@ -3125,7 +3125,7 @@ function IntercompanyPosTab() {
       },
     });
   
-    const handleEditCompany = (company: any) => {
+    const handleEditCompany = async (company: any) => {
       setEditingCompany(company);
       companyForm.reset({
         name: company.name,
@@ -3138,7 +3138,7 @@ function IntercompanyPosTab() {
       setIsCompanyDialogOpen(true);
     };
   
-    const handleEdit = (user: any) => {
+    const handleEdit = async (user: any) => {
       setEditingUser(user);
       form.reset({
         username: user.username,
@@ -3148,11 +3148,11 @@ function IntercompanyPosTab() {
       setIsDialogOpen(true);
     };
   
-    const handleSubmitCompany = (data: CompanyFormData) => {
+    const handleSubmitCompany = async (data: CompanyFormData) => {
       createCompanyMutation.mutate(data);
     };
   
-    const handleSubmit = (data: UserFormData) => {
+    const handleSubmit = async (data: UserFormData) => {
       // If editing and password is empty, remove it from the update
       if (editingUser && !data.password) {
         const { password, ...dataWithoutPassword } = data;
@@ -3162,7 +3162,7 @@ function IntercompanyPosTab() {
       }
     };
   
-    const handleAddRole = (userId: string) => {
+    const handleAddRole = async (userId: string) => {
       setCurrentUserId(userId);
       setEditingRole(null);
       setSelectedLocationIds([]);
@@ -3200,20 +3200,20 @@ function IntercompanyPosTab() {
       setIsRoleDialogOpen(true);
     };
   
-    const handleSubmitRole = (data: RoleAssignmentData) => {
+    const handleSubmitRole = async (data: RoleAssignmentData) => {
       createRoleMutation.mutate(data);
     };
   
-    const handleDeleteRole = (roleId: number, userId: string) => {
+    const handleDeleteRole = async (roleId: number, userId: string) => {
       setCurrentUserId(userId);
       setPendingDelete(() => () => deleteRoleMutation.mutate(roleId));
     };
   
-    const toggleUserExpansion = (userId: string) => {
+    const toggleUserExpansion = async (userId: string) => {
       setExpandedUserId(expandedUserId === userId ? null : userId);
     };
   
-    const handlePermissionToggle = (roleId: number, userId: string, companyId: number, field: string, value: boolean) => {
+    const handlePermissionToggle = async (roleId: number, userId: string, companyId: number, field: string, value: boolean) => {
       updatePermissionMutation.mutate({
         roleId,
         userId,
@@ -3222,7 +3222,7 @@ function IntercompanyPosTab() {
       });
     };
 
-    const handleDaybookDaysChange = (roleId: number, userId: string, companyId: number, days: number) => {
+    const handleDaybookDaysChange = async (roleId: number, userId: string, companyId: number, days: number) => {
       updatePermissionMutation.mutate({
         roleId,
         userId,

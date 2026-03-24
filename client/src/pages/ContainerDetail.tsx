@@ -241,7 +241,7 @@ export default function ContainerDetail() {
       const worksheet = utils.json_to_sheet(rows);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Container Items");
-      writeFile(workbook, `container_${data.container.containerNumber}.xlsx`);
+      await writeFile(workbook, `container_${data.container.containerNumber}.xlsx`);
 
       toast({ title: "Export successful", description: "Container data downloaded as Excel" });
     } catch (error: any) {
@@ -369,19 +369,19 @@ export default function ContainerDetail() {
     },
   });
 
-  const handleDeletePO = (poId: number, _poNumber: string) => {
+  const handleDeletePO = async (poId: number, _poNumber: string) => {
     setPendingDelete(() => () => deletePOMutation.mutate(poId));
   };
 
-  const handleDeleteContainer = () => {
+  const handleDeleteContainer = async () => {
     setPendingDelete(() => () => deleteContainerMutation.mutate(parseInt(containerId!)));
   };
 
-  const handleSellSubmit = (data: z.infer<typeof saleFormSchema>) => {
+  const handleSellSubmit = async (data: z.infer<typeof saleFormSchema>) => {
     sellContainerMutation.mutate(data);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     window.print();
   };
 

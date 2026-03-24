@@ -178,7 +178,7 @@ export default function StockItems() {
     },
   });
 
-  const handleAdjustStock = () => {
+  const handleAdjustStock = async () => {
     if (!adjustStockItemId || !adjustLocationId || !adjustQuantity) {
       toast({
         title: "Error",
@@ -204,7 +204,7 @@ export default function StockItems() {
     });
   };
 
-  const handleSelectAll = (checked: boolean) => {
+  const handleSelectAll = async (checked: boolean) => {
     if (checked) {
       setSelectedIds(filteredStockItems.map(item => item.id));
     } else {
@@ -212,7 +212,7 @@ export default function StockItems() {
     }
   };
 
-  const handleSelectItem = (id: number, checked: boolean) => {
+  const handleSelectItem = async (id: number, checked: boolean) => {
     if (checked) {
       setSelectedIds(prev => [...prev, id]);
     } else {
@@ -220,22 +220,22 @@ export default function StockItems() {
     }
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = async () => {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     deleteMutation.mutate(selectedIds);
     setDeleteDialogOpen(false);
   };
 
-  const handleStockItemClick = (stockItemId: number, stockItemName: string) => {
+  const handleStockItemClick = async (stockItemId: number, stockItemName: string) => {
     setSelectedStockItemId(stockItemId);
     setSelectedStockItemName(stockItemName);
     setDetailsDialogOpen(true);
   };
 
-  const handleEditClick = (stockItemId: number, e: React.MouseEvent) => {
+  const handleEditClick = async (stockItemId: number, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent row click from firing
     setEditStockItemId(stockItemId);
     setEditDialogOpen(true);
@@ -255,7 +255,7 @@ export default function StockItems() {
 
   const unassignedItems = stockItems.filter(item => !item.stockGroupId);
 
-  const getStockGroupName = (stockGroupId: number | null) => {
+  const getStockGroupName = async (stockGroupId: number | null) => {
     if (!stockGroupId) return "— No Group —";
     const group = stockGroups.find(g => g.id === stockGroupId);
     return group ? group.name : "Unknown";
@@ -309,7 +309,7 @@ export default function StockItems() {
       const worksheet = utils.json_to_sheet(data);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Sales History");
-      writeFile(workbook, "stock-items-sales-history.xlsx");
+      await writeFile(workbook, "stock-items-sales-history.xlsx");
     } catch (error) {
       toast({
         title: "Export failed",
@@ -362,7 +362,7 @@ export default function StockItems() {
       const worksheet = utils.json_to_sheet(data);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Items");
-      writeFile(workbook, "stock-items.xlsx");
+      await writeFile(workbook, "stock-items.xlsx");
     } catch (error) {
       toast({
         title: "Export failed",

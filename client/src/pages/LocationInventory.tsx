@@ -150,7 +150,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   // Helper: set cost visibility then print
-  const handlePrintWithOption = (withCost: boolean) => {
+  const handlePrintWithOption = async (withCost: boolean) => {
     setPrintWithCost(withCost);
     setViewAllItems(true);
     setTimeout(() => handlePrint(), 150);
@@ -392,19 +392,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     );
 
   // Handle location selection
-  const handleLocationClick = (location: Location) => {
+  const handleLocationClick = async (location: Location) => {
     setSelectedLocationLocal(location);
     setSelectedGroup(null);
   };
 
   // Handle selecting a location for use in POS/other modules
-  const handleUseLocation = (location: Location) => {
+  const handleUseLocation = async (location: Location) => {
     setSelectedLocation(location);
     navigate("/pos");
   };
 
   // Handle back to locations
-  const handleBackToLocations = () => {
+  const handleBackToLocations = async () => {
     setSelectedLocationLocal(null);
     setSelectedGroup(null);
     setViewAllItems(false);
@@ -415,7 +415,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   };
 
   // Handle back to groups
-  const handleBackToGroups = () => {
+  const handleBackToGroups = async () => {
     setSelectedGroup(null);
     setViewAllItems(false);
     setSelectedRowIndex(0);
@@ -434,7 +434,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   useEffect(() => {
     if (!selectedGroup) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if (hasAnyOpenDialog()) return;
       const itemCount = selectedGroup.items.length;
       if (itemCount === 0) return;
@@ -473,7 +473,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   }, [selectedGroup, selectedRowIndex]);
 
   // Import handlers
-  const downloadImportTemplate = () => {
+  const downloadImportTemplate = async () => {
     const template = [
       { Item_barcode: "BALE001", stockGroupCode: "FABRIC", quantity: "100", rate: "150.00", value: "15000.00" },
       { Item_barcode: "BALE002", stockGroupCode: "TEXTILE", quantity: "50", rate: "145.50", value: "7275.00" },
@@ -482,7 +482,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Inventory Import");
-    writeFile(wb, "inventory_import_template.xlsx");
+    await writeFile(wb, "inventory_import_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -626,7 +626,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   };
 
-  const handleImportDialogClose = () => {
+  const handleImportDialogClose = async () => {
     setImportDialogOpen(false);
     setImportFile(null);
     setImportPreview([]);
@@ -634,7 +634,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setImportComplete(false);
   };
 
-  const downloadCostPriceTemplate = () => {
+  const downloadCostPriceTemplate = async () => {
     const template = [
       { barcode: "ITEM001", costPrice: "125.50" },
       { barcode: "ITEM002", costPrice: "95.75" },
@@ -643,7 +643,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Cost Price Import");
-    writeFile(wb, "cost_price_import_template.xlsx");
+    await writeFile(wb, "cost_price_import_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -783,7 +783,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   };
 
-  const handleCostPriceDialogClose = () => {
+  const handleCostPriceDialogClose = async () => {
     setCostPriceImportOpen(false);
     setCostPriceFile(null);
     setCostPricePreview([]);
@@ -853,7 +853,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   };
 
-  const handleExportNegativeStock = () => {
+  const handleExportNegativeStock = async () => {
     if (negativeStockData.length === 0) return;
     const wb = utils.book_new();
     const wsData = negativeStockData.map(item => ({
@@ -865,7 +865,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }));
     const ws = utils.json_to_sheet(wsData);
     utils.book_append_sheet(wb, ws, "Negative Stock");
-    writeFile(wb, "negative_stock_all_locations.xlsx");
+    await writeFile(wb, "negative_stock_all_locations.xlsx");
   };
 
   const handleExportInventory = async () => {

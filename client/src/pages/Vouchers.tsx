@@ -452,7 +452,7 @@ function StockItemCombobox({
 }
 
 // Print Template Component
-const PrintTemplate = ({
+const PrintTemplate = async ({
   voucherType,
   paymentAccountName,
   date,
@@ -638,7 +638,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isFactoryMode = appMode === "factory";
 
   // Handle opening voucher for editing
-  const handleEditVoucher = (voucherId: number) => {
+  const handleEditVoucher = async (voucherId: number) => {
     const prefix = isFactoryMode ? "/factory" : "";
     setLocation(`${prefix}/vouchers/${voucherId}/edit`);
   };
@@ -1305,7 +1305,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   // Handle account selection from sidebar
-  const handleSidebarAccountSelect = (account: Account) => {
+  const handleSidebarAccountSelect = async (account: Account) => {
     // Get the current entries from form state
     const currentEntries = form.getValues("entries");
     
@@ -1381,7 +1381,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
   
   // Clear selection when amount is committed (blur or Enter with amount > 0)
-  const handleAmountCommit = (rowIndex: number) => {
+  const handleAmountCommit = async (rowIndex: number) => {
     // Only clear if this is the active row
     if (rowIndex === activeRowIndex) {
       setSelectedAccountId(null);
@@ -1403,13 +1403,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Handle opening the create account modal
-  const handleOpenCreateAccountModal = (tab: "payment" | "receipt" | "journal", rowIndex?: number) => {
+  const handleOpenCreateAccountModal = async (tab: "payment" | "receipt" | "journal", rowIndex?: number) => {
     setCreateAccountContext({ tab, rowIndex });
     setShowCreateAccountModal(true);
   };
 
   // Handle account created - auto-select in the appropriate field
-  const handleAccountCreated = (account: { id: number; name: string; type: string }) => {
+  const handleAccountCreated = async (account: { id: number; name: string; type: string }) => {
     if (!createAccountContext) return;
 
     if (createAccountContext.tab === "payment" || createAccountContext.tab === "receipt") {
@@ -1534,7 +1534,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   // Export current Payment/Receipt voucher to Excel
-  const handleExportVoucher = (detailed: boolean) => {
+  const handleExportVoucher = async (detailed: boolean) => {
     const formData = form.getValues();
     const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
     const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
@@ -1568,7 +1568,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, `${voucherType} Detailed`);
       const fileName = `${voucherType}_Voucher_Detailed_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -1590,7 +1590,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, `${voucherType} Summary`);
       const fileName = `${voucherType}_Voucher_Summary_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -1599,7 +1599,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
-  const onSubmit = (data: VoucherFormData) => {
+  const onSubmit = async (data: VoucherFormData) => {
     // Validate that all amounts are numeric and positive
     const validEntries = data.entries.filter(entry => entry.accountId > 0 && entry.amount);
     if (validEntries.length === 0) {
@@ -1695,7 +1695,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   }, [allAccounts, journalAccountSearchTerm]);
 
   // Handle account selection from sidebar
-  const handleJournalAccountSelect = (account: CombinedAccount) => {
+  const handleJournalAccountSelect = async (account: CombinedAccount) => {
     if (activeJournalRow !== null) {
       journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
       journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
@@ -1725,7 +1725,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const remainingCrAmount = totalDebit - totalCredit;
 
   // Auto-fill CR amount when the user switches to CR on a row
-  const handleJournalTypeChange = (index: number, newType: "DR" | "CR") => {
+  const handleJournalTypeChange = async (index: number, newType: "DR" | "CR") => {
     // Get fresh values from form, not from watched values which may be stale
     const currentEntries = journalForm.getValues("entries");
     const currentAmount = parseFloat(currentEntries[index]?.amount || "0");
@@ -1936,7 +1936,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   // Export current Journal voucher to Excel
-  const handleExportJournalVoucher = (detailed: boolean) => {
+  const handleExportJournalVoucher = async (detailed: boolean) => {
     const formData = journalForm.getValues();
     const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
     const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
@@ -1967,7 +1967,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Journal Detailed");
       const fileName = `Journal_Voucher_Detailed_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -1992,7 +1992,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Journal Summary");
       const fileName = `Journal_Voucher_Summary_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -2001,7 +2001,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
-  const onJournalSubmit = (data: JournalFormData) => {
+  const onJournalSubmit = async (data: JournalFormData) => {
     // Validate that all entries have valid accounts
     const validEntries = data.entries.filter(
       (entry) => entry.accountId > 0 && parseFloat(entry.amount) > 0
@@ -2205,7 +2205,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
   });
 
-  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setImportFile(selectedFile);
@@ -2214,7 +2214,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
-  const handleImportParse = () => {
+  const handleImportParse = async () => {
     if (!importFile) {
       toast({
         title: "No file selected",
@@ -2228,7 +2228,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     importParseMutation.mutate(formData);
   };
 
-  const handleImportValidate = () => {
+  const handleImportValidate = async () => {
     if (!importDestLocation) {
       toast({
         title: "Destination required",
@@ -2251,7 +2251,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     });
   };
 
-  const handleImportSubmit = () => {
+  const handleImportSubmit = async () => {
     if (!importDestLocation || !importPreview || !importValidationResult?.validatedItems) {
       toast({
         title: "Cannot import",
@@ -2279,7 +2279,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     });
   };
   
-  const handleConfirmedImport = () => {
+  const handleConfirmedImport = async () => {
     // Filter valid items and proceed with import
     const validItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
     
@@ -2311,7 +2311,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     });
   };
 
-  const downloadImportTemplate = () => {
+  const downloadImportTemplate = async () => {
     window.open("/api/stock-transfer-import/template-multi-source", "_blank");
   };
 
@@ -2436,7 +2436,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Helper function to lookup location by code
-  const lookupLocationByCode = (code: string) => {
+  const lookupLocationByCode = async (code: string) => {
     const location = locations.find(
       (l) => l.code && l.code.toLowerCase() === code.toLowerCase()
     );
@@ -2444,7 +2444,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Helper function to lookup stock item by code
-  const lookupStockItemByCode = (code: string) => {
+  const lookupStockItemByCode = async (code: string) => {
     const item = stockItems.find(
       (s) => s.code && s.code.toLowerCase() === code.toLowerCase()
     );
@@ -3163,7 +3163,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   // Export current Production/Consumption voucher to Excel
-  const handleExportProductionConsumptionVoucher = (detailed: boolean) => {
+  const handleExportProductionConsumptionVoucher = async (detailed: boolean) => {
     const formData = stockAdjustmentForm.getValues();
     const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
     const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
@@ -3199,7 +3199,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Production-Consumption Detailed");
       const fileName = `Production_Consumption_Detailed_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -3225,7 +3225,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Production-Consumption Summary");
       const fileName = `Production_Consumption_Summary_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -3235,7 +3235,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Export current Stock Transfer voucher to Excel
-  const handleExportStockTransfer = (detailed: boolean) => {
+  const handleExportStockTransfer = async (detailed: boolean) => {
     const formData = stockTransferForm.getValues();
     const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
     const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
@@ -3270,7 +3270,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Transfer Detailed");
       const fileName = `Stock_Transfer_Detailed_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -3295,7 +3295,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Transfer Summary");
       const fileName = `Stock_Transfer_Summary_${voucherDate}.xlsx`;
-      writeFile(workbook, fileName);
+      await writeFile(workbook, fileName);
       
       toast({
         title: "Export successful",
@@ -3304,7 +3304,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
-  const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
+  const onStockAdjustmentSubmit = async (data: StockAdjustmentFormData) => {
     // Validate entries
     const validEntries = data.entries.filter(
       (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
@@ -3323,7 +3323,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Keyboard navigation handlers for Payment/Receipt
-  const handleKeyDown = (
+  const handleKeyDown = async (
     e: React.KeyboardEvent,
     rowIndex: number,
     fieldName: "account" | "amount"
@@ -3409,7 +3409,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Keyboard navigation handlers for Journal
-  const handleJournalKeyDown = (
+  const handleJournalKeyDown = async (
     e: React.KeyboardEvent,
     rowIndex: number,
     fieldName: "type" | "account" | "amount"
@@ -3515,7 +3515,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Keyboard navigation handlers for Stock Transfer
-  const handleTransferKeyDown = (
+  const handleTransferKeyDown = async (
     e: React.KeyboardEvent,
     rowIndex: number,
     fieldName: "quantity" | "rate"
@@ -3678,7 +3678,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   // Keyboard navigation handlers for Production/Consumption Table
-  const handleAdjustmentKeyDown = (
+  const handleAdjustmentKeyDown = async (
     e: React.KeyboardEvent,
     rowIndex: number,
     fieldName: "type" | "stockItem" | "quantity" | "rate"
