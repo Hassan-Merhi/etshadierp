@@ -2325,11 +2325,10 @@ function IntercompanyPosTab() {
 }
 
 function OfflineSyncPanel() {
-  const { isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, triggerSync, refreshCounts } = useConnectivity();
+  const { isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, conflictCount, triggerSync, refreshCounts } = useConnectivity();
   const { toast } = useToast();
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [idbStats, setIdbStats] = useState<{ pending: number; failed: number } | null>(null);
   const [clearing, setClearing] = useState(false);
 
   const loadLogs = async () => {
@@ -2345,19 +2344,8 @@ function OfflineSyncPanel() {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const { getSyncQueueCount } = await import("@/lib/db");
-      const stats = await getSyncQueueCount();
-      setIdbStats(stats);
-    } catch {
-      setIdbStats(null);
-    }
-  };
-
   useEffect(() => {
     void loadLogs();
-    void loadStats();
     void refreshCounts();
   }, []);
 
@@ -2368,7 +2356,7 @@ function OfflineSyncPanel() {
     }
     triggerSync();
     toast({ title: "Sync started", description: "Replaying all pending actions." });
-    setTimeout(() => { void loadLogs(); void loadStats(); void refreshCounts(); }, 2000);
+    setTimeout(() => { void loadLogs(); void refreshCounts(); }, 2000);
   };
 
   const handleClearData = async () => {
@@ -2379,7 +2367,6 @@ function OfflineSyncPanel() {
       await clearAllOfflineData();
       toast({ title: "Cleared", description: "Offline IndexedDB data cleared." });
       void loadLogs();
-      void loadStats();
       void refreshCounts();
     } catch (e: any) {
       toast({ title: "Error", description: e?.message || "Failed to clear data.", variant: "destructive" });
@@ -2414,7 +2401,7 @@ function OfflineSyncPanel() {
       </div>
 
       {/* Status Overview */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
@@ -2440,12 +2427,34 @@ function OfflineSyncPanel() {
               <div>
                 <p className="text-xs text-muted-foreground">Pending Actions</p>
                 <p className="font-medium text-sm" data-testid="text-pending-count">
-                  {pendingCount + (idbStats?.pending ?? 0)} pending
-                  {failedCount + (idbStats?.failed ?? 0) > 0 && (
+                  {pendingCount} pending
+                  {failedCount > 0 && (
                     <span className="text-destructive ml-1">
-                      · {failedCount + (idbStats?.failed ?? 0)} failed
+                      · {failedCount} failed
                     </span>
                   )}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={conflictCount > 0 ? "cursor-pointer hover-elevate" : ""}
+          onClick={conflictCount > 0 ? () => window.location.href = "/conflicts" : undefined}
+          data-testid="card-conflict-count"
+        >
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${conflictCount > 0 ? "bg-orange-500/10" : "bg-muted/50"}`}>
+                <AlertTriangle className={`h-5 w-5 ${conflictCount > 0 ? "text-orange-500" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Conflicts</p>
+                <p className={`font-medium text-sm ${conflictCount > 0 ? "text-orange-600 dark:text-orange-400" : ""}`} data-testid="text-conflict-count">
+                  {conflictCount > 0 ? (
+                    <>{conflictCount} unresolved — <span className="underline">review</span></>
+                  ) : "None"}
                 </p>
               </div>
             </div>
@@ -2489,7 +2498,7 @@ function OfflineSyncPanel() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => { void loadLogs(); void loadStats(); void refreshCounts(); }}
+            onClick={() => { void loadLogs(); void refreshCounts(); }}
             data-testid="button-refresh-offline-panel"
           >
             Refresh

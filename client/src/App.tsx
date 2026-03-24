@@ -760,6 +760,7 @@ function AuthenticatedApp() {
             <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                <PendingSyncIndicator />
                 <Button
                   variant="ghost"
                   size="sm"

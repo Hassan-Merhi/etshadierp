@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { WifiOff, RefreshCw, Trash2, RotateCcw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -286,12 +287,7 @@ export function OfflineBanner() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Badge
-                        variant={item.status === "failed" ? "destructive" : "secondary"}
-                        className="text-xs"
-                      >
-                        {item.status === "failed" ? "Failed" : "Pending"}
-                      </Badge>
+                      <SyncStatusBadge status={item.status === "failed" ? "failed" : "pending"} />
                       <Button
                         size="icon"
                         variant="ghost"
