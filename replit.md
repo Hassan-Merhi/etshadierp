@@ -63,10 +63,60 @@ Key features include:
 
 The system employs shared schemas (`shared/schema.ts`) for type safety across the stack, path aliases for clean imports, and a clear separation of concerns with code organized into `/client`, `/server`, and `/shared`. It supports distinct development and production build targets and uses a comprehensive design system for UI consistency.
 
+## Offline-First Architecture (Mar 2026)
+
+The app has a layered offline-first foundation:
+
+### IndexedDB Layer (`client/src/lib/db.ts`)
+- Uses **Dexie.js** (v4) for typed IndexedDB access
+- Schema tables: `syncQueue`, `syncState`, `syncLogs`, `conflicts`, `localDrafts`, `offlinePackages`, and entity cache tables (users, suppliers, ledgerAccounts, stockItems, etc.)
+- `syncQueue` stores pending mutations with: `idempotencyKey`, `mode`, `entityType`, `operation`, `payload`, `url`, `method`, `companyId`, `locationId`, `status`, `retryCount`, `lastError`, `description`
+- `syncLogs` is pruned to 500 entries; `appendSyncLog()` is always best-effort
+- Helper: `addToSyncQueue()`, `getSyncQueueCount()`, `getGlobalSyncState()`, `upsertGlobalSyncState()`, `getRecentSyncLogs()`, `clearAllOfflineData()`
+
+### Sync Engine (`client/src/lib/syncEngine.ts`)
+- `runSync()` is idempotent and serialized (no concurrent runs)
+- Processes **IndexedDB queue** first, then **legacy localStorage queue** (`offlineQueue.ts`)
+- Emits `window.CustomEvent("erp:sync", { syncing, lastSyncedAt, error })` for UI updates
+- Auth redirect on 401 during sync
+- `isSyncInProgress()` for external polling
+
+### ConnectivityContext (`client/src/contexts/ConnectivityContext.tsx`)
+- Global `ConnectivityProvider` wraps the entire app (inside ThemeProvider, above CompanyProvider)
+- Exposes: `isOnline`, `isSyncing`, `status` ("online"|"offline"|"syncing"|"error"), `lastSyncedAt`, `pendingCount`, `failedCount`, `triggerSync()`, `refreshCounts()`
+- Pings `/api/health` on browser online/offline events AND every 30 seconds
+- `pendingCount`/`failedCount` aggregate both IndexedDB and localStorage queues
+- Listens for `erp:sync` events from the sync engine to update UI state
+
+### OfflineBanner (`client/src/components/OfflineBanner.tsx`)
+- Now uses `useConnectivity()` for `isOnline`/`isSyncing`/`lastSyncedAt`
+- Retains its own legacy localStorage queue replay logic for the Sheet drawer
+- Auto-triggers replay when `isOnline` changes from false to true
+
+### Service Worker (`client/public/sw.js`)
+- Version: `erp-v3`
+- Navigation requests: network-first with SPA shell fallback (app loads offline)
+- API requests (`/api/*`): network-first with offline JSON 503 fallback
+- Static assets: stale-while-revalidate (bundles cached as served)
+- Background sync: `sync` event fires `TRIGGER_SYNC` message to all clients
+- SW message listener in `main.tsx` calls `syncEngine.runSync()` on `TRIGGER_SYNC`
+
+### Settings → Offline & Sync Panel
+- New sidebar section in Settings under "System" group
+- Shows connection status, pending/failed counts, last sync time
+- Controls: Sync Now, Refresh, Clear Offline Data
+- Displays last 30 sync log entries with type-colored output
+
+### Legacy Queue (`client/src/lib/offlineQueue.ts`)
+- localStorage-based queue continues to work for mutations captured by `apiRequest()`
+- Safe patterns (POST/PATCH vouchers, POS sales) — unchanged
+- Used by `OfflineBanner` sheet UI and `syncEngine.processLegacyItem()`
+
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API
 -   **UI Component Libraries**: Radix UI, Tailwind CSS, `shadcn/ui`, `class-variance-authority`, `clsx`, `cmdk`, `embla-carousel-react`, `recharts`, `date-fns`, `react-day-picker`.
 -   **Database & Backend**: `pg` (node-postgres driver), `drizzle-orm`, `connect-pg-simple`.
 -   **Form Handling**: `react-hook-form`, `@hookform/resolvers`, `zod`, `drizzle-zod`.
+-   **Offline/PWA**: `dexie` (IndexedDB), service worker (stale-while-revalidate + navigation SPA fallback).
 -   **Build Tools**: Vite, `esbuild`, PostCSS with Autoprefixer.

@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag } from "lucide-react";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { ConnectivityProvider } from "@/contexts/ConnectivityContext";
 import { usePresence } from "@/hooks/use-presence";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { apiRequest } from "@/lib/queryClient";
@@ -803,24 +804,26 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <CompanyProvider>
-            <LocationProvider>
-              <DateFormatProvider>
-                <CurrencyProvider>
-                  <CursorNavProvider>
-                    <Switch>
-                      <Route path="/login" component={Login} />
-                      <Route>
-                        <AuthenticatedApp />
-                      </Route>
-                    </Switch>
-                    <Toaster />
-                    <ChatWidget />
-                  </CursorNavProvider>
-                </CurrencyProvider>
-              </DateFormatProvider>
-            </LocationProvider>
-          </CompanyProvider>
+          <ConnectivityProvider>
+            <CompanyProvider>
+              <LocationProvider>
+                <DateFormatProvider>
+                  <CurrencyProvider>
+                    <CursorNavProvider>
+                      <Switch>
+                        <Route path="/login" component={Login} />
+                        <Route>
+                          <AuthenticatedApp />
+                        </Route>
+                      </Switch>
+                      <Toaster />
+                      <ChatWidget />
+                    </CursorNavProvider>
+                  </CurrencyProvider>
+                </DateFormatProvider>
+              </LocationProvider>
+            </CompanyProvider>
+          </ConnectivityProvider>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>

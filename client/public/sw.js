@@ -1,14 +1,15 @@
-const CACHE_VERSION = "erp-v2";
+const CACHE_VERSION = "erp-v3";
+const APP_SHELL = ["/", "/manifest.json"];
 
+// ── Install: cache app shell ──────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) =>
-      cache.addAll(["/", "/manifest.json"])
-    )
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL))
   );
 });
 
+// ── Activate: prune old caches ────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -20,20 +21,28 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
+  // Only handle same-origin GET requests
   if (request.method !== "GET") return;
-
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/")) {
+    // Network-first for API calls; offline JSON fallback
     event.respondWith(networkFirstApi(request));
+  } else if (request.mode === "navigate") {
+    // Navigation requests: network first, fall back to cached shell (SPA)
+    event.respondWith(navigationHandler(request));
   } else {
+    // Static assets: stale-while-revalidate
     event.respondWith(staleWhileRevalidate(request));
   }
 });
+
+// ── Strategies ────────────────────────────────────────────────────────────────
 
 async function networkFirstApi(request) {
   try {
@@ -53,6 +62,28 @@ async function networkFirstApi(request) {
   }
 }
 
+async function navigationHandler(request) {
+  try {
+    const response = await fetch(request.clone());
+    if (response.ok) {
+      const cache = await caches.open(CACHE_VERSION);
+      cache.put(request, response.clone());
+      return response;
+    }
+    throw new Error("Network response not ok");
+  } catch {
+    // Fall back to the cached root (SPA shell) so the app loads offline
+    const cached =
+      (await caches.match(request)) ||
+      (await caches.match("/"));
+    if (cached) return cached;
+    return new Response("Offline — please check your connection.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+}
+
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_VERSION);
   const cached = await cache.match(request);
@@ -68,3 +99,31 @@ async function staleWhileRevalidate(request) {
 
   return cached || fetchPromise;
 }
+
+// ── Background sync (triggered by ConnectivityContext) ────────────────────────
+self.addEventListener("sync", (event) => {
+  if (event.tag === "erp-sync") {
+    event.waitUntil(
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: "TRIGGER_SYNC" }));
+      })
+    );
+  }
+});
+
+// ── Push notifications (future-proof hook) ───────────────────────────────────
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    event.waitUntil(
+      self.registration.showNotification(data.title || "ERP Notification", {
+        body: data.body || "",
+        icon: "/favicon.png",
+        tag: data.tag || "erp-notification",
+      })
+    );
+  } catch {
+    // Ignore malformed push payloads
+  }
+});

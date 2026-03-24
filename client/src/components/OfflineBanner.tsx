@@ -24,20 +24,7 @@ import {
   type QueueItem,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
-
-const PING_TIMEOUT = 5000;
-
-async function pingServer(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PING_TIMEOUT);
-    const res = await fetch("/api/health", { credentials: "include", signal: controller.signal });
-    clearTimeout(timer);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+import { useConnectivity } from "@/contexts/ConnectivityContext";
 
 function formatRelativeTime(ts: number): string {
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -45,21 +32,34 @@ function formatRelativeTime(ts: number): string {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   const d = new Date(ts);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return (
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " " +
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+  );
 }
 
 export function OfflineBanner() {
-  const [isOffline, setIsOffline] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const { isOnline, isSyncing: globalSyncing, lastSyncedAt, refreshCounts } = useConnectivity();
+
+  const [localSyncing, setLocalSyncing] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>(() => getQueue());
-  const [lastSynced, setLastSyncedState] = useState<number | null>(getLastSynced);
+  const [lastSynced, setLastSyncedState] = useState<number | null>(() => getLastSynced());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [discardTarget, setDiscardTarget] = useState<string | null>(null);
   const { toast } = useToast();
   const syncingRef = useRef(false);
 
+  const isSyncing = localSyncing || globalSyncing;
+
   const refreshQueue = () => setQueue(getQueue());
+
+  // Sync lastSynced from global context
+  useEffect(() => {
+    if (lastSyncedAt) {
+      setLastSyncedState(lastSyncedAt);
+    }
+  }, [lastSyncedAt]);
 
   useEffect(() => {
     const unsubWarn = onQueueSizeWarning((count) => {
@@ -82,7 +82,7 @@ export function OfflineBanner() {
     }
 
     syncingRef.current = true;
-    setIsSyncing(true);
+    setLocalSyncing(true);
 
     let succeeded = 0;
     let failed = 0;
@@ -98,7 +98,7 @@ export function OfflineBanner() {
 
         if (res.status === 401) {
           syncingRef.current = false;
-          setIsSyncing(false);
+          setLocalSyncing(false);
           refreshQueue();
           const remaining = getQueue().filter((i) => i.status === "pending").length;
           toast({
@@ -129,9 +129,10 @@ export function OfflineBanner() {
     setLastSynced();
     setLastSyncedState(getLastSynced());
     refreshQueue();
+    void refreshCounts();
     queryClient.invalidateQueries();
     syncingRef.current = false;
-    setIsSyncing(false);
+    setLocalSyncing(false);
 
     if (succeeded > 0) {
       toast({ title: `${succeeded} action(s) synced`, description: "Your offline data has been saved." });
@@ -145,50 +146,16 @@ export function OfflineBanner() {
     }
   };
 
+  // Auto-sync when coming back online
   useEffect(() => {
-    let lastKnownOffline = false;
-
-    const checkConnectivity = async (triggerSync = false) => {
-      const reachable = await pingServer();
-      if (!reachable && !lastKnownOffline) {
-        lastKnownOffline = true;
-        setIsOffline(true);
-        refreshQueue();
-      } else if (reachable && lastKnownOffline) {
-        lastKnownOffline = false;
-        setIsOffline(false);
-        refreshQueue();
-        if (triggerSync) await replayQueue();
-      } else if (reachable && triggerSync) {
-        setIsOffline(false);
-        refreshQueue();
-        await replayQueue();
+    if (isOnline) {
+      const pending = getQueue().filter((i) => i.status === "pending");
+      if (pending.length > 0) {
+        void replayQueue();
       }
-    };
-
-    checkConnectivity();
-
-    const pollInterval = setInterval(() => checkConnectivity(false), 30000);
-
-    const handleOffline = () => {
-      lastKnownOffline = true;
-      setIsOffline(true);
-      refreshQueue();
-    };
-
-    const handleOnline = () => {
-      checkConnectivity(true);
-    };
-
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
-
-    return () => {
-      clearInterval(pollInterval);
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
+    }
+    refreshQueue();
+  }, [isOnline]);
 
   useEffect(() => {
     refreshQueue();
@@ -204,6 +171,7 @@ export function OfflineBanner() {
     if (discardTarget) {
       removeFromQueue(discardTarget);
       refreshQueue();
+      void refreshCounts();
       setDiscardTarget(null);
     }
   };
@@ -211,9 +179,7 @@ export function OfflineBanner() {
   const handleRetry = async (item: QueueItem) => {
     updateItemStatus(item.id, "pending");
     refreshQueue();
-    const reachable = await pingServer();
-    if (reachable) {
-      setIsOffline(false);
+    if (isOnline) {
       await replayQueue();
     } else {
       toast({ title: "Still offline", description: "Cannot retry — no connection." });
@@ -223,14 +189,14 @@ export function OfflineBanner() {
   };
 
   const handleManualSync = async () => {
-    const reachable = await pingServer();
-    if (!reachable) {
+    if (!isOnline) {
       toast({ title: "No connection", description: "Cannot sync — still offline.", variant: "destructive" });
       return;
     }
-    setIsOffline(false);
     await replayQueue();
   };
+
+  const isOffline = !isOnline;
 
   if (!isOffline && totalCount === 0) return null;
 
@@ -283,8 +249,17 @@ export function OfflineBanner() {
 
           {!isOffline && pendingCount > 0 && (
             <div className="shrink-0 pt-2">
-              <Button size="sm" onClick={handleManualSync} disabled={isSyncing} data-testid="button-sync-now">
-                {isSyncing ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+              <Button
+                size="sm"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                data-testid="button-sync-now"
+              >
+                {isSyncing ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                )}
                 Sync Now
               </Button>
             </div>
@@ -292,7 +267,9 @@ export function OfflineBanner() {
 
           <div className="flex-1 overflow-y-auto py-2 space-y-2">
             {queue.length === 0 ? (
-              <div className="text-center text-muted-foreground py-10 text-sm">No pending actions</div>
+              <div className="text-center text-muted-foreground py-10 text-sm">
+                No pending actions
+              </div>
             ) : (
               queue.map((item) => (
                 <div
@@ -358,7 +335,12 @@ export function OfflineBanner() {
         </SheetContent>
       </Sheet>
 
-      <AlertDialog open={!!discardTarget} onOpenChange={(open) => { if (!open) setDiscardTarget(null); }}>
+      <AlertDialog
+        open={!!discardTarget}
+        onOpenChange={(open) => {
+          if (!open) setDiscardTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Discard this action?</AlertDialogTitle>
