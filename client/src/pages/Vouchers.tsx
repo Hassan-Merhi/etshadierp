@@ -3940,7 +3940,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </CardHeader>
                 <CardContent>
                 <Form {...journalForm}>
-                  <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6" noValidate>
+                  <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6" noValidate>
                     {/* Header section */}
                     <div className="flex flex-col sm:flex-row items-start sm:justify-end gap-4">
                     <FormField
@@ -4461,7 +4461,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {(isPOS || activeTab === "transfer") && (
           <div className="space-y-4">
           <Form {...stockTransferForm}>
-            <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit, (errors) = noValidate> {
+            <form noValidate onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit, (errors) => {
               console.error("Stock Transfer Form Validation Errors:", errors);
               toast({
                 title: "Form Validation Error",
@@ -5314,7 +5314,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </CardHeader>
               <CardContent>
               <Form {...stockAdjustmentForm}>
-                <form onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6" noValidate>
+                <form noValidate onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6" noValidate>
                   {/* Header section */}
                   <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                     <FormField

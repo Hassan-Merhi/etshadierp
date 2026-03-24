@@ -992,7 +992,7 @@ export default function ContainerDetail() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSellSubmit)} className="space-y-4" noValidate>
+            <form noValidate onSubmit={form.handleSubmit(handleSellSubmit)} className="space-y-4" noValidate>
               <FormField
                 control={form.control}
                 name="customerId"
@@ -1161,8 +1161,8 @@ export default function ContainerDetail() {
             <DialogTitle>Add Freight Charge</DialogTitle>
             <DialogDescription>Record a freight/shipping charge for this container</DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={freightForm.handleSubmit((data) = noValidate> addFreightMutation.mutate(data))}
+          <form noValidate
+            onSubmit={freightForm.handleSubmit((data) => addFreightMutation.mutate(data))}
             className="space-y-4"
           >
             <div>
@@ -1212,8 +1212,8 @@ export default function ContainerDetail() {
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>Record a payment toward this freight charge</DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={paymentForm.handleSubmit((data) = noValidate> {
+          <form noValidate
+            onSubmit={paymentForm.handleSubmit((data) => {
               if (showPaymentDialog !== null) addPaymentMutation.mutate({ freightId: showPaymentDialog, data });
             })}
             className="space-y-4"

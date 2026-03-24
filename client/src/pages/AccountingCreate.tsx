@@ -378,7 +378,7 @@ function LocationForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -558,8 +558,8 @@ function LedgerAccountForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
+        <form noValidate
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -702,7 +702,7 @@ function LedgerAccountForm({
                           <DialogTitle>Create Parent Account</DialogTitle>
                         </DialogHeader>
                         <Form {...parentForm}>
-                          <form
+                          <form noValidate
                             onSubmit={parentForm.handleSubmit(
                               handleCreateParent,
                             )}
@@ -911,8 +911,8 @@ function EmployeeForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
+        <form noValidate
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1064,8 +1064,8 @@ function SupplierForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
+        <form noValidate
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1150,8 +1150,8 @@ function StockGroupForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
+        <form noValidate
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1248,8 +1248,8 @@ function StockItemForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data: any) = noValidate> onSubmit(data, false))}
+        <form noValidate
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
