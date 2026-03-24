@@ -14,7 +14,12 @@ interface State {
   isChunkError: boolean;
 }
 
-// Check every possible place the chunk error text might live
+// Check every possible place the chunk error text might live.
+// IMPORTANT: Only match genuine network-level chunk loading failures.
+// Do NOT match based on stack trace paths — production JS files have hashed
+// names like /assets/Foo-ABC123.js which appear in ALL stack traces, causing
+// real runtime errors to be misclassified as chunk errors and triggering
+// an infinite "New version available" reload loop.
 function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
   const candidates: string[] = [];
@@ -22,9 +27,8 @@ function isChunkLoadError(error: unknown): boolean {
     candidates.push(error);
   } else if (error && typeof error === "object") {
     const e = error as any;
-    if (e.message)     candidates.push(String(e.message));
-    if (e.stack)       candidates.push(String(e.stack));
-    if (e.name)        candidates.push(String(e.name));
+    if (e.message) candidates.push(String(e.message));
+    if (e.name)    candidates.push(String(e.name));
     try { candidates.push(e.toString()); } catch { /* ignore */ }
   }
   const combined = candidates.join(" ");
@@ -34,8 +38,7 @@ function isChunkLoadError(error: unknown): boolean {
     combined.includes("Importing a module script failed") ||
     combined.includes("Unable to preload CSS") ||
     combined.includes("ChunkLoadError") ||
-    (error as any)?.name === "ChunkLoadError" ||
-    /\/assets\/[^/]+-[A-Za-z0-9_-]+\.js/.test(combined)
+    (error as any)?.name === "ChunkLoadError"
   );
 }
 
@@ -144,10 +147,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isChunk =
         this.state.isChunkError ||
-        isChunkLoadError(this.state.error) ||
-        (this.state.error?.message ?? "").includes("dynamically imported module") ||
-        (this.state.error?.message ?? "").includes("Loading chunk") ||
-        /\/assets\/[^/]+-[A-Za-z0-9_-]+\.js/.test(this.state.error?.message ?? "");
+        isChunkLoadError(this.state.error);
 
       if (isChunk) {
         return (

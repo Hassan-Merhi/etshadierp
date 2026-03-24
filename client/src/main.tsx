@@ -25,9 +25,10 @@ window.addEventListener("unhandledrejection", (event) => {
     combined.includes("Importing a module script failed") ||
     combined.includes("Unable to preload CSS") ||
     combined.includes("ChunkLoadError") ||
-    reason?.name === "ChunkLoadError" ||
-    /\/assets\/[^/]+-[A-Za-z0-9_-]+\.js/.test(combined);
+    reason?.name === "ChunkLoadError";
   // NOTE: bare "Failed to fetch" intentionally excluded — it also matches API failures.
+  // NOTE: stack-trace path regex intentionally excluded — hashed filenames like /assets/Foo-ABC123.js
+  //       appear in ALL runtime error stacks and cause false positives → infinite reload loop.
 
   if (isChunk) {
     const path = window.location.pathname;
