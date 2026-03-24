@@ -656,7 +656,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setNotes(draft.notes || "");
 
       // Populate rows with draft items
-      const draftRows = draft.items.map((item: any, index: number) => {
+      const draftRows = (Array.isArray(draft.items) ? draft.items : []).map((item: any, index: number) => {
         const rate = parseFloat(item.rate);
         return {
           id: String(index + 1),

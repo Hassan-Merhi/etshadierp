@@ -387,7 +387,7 @@ export default function BaleTransfers() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {transferDetail.items.map((item) => (
+                                      {(Array.isArray(transferDetail.items) ? transferDetail.items : []).map((item) => (
                                         <TableRow key={item.id} data-testid={`row-transfer-item-${item.id}`}>
                                           <TableCell className="font-mono text-xs">{item.baleCode}</TableCell>
                                           <TableCell>{item.productName || "-"}</TableCell>

@@ -286,7 +286,7 @@ export default function FactoryWaste() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <span className="ml-2 text-muted-foreground">Loading waste entries...</span>
             </div>
-          ) : !wasteQuery.data || wasteQuery.data.length === 0 ? (
+          ) : !Array.isArray(wasteQuery.data) || wasteQuery.data.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground" data-testid="text-no-data">No waste entries for selected range</p>
             </div>

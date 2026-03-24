@@ -128,7 +128,7 @@ export default function FactoryKpis() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-muted-foreground">Loading daily production...</span>
                 </div>
-              ) : !dailyQuery.data || dailyQuery.data.length === 0 ? (
+              ) : !Array.isArray(dailyQuery.data) || dailyQuery.data.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground" data-testid="text-no-data">No daily production data for selected range</p>
                 </div>
@@ -171,7 +171,7 @@ export default function FactoryKpis() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-muted-foreground">Loading worker performance...</span>
                 </div>
-              ) : !workersQuery.data || workersQuery.data.length === 0 ? (
+              ) : !Array.isArray(workersQuery.data) || workersQuery.data.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground" data-testid="text-no-data">No worker performance data for selected range</p>
                 </div>
@@ -216,7 +216,7 @@ export default function FactoryKpis() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-muted-foreground">Loading mix efficiency...</span>
                 </div>
-              ) : !mixesQuery.data || mixesQuery.data.length === 0 ? (
+              ) : !Array.isArray(mixesQuery.data) || mixesQuery.data.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground" data-testid="text-no-data">No mix efficiency data for selected range</p>
                 </div>

@@ -110,7 +110,7 @@ export default function LedgerMonthlySummary() {
     enabled: !!accountId,
   });
 
-  const chartData = data?.months.map((m) => ({
+  const chartData = (Array.isArray(data?.months) ? data!.months : []).map((m) => ({
     name: m.monthName.substring(0, 3),
     debit: m.debit,
     credit: m.credit,
@@ -244,7 +244,7 @@ export default function LedgerMonthlySummary() {
                       </TableRow>
 
                       {/* Monthly rows */}
-                      {data.months.map((month) => {
+                      {(Array.isArray(data.months) ? data.months : []).map((month) => {
                         const year = parseISO(data.dateRange.startDate).getFullYear();
                         return (
                           <TableRow

@@ -241,7 +241,7 @@ export default function FactoryMixOptimizer() {
             Optimization Results
           </h2>
 
-          {optimizeMutation.data.length === 0 ? (
+          {!Array.isArray(optimizeMutation.data) || optimizeMutation.data.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground" data-testid="text-no-suggestions">
@@ -251,7 +251,7 @@ export default function FactoryMixOptimizer() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {optimizeMutation.data.map((suggestion, idx) => (
+              {(Array.isArray(optimizeMutation.data) ? optimizeMutation.data : []).map((suggestion, idx) => (
                 <Card key={idx} data-testid={`card-suggestion-${idx}`}>
                   <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-base">Suggestion {idx + 1}</CardTitle>

@@ -145,7 +145,7 @@ export default function FactorySupplierScoreboard() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <span className="ml-2 text-muted-foreground">Loading supplier scores...</span>
             </div>
-          ) : !data || data.length === 0 ? (
+          ) : !Array.isArray(data) || data.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground" data-testid="text-no-data">No supplier data for selected range</p>
             </div>

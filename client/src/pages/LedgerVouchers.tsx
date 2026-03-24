@@ -188,7 +188,7 @@ export default function LedgerVouchers() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">
-                      {data.vouchers.length} voucher(s)
+                      {Array.isArray(data.vouchers) ? data.vouchers.length : 0} voucher(s)
                     </p>
                   </div>
                 </div>
@@ -196,7 +196,7 @@ export default function LedgerVouchers() {
               <CardContent className="pt-4">
                 {(() => {
                   let runningBal = data.openingBalance;
-                  const vouchersWithBal = data.vouchers.map((v) => {
+                  const vouchersWithBal = (Array.isArray(data.vouchers) ? data.vouchers : []).map((v) => {
                     runningBal = runningBal + v.credit - v.debit;
                     return { ...v, runningBalance: runningBal };
                   });

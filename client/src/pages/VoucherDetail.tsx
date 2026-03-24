@@ -225,7 +225,7 @@ export default function VoucherDetail() {
             </Card>
 
             {/* Items Table (for Purchase/Sales vouchers) */}
-            {data.items.length > 0 && (
+            {Array.isArray(data.items) && data.items.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
@@ -310,7 +310,7 @@ export default function VoucherDetail() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {data.entries.map((entry, index) => (
+                        {(Array.isArray(data.entries) ? data.entries : []).map((entry, index) => (
                           <TableRow key={entry.id || index}>
                             <TableCell className="font-medium">
                               {entry.ledgerAccountName}

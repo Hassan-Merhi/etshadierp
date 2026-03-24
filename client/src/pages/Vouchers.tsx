@@ -1771,7 +1771,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Pre-populate journal form when editing
   useEffect(() => {
-    if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
+    if (voucherToEdit && voucherToEdit.voucherType === "Journal" && Array.isArray(voucherToEdit.entries) && voucherToEdit.entries.length > 0 && allAccounts.length > 0) {
       if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
       // Wait for factorySuppliersList to load if any entry references one
       const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);

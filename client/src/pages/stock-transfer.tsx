@@ -159,7 +159,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         sourceLocationId: activeSourceLocation,
         destinationLocationId: selectedDestLocation,
         notes: data.notes || "",
-        items: data.items.map((item) => ({
+        items: (Array.isArray(data.items) ? data.items : []).map((item) => ({
           stockItemId: item.stockItemId,
           quantity: item.quantity,
         })),
@@ -978,7 +978,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {viewingTransfer.items.map((item: any, idx: number) => (
+                      {(Array.isArray(viewingTransfer.items) ? viewingTransfer.items : []).map((item: any, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
                           <TableCell className="text-right font-mono">

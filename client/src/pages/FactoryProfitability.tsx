@@ -212,7 +212,7 @@ export default function FactoryProfitability() {
                   <CardTitle>Bale Cost Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {!balesQuery.data || balesQuery.data.length === 0 ? (
+                  {!Array.isArray(balesQuery.data) || balesQuery.data.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground" data-testid="text-no-data">No bale cost data for selected range</p>
                     </div>
@@ -316,7 +316,7 @@ export default function FactoryProfitability() {
                   <CardTitle>Container Profitability</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {!containersQuery.data || containersQuery.data.length === 0 ? (
+                  {!Array.isArray(containersQuery.data) || containersQuery.data.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground" data-testid="text-no-data">No container profitability data for selected range</p>
                     </div>
