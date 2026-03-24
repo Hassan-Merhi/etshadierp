@@ -61,6 +61,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { AlertTriangle } from "lucide-react";
 import { useState, useEffect, useRef, Fragment } from "react";
 
 interface MenuItem {
@@ -185,6 +187,7 @@ export function FactorySidebar({ user }: { user?: any }) {
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const isAdmin = user?.role === "Admin";
   const { toast } = useToast();
+  const { conflictCount } = useConnectivity();
   const prevUnreadRef = useRef<number>(-1);
 
   const { data: chatUnread } = useQuery<{ count: number }>({
@@ -363,6 +366,24 @@ export function FactorySidebar({ user }: { user?: any }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {/* Conflict Center — shows when there are unresolved conflicts */}
+              {conflictCount > 0 && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/factory/conflicts"}>
+                    <a href="/factory/conflicts" data-testid="link-factory-conflicts">
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                      <span className="flex-1">Conflicts</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
+                        data-testid="badge-factory-conflict-count"
+                      >
+                        {conflictCount}
+                      </Badge>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {/* Settings — flat top-level button (admin only) */}
               {isAdmin && (
                 <SidebarMenuItem>

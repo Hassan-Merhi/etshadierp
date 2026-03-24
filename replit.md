@@ -67,41 +67,55 @@ The system employs shared schemas (`shared/schema.ts`) for type safety across th
 
 The app has a layered offline-first foundation:
 
-### IndexedDB Layer (`client/src/lib/db.ts`)
+### IndexedDB Layer (`client/src/lib/db.ts`) — Schema v3
 - Uses **Dexie.js** (v4) for typed IndexedDB access
-- Schema tables: `syncQueue`, `syncState`, `syncLogs`, `conflicts`, `localDrafts`, `offlinePackages`, and entity cache tables (users, suppliers, ledgerAccounts, stockItems, etc.)
-- `syncQueue` stores pending mutations with: `idempotencyKey`, `mode`, `entityType`, `operation`, `payload`, `url`, `method`, `companyId`, `locationId`, `status`, `retryCount`, `lastError`, `description`
-- `syncLogs` is pruned to 500 entries; `appendSyncLog()` is always best-effort
-- Helper: `addToSyncQueue()`, `getSyncQueueCount()`, `getGlobalSyncState()`, `upsertGlobalSyncState()`, `getRecentSyncLogs()`, `clearAllOfflineData()`
+- Schema tables: `syncQueue`, `syncState`, `syncLogs`, `conflicts`, `localDrafts`, `offlinePackages`, and entity cache tables
+- `syncQueue` v2+ fields: `idempotencyKey`, `mode`, `entityType`, `operation`, `payload`, `url`, `method`, `companyId`, `locationId`, `status`, `retryCount`, `nextRetryAt`, `lastError`, `description`
+- `conflicts` v3+ fields: `syncQueueItemId`, `entityType`, `operation`, `localPayload`, `serverResponse`, `conflictReason`, `url`, `method`, `resolved`, `resolvedAt`, `resolution`
+- `syncLogs` pruned to 500 entries; `appendSyncLog()` always best-effort
+- Helpers: `addToSyncQueue()`, `getSyncQueueCount()`, `getConflictCount()`, `getUnresolvedConflicts()`, `resolveConflict()`, `addConflict()`, `getGlobalSyncState()`, `upsertGlobalSyncState()`, `clearAllOfflineData()`
 
-### Sync Engine (`client/src/lib/syncEngine.ts`)
+### Sync Engine (`client/src/lib/syncEngine.ts`) — Part 3 upgraded
 - `runSync()` is idempotent and serialized (no concurrent runs)
-- Processes **IndexedDB queue** first, then **legacy localStorage queue** (`offlineQueue.ts`)
-- Emits `window.CustomEvent("erp:sync", { syncing, lastSyncedAt, error })` for UI updates
+- **Exponential backoff**: skip items where `nextRetryAt > now`; backoff = min(3s × 2^retryCount, 120s)
+- **Error classification**: 401 → auth redirect; 409 → conflict; 4xx → permanent fail (no retry); 5xx/network → retry with backoff
+- **Max retries**: items with `retryCount >= 5` are permanently marked failed
+- **Conflict detection**: 409 responses → write to `conflicts` table (with url/method for retry), remove from queue
+- **Queue deduplication** via `deduplicateQueue()`: multiple PATCH/PUT to same URL → collapse to latest payload
+- Emits `erp:sync` events with `conflictDetected` flag
 - Auth redirect on 401 during sync
-- `isSyncInProgress()` for external polling
 
-### ConnectivityContext (`client/src/contexts/ConnectivityContext.tsx`)
-- Global `ConnectivityProvider` wraps the entire app (inside ThemeProvider, above CompanyProvider)
-- Exposes: `isOnline`, `isSyncing`, `status` ("online"|"offline"|"syncing"|"error"), `lastSyncedAt`, `pendingCount`, `failedCount`, `triggerSync()`, `refreshCounts()`
-- Pings `/api/health` on browser online/offline events AND every 30 seconds
-- `pendingCount`/`failedCount` aggregate both IndexedDB and localStorage queues
-- Listens for `erp:sync` events from the sync engine to update UI state
+### ConnectivityContext (`client/src/contexts/ConnectivityContext.tsx`) — Part 3 upgraded
+- Global `ConnectivityProvider` wraps entire app
+- Exposes: `isOnline`, `isSyncing`, `status`, `lastSyncedAt`, `pendingCount`, `failedCount`, **`conflictCount`**, `triggerSync()`, `refreshCounts()`
+- `conflictCount` = number of unresolved conflicts in IndexedDB
+- Pings `/api/health` on online/offline events AND every 30 seconds
+- Refreshes counts (including conflicts) every 15 seconds
 
-### Offline Queue Safe Patterns (`client/src/lib/offlineQueue.ts`)
-- SAFE_PATTERNS now covers: POS sales/drafts, ERP vouchers (payment, receipt, journal, sales), all factory endpoints (stock-entry, bale-products, customer-orders loading/bales/finalize, vouchers, mix-batches, daybook), stock adjustments, stock transfers, bale transfers
-- `getDescriptionForRequest()` returns human-readable descriptions for all queued operations
+### Offline Queue (`client/src/lib/offlineQueue.ts`) — Part 3 deduplication
+- SAFE_PATTERNS covers: POS, all ERP vouchers, all factory endpoints, stock adjustments/transfers, bale transfers
+- **Deduplication**: PATCH/PUT to same URL → replaces existing pending item's payload (no duplicate edits queued)
+- **DELETE dedup**: removes preceding POST/PATCH for same URL
+
+### Conflict Center — New in Part 3
+- **`client/src/pages/ConflictCenter.tsx`**: Review page at `/conflicts` and `/factory/conflicts`
+  - Lists all unresolved sync conflicts
+  - Shows entity type, timestamp, conflict reason
+  - "Accept server version" → marks resolved, discards local
+  - "Retry local version" → re-queues local payload to IDB sync queue, marks resolved
+  - "Dismiss all" button to batch-clear
+  - Expandable diff view: local JSON vs server response side by side
+- **Conflict badge in AppSidebar** and **FactorySidebar**: orange "Conflicts (N)" entry appears when `conflictCount > 0`
+- **`PendingSyncIndicator`** updated: now also shows orange conflict badge (clickable → `/conflicts`)
 
 ### Draft Autosave System (Part 2, Mar 2026)
-- **`client/src/lib/offlineDraft.ts`**: CRUD helpers using Dexie `localDrafts` table (`saveDraft`, `loadDraft`, `deleteDraft`, `getDraftAge`)
-- **`client/src/hooks/useFormDraft.ts`**: React hook — debounced autosave (1.5s), load draft on mount, `scheduleSave`, `saveNow`, `discardDraft`, `hasDraft`, `draftAge`
-- **`client/src/components/DraftRestorePrompt.tsx`**: Amber banner shown when a draft exists — "Restore" / "Discard" actions
-- **`client/src/components/SyncStatusBadge.tsx`**: Per-record status badge — synced / pending / local / failed / conflict
-- **`client/src/components/PendingSyncIndicator.tsx`**: Global header badge showing queued/syncing/failed count from ConnectivityContext
-
-### Draft Integration
-- **Vouchers.tsx** (payment + receipt + journal): autosaves on every keystroke (debounced), restores via `DraftRestorePrompt`, clears on successful submit; draft scoped by `entityType` + `mode` (erp/factory) + `companyId`
-- **BaleStockEntry.tsx** (factory stock entry cart): autosaves cart + location on change; restores location from draft
+- **`client/src/lib/offlineDraft.ts`**: CRUD helpers for Dexie `localDrafts` table
+- **`client/src/hooks/useFormDraft.ts`**: debounced autosave hook (1.5s)
+- **`client/src/components/DraftRestorePrompt.tsx`**: amber restore banner
+- **`client/src/components/SyncStatusBadge.tsx`**: per-record status badge
+- **`client/src/components/PendingSyncIndicator.tsx`**: global header badge (queued/syncing/failed/conflicts)
+- **Vouchers.tsx**: payment + receipt + journal autosave to IndexedDB
+- **BaleStockEntry.tsx**: factory stock entry location autosave
 
 ### PendingSyncIndicator in App Headers
 - ERP header and Factory header both show `<PendingSyncIndicator />` — reflects real-time pending/syncing/failed state from ConnectivityContext

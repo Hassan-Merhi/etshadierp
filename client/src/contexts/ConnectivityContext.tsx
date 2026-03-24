@@ -7,7 +7,13 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { appendSyncLog, getGlobalSyncState, upsertGlobalSyncState, getSyncQueueCount } from "@/lib/db";
+import {
+  appendSyncLog,
+  getGlobalSyncState,
+  upsertGlobalSyncState,
+  getSyncQueueCount,
+  getConflictCount,
+} from "@/lib/db";
 import { getQueue } from "@/lib/offlineQueue";
 
 export type ConnectivityStatus = "online" | "offline" | "syncing" | "error";
@@ -19,6 +25,7 @@ interface ConnectivityContextValue {
   lastSyncedAt: number | null;
   pendingCount: number;
   failedCount: number;
+  conflictCount: number;
   triggerSync: () => void;
   refreshCounts: () => Promise<void>;
 }
@@ -30,6 +37,7 @@ const ConnectivityContext = createContext<ConnectivityContextValue>({
   lastSyncedAt: null,
   pendingCount: 0,
   failedCount: 0,
+  conflictCount: 0,
   triggerSync: () => {},
   refreshCounts: async () => {},
 });
@@ -65,6 +73,7 @@ export function ConnectivityProvider({ children }: Props) {
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [conflictCount, setConflictCount] = useState(0);
   const isMountedRef = useRef(true);
 
   // Load last sync time from IndexedDB on mount
@@ -84,13 +93,17 @@ export function ConnectivityProvider({ children }: Props) {
 
   const refreshCounts = useCallback(async () => {
     try {
-      const { pending: idbPending, failed: idbFailed } = await getSyncQueueCount();
+      const [{ pending: idbPending, failed: idbFailed }, conflicts] = await Promise.all([
+        getSyncQueueCount(),
+        getConflictCount(),
+      ]);
       const legacyQueue = getQueue();
-      const legacyPending = legacyQueue.filter((i) => i.status === "pending").length;
-      const legacyFailed = legacyQueue.filter((i) => i.status === "failed").length;
+      const legacyPending = legacyQueue.filter(i => i.status === "pending").length;
+      const legacyFailed = legacyQueue.filter(i => i.status === "failed").length;
       if (isMountedRef.current) {
         setPendingCount(idbPending + legacyPending);
         setFailedCount(idbFailed + legacyFailed);
+        setConflictCount(conflicts);
       }
     } catch {
       // Non-critical
@@ -159,6 +172,7 @@ export function ConnectivityProvider({ children }: Props) {
         syncing?: boolean;
         lastSyncedAt?: number;
         error?: string;
+        conflictDetected?: boolean;
       }>;
       if (!isMountedRef.current) return;
       if (evt.detail.syncing !== undefined) setIsSyncing(evt.detail.syncing);
@@ -187,6 +201,7 @@ export function ConnectivityProvider({ children }: Props) {
         lastSyncedAt,
         pendingCount,
         failedCount,
+        conflictCount,
         triggerSync,
         refreshCounts,
       }}

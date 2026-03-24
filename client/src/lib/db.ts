@@ -16,6 +16,7 @@ export interface SyncQueueItem {
   tempId: string | null;
   createdAt: number;
   retryCount: number;
+  nextRetryAt: number;
   status: "pending" | "syncing" | "failed" | "succeeded";
   lastError: string | null;
   description: string;
@@ -40,13 +41,18 @@ export interface SyncLog {
 
 export interface Conflict {
   id?: number;
-  syncQueueItemId: number;
+  syncQueueItemId: number | null;
   entityType: string;
   operation: string;
-  payload: string;
+  localPayload: string;
   serverResponse: string;
+  conflictReason: string;
+  url: string;
+  method: string;
   createdAt: number;
   resolved: boolean;
+  resolvedAt: number | null;
+  resolution: "local" | "server" | null;
 }
 
 export interface LocalDraft {
@@ -105,27 +111,51 @@ class ERPDatabase extends Dexie {
 
   constructor() {
     super("ERPDatabase");
+
+    // v1 — original schema
     this.version(1).stores({
-      syncQueue:         "++id, idempotencyKey, mode, entityType, status, createdAt",
-      syncState:         "++id, &key",
-      syncLogs:          "++id, timestamp, type",
-      conflicts:         "++id, syncQueueItemId, entityType, resolved",
-      localDrafts:       "++id, entityType, mode, companyId, createdAt",
-      offlinePackages:   "++id, &key, entityType, companyId",
-      users:             "id, companyId, fetchedAt",
-      companies:         "id, companyId, fetchedAt",
-      companySettings:   "id, companyId, fetchedAt",
-      permissions:       "id, companyId, fetchedAt",
-      locations:         "id, companyId, fetchedAt",
-      ledgerAccounts:    "id, companyId, fetchedAt",
-      bankAccounts:      "id, companyId, fetchedAt",
-      suppliers:         "id, companyId, fetchedAt",
-      customers:         "id, companyId, fetchedAt",
-      employees:         "id, companyId, fetchedAt",
-      fixedAssets:       "id, companyId, fetchedAt",
-      stockItems:        "id, companyId, fetchedAt",
+      syncQueue:           "++id, idempotencyKey, mode, entityType, status, createdAt",
+      syncState:           "++id, &key",
+      syncLogs:            "++id, timestamp, type",
+      conflicts:           "++id, syncQueueItemId, entityType, resolved",
+      localDrafts:         "++id, entityType, mode, companyId, createdAt",
+      offlinePackages:     "++id, &key, entityType, companyId",
+      users:               "id, companyId, fetchedAt",
+      companies:           "id, companyId, fetchedAt",
+      companySettings:     "id, companyId, fetchedAt",
+      permissions:         "id, companyId, fetchedAt",
+      locations:           "id, companyId, fetchedAt",
+      ledgerAccounts:      "id, companyId, fetchedAt",
+      bankAccounts:        "id, companyId, fetchedAt",
+      suppliers:           "id, companyId, fetchedAt",
+      customers:           "id, companyId, fetchedAt",
+      employees:           "id, companyId, fetchedAt",
+      fixedAssets:         "id, companyId, fetchedAt",
+      stockItems:          "id, companyId, fetchedAt",
       inventoryByLocation: "id, companyId, fetchedAt",
     });
+
+    // v2 — add nextRetryAt index to syncQueue; richer Conflict schema
+    this.version(2).stores({
+      syncQueue:  "++id, idempotencyKey, mode, entityType, status, createdAt, nextRetryAt",
+      conflicts:  "++id, syncQueueItemId, entityType, resolved, createdAt",
+    }).upgrade(tx =>
+      tx.table("syncQueue").toCollection().modify((item: any) => {
+        if (item.nextRetryAt === undefined) item.nextRetryAt = 0;
+      })
+    );
+
+    // v3 — add url/method fields to conflicts for retry capability
+    this.version(3).upgrade(tx =>
+      tx.table("conflicts").toCollection().modify((c: any) => {
+        if (c.url === undefined) c.url = "";
+        if (c.method === undefined) c.method = "POST";
+        if (c.localPayload === undefined && c.payload !== undefined) {
+          c.localPayload = c.payload;
+        }
+        if (c.conflictReason === undefined) c.conflictReason = c.serverResponse || "";
+      })
+    );
   }
 }
 
@@ -134,12 +164,13 @@ export const db = new ERPDatabase();
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 export async function addToSyncQueue(
-  item: Omit<SyncQueueItem, "id" | "createdAt" | "retryCount" | "status" | "lastError">
+  item: Omit<SyncQueueItem, "id" | "createdAt" | "retryCount" | "nextRetryAt" | "status" | "lastError">
 ): Promise<number> {
   const id = await db.syncQueue.add({
     ...item,
     createdAt: Date.now(),
     retryCount: 0,
+    nextRetryAt: 0,
     status: "pending",
     lastError: null,
   });
@@ -152,6 +183,43 @@ export async function getSyncQueueCount(): Promise<{ pending: number; failed: nu
     db.syncQueue.where("status").equals("failed").count(),
   ]);
   return { pending, failed };
+}
+
+export async function getConflictCount(): Promise<number> {
+  try {
+    return await db.conflicts.where("resolved").equals(0).count();
+  } catch {
+    return 0;
+  }
+}
+
+export async function getUnresolvedConflicts(): Promise<Conflict[]> {
+  return db.conflicts.where("resolved").equals(0).reverse().sortBy("createdAt");
+}
+
+export async function resolveConflict(
+  id: number,
+  resolution: "local" | "server"
+): Promise<void> {
+  await db.conflicts.update(id, {
+    resolved: true,
+    resolvedAt: Date.now(),
+    resolution,
+  });
+}
+
+export async function addConflict(
+  conflict: Omit<Conflict, "id" | "createdAt" | "resolved" | "resolvedAt" | "resolution">
+): Promise<void> {
+  await db.conflicts.add({
+    ...conflict,
+    url: conflict.url || "",
+    method: conflict.method || "POST",
+    createdAt: Date.now(),
+    resolved: false,
+    resolvedAt: null,
+    resolution: null,
+  });
 }
 
 export async function getGlobalSyncState(): Promise<SyncState | null> {

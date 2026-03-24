@@ -146,6 +146,7 @@ const FactoryCashflow = lazy(() => import("@/pages/FactoryCashflow"));
 const FactoryWaste = lazy(() => import("@/pages/FactoryWaste"));
 const WasteDispatchPage = lazy(() => import("@/pages/WasteDispatch"));
 const FactoryIntelSettings = lazy(() => import("@/pages/FactorySettings"));
+const ConflictCenter = lazy(() => import("@/pages/ConflictCenter"));
 const Chat = lazy(() => import("@/pages/Chat"));
 const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
 const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
@@ -266,6 +267,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
       <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
+      <Route path="/conflicts" component={ConflictCenter} />
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
@@ -716,6 +718,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/bale-ledger" component={BaleLedger} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
+                    <Route path="/factory/conflicts" component={ConflictCenter} />
                     {user?.role === "Admin" && <Route path="/factory/settings" component={Settings} />}
                     {user?.role === "Admin" && <Route path="/factory/deleted-items" component={DeletedItems} />}
                     {user?.role === "Admin" && <Route path="/factory/orphaned-records" component={OrphanedRecords} />}

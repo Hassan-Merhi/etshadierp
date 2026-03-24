@@ -38,14 +38,45 @@ export function enqueueRequest(
   body: string,
   description: string
 ): string {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const item: QueueItem = { id, url, method, body, description, timestamp: Date.now(), status: "pending" };
   const queue = readQueue();
-  queue.push(item);
-  writeQueue(queue);
+  const upperMethod = method.toUpperCase();
 
-  if (queue.length === QUEUE_WARN_THRESHOLD) {
-    queueSizeWarningCallbacks.forEach((cb) => cb(queue.length));
+  // Dedup: for PATCH/PUT, collapse multiple edits to the same URL into one
+  if (upperMethod === "PATCH" || upperMethod === "PUT") {
+    const existingIdx = queue.findIndex(
+      i => i.url === url && i.method.toUpperCase() === upperMethod && i.status === "pending"
+    );
+    if (existingIdx !== -1) {
+      // Replace body of existing item with latest payload
+      queue[existingIdx] = {
+        ...queue[existingIdx],
+        body,
+        description,
+        timestamp: Date.now(),
+      };
+      writeQueue(queue);
+      return queue[existingIdx].id;
+    }
+  }
+
+  // Dedup: for DELETE, remove any pending POST/PATCH for the same URL
+  if (upperMethod === "DELETE") {
+    const filtered = queue.filter(
+      i => !(i.url === url && i.status === "pending" && i.method.toUpperCase() !== "DELETE")
+    );
+    if (filtered.length !== queue.length) {
+      writeQueue(filtered);
+    }
+  }
+
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const item: QueueItem = { id, url, method: upperMethod, body, description, timestamp: Date.now(), status: "pending" };
+  const currentQueue = readQueue();
+  currentQueue.push(item);
+  writeQueue(currentQueue);
+
+  if (currentQueue.length === QUEUE_WARN_THRESHOLD) {
+    queueSizeWarningCallbacks.forEach((cb) => cb(currentQueue.length));
   }
 
   return id;

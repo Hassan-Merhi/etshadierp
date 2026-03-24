@@ -29,7 +29,9 @@ import {
   MessageCircle,
   TableProperties,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
 import {
   Sidebar,
   SidebarContent,
@@ -137,6 +139,7 @@ export function AppSidebar({ user }: { user?: any }) {
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const { conflictCount } = useConnectivity();
   const prevUnreadRef = useRef<number>(-1);
 
   const { data: chatUnread } = useQuery<{ count: number }>({
@@ -338,6 +341,23 @@ export function AppSidebar({ user }: { user?: any }) {
                   </SidebarMenuItem>
                 );
               })}
+              {conflictCount > 0 && (
+                <SidebarMenuItem key="conflicts">
+                  <SidebarMenuButton asChild isActive={location === "/conflicts"}>
+                    <a href="/conflicts" data-testid="link-conflicts">
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                      <span className="flex-1">Conflicts</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
+                        data-testid="badge-conflict-count"
+                      >
+                        {conflictCount}
+                      </Badge>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
