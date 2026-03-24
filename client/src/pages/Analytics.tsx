@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { 
+  TrendingUp,
   TrendingDown, 
   DollarSign, 
   Wallet, 
@@ -24,6 +25,7 @@ import {
   ChevronDown,
   Download,
   RefreshCw,
+  BarChart3,
   ShoppingCart,
   Container as ContainerIcon,
   Landmark,
@@ -969,6 +971,883 @@ export default function Analytics() {
             data-testid="analytics-period-filter"
           />
         </div>
+
+
+        {activeSection === "assets" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  Asset Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(assetAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : assetAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No asset accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(assetAccounts)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "liabilities" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-500" />
+                  Liability Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : liabilityAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No liability accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(liabilityAccounts)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "cash" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-green-500" />
+                  Cash Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total Cash</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(cashAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : cashAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No cash accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Side</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(cashAccounts, true)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "loans-banks" && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Landmark className="h-5 w-5 text-blue-500" />
+                  Loans &amp; Bank Accounts
+                </h4>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Total Balance</p>
+                  <p className="text-xl font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(loansBanksAccounts))}
+                  </p>
+                </div>
+              </div>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : loansBanksAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No loan or bank accounts found
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">Side</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renderHierarchicalAccounts(loansBanksAccounts, true)}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeSection === "expenses" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5 text-destructive" />
+                    All Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(expenseAccounts))}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : expenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(expenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+        )}
+
+        {activeSection === "direct-expenses" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-red-500" />
+                    Direct Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : directExpenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No direct expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(directExpenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+        )}
+
+        {activeSection === "indirect-expenses" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-orange-500" />
+                    Indirect Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : indirectExpenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No indirect expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(indirectExpenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+        )}
+
+        {activeSection === "sales" && (<>
+          {appMode === "factory" ? (
+            <Card className="p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium">Sales by Customer</h3>
+                <p className="text-sm text-muted-foreground mt-1">Container sales grouped by customer</p>
+              </div>
+              {loadingFactorySales ? (
+                <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+              ) : factorySalesByCustomer.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No factory sales data available</p>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Customer</TableHead>
+                          <TableHead className="text-right">Containers</TableHead>
+                          <TableHead className="text-right">Total Value</TableHead>
+                          <TableHead className="text-right">Paid</TableHead>
+                          <TableHead className="text-right">Outstanding</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {factorySalesByCustomer.map((row: any) => (
+                          <TableRow key={row.customerId}>
+                            <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
+                            <TableCell className="text-right">{row.containers}</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                            <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                            <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
+                              {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableBody className="font-semibold border-t-2">
+                        <TableRow>
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-right">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden space-y-3">
+                    {factorySalesByCustomer.map((row: any) => (
+                      <Card key={row.customerId}>
+                        <CardContent className="p-4 space-y-2">
+                          <div className="font-medium">{row.customerName || `Customer #${row.customerId}`}</div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div><span className="text-muted-foreground">Containers: </span>{row.containers}</div>
+                            <div className="text-right"><span className="text-muted-foreground">Total: </span><span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span></div>
+                            <div><span className="text-muted-foreground">Paid: </span><span className="font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</span></div>
+                            <div className="text-right"><span className="text-muted-foreground">Outstanding: </span><span className="font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</span></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
+          ) : (
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-medium">Sales by Location</h3>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {salesLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : salesData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No sales data available
+              </p>
+            ) : (
+              <>
+              <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Total Sales</TableHead>
+                    <TableHead className="text-right">Transactions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salesData.map((location) => (
+                    <TableRow key={location.locationId}>
+                      <TableCell className="font-medium">{location.locationName}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatAmount(location.totalSales)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {location.totalTransactions}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedLocationForDetails(location.locationId)}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              </div>
+              <div className="md:hidden space-y-3">
+                {salesData.map((location) => (
+                  <Card key={location.locationId} className="hover-elevate cursor-pointer" onClick={() => setSelectedLocationForDetails(location.locationId)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{location.locationName}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-sm">
+                        <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground">{formatAmount(location.totalSales)}</span></span>
+                        <span className="text-muted-foreground">Txns: <span className="text-foreground">{location.totalTransactions}</span></span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              </>
+            )}
+          </Card>
+          )}
+
+          {/* Sales Details Dialog (ERP only) */}
+          {appMode !== "factory" && (
+          <Dialog 
+            open={selectedLocationForDetails !== null} 
+            onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
+          >
+            <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>
+                  Sales Details - {salesData.find(l => l.locationId === selectedLocationForDetails)?.locationName}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
+                <Select value={detailsPeriod} onValueChange={setDetailsPeriod}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {transactionsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No transactions found
+                  </p>
+                ) : (
+                  <>
+                    <div className="overflow-y-auto flex-1 min-h-0">
+                    <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Items</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell>
+                              {formatDisplayDate(transaction.voucherDate)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {transaction.itemCount}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {transaction.totalQuantity}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatAmount(transaction.totalAmount)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    </div>
+                    <div className="md:hidden space-y-3">
+                      {transactions.map((transaction) => (
+                        <Card key={transaction.id}>
+                          <CardContent className="p-3 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-muted-foreground">{formatDisplayDate(transaction.voucherDate)}</span>
+                              <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    </div>
+
+                    <div className="border-t pt-4 shrink-0">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Transactions:</span>
+                        <span className="font-medium">{transactions.length}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-2">
+                        <span className="text-muted-foreground">Total Quantity:</span>
+                        <span className="font-medium">
+                          {transactions.reduce((sum, t) => sum + t.totalQuantity, 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-2">
+                        <span className="text-muted-foreground">Total Amount:</span>
+                        <span className="font-mono font-medium">
+                          {formatAmount(transactions.reduce((sum, t) => sum + t.totalAmount, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          )}
+        </>)}
+
+        {activeSection === "containers" && appMode === "factory" && (
+          <Card className="p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <ContainerIcon className="h-5 w-5" />
+                Container Report
+              </h3>
+              <Button size="sm" onClick={() => refetchFactoryContainerSales()} disabled={loadingFactoryContainerSales}>
+                {loadingFactoryContainerSales ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <Label>Start Date</Label>
+                <DatePickerInput value={factoryContainerStartDate} onChange={setFactoryContainerStartDate} placeholder="Start date" />
+              </div>
+              <div>
+                <Label>End Date</Label>
+                <DatePickerInput value={factoryContainerEndDate} onChange={setFactoryContainerEndDate} placeholder="End date" />
+              </div>
+              <div>
+                <Label>Customer</Label>
+                <Select value={factoryContainerCustomerId} onValueChange={setFactoryContainerCustomerId}>
+                  <SelectTrigger><SelectValue placeholder="All Customers" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Customers</SelectItem>
+                    {factorySalesByCustomer.map((r: any) => (
+                      <SelectItem key={r.customerId} value={r.customerId.toString()}>
+                        {r.customerName || `Customer #${r.customerId}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Payment Status</Label>
+                <Select value={factoryContainerPaymentStatus} onValueChange={setFactoryContainerPaymentStatus}>
+                  <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="PARTIAL">Partial</SelectItem>
+                    <SelectItem value="PAID">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingFactoryContainerSales ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : factoryContainerSales ? (
+              <div className="space-y-4">
+                {/* Summary cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Containers</div>
+                    <div className="text-xl font-bold">{factoryContainerSales.summary.count}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Total Value</div>
+                    <div className="text-xl font-bold font-mono">{formatAmount(factoryContainerSales.summary.total)}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Paid</div>
+                    <div className="text-xl font-bold font-mono text-green-600 dark:text-green-400">{formatAmount(factoryContainerSales.summary.paid)}</div>
+                  </div>
+                  <div className="border rounded-md p-3">
+                    <div className="text-xs text-muted-foreground">Outstanding</div>
+                    <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">{formatAmount(factoryContainerSales.summary.outstanding)}</div>
+                  </div>
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>Sale Date</TableHead>
+                        <TableHead>Container Status</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {factoryContainerSales.rows.map((row: any) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-mono">{row.containerNumber || "-"}</TableCell>
+                          <TableCell className="font-medium">{row.customerName || `#${row.customerId}`}</TableCell>
+                          <TableCell className="font-mono text-sm">{row.invoiceNumber || "-"}</TableCell>
+                          <TableCell>{row.saleDate}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.containerStatus === "OFFLOADED" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>
+                              {row.containerStatus || "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.paymentStatus === "PAID" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : row.paymentStatus === "PARTIAL" ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>
+                              {row.paymentStatus}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {factoryContainerSales.rows.map((row: any) => (
+                    <Card key={row.id}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-medium">{row.containerNumber || "-"}</span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${row.paymentStatus === "PAID" ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300" : row.paymentStatus === "PARTIAL" ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300" : "bg-muted border-muted-foreground/20 text-muted-foreground"}`}>{row.paymentStatus}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{row.customerName} · {row.saleDate}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                          <div><span className="text-muted-foreground block">Total</span><span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span></div>
+                          <div><span className="text-muted-foreground block">Paid</span><span className="font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</span></div>
+                          <div className="text-right"><span className="text-muted-foreground block">Outstanding</span><span className="font-mono text-amber-600 dark:text-amber-400">{formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}</span></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">Click Generate to load the container report.</div>
+            )}
+          </Card>
+        )}
+
+        {activeSection === "containers" && appMode !== "factory" && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Container Report
+              </h3>
+              <Button
+                size="sm"
+                onClick={() => refetchContainers()}
+                disabled={loadingContainers}
+              >
+                {loadingContainers ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+              <div>
+                <Label htmlFor="container-start-date">Start Date</Label>
+                <DatePickerInput
+                  value={reportStartDate}
+                  onChange={setReportStartDate}
+                  placeholder="Start date"
+                />
+              </div>
+              <div>
+                <Label htmlFor="container-end-date">End Date</Label>
+                <DatePickerInput
+                  value={reportEndDate}
+                  onChange={setReportEndDate}
+                  placeholder="End date"
+                />
+              </div>
+              <div>
+                <Label htmlFor="container-supplier">Supplier</Label>
+                <Select value={reportSupplierId} onValueChange={setReportSupplierId}>
+                  <SelectTrigger id="container-supplier">
+                    <SelectValue placeholder="All Suppliers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Suppliers</SelectItem>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="container-status">Status</Label>
+                <Select value={reportContainerStatus} onValueChange={setReportContainerStatus}>
+                  <SelectTrigger id="container-status">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="OTW">OTW</SelectItem>
+                    <SelectItem value="In Transit">In Transit</SelectItem>
+                    <SelectItem value="Arrived">Arrived</SelectItem>
+                    <SelectItem value="Offloaded">Offloaded</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="container-company">Company</Label>
+                <Select value={reportAllCompanies} onValueChange={setReportAllCompanies}>
+                  <SelectTrigger id="container-company">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current Company</SelectItem>
+                    <SelectItem value="all">All Companies</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingContainers ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : containerData ? (
+              <div className="space-y-4">
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>{reportContainerStatus === "Offloaded" ? "Offload Date" : "Import Date"}</TableHead>
+                        <TableHead className="text-right">Items Total</TableHead>
+                        <TableHead className="text-right">Charges Total</TableHead>
+                        <TableHead className="text-right">Grand Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {containerData.containers.map((container) => (
+                        <TableRow key={container.id}>
+                          <TableCell className="font-mono">{container.containerNumber}</TableCell>
+                          <TableCell>{container.supplierName}</TableCell>
+                          <TableCell>{container.status}</TableCell>
+                          <TableCell>{reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatAmount(parseFloat(container.itemsTotal))}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatAmount(parseFloat(container.chargesTotal))}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatAmount(parseFloat(container.grandTotal))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableBody className="font-semibold border-t-2">
+                      <TableRow>
+                        <TableCell colSpan={4}>TOTALS</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(containerData.summary.totalItemsTotal)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(containerData.summary.totalChargesTotal)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(containerData.summary.totalGrandTotal)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="md:hidden space-y-3">
+                  {containerData.containers.map((container) => (
+                    <Card key={container.id}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-medium">{container.containerNumber}</span>
+                          <span className="text-sm text-muted-foreground">{container.status}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{container.supplierName} - {reportContainerStatus === "Offloaded" ? (container.offloadDate || "-") : container.importDate}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
+                          <div>
+                            <span className="text-muted-foreground block">Items</span>
+                            <span className="font-mono">{formatAmount(parseFloat(container.itemsTotal))}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">Charges</span>
+                            <span className="font-mono">{formatAmount(parseFloat(container.chargesTotal))}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-muted-foreground block">Total</span>
+                            <span className="font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal))}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-4">
+                      <div className="font-bold text-sm mb-2">TOTALS</div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground block">Items</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalItemsTotal)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block">Charges</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalChargesTotal)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-muted-foreground block">Grand Total</span>
+                          <span className="font-mono font-semibold">{formatAmount(containerData.summary.totalGrandTotal)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No data available. Click Generate to load report.
+              </div>
+            )}
+          </Card>
+        )}
+
 
 
         {activeSection === "reports" && (
