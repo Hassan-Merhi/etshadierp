@@ -77,7 +77,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     },
   });
 
-  const downloadPricesTemplate = () => {
+  const downloadPricesTemplate = async () => {
     const template = [
       { Barcode: "BAR001", "Selling Price": 100.00 },
       { Barcode: "BAR002", "Selling Price": 200.00 },
@@ -165,7 +165,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     }
   };
 
-  const downloadOpeningTemplate = () => {
+  const downloadOpeningTemplate = async () => {
     const template = [
       { Barcode: "BAR001", Qty: 100, Rate: 10.50, "Total Value": 1050.00 },
       { Barcode: "BAR002", Qty: 50, Rate: 25.00, "Total Value": 1250.00 },

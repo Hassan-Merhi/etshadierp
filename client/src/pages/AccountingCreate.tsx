@@ -378,7 +378,7 @@ function LocationForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
+        <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -706,8 +706,7 @@ function LedgerAccountForm({
                             onSubmit={parentForm.handleSubmit(
                               handleCreateParent,
                             )}
-                            className="space-y-4"
-                           noValidate>
+                            className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <FormField
                                 control={parentForm.control}

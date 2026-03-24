@@ -3940,7 +3940,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </CardHeader>
                 <CardContent>
                 <Form {...journalForm}>
-                  <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6" noValidate>
+                  <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
                     {/* Header section */}
                     <div className="flex flex-col sm:flex-row items-start sm:justify-end gap-4">
                     <FormField
@@ -5314,7 +5314,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </CardHeader>
               <CardContent>
               <Form {...stockAdjustmentForm}>
-                <form noValidate onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6" noValidate>
+                <form noValidate onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
                   {/* Header section */}
                   <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                     <FormField

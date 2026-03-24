@@ -709,7 +709,7 @@ export default function Accounts() {
     for (const v of vouchersWithBalance) {
       const dateKey = v.voucherDate.split("T")[0];
       const formattedDate = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
-      const noteText = (v.voucherDescription && v.voucherDescription.trim())
+      const noteText = async (v.voucherDescription && v.voucherDescription.trim())
         ? v.voucherDescription.trim()
         : (v.narration && v.narration.trim()) ? v.narration.trim() : "";
 

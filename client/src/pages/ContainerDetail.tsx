@@ -992,7 +992,7 @@ export default function ContainerDetail() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form noValidate onSubmit={form.handleSubmit(handleSellSubmit)} className="space-y-4" noValidate>
+            <form noValidate onSubmit={form.handleSubmit(handleSellSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="customerId"
