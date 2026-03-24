@@ -457,6 +457,25 @@ export default function FactorySuppliers() {
     },
   });
 
+  const deleteFxTransferMutation = useMutation({
+    mutationFn: async (transferId: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/supplier-fx-transfers/${transferId}`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to reverse FX settlement"); }
+    },
+    onSuccess: () => {
+      if (statementSupplierId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+        if (statementData?.supplier?.parentId) {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementData.supplier.parentId, "statement"] });
+        }
+      }
+      toast({ title: "FX settlement reversed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const [editObComm, setEditObComm] = useState<null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string }>(null);
 
   const updateObCommissionMutation = useMutation({
@@ -1277,7 +1296,7 @@ export default function FactorySuppliers() {
                     brokerStatement.currencyLedgers.map((section: any) => {
                       const typeLabel: Record<string, string> = {
                         container: "Container", payment: "Payment",
-                        fx_out: "FX Out", fx_in: "FX In", commission: "Commission",
+                        fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
                       };
                       const typeBadgeVariant = (t: string): "outline"|"secondary"|"default"|"destructive" => {
                         if (t === "payment") return "secondary";
@@ -1290,6 +1309,7 @@ export default function FactorySuppliers() {
                         if (t === "fx_out") return "text-amber-600 dark:text-amber-400";
                         if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
                         if (t === "commission") return "text-destructive";
+                        if (t === "other_charge") return "text-purple-600 dark:text-purple-400";
                         return "";
                       };
                       return (
@@ -1407,7 +1427,7 @@ export default function FactorySuppliers() {
               </CardHeader>
               <CardContent>
                 {(() => {
-                  type RowType = "purchase" | "payment" | "fx" | "commission";
+                  type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge";
                   const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
                   const allRows: Array<{
                     key: string; date: string | null; type: RowType;
@@ -1470,6 +1490,24 @@ export default function FactorySuppliers() {
                         amountIsNeg: isOut,
                         notes: t.notes,
                         usdImpact: isOut ? -parseFloat(t.toAmountUsd || "0") : 0,
+                        onDelete: isOut ? () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); } : undefined,
+                      };
+                    }),
+                    ...(statementData.offloadCharges || []).map((oc: any) => {
+                      const cc = oc.currencyCode || "USD";
+                      const amt = parseFloat(oc.amount || "0");
+                      const fxRate = parseFloat(oc.fxRateToUsd || "1");
+                      const usdAmt = cc === "USD" ? amt : amt * fxRate;
+                      return {
+                        key: `oac-${oc.id}`,
+                        date: oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null,
+                        type: "other_charge" as RowType,
+                        ref: "Other Charge",
+                        detail: [oc.description, cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : ""].filter(Boolean).join(" · "),
+                        amount: cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : `$${formatNum(String(amt))}`,
+                        amountIsNeg: false,
+                        notes: null,
+                        usdImpact: usdAmt,
                       };
                     }),
                     ...(statementData.obCommissions || []).map(oc => ({
@@ -1503,6 +1541,7 @@ export default function FactorySuppliers() {
                     if (type === "purchase") return <Badge variant="outline" className="text-xs font-normal">Purchase</Badge>;
                     if (type === "payment") return <Badge variant="secondary" className="text-xs font-normal">Payment</Badge>;
                     if (type === "fx") return <Badge className="text-xs font-normal bg-blue-500 dark:bg-blue-600">FX</Badge>;
+                    if (type === "other_charge") return <Badge className="text-xs font-normal bg-purple-500 dark:bg-purple-700">Other Charge</Badge>;
                     return <Badge variant="destructive" className="text-xs font-normal">Commission</Badge>;
                   };
 

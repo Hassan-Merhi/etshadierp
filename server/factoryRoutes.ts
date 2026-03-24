@@ -2592,6 +2592,24 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             ))
         : [];
 
+      // Additional charges (offload) assigned directly to this supplier
+      const supplierOffloadCharges = await db
+        .select({
+          id: factoryOffloadAdditionalCharges.id,
+          containerId: factoryOffloadAdditionalCharges.containerId,
+          description: factoryOffloadAdditionalCharges.description,
+          amount: factoryOffloadAdditionalCharges.amount,
+          currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+          fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+          createdAt: factoryOffloadAdditionalCharges.createdAt,
+        })
+        .from(factoryOffloadAdditionalCharges)
+        .where(and(
+          eq(factoryOffloadAdditionalCharges.companyId, companyId),
+          eq((factoryOffloadAdditionalCharges as any).supplierId, supplierId)
+        ))
+        .orderBy(factoryOffloadAdditionalCharges.createdAt);
+
       const statement = containers.map((c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
@@ -3034,6 +3052,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amountIsNeg: true,
           notes: null,
         })),
+        ...supplierOffloadCharges.map((oc: any) => {
+          const cc = oc.currencyCode || "USD";
+          return {
+            key: `oac-${oc.id}`,
+            date: oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null,
+            type: "other_charge",
+            ref: containerMap[oc.containerId]?.containerNumber || `Container ${oc.containerId}`,
+            detail: oc.description || "Additional charge",
+            amount: fmtAmt(oc.amount, cc, false),
+            amountIsNeg: false,
+            notes: null,
+          };
+        }),
       ].sort((a, b) => {
         const da = a.date ? new Date(a.date).getTime() : 0;
         const db2 = b.date ? new Date(b.date).getTime() : 0;
@@ -3046,6 +3077,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         statement: enrichedStatement,
         currencyGroups,
         obCommissions,
+        offloadCharges: supplierOffloadCharges,
         payments,
         fxTransfers: enrichedFxTransfers,
         linkedSupplierGroups,
@@ -3113,9 +3145,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .orderBy(factorySupplierFxTransfers.date)
       : [];
 
+    // Offload additional charges assigned to any of the broker's suppliers
+    const allOffloadCharges = allSupplierIds.length > 0
+      ? await db.select({
+          id: factoryOffloadAdditionalCharges.id,
+          containerId: factoryOffloadAdditionalCharges.containerId,
+          description: factoryOffloadAdditionalCharges.description,
+          amount: factoryOffloadAdditionalCharges.amount,
+          currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+          fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+          createdAt: factoryOffloadAdditionalCharges.createdAt,
+          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+        })
+        .from(factoryOffloadAdditionalCharges)
+        .where(and(
+          eq(factoryOffloadAdditionalCharges.companyId, companyId),
+          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)})`
+        ))
+        .orderBy(factoryOffloadAdditionalCharges.createdAt)
+      : [];
+
     type LedgerRow = {
       date: string | null;
-      type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight";
+      type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight" | "other_charge";
       description: string;
       ref: string;
       amount: number;
@@ -3233,6 +3285,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
     }
 
+    // Offload additional charge rows
+    for (const oc of allOffloadCharges as any[]) {
+      const cc = oc.currencyCode || "USD";
+      const amt = parseFloat(oc.amount || "0");
+      const supplierName = supplierNameMap[oc.supplierId] || "Unknown";
+      const dateVal = oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null;
+      addRow(cc, {
+        date: dateVal,
+        type: "other_charge",
+        description: `${oc.description || "Additional Charge"} — ${supplierName}`,
+        ref: `Container ${oc.containerId}`,
+        amount: amt,
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
     // Sort rows by date within each section
     for (const cc of Object.keys(ledgerByCurrency)) {
       ledgerByCurrency[cc].sort((a, b) => {
@@ -3304,10 +3373,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const typeLabel: Record<string, string> = {
         container: "Container", payment: "Payment",
-        fx_out: "FX Out", fx_in: "FX In", commission: "Commission",
+        fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
       };
       const rowTypeFill: Record<string, string> = {
-        container: "FFFAFAFA", payment: "FFE8F5E9", fx_out: "FFFFF8E1", fx_in: "FFE3F2FD", commission: "FFFFF3E0",
+        container: "FFFAFAFA", payment: "FFE8F5E9", fx_out: "FFFFF8E1", fx_in: "FFE3F2FD", commission: "FFFFF3E0", other_charge: "FFEDE7F6",
       };
 
       for (const section of data.currencyLedgers) {
