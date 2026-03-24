@@ -2371,10 +2371,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
-          // Only add freight to byCurrency if same currency as container;
-          // cross-currency freight stays hidden until the user does an FX conversion
-          if (freightAmt > 0 && freightCc === cc) {
-            byCurrency[cc] = (byCurrency[cc] || 0) + freightAmt;
+          // Freight always shows in its own currency bucket in the balance totals;
+          // it just doesn't show as individual ledger rows until the user does an FX conversion
+          if (freightAmt > 0) {
+            byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
           }
         }
         // Add commission amounts (in their own currency) for containers where this supplier is the broker
@@ -2723,7 +2723,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
           byCurrency[commCc].totalDirectCommission += directCommAmt;
         }
-        // Cross-currency freight stays hidden until the user does an FX conversion; not added to byCurrency here.
+        // Freight always shows in its own currency bucket in the balance totals (currencyGroups);
+        // it just doesn't create individual ledger rows until the user does an FX conversion.
+        const freightAmt = parseFloat(s.freight || "0");
+        const freightCc = s.freightCurrencyCode || cc;
+        if (freightAmt > 0 && freightCc !== cc) {
+          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0 };
+          byCurrency[freightCc].totalValue += freightAmt;
+        }
       }
 
       // Fetch FX transfers involving this supplier (as source or destination)
