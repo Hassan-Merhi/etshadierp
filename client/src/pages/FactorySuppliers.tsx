@@ -1374,6 +1374,14 @@ export default function FactorySuppliers() {
                                   </span>
                                 </div>
                               )}
+                              {parseFloat(section.totalOtherCharges || "0") > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Other Charges</span>
+                                  <span className="tabular-nums text-purple-600 dark:text-purple-400">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalOtherCharges)}
+                                  </span>
+                                </div>
+                              )}
                               {parseFloat(section.totalFreight || "0") > 0 && (
                                 <div className="flex justify-between gap-6 text-muted-foreground">
                                   <span>Freight</span>

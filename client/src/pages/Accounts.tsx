@@ -1897,6 +1897,12 @@ export default function Accounts() {
                                         <span className="tabular-nums text-destructive">{ccPfx(section.currencyCode)}{fmt(section.totalCommission)}</span>
                                       </div>
                                     )}
+                                    {parseFloat(section.totalOtherCharges || "0") > 0 && (
+                                      <div className="flex justify-between gap-6 text-muted-foreground">
+                                        <span>Other Charges</span>
+                                        <span className="tabular-nums text-purple-600 dark:text-purple-400">{ccPfx(section.currencyCode)}{fmt(section.totalOtherCharges)}</span>
+                                      </div>
+                                    )}
                                     {parseFloat(section.totalFreight || "0") > 0 && (
                                       <div className="flex justify-between gap-6 text-muted-foreground">
                                         <span>Freight</span>

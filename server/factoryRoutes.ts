@@ -3189,6 +3189,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .orderBy(factoryOffloadAdditionalCharges.createdAt)
       : [];
 
+    // Container-level other charges (entered per-container, currency inherited from container)
+    const allContainerOtherCharges = allSupplierIds.length > 0
+      ? await db.select({
+          id: factoryContainerOtherCharges.id,
+          containerId: factoryContainerOtherCharges.containerId,
+          description: factoryContainerOtherCharges.description,
+          amount: factoryContainerOtherCharges.amount,
+          createdAt: factoryContainerOtherCharges.createdAt,
+          supplierId: factoryContainers.supplierId,
+          currencyCode: factoryContainers.currencyCode,
+          containerNumber: factoryContainers.containerNumber,
+        })
+        .from(factoryContainerOtherCharges)
+        .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
+        .where(and(
+          eq(factoryContainerOtherCharges.companyId, companyId),
+          inArray(factoryContainers.supplierId, allSupplierIds)
+        ))
+        .orderBy(factoryContainerOtherCharges.createdAt)
+      : [];
+
     type LedgerRow = {
       date: string | null;
       type: "container" | "payment" | "fx_out" | "fx_in" | "commission" | "freight" | "other_charge";
@@ -3337,6 +3358,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
     }
 
+    // Container-level other charge rows (linked via container → supplier)
+    for (const oc of allContainerOtherCharges as any[]) {
+      const cc = oc.currencyCode || "USD";
+      const amt = parseFloat(oc.amount || "0");
+      const dateVal = oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null;
+      addRow(cc, {
+        date: dateVal,
+        type: "other_charge",
+        description: `${oc.description || "Other Charge"} — ${oc.containerNumber || `Container ${oc.containerId}`}`,
+        ref: oc.containerNumber || `Container ${oc.containerId}`,
+        amount: amt,
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
     // Sort rows by date within each section
     for (const cc of Object.keys(ledgerByCurrency)) {
       ledgerByCurrency[cc].sort((a, b) => {
@@ -3363,6 +3400,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalPaid = Math.abs(rows.filter(r => r.type === "payment").reduce((s, r) => s + r.amount, 0));
       const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
       const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
+      const totalOtherCharges = rows.filter(r => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
       // Cross-currency freight owed in this currency (tracked separately from rows)
       const totalFreight = freightByBucket[cc] || 0;
       const netBalanceWithFreight = runBal + totalFreight;
@@ -3373,6 +3411,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalValue: totalValue.toFixed(2),
         totalCommission: totalCommission.toFixed(2),
         totalFreight: totalFreight.toFixed(2),
+        totalOtherCharges: totalOtherCharges.toFixed(2),
         totalPaid: totalPaid.toFixed(2),
         totalFxOut: totalFxOut.toFixed(2),
         totalFxIn: totalFxIn.toFixed(2),
