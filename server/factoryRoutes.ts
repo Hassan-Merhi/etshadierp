@@ -3200,6 +3200,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     };
 
     const ledgerByCurrency: Record<string, LedgerRow[]> = {};
+    const freightByBucket: Record<string, number> = {}; // cross-currency freight totals keyed by freight currency code
     const addRow = (cc: string, row: LedgerRow) => {
       if (!ledgerByCurrency[cc]) ledgerByCurrency[cc] = [];
       ledgerByCurrency[cc].push(row);
@@ -3233,7 +3234,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
       });
 
-      // Cross-currency freight stays hidden in the ledger until the user does an FX conversion.
+      // Cross-currency freight: accumulate into its own currency bucket total (shown in summary, not as a row)
+      if (freight > 0 && !freightSameCcy) {
+        freightByBucket[freightCc] = (freightByBucket[freightCc] || 0) + freight;
+        // Ensure the freight currency has a section even if there are no other rows for it
+        if (!ledgerByCurrency[freightCc]) ledgerByCurrency[freightCc] = [];
+      }
 
       // Commission row in different currency section
       if (commAmt > 0 && commCc !== cc) {
@@ -3357,16 +3363,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalPaid = Math.abs(rows.filter(r => r.type === "payment").reduce((s, r) => s + r.amount, 0));
       const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
       const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
+      // Cross-currency freight owed in this currency (tracked separately from rows)
+      const totalFreight = freightByBucket[cc] || 0;
+      const netBalanceWithFreight = runBal + totalFreight;
       return {
         currencyCode: cc,
         rows: rowsWithBal,
         totalContainers,
         totalValue: totalValue.toFixed(2),
         totalCommission: totalCommission.toFixed(2),
+        totalFreight: totalFreight.toFixed(2),
         totalPaid: totalPaid.toFixed(2),
         totalFxOut: totalFxOut.toFixed(2),
         totalFxIn: totalFxIn.toFixed(2),
-        netBalance: runBal.toFixed(2),
+        netBalance: netBalanceWithFreight.toFixed(2),
       };
     }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
 
@@ -3466,7 +3476,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalsLabel.font = { bold: true };
         const totalsData = ws.addRow([
           "", "",
-          `Containers: ${section.totalContainers}  |  Paid: ${section.totalPaid}  |  FX Out: ${section.totalFxOut}`,
+          `Containers: ${section.totalContainers}  |  Freight: ${section.totalFreight}  |  Paid: ${section.totalPaid}  |  FX Out: ${section.totalFxOut}`,
           parseFloat(section.totalValue),
           parseFloat(section.totalCommission),
           "",
@@ -3485,7 +3495,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       sumWs.addRow([`Broker Consolidated Statement — ${(data.supplier as any).name}`]).font = { bold: true, size: 13 };
       sumWs.addRow([`Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]).font = { italic: true };
       sumWs.addRow([]);
-      const sumHdr = sumWs.addRow(["Currency", "Containers", "Gross Value", "Commission", "FX Out", "FX In", "Paid", "Net Balance"]);
+      const sumHdr = sumWs.addRow(["Currency", "Containers", "Gross Value", "Commission", "Freight", "FX Out", "FX In", "Paid", "Net Balance"]);
       sumHdr.font = { bold: true, color: { argb: "FFFFFFFF" } };
       sumHdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
       for (const section of data.currencyLedgers) {
@@ -3494,29 +3504,34 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           section.totalContainers,
           parseFloat(section.totalValue),
           parseFloat(section.totalCommission),
+          parseFloat(section.totalFreight || "0"),
           parseFloat(section.totalFxOut),
           parseFloat(section.totalFxIn),
           parseFloat(section.totalPaid),
           parseFloat(section.netBalance),
         ]);
         // Colour FX Out red, FX In green for clarity
-        ["C", "D", "E", "F", "G", "H"].forEach(col => {
+        ["C", "D", "E", "F", "G", "H", "I"].forEach(col => {
           dr.getCell(col).numFmt = "#,##0.00";
           dr.getCell(col).alignment = { horizontal: "right" };
         });
         const fxOutVal = parseFloat(section.totalFxOut);
         const fxInVal  = parseFloat(section.totalFxIn);
+        const freightVal = parseFloat(section.totalFreight || "0");
         if (fxOutVal > 0) {
-          dr.getCell("E").font = { color: { argb: "FFCC0000" } };
+          dr.getCell("F").font = { color: { argb: "FFCC0000" } };
         }
         if (fxInVal > 0) {
-          dr.getCell("F").font = { color: { argb: "FF006600" } };
+          dr.getCell("G").font = { color: { argb: "FF006600" } };
+        }
+        if (freightVal > 0) {
+          dr.getCell("E").font = { color: { argb: "FFE65100" } };
         }
         // Bold the Net Balance
-        dr.getCell("H").font = { bold: true };
+        dr.getCell("I").font = { bold: true };
       }
       sumWs.columns = [
-        { width: 12 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 18 }
+        { width: 12 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 18 }
       ];
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

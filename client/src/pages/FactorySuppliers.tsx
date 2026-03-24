@@ -1222,7 +1222,6 @@ export default function FactorySuppliers() {
                                   <TableHead className="h-8 text-xs">Date</TableHead>
                                   <TableHead className="h-8 text-xs">Container</TableHead>
                                   <TableHead className="h-8 text-xs">Status</TableHead>
-                                  <TableHead className="h-8 text-xs text-right">Freight</TableHead>
                                   <TableHead className="h-8 text-xs text-right">Value ({cg.currencyCode})</TableHead>
                                   <TableHead className="h-8 text-xs text-right">Commission</TableHead>
                                   <TableHead className="h-8 text-xs">Notes</TableHead>
@@ -1235,13 +1234,6 @@ export default function FactorySuppliers() {
                                     <TableCell className="py-1 font-medium">{c.containerNumber}</TableCell>
                                     <TableCell className="py-1">
                                       <Badge variant={statusColor(c.status)} className="text-xs">{c.status}</Badge>
-                                    </TableCell>
-                                    <TableCell className="py-1 text-right tabular-nums text-amber-600 dark:text-amber-400">
-                                      {parseFloat(c.freight || "0") > 0
-                                        ? (c.freightCurrencyCode && c.freightCurrencyCode !== cg.currencyCode
-                                            ? `${c.freightCurrencyCode} ${formatNum(c.freight)}`
-                                            : formatNum(c.freight))
-                                        : "—"}
                                     </TableCell>
                                     <TableCell className="py-1 text-right tabular-nums font-medium">{formatNum(c.value)}</TableCell>
                                     <TableCell className="py-1 text-right tabular-nums text-destructive">
@@ -1379,6 +1371,14 @@ export default function FactorySuppliers() {
                                   <span>Commission</span>
                                   <span className="tabular-nums text-destructive">
                                     {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalCommission)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalFreight || "0") > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Freight</span>
+                                  <span className="tabular-nums text-orange-600 dark:text-orange-400">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalFreight)}
                                   </span>
                                 </div>
                               )}

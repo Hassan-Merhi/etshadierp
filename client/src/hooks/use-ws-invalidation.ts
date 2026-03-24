@@ -5,10 +5,23 @@ export function useWsInvalidation() {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
 
   useEffect(() => {
     unmountedRef.current = false;
+
+    function handleInvalidate() {
+      // Debounce: if multiple WS messages arrive rapidly, only run one invalidation
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        if (!unmountedRef.current) {
+          // Only refetch queries that are currently active (mounted) and stale
+          // Avoid blasting all cached queries simultaneously
+          queryClient.invalidateQueries({ refetchType: "active" });
+        }
+      }, 800);
+    }
 
     function connect() {
       if (unmountedRef.current) return;
@@ -21,7 +34,7 @@ export function useWsInvalidation() {
         try {
           const msg = JSON.parse(event.data as string);
           if (msg.type === "invalidate") {
-            queryClient.invalidateQueries();
+            handleInvalidate();
           }
         } catch {
         }
@@ -43,6 +56,7 @@ export function useWsInvalidation() {
     return () => {
       unmountedRef.current = true;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       wsRef.current?.close();
     };
   }, [queryClient]);
