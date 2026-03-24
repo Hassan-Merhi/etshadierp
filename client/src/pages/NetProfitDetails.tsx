@@ -10,14 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   ArrowLeft,
   Plus,
   Minus,
@@ -58,6 +50,67 @@ interface NetProfitData {
   expensesTotal: number;
 }
 
+function CategoryGroup({
+  category,
+  accounts,
+  amountColor,
+  amountPrefix,
+  formatAmount,
+  accentColor,
+}: {
+  category: string;
+  accounts: AccountItem[];
+  amountColor: (val: number) => string;
+  amountPrefix: (val: number) => string;
+  formatAmount: (n: number) => string;
+  accentColor: string;
+}) {
+  const [open, setOpen] = useState(true);
+  const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+
+  return (
+    <div className="border border-border rounded-md overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 hover-elevate text-sm font-semibold"
+        data-testid={`button-category-${category.toLowerCase().replace(/\s+/g, "-")}`}
+      >
+        <div className="flex items-center gap-2">
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )}
+          <span>{category}</span>
+          <Badge variant="outline" className="text-xs font-normal">
+            {accounts.length}
+          </Badge>
+        </div>
+        <span className={`font-mono font-bold ${accentColor}`}>
+          {formatAmount(total)}
+        </span>
+      </button>
+      {open && (
+        <div className="divide-y divide-border">
+          {accounts.map((acc, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between px-4 py-2 text-sm"
+              data-testid={`row-account-${i}`}
+            >
+              <span className="font-medium text-foreground">{acc.name}</span>
+              <span className={`font-mono tabular-nums ${amountColor(acc.value)}`}>
+                {amountPrefix(acc.value)}{formatAmount(Math.abs(acc.value))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CollapsibleSection({
   id,
   title,
@@ -68,7 +121,6 @@ function CollapsibleSection({
   totalLabel,
   totalColor,
   accounts,
-  showCategory,
   amountColor,
   amountPrefix,
   formatAmount,
@@ -82,33 +134,45 @@ function CollapsibleSection({
   totalLabel: string;
   totalColor: string;
   accounts: AccountItem[];
-  showCategory: boolean;
   amountColor: (val: number) => string;
   amountPrefix: (val: number) => string;
   formatAmount: (n: number) => string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
+
+  const grouped = accounts.reduce<Record<string, AccountItem[]>>((acc, item) => {
+    const cat = item.category || "Other";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {});
+
+  const sortedCategories = Object.entries(grouped).sort(
+    ([, a], [, b]) =>
+      b.reduce((s, x) => s + Math.abs(x.value), 0) -
+      a.reduce((s, x) => s + Math.abs(x.value), 0)
+  );
 
   return (
-    <Card data-testid={`card-${id}`}>
+    <Card data-testid={`card-${id}`} className="flex flex-col">
       <CardHeader
-        className="cursor-pointer select-none"
+        className="cursor-pointer select-none pb-3"
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <span className={accentColor}>{icon}</span>
             <div>
-              <CardTitle className={`flex items-center gap-2 ${accentColor}`}>
+              <CardTitle className={`flex items-center gap-2 text-lg ${accentColor}`}>
                 {title}
               </CardTitle>
               {subtitle && (
-                <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-xl font-bold font-mono ${totalColor}`}>
+            <span className={`text-2xl font-bold font-mono ${totalColor}`}>
               {formatAmount(total)}
             </span>
             {open ? (
@@ -121,40 +185,25 @@ function CollapsibleSection({
       </CardHeader>
 
       {open && (
-        <CardContent className="pt-0">
-          {accounts.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account</TableHead>
-                  {showCategory && <TableHead>Category</TableHead>}
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accounts.map((acc, index) => (
-                  <TableRow key={index} data-testid={`${id}-account-${index}`}>
-                    <TableCell className="font-medium">{acc.name}</TableCell>
-                    {showCategory && (
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {acc.category}
-                        </Badge>
-                      </TableCell>
-                    )}
-                    <TableCell className={`text-right font-mono ${amountColor(acc.value)}`}>
-                      {amountPrefix(acc.value)}{formatAmount(Math.abs(acc.value))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="border-t-2 font-bold bg-muted/50">
-                  <TableCell colSpan={showCategory ? 2 : 1}>{totalLabel}</TableCell>
-                  <TableCell className={`text-right font-mono ${totalColor}`}>
-                    {formatAmount(total)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+        <CardContent className="pt-0 flex-1 space-y-2">
+          {sortedCategories.length > 0 ? (
+            <>
+              {sortedCategories.map(([cat, catAccounts]) => (
+                <CategoryGroup
+                  key={cat}
+                  category={cat}
+                  accounts={catAccounts}
+                  amountColor={amountColor}
+                  amountPrefix={amountPrefix}
+                  formatAmount={formatAmount}
+                  accentColor={totalColor}
+                />
+              ))}
+              <div className="flex justify-between items-center px-4 py-2.5 rounded-md bg-muted/60 font-bold text-sm mt-1">
+                <span>{totalLabel}</span>
+                <span className={`font-mono ${totalColor}`}>{formatAmount(total)}</span>
+              </div>
+            </>
           ) : (
             <p className="text-muted-foreground text-center py-4">No data recorded</p>
           )}
@@ -172,7 +221,7 @@ export default function NetProfitDetails() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4 max-w-6xl mx-auto">
+      <div className="p-6 space-y-4">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <Skeleton className="h-8 w-64" />
@@ -200,7 +249,7 @@ export default function NetProfitDetails() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 w-full">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -251,8 +300,8 @@ export default function NetProfitDetails() {
         </CardContent>
       </Card>
 
-      {/* Assets + Liabilities (collapsible) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Assets + Liabilities side by side, full width */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <CollapsibleSection
           id="assets"
           title="What We Have"
@@ -263,7 +312,6 @@ export default function NetProfitDetails() {
           totalLabel="Total Assets"
           totalColor="text-green-600"
           accounts={data?.forUs.accounts || []}
-          showCategory={true}
           amountColor={() => "text-green-600"}
           amountPrefix={() => ""}
           formatAmount={formatAmount}
@@ -278,15 +326,14 @@ export default function NetProfitDetails() {
           totalLabel="Total Liabilities"
           totalColor="text-red-600"
           accounts={data?.onUs.accounts || []}
-          showCategory={true}
           amountColor={() => "text-red-600"}
           amountPrefix={() => ""}
           formatAmount={formatAmount}
         />
       </div>
 
-      {/* Income + Expenses (collapsible) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Income + Expenses side by side, full width */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <CollapsibleSection
           id="income"
           title="Income"
@@ -297,7 +344,6 @@ export default function NetProfitDetails() {
           totalLabel="Total Income"
           totalColor="text-green-600"
           accounts={data?.income.accounts || []}
-          showCategory={false}
           amountColor={(v) => (v >= 0 ? "text-green-600" : "text-red-600")}
           amountPrefix={(v) => (v >= 0 ? "+" : "-")}
           formatAmount={formatAmount}
@@ -312,7 +358,6 @@ export default function NetProfitDetails() {
           totalLabel="Total Expenses"
           totalColor="text-red-600"
           accounts={data?.expenses.accounts || []}
-          showCategory={false}
           amountColor={(v) => (v >= 0 ? "text-red-600" : "text-green-600")}
           amountPrefix={(v) => (v >= 0 ? "-" : "+")}
           formatAmount={formatAmount}
