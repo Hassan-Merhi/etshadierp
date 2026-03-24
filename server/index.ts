@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
@@ -24,6 +25,9 @@ const BUILD_VERSION = process.env.BUILD_VERSION ||
                       Date.now().toString();
 
 const app = express();
+
+// Compress all HTTP responses (gzip/deflate) — reduces bandwidth by 60-80%
+app.use(compression());
 
 declare global {
   namespace Express {
