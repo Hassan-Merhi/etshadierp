@@ -4573,6 +4573,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           notes: factoryContainers.notes,
           status: factoryContainers.status,
           freight: factoryContainers.freight,
+          freightCurrencyCode: factoryContainers.freightCurrencyCode,
           freightAccountId: factoryContainers.freightAccountId,
           otherCharges: factoryContainers.otherCharges,
           otherChargesAccountId: factoryContainers.otherChargesAccountId,
@@ -4767,7 +4768,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry: Freight (Dr Freight Expense / Cr Supplier Payable)
+      // Freight posts in its own currency (may differ from container currency)
       const freightAmt = parseFloat(container.freight || "0");
+      const freightCcy = (container as any).freightCurrencyCode || container.currencyCode || "USD";
       if (freightAmt > 0 && container.freightAccountId) {
         const freightVoucherNum = `FACTORY-FREIGHT-${container.id}-${Date.now()}`;
         const [freightVoucher] = await db.insert(vouchers).values({
@@ -4777,8 +4780,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: container.arrivalDate || today,
           description: `Freight on container ${container.containerNumber}`,
           totalAmount: String(freightAmt),
-          currency: container.currencyCode || "USD",
-          exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+          currency: freightCcy,
+          exchangeRate: freightCcy === (container.currencyCode || "USD")
+            ? String(parseFloat(container.fxRateToUsd || "1"))
+            : "1",
           sourceModule: "FACTORY",
         }).returning();
         // Dr Freight Expense

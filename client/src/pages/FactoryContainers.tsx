@@ -65,6 +65,7 @@ export default function FactoryContainers() {
     commissionSupplierId: "",
     commissionNotes: "",
     freight: "",
+    freightCurrencyCode: "USD",
     freightAccountId: "",
     otherCharges: "",
     otherChargesAccountId: "",
@@ -173,6 +174,7 @@ export default function FactoryContainers() {
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
         freight: data.freight || "0",
+        freightCurrencyCode: data.freightCurrencyCode || "USD",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
         otherCharges: "0",
         otherChargesAccountId: null,
@@ -223,6 +225,7 @@ export default function FactoryContainers() {
         commissionSupplierId: data.commissionSupplierId ? parseInt(data.commissionSupplierId) : null,
         commissionNotes: data.commissionNotes || null,
         freight: data.freight || "0",
+        freightCurrencyCode: data.freightCurrencyCode || "USD",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
         // Preserve offload-set values — do NOT hardcode 0/null here
         otherCharges: data.otherCharges || "0",
@@ -416,6 +419,7 @@ export default function FactoryContainers() {
       commissionSupplierId: "",
       commissionNotes: "",
       freight: "",
+      freightCurrencyCode: "USD",
       freightAccountId: "",
       otherCharges: "",
       otherChargesAccountId: "",
@@ -444,6 +448,7 @@ export default function FactoryContainers() {
       commissionSupplierId: (c as any).commissionSupplierId ? String((c as any).commissionSupplierId) : "",
       commissionNotes: (c as any).commissionNotes || "",
       freight: (c as any).freight || "",
+      freightCurrencyCode: (c as any).freightCurrencyCode || "USD",
       freightAccountId: (c as any).freightAccountId ? String((c as any).freightAccountId) : "",
       otherCharges: (c as any).otherCharges || "",
       otherChargesAccountId: (c as any).otherChargesAccountId ? String((c as any).otherChargesAccountId) : "",
@@ -613,11 +618,13 @@ export default function FactoryContainers() {
                   const ccy = (c as any).currencyCode || "USD";
                   const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
                   const freightAmt = parseFloat((c as any).freight || "0");
+                  const freightCcy = (c as any).freightCurrencyCode || ccy;
+                  const freightSameCcy = freightCcy === ccy;
                   const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
                   const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
                   const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
                   const totalOtherAmt = legacyOtherAmt + preRegisteredAmt + additionalAmt;
-                  const totalValue = baseValue + freightAmt + totalOtherAmt;
+                  const totalValue = baseValue + (freightSameCcy ? freightAmt : 0) + totalOtherAmt;
                   return (
                     <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
                       <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
@@ -635,10 +642,10 @@ export default function FactoryContainers() {
                       <TableCell className="font-mono text-sm">
                         {(freightAmt > 0 || totalOtherAmt > 0) ? (
                           <div className="space-y-0.5">
-                            <span>{ccy} {formatNumber(freightAmt + totalOtherAmt)}</span>
+                            <span>{ccy} {formatNumber((freightSameCcy ? freightAmt : 0) + totalOtherAmt)}{!freightSameCcy && freightAmt > 0 ? ` + ${freightCcy} ${formatNumber(freightAmt)}` : ""}</span>
                             <div className="text-xs text-muted-foreground space-y-0">
                               {freightAmt > 0 && (
-                                <div>Freight: {formatNumber(freightAmt)}</div>
+                                <div>Freight: {freightCcy} {formatNumber(freightAmt)}</div>
                               )}
                               {(legacyOtherAmt + preRegisteredAmt) > 0 && (
                                 <div>Other: {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
@@ -1045,7 +1052,7 @@ export default function FactoryContainers() {
                 <Separator className="flex-1" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                   <Input
@@ -1055,6 +1062,24 @@ export default function FactoryContainers() {
                     placeholder="0.00"
                     data-testid="input-container-freight"
                   />
+                </div>
+                <div>
+                  <Label>Freight Currency</Label>
+                  <Select
+                    value={formData.freightCurrencyCode}
+                    onValueChange={(val) => setFormData({ ...formData, freightCurrencyCode: val })}
+                  >
+                    <SelectTrigger data-testid="select-freight-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>

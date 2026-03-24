@@ -427,6 +427,8 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_daily_usages_company_date_idx ON factory_daily_usages (company_id, used_date)`,
     // Wipers Re-Entry by Date (Mar 2026) — backdated stock entry date per bale
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS stock_entry_date date`,
+    // Freight currency per container (Mar 2026)
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_currency_code varchar(10) DEFAULT 'USD'`,
     // Container-level multiple other charges (Mar 2026)
     `CREATE TABLE IF NOT EXISTS factory_container_other_charges (
       id serial PRIMARY KEY,
