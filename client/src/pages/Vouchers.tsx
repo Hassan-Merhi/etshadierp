@@ -452,7 +452,7 @@ function StockItemCombobox({
 }
 
 // Print Template Component
-const PrintTemplate = async ({
+const PrintTemplate = ({
   voucherType,
   paymentAccountName,
   date,
