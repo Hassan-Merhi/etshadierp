@@ -7,13 +7,15 @@ import "./index.css";
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
 
-  // Collect all text fields we can inspect
+  // Collect only message and name — deliberately omit stack traces because
+  // production JS files have hashed paths that could appear in any stack,
+  // causing legitimate runtime errors to be mis-classified as chunk errors
+  // and triggering a spurious reload loop.
   const candidates: string[] = [];
   if (typeof reason === "string") {
     candidates.push(reason);
   } else if (reason && typeof reason === "object") {
     if (reason.message) candidates.push(String(reason.message));
-    if (reason.stack)   candidates.push(String(reason.stack));
     if (reason.name)    candidates.push(String(reason.name));
     try { candidates.push(reason.toString()); } catch { /* ignore */ }
   }

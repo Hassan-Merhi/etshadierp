@@ -90,19 +90,43 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+  async ({ queryKey, signal: querySignal }) => {
     // The queryKey is expected to be a single URL string as the first element
     const url = queryKey[0] as string;
-    const res = await fetch(url, {
-      credentials: "include",
-    });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    // Apply a 30-second hard timeout so queries never hang indefinitely.
+    // We race the caller's own signal (query cancellation) against our timeout.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 30000);
+
+    // Forward query-level cancellation (e.g. component unmount) into our controller
+    querySignal?.addEventListener("abort", () => controller.abort(), { once: true });
+
+    try {
+      const res = await fetch(url, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (timedOut && error?.name === "AbortError") {
+        throw new Error(`Request timed out after 30 seconds: GET ${url}`);
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

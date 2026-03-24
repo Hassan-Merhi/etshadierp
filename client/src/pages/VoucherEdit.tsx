@@ -821,7 +821,7 @@ export default function VoucherEdit() {
   });
 
   // Helper function to find account details by ID
-  const findAccountDetails = async (entry: VoucherEntry) => {
+  const findAccountDetails = (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
       const account = ledgerAccounts.find(a => a.id === entry.ledgerAccountId);
       return account ? {
