@@ -136,6 +136,7 @@ export default function PurchaseOrderEdit() {
       navigate("/daybook");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update purchase order",

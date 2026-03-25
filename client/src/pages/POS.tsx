@@ -630,6 +630,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       refetchDrafts();
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to save draft",
@@ -710,6 +711,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       refetchDrafts();
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete draft",

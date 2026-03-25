@@ -1110,6 +1110,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       setEditFormInitialized(false);
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update voucher",
@@ -1161,6 +1162,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       setVoucherToDelete(null);
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete voucher",

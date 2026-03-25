@@ -64,6 +64,7 @@ export default function OptionalVouchers() {
       setFinalizeVoucherId(null);
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -79,6 +80,7 @@ export default function OptionalVouchers() {
       setDeleteVoucherId(null);
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

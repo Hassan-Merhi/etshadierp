@@ -324,6 +324,7 @@ export default function POSDaybook() {
       setIsEditMode(false);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,

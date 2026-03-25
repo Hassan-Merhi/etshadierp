@@ -124,6 +124,7 @@ export default function StockItems() {
       });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete stock items",
@@ -144,6 +145,7 @@ export default function StockItems() {
       });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update UOM",
@@ -170,6 +172,7 @@ export default function StockItems() {
       });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to adjust stock",

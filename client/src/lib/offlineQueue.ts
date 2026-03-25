@@ -108,11 +108,29 @@ export function setLastSynced(): void {
 
 const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   // Session
-  { method: "POST", pattern: /^\/api\/auth\/set-company$/ },
+  { method: "POST",   pattern: /^\/api\/auth\/set-company$/ },
+  // ERP — customers
+  { method: "POST",   pattern: /^\/api\/customers$/ },
+  { method: "PUT",    pattern: /^\/api\/customers\/\d+$/ },
+  // ERP — suppliers
+  { method: "PATCH",  pattern: /^\/api\/suppliers\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/suppliers\/\d+$/ },
+  // ERP — purchase orders
+  { method: "PATCH",  pattern: /^\/api\/purchase-orders\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/purchase-orders\/\d+$/ },
+  // ERP — voucher extras
+  { method: "PUT",    pattern: /^\/api\/vouchers\/\d+\/with-entries$/ },
+  { method: "PATCH",  pattern: /^\/api\/vouchers\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/vouchers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/vouchers\/\d+\/finalize$/ },
+  // ERP — inventory
+  { method: "POST",   pattern: /^\/api\/inventory\/quick-adjust$/ },
   // POS
   { method: "POST",  pattern: /^\/api\/pos\/sales$/ },
   { method: "POST",  pattern: /^\/api\/pos\/drafts$/ },
   { method: "PATCH", pattern: /^\/api\/pos\/drafts\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/pos\/drafts\/\d+$/ },
+  { method: "POST",  pattern: /^\/api\/pos\/customers$/ },
   // ERP Vouchers
   { method: "POST",  pattern: /^\/api\/vouchers$/ },
   { method: "POST",  pattern: /^\/api\/vouchers\/payment-receipt$/ },

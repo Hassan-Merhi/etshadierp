@@ -94,6 +94,7 @@ export default function Suppliers() {
       setSupplierToDelete(null);
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setSupplierToDelete(null);
     },

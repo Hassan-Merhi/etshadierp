@@ -80,6 +80,7 @@ export default function EditSupplier() {
       navigate("/suppliers");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update supplier",
