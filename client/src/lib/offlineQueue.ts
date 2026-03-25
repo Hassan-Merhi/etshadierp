@@ -189,6 +189,13 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH",  pattern: /^\/api\/factory\/customers\/\d+$/ },
   { method: "PUT",    pattern: /^\/api\/factory\/customers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customers\/\d+$/ },
+  // Factory — proformas
+  { method: "POST",   pattern: /^\/api\/factory\/customer-proformas$/ },
+  { method: "PUT",    pattern: /^\/api\/factory\/customer-proformas\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/customer-proformas\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-proforma-lines$/ },
+  { method: "PUT",    pattern: /^\/api\/factory\/customer-proforma-lines\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/customer-proforma-lines\/\d+$/ },
   // Factory — alerts / settings
   { method: "POST",  pattern: /^\/api\/factory\/alerts$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/alerts\/\d+$/ },
@@ -253,6 +260,8 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/factory\/employees\/\d+\/withdraw/.test(url)) return "Employee Withdrawal";
   if (/\/api\/factory\/employees/.test(url)) return "Employee";
   if (/\/api\/factory\/customers/.test(url)) return "Customer";
+  if (/\/api\/factory\/customer-proforma-lines/.test(url)) return "Proforma Line";
+  if (/\/api\/factory\/customer-proformas/.test(url)) return "Proforma";
   if (/\/api\/factory\/payrolls\/\d+\/mark-paid/.test(url)) return "Payroll Payment";
   if (/\/api\/factory\/payrolls\/mark-paid-bulk/.test(url)) return "Bulk Payroll Payment";
   if (/\/api\/factory\/payroll/.test(url)) return "Payroll";
