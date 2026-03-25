@@ -549,6 +549,8 @@ let migrationsDone = false;
       rate decimal(15,2) NOT NULL,
       total_amount decimal(15,2) NOT NULL
     )`,
+    // Factory waste type column (missed in original factory_waste_entries creation)
+    `ALTER TABLE factory_waste_entries ADD COLUMN IF NOT EXISTS waste_type varchar(50)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
