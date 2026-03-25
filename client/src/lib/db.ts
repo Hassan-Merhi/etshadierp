@@ -97,6 +97,14 @@ export interface OfflineMeta {
   packSummary: string;
 }
 
+export interface PooledRef {
+  id?: number;
+  referenceNumber: string;
+  status: "available" | "used";
+  allocatedAt: number;
+  usedAt: number | null;
+}
+
 // ─── Dexie Database ───────────────────────────────────────────────────────────
 
 class ERPDatabase extends Dexie {
@@ -127,6 +135,8 @@ class ERPDatabase extends Dexie {
   factoryRawStock!: Table<CachedEntity, string | number>;
   // Offline prep metadata
   offlineMeta!: Table<OfflineMeta, number>;
+  // Pre-allocated label reference number pool
+  refPool!: Table<PooledRef, number>;
 
   constructor() {
     super("ERPDatabase");
@@ -184,6 +194,11 @@ class ERPDatabase extends Dexie {
       factoryContainers: "id, companyId, fetchedAt",
       factoryRawStock:   "id, companyId, fetchedAt",
       offlineMeta:       "++id, &key",
+    });
+
+    // v5 — pre-allocated label reference number pool for offline printing
+    this.version(5).stores({
+      refPool: "++id, referenceNumber, status, allocatedAt",
     });
   }
 }

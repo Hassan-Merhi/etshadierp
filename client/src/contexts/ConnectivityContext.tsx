@@ -76,7 +76,7 @@ export function ConnectivityProvider({ children }: Props) {
   const [conflictCount, setConflictCount] = useState(0);
   const isMountedRef = useRef(true);
 
-  // Load last sync time from IndexedDB on mount
+  // Load last sync time from IndexedDB on mount; prime label ref pool if online
   useEffect(() => {
     isMountedRef.current = true;
     getGlobalSyncState()
@@ -86,6 +86,11 @@ export function ConnectivityProvider({ children }: Props) {
         }
       })
       .catch(() => {});
+    if (navigator.onLine) {
+      import("@/lib/refPool")
+        .then(({ ensurePoolReady }) => ensurePoolReady())
+        .catch(() => {});
+    }
     return () => {
       isMountedRef.current = false;
     };
@@ -125,6 +130,9 @@ export function ConnectivityProvider({ children }: Props) {
       if (alive) {
         void appendSyncLog("online", "Connection restored");
         triggerSync();
+        import("@/lib/refPool")
+          .then(({ ensurePoolReady }) => ensurePoolReady())
+          .catch(() => {});
       }
     };
 
@@ -145,6 +153,9 @@ export function ConnectivityProvider({ children }: Props) {
         if (alive) {
           void appendSyncLog("online", "Connection verified by ping");
           triggerSync();
+          import("@/lib/refPool")
+            .then(({ ensurePoolReady }) => ensurePoolReady())
+            .catch(() => {});
         } else {
           void appendSyncLog("offline", "Connection lost (ping failed)");
         }

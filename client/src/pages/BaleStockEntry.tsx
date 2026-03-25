@@ -35,6 +35,8 @@
   import * as XLSX from "xlsx";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+  import { consumeRef } from "@/lib/refPool";
+  import { enqueueRequest } from "@/lib/offlineQueue";
 
   interface CartItem {
     productId: number;
@@ -377,25 +379,52 @@
 
         printLabels(result.bales);
       },
-      onError: (error: Error) => {
+      onError: async (error: Error) => {
         if (error?._handledGlobally) return;
         if ((error as any).name === "OfflineQueued") {
-          // Offline: generate synthetic label data from cart without hitting the server
+          // Offline: use pre-allocated pool refs (scannable) or fall back to OFFL-xxx
           const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
           let globalIdx = 0;
           const syntheticLabels: LabelData[] = [];
+          const pooledBales: Array<{ referenceNumber: string; articleCode: string; pieces: number; approxWeightKg: string; productId: number }> = [];
+
           for (const item of cart) {
             for (let i = 0; i < item.qty; i++) {
               globalIdx++;
+              const articleCode = item.product.articleCode || item.product.code || "";
+              const pooledRef = await consumeRef();
+              const referenceNumber = pooledRef ?? `OFFL-${today}-${String(globalIdx).padStart(3, "0")}`;
+
               syntheticLabels.push({
-                referenceNumber: `OFFL-${today}-${String(globalIdx).padStart(3, "0")}`,
-                articleCode: item.product.articleCode || item.product.code || "",
+                referenceNumber,
+                articleCode,
                 pieces: 1,
                 approxWeightKg: String(item.weightPerBaleKg),
                 productName: item.product.name,
               });
+
+              if (pooledRef) {
+                pooledBales.push({
+                  referenceNumber: pooledRef,
+                  articleCode,
+                  pieces: 1,
+                  approxWeightKg: String(item.weightPerBaleKg),
+                  productId: item.productId,
+                });
+              }
             }
           }
+
+          // Queue the label print records so DB is updated when back online
+          if (pooledBales.length > 0) {
+            enqueueRequest(
+              "/api/bale-label-prints",
+              "POST",
+              JSON.stringify({ bales: pooledBales }),
+              "Label Print"
+            );
+          }
+
           discardCartDraft();
           setConfirmDialogOpen(false);
           setCart([]);

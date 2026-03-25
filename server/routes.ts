@@ -29542,6 +29542,26 @@ if (asOfDate) {
     return referenceNumber;
   }
 
+  // Bale Label Prints - pre-allocate a batch of reference numbers for offline label printing
+  app.post("/api/bale-label-prints/allocate-pool", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const count = Math.min(Math.max(parseInt(req.body?.count ?? "200", 10) || 200, 1), 500);
+      const refs = await db.transaction(async (tx) => {
+        const result: string[] = [];
+        for (let i = 0; i < count; i++) {
+          result.push(await generateSafeRef(tx, companyId));
+        }
+        return result;
+      });
+      res.json({ refs });
+    } catch (error: any) {
+      console.error("Error allocating label ref pool:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bale Label Prints - create label print records with unique reference numbers
   app.post("/api/bale-label-prints", requireAuth, async (req, res) => {
     try {
@@ -29579,6 +29599,9 @@ if (asOfDate) {
                 .set({ referenceNumber })
                 .where(eq(factoryBales.id, bale.productionBaleId));
             }
+          } else if (bale.referenceNumber) {
+            // Pre-allocated offline ref — use it directly (sequence was already advanced)
+            referenceNumber = bale.referenceNumber;
           } else {
             // No productionBaleId — standalone label print, generate from sequence
             referenceNumber = await generateSafeRef(tx, companyId);

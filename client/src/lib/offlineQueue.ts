@@ -216,6 +216,7 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PUT",    pattern: /^\/api\/stock-adjustments\/\d+$/ },
   { method: "POST",   pattern: /^\/api\/stock-transfers$/ },
   { method: "PUT",    pattern: /^\/api\/stock-transfers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/bale-label-prints$/ },
   // Bale transfers
   { method: "POST",   pattern: /^\/api\/bale-transfers$/ },
 ];
