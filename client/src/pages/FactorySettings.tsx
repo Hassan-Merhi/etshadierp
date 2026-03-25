@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 
 interface Location {
   id: number;
@@ -670,6 +671,23 @@ export default function FactorySettings() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Offline Mode ────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <WifiOff className="h-5 w-5 text-muted-foreground" />
+            Offline Mode
+          </CardTitle>
+          <CardDescription>
+            Download all factory data to this device so it works without internet. Mutations
+            made while offline are queued and auto-synced when the connection returns.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OfflinePrepPanel />
         </CardContent>
       </Card>
     </div>
