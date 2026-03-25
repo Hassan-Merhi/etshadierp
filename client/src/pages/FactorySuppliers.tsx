@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { enqueueRequest } from "@/lib/offlineQueue";
 import type { FactorySupplier } from "@shared/schema";
 
 interface CurrencyBalance {
@@ -291,8 +292,15 @@ export default function FactorySuppliers() {
       return res.json() as Promise<BulkFxPreview>;
     },
     onSuccess: (data) => { setBulkFxPreview(data); },
-    onError: (err: Error) => { 
+    onError: (err: Error) => {
       if (err?._handledGlobally) return;
+      if (!navigator.onLine) {
+        toast({
+          title: "Preview unavailable offline",
+          description: "Enter your amounts and confirm — the settlement will be queued and recorded when back online.",
+        });
+        return;
+      }
       toast({ title: "Preview failed", description: err.message, variant: "destructive" });
     },
   });
@@ -330,6 +338,28 @@ export default function FactorySuppliers() {
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
+      if (!navigator.onLine && bulkFxBrokerId) {
+        enqueueRequest(
+          `/api/factory/suppliers/${bulkFxBrokerId}/bulk-fx-settlement`,
+          "POST",
+          JSON.stringify({
+            fromCurrencyCode: bulkFxForm.fromCurrencyCode,
+            totalAmount: bulkFxForm.totalAmount,
+            fxRateToUsd: bulkFxForm.fxRateToUsd,
+            date: bulkFxForm.date,
+            notes: bulkFxForm.notes || null,
+            order: bulkFxForm.order,
+          }),
+          "Bulk FX Settlement"
+        );
+        setBulkFxOpen(false);
+        setBulkFxPreview(null);
+        toast({
+          title: "Bulk FX Settlement queued",
+          description: "Will be recorded automatically when back online.",
+        });
+        return;
+      }
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

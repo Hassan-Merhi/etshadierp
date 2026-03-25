@@ -122,6 +122,7 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   // Factory — stock & bales
   { method: "POST",   pattern: /^\/api\/factory\/stock-entry$/ },
   { method: "POST",   pattern: /^\/api\/factory\/stock-entry\/remove$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/stock-entry\/remove-by-product$/ },
   { method: "POST",   pattern: /^\/api\/factory\/bale-products$/ },
   { method: "PATCH",  pattern: /^\/api\/factory\/bale-products\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/bale-products\/\d+$/ },
@@ -169,6 +170,8 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH",  pattern: /^\/api\/factory\/containers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+$/ },
   { method: "POST",   pattern: /^\/api\/factory\/containers\/\d+\/other-charges\/sync$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/containers\/\d+\/reverse-offload$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/containers\/import-excel$/ },
   // Factory — attendance
   { method: "POST",  pattern: /^\/api\/factory\/attendance\/bulk$/ },
   // Factory — waste
@@ -234,6 +237,7 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/vouchers\/journal/.test(url)) return "Journal Entry";
   if (/\/api\/vouchers\/\d+\/sales/.test(url)) return "Sales Voucher Update";
   if (/\/api\/vouchers/.test(url)) return "Voucher";
+  if (/\/api\/factory\/stock-entry\/remove-by-product/.test(url)) return "Remove Bales by Product";
   if (/\/api\/factory\/stock-entry\/remove/.test(url)) return "Stock Entry Removal";
   if (/\/api\/factory\/stock-entry/.test(url)) return "Factory Stock Entry";
   if (/\/api\/factory\/bale-products\/\d+\/cascade-update/.test(url)) return "Bale Product Update";
@@ -258,6 +262,8 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/factory\/suppliers/.test(url)) return "Supplier";
   if (/\/api\/factory\/raw-stock\/opening-balance/.test(url)) return "Raw Stock Opening Balance";
   if (/\/api\/factory\/containers\/\d+\/other-charges\/sync/.test(url)) return "Container Charges";
+  if (/\/api\/factory\/containers\/\d+\/reverse-offload/.test(url)) return "Container Reverse Offload";
+  if (/\/api\/factory\/containers\/import-excel/.test(url)) return "Container Excel Import";
   if (/\/api\/factory\/containers/.test(url)) return "Container";
   if (/\/api\/factory\/attendance/.test(url)) return "Attendance";
   if (/\/api\/factory\/waste/.test(url)) return "Waste Entry";
