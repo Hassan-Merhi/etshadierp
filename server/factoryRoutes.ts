@@ -2827,7 +2827,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
           totalFreight: data.totalFreight.toFixed(2),
         };
-      }).filter(g => parseFloat(g.netPayable) > 0.005);
+      }).filter(g => parseFloat(g.netPayable) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD"));
 
       // Compute the combined USD-equivalent net payable across all currency groups.
       // Correctly accounts for FX transfers (already deducted in paidByCurrency) and

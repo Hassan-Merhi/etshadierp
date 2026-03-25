@@ -1048,10 +1048,19 @@ export default function FactorySuppliers() {
                         const primaryGroup = groups.find((g: any) => g.currencyCode !== "USD") || groups[0];
                         const cc = primaryGroup?.currencyCode || "USD";
                         const bal = primaryGroup ? parseFloat(primaryGroup.netPayable) : 0;
+                        const usdGroup = cc !== "USD" ? groups.find((g: any) => g.currencyCode === "USD") : null;
+                        const usdBal = usdGroup ? parseFloat(usdGroup.netPayable) : 0;
                         return (
-                          <div className={`text-xl font-bold mt-1 ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} data-testid="text-statement-total-owed">
-                            {bal < 0 ? "-" : ""}{cc !== "USD" ? `${cc} ` : "$"}{formatNum(String(Math.abs(bal).toFixed(2)))}
-                            <span className="text-sm font-normal ml-1">{bal > 0 ? "CR" : bal < 0 ? "DR" : ""}</span>
+                          <div data-testid="text-statement-total-owed">
+                            <div className={`text-xl font-bold mt-1 ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                              {bal < 0 ? "-" : ""}{cc !== "USD" ? `${cc} ` : "$"}{formatNum(String(Math.abs(bal).toFixed(2)))}
+                              <span className="text-sm font-normal ml-1">{bal > 0 ? "CR" : bal < 0 ? "DR" : bal === 0 ? "Settled" : ""}</span>
+                            </div>
+                            {usdBal > 0.005 && (
+                              <div className="text-sm font-medium mt-0.5 text-red-600 dark:text-red-400">
+                                + ${formatNum(String(usdBal.toFixed(2)))} <span className="font-normal opacity-70">USD CR</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -1439,41 +1448,83 @@ export default function FactorySuppliers() {
                 {(() => {
                   type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge";
                   const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
+
+                  // Determine the supplier's primary currency from their containers
+                  const stmts: any[] = statementData.statement || [];
+                  const primaryCc = (() => {
+                    if (stmts.length === 0) return "USD";
+                    const counts: Record<string, number> = {};
+                    for (const s of stmts) { const c = s.currencyCode || "USD"; counts[c] = (counts[c] || 0) + 1; }
+                    const nonUsd = Object.entries(counts).filter(([c]) => c !== "USD").sort((a, b) => b[1] - a[1]);
+                    return nonUsd.length > 0 ? nonUsd[0][0] : "USD";
+                  })();
+
+                  // Weighted-average FX rate (primary currency → USD) from container data
+                  const avgFxRate = (() => {
+                    const relevant = stmts.filter((s: any) => (s.currencyCode || "USD") === primaryCc && parseFloat(s.fxRateToUsd || "0") > 0);
+                    if (relevant.length === 0) return 1;
+                    const totalVal = relevant.reduce((s: number, r: any) => s + parseFloat(r.value || "0"), 0);
+                    if (totalVal === 0) return parseFloat(relevant[0].fxRateToUsd || "1");
+                    return relevant.reduce((s: number, r: any) => s + parseFloat(r.value || "0") * parseFloat(r.fxRateToUsd || "1"), 0) / totalVal;
+                  })();
+
+                  // Convert any amount in any currency to primary currency for running balance
+                  const toNative = (amount: number, currencyCode: string, fxToUsd: number = 1): number => {
+                    if (currencyCode === primaryCc) return amount;
+                    const usd = currencyCode === "USD" ? amount : amount * fxToUsd;
+                    return primaryCc === "USD" ? usd : usd / avgFxRate;
+                  };
+
+                  const fmtNative = (amt: number) => `${primaryCc !== "USD" ? `${primaryCc} ` : "$"}${formatNum(String(Math.abs(amt).toFixed(2)))}`;
+
                   const allRows: Array<{
                     key: string; date: string | null; type: RowType;
                     ref: string; detail: string; amount: string; amountIsNeg: boolean;
                     status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
-                    usdImpact: number;
+                    nativeImpact: number;
                   }> = [
-                    ...(statementData.statement || []).map(e => {
+                    ...stmts.map((e: any) => {
                       const rawVal = parseFloat(e.value || "0");
                       const fxRate = parseFloat(e.fxRateToUsd || "1") || 1;
-                      const usdVal = rawVal * fxRate;
+                      const cc = e.currencyCode || "USD";
+                      const dispAmt = cc !== "USD" ? `${cc} ${formatNum(e.value)}` : `$${formatNum(String(rawVal.toFixed(2)))}`;
+                      const freightAmt = parseFloat(e.freight || "0");
+                      const freightCc = e.freightCurrencyCode || cc;
+                      const freightNote = freightAmt > 0 ? `Freight: ${freightCc !== "USD" ? `${freightCc} ` : "$"}${formatNum(String(freightAmt.toFixed(2)))}` : "";
+                      const commNote = parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "";
+                      const fxNote = cc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((rawVal * fxRate).toFixed(2)))}` : "";
                       return {
                         key: `c-${e.id}`,
                         date: e.date,
                         type: "purchase" as RowType,
                         ref: e.containerNumber,
-                        detail: [e.origin, e.currencyCode !== "USD" ? `${e.currencyCode} ${formatNum(e.value)} @ ${formatNum(e.fxRateToUsd)}` : ""].filter(Boolean).join(" · "),
-                        amount: `$${formatNum(String(usdVal.toFixed(2)))}`,
+                        detail: [e.origin, fxNote].filter(Boolean).join(" · "),
+                        amount: dispAmt,
                         amountIsNeg: false,
                         status: e.status,
-                        notes: [e.notes, (parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "")].filter(Boolean).join(" · ") || null,
-                        usdImpact: +usdVal,
+                        notes: [e.notes, freightNote, commNote].filter(Boolean).join(" · ") || null,
+                        nativeImpact: toNative(rawVal, cc, fxRate),
                       };
                     }),
-                    ...(statementData.payments || []).map(p => ({
-                      key: `p-${p.id}`,
-                      date: p.date,
-                      type: "payment" as RowType,
-                      ref: "Payment",
-                      detail: p.currencyCode !== "USD" ? `${p.currencyCode} ${formatNum(p.amount)} @ ${formatNum(p.fxRateToUsd || "1")}` : "",
-                      amount: `$${formatNum(p.amountUsd)}`,
-                      amountIsNeg: false,
-                      notes: p.notes,
-                      onDelete: () => { setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)); },
-                      usdImpact: -parseFloat(p.amountUsd || "0"),
-                    })),
+                    ...(statementData.payments || []).map((p: any) => {
+                      const cc = p.currencyCode || "USD";
+                      const amt = parseFloat(p.amount || "0");
+                      const fxRate = parseFloat(p.fxRateToUsd || "1") || 1;
+                      const dispAmt = cc !== "USD" ? `${cc} ${formatNum(String(amt.toFixed(2)))}` : `$${formatNum(String(amt.toFixed(2)))}`;
+                      const fxNote = cc !== "USD" ? ` (@ ${formatNum(p.fxRateToUsd || "1")} = $${formatNum(p.amountUsd)})` : "";
+                      return {
+                        key: `p-${p.id}`,
+                        date: p.date,
+                        type: "payment" as RowType,
+                        ref: "Payment",
+                        detail: cc !== "USD" ? `${cc} ${formatNum(String(amt))}${fxNote}` : "",
+                        amount: dispAmt,
+                        amountIsNeg: false,
+                        notes: p.notes,
+                        onDelete: () => { setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)); },
+                        nativeImpact: -toNative(amt, cc, fxRate),
+                      };
+                    }),
                     ...(statementData.ledger || [])
                       .filter((e: any) => e.type === "payment" && typeof e.key === "string" && e.key.startsWith("vp-"))
                       .map((vp: any) => {
@@ -1488,23 +1539,30 @@ export default function FactorySuppliers() {
                           amount: `$${formatNum(String(usdAmt))}`,
                           amountIsNeg: false,
                           notes: vp.notes || null,
-                          usdImpact: -usdAmt,
+                          nativeImpact: -toNative(usdAmt, "USD"),
                         };
                       }),
-                    ...(statementData.fxTransfers || []).map(t => {
+                    ...(statementData.fxTransfers || []).map((t: any) => {
                       const isOut = t.fromSupplierId === statementSupplierId;
                       const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
-                      const refs = !isOut && t.containerRefs?.length ? ` · Covers: ${t.containerRefs.map(r => r.containerNumber).join(", ")}` : "";
+                      const refs = !isOut && t.containerRefs?.length ? ` · Covers: ${t.containerRefs.map((r: any) => r.containerNumber).join(", ")}` : "";
+                      const fromAmt = parseFloat(t.fromAmount || "0");
+                      const fromCc = t.fromCurrencyCode || "USD";
+                      const toUsd = parseFloat(t.toAmountUsd || "0");
                       return {
                         key: `f-${t.id}`,
                         date: t.date,
                         type: "fx" as RowType,
                         ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
-                        detail: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)} → $${formatNum(t.toAmountUsd)}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}` : `+$${formatNum(t.toAmountUsd)} received${refs}`,
-                        amount: isOut ? `${t.fromCurrencyCode} ${formatNum(t.fromAmount)}` : `$${formatNum(t.toAmountUsd)}`,
+                        detail: isOut
+                          ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))} → $${formatNum(String(toUsd.toFixed(2)))}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}`
+                          : `+$${formatNum(String(toUsd.toFixed(2)))} received${refs}`,
+                        amount: isOut
+                          ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))}`
+                          : `$${formatNum(String(toUsd.toFixed(2)))}`,
                         amountIsNeg: isOut,
                         notes: t.notes,
-                        usdImpact: isOut ? -parseFloat(t.toAmountUsd || "0") : 0,
+                        nativeImpact: isOut ? -toNative(fromAmt, fromCc, toUsd / (fromAmt || 1)) : 0,
                         onDelete: isOut ? () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); } : undefined,
                       };
                     }),
@@ -1512,7 +1570,6 @@ export default function FactorySuppliers() {
                       const cc = oc.currencyCode || "USD";
                       const amt = parseFloat(oc.amount || "0");
                       const fxRate = parseFloat(oc.fxRateToUsd || "1");
-                      const usdAmt = cc === "USD" ? amt : amt * fxRate;
                       return {
                         key: `oac-${oc.id}`,
                         date: oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null,
@@ -1522,10 +1579,10 @@ export default function FactorySuppliers() {
                         amount: cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : `$${formatNum(String(amt))}`,
                         amountIsNeg: false,
                         notes: null,
-                        usdImpact: usdAmt,
+                        nativeImpact: toNative(amt, cc, fxRate),
                       };
                     }),
-                    ...(statementData.obCommissions || []).map(oc => ({
+                    ...(statementData.obCommissions || []).map((oc: any) => ({
                       key: `oc-${oc.rawStockId}`,
                       date: oc.date,
                       type: "commission" as RowType,
@@ -1536,7 +1593,7 @@ export default function FactorySuppliers() {
                       notes: null,
                       onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
                       onDelete: () => { setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)); },
-                      usdImpact: -parseFloat(oc.amount || "0"),
+                      nativeImpact: -toNative(parseFloat(oc.amount || "0"), oc.currencyCode || "USD"),
                     })),
                   ].sort((a, b) => {
                     const da = a.date ? new Date(a.date).getTime() : 0;
@@ -1544,11 +1601,11 @@ export default function FactorySuppliers() {
                     return db - da;
                   });
 
-                  // Compute per-row running balance (oldest → newest accumulation)
+                  // Compute per-row running balance in primary currency (oldest → newest)
                   const balanceByKey: Record<string, number> = {};
                   let runBal = 0;
                   for (const r of [...allRows].reverse()) {
-                    runBal += r.usdImpact;
+                    runBal += r.nativeImpact;
                     balanceByKey[r.key] = runBal;
                   }
 
@@ -1577,7 +1634,7 @@ export default function FactorySuppliers() {
                             <TableHead>Reference</TableHead>
                             <TableHead>Detail</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
-                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-right">Balance ({primaryCc})</TableHead>
                             <TableHead>Notes</TableHead>
                             <TableHead className="w-8" />
                           </TableRow>
@@ -1600,7 +1657,7 @@ export default function FactorySuppliers() {
                                 {row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                ${formatNum(String(Math.abs(bal)))}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
+                                {fmtNative(bal)}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
