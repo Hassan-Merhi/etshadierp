@@ -50,6 +50,10 @@ export default function POSSettings() {
       toast({ title: "Password too short", description: "Password must be at least 4 characters.", variant: "destructive" });
       return;
     }
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Password changes require a connection", variant: "destructive" });
+      return;
+    }
     changePasswordMutation.mutate();
   };
 

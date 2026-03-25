@@ -268,6 +268,7 @@ export default function StockItems() {
     filteredStockItems.every(item => selectedIds.includes(item.id));
 
   const exportSalesHistory = async () => {
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
     try {
       const res = await fetch("/api/stock-items/last-sales-export", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch sales history");

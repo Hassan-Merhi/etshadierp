@@ -453,6 +453,7 @@ export default function FactoryWorkerDetail() {
 
   const handleCalculate = async () => {
     if (!worker || !endStart || !endEnd) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Settle-and-end requires a connection", variant: "destructive" }); return; }
     setEndCalculating(true);
     try {
       const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/settle-and-end`, {
@@ -471,6 +472,7 @@ export default function FactoryWorkerDetail() {
 
   const handleEndContract = async (payNow: boolean) => {
     if (!worker) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Settle-and-end requires a connection", variant: "destructive" }); return; }
     setEndSubmitting(true);
     try {
       const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/settle-and-end`, {

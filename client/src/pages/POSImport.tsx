@@ -272,7 +272,10 @@ export default function POSImport() {
       });
       return;
     }
-
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "File imports require a connection", variant: "destructive" });
+      return;
+    }
     const formData = new FormData();
     formData.append("file", file);
     parseMutation.mutate(formData);

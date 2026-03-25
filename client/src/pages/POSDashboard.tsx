@@ -521,7 +521,10 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               Cancel
             </Button>
             <Button
-              onClick={() => openShiftMutation.mutate()}
+              onClick={() => {
+                if (!navigator.onLine) { toast({ title: "Not available offline", description: "Shift operations require a connection", variant: "destructive" }); return; }
+                openShiftMutation.mutate();
+              }}
               disabled={openShiftMutation.isPending}
               data-testid="button-confirm-start-shift"
             >
@@ -582,7 +585,10 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => closeShiftMutation.mutate()}
+              onClick={() => {
+                if (!navigator.onLine) { toast({ title: "Not available offline", description: "Shift operations require a connection", variant: "destructive" }); return; }
+                closeShiftMutation.mutate();
+              }}
               disabled={closeShiftMutation.isPending || !closingCash}
               data-testid="button-confirm-end-shift"
             >

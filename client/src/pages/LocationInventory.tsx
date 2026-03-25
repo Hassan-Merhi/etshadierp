@@ -882,6 +882,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   const handleExportInventory = async () => {
     if (!selectedLocationLocal) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
     try {
       const response = await fetch(
         `/api/locations/${selectedLocationLocal.id}/inventory/export`,

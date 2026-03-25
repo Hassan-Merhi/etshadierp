@@ -369,6 +369,7 @@ export default function Containers() {
   };
 
   const exportAllContainersFull = async () => {
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
     try {
       const response = await fetch("/api/containers/export-all");
       if (!response.ok) throw new Error("Export failed");

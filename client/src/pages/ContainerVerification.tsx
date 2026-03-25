@@ -203,11 +203,13 @@ export default function ContainerVerification() {
 
   const exportToExcel = () => {
     if (!selectedSupplierId || !selectedProformaId) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection" }); return; }
     window.open(`/api/suppliers/${selectedSupplierId}/containers/${containerId}/verification-export.xlsx?proformaId=${selectedProformaId}`, "_blank");
   };
 
   const exportSummaryExcel = () => {
     if (!selectedSupplierId || !selectedProformaId) return;
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection" }); return; }
     window.open(`/api/suppliers/${selectedSupplierId}/containers/${containerId}/verification-summary-export.xlsx?proformaId=${selectedProformaId}`, "_blank");
   };
 
@@ -233,7 +235,7 @@ export default function ContainerVerification() {
   }, [containerData, suppliers, selectedSupplierId]);
 
   useEffect(() => {
-    if (loadedItems.length === 0 && !loadingItems && containerData?.container && !autoPopulateMutation.isPending && !autoPopulateMutation.isSuccess) {
+    if (loadedItems.length === 0 && !loadingItems && containerData?.container && !autoPopulateMutation.isPending && !autoPopulateMutation.isSuccess && navigator.onLine) {
       autoPopulateMutation.mutate();
     }
   }, [loadedItems, loadingItems, containerData]);
@@ -268,7 +270,7 @@ export default function ContainerVerification() {
             <CardTitle className="text-sm">Loaded Items ({loadedItems.length})</CardTitle>
             <div className="flex items-center gap-2">
               {loadedItems.length === 0 && (
-                <Button variant="outline" size="sm" onClick={() => autoPopulateMutation.mutate()} disabled={autoPopulateMutation.isPending} data-testid="button-load-from-pos">
+                <Button variant="outline" size="sm" onClick={() => { if (!navigator.onLine) { toast({ title: "Not available offline", description: "Auto-populate requires a connection" }); return; } autoPopulateMutation.mutate(); }} disabled={autoPopulateMutation.isPending} data-testid="button-load-from-pos">
                   <RefreshCw className={`mr-1 h-3 w-3 ${autoPopulateMutation.isPending ? "animate-spin" : ""}`} />
                   Load from POs
                 </Button>
