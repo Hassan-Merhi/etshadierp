@@ -605,7 +605,7 @@ export default function Containers() {
     }));
   };
 
-  const hasChanges = async (containerId: number) => {
+  const hasChanges = (containerId: number) => {
     return (
       trackingEdits[containerId] &&
       Object.keys(trackingEdits[containerId]).length > 0

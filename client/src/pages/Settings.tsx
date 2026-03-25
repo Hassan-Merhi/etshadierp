@@ -382,7 +382,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       queryKey: ["/api/companies"],
     });
 
-    const formatTimeAgo = async (dateStr: string) => {
+    const formatTimeAgo = (dateStr: string) => {
       const date = new Date(dateStr);
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
@@ -1544,7 +1544,7 @@ function FileStorageTab() {
     }
   };
 
-  const formatSize = async (bytes: number) => {
+  const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -2725,7 +2725,7 @@ function OfflineSyncPanel() {
       setFactoryUserHiddenCostFields(user.hiddenCostFields ?? []);
     };
 
-    const isFactoryAdminOrOwner = async (user: any) => ["admin", "owner"].includes(user.role?.toLowerCase());
+    const isFactoryAdminOrOwner = (user: any) => ["admin", "owner"].includes(user.role?.toLowerCase());
 
     const toggleFactoryUserPage = async (pageKey: string) => {
       setFactoryUserPages(prev => { const next = new Set(prev); next.has(pageKey) ? next.delete(pageKey) : next.add(pageKey); return next; });
