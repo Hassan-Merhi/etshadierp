@@ -1443,18 +1443,23 @@ export default function FactorySuppliers() {
                     status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
                     usdImpact: number;
                   }> = [
-                    ...(statementData.statement || []).map(e => ({
-                      key: `c-${e.id}`,
-                      date: e.date,
-                      type: "purchase" as RowType,
-                      ref: e.containerNumber,
-                      detail: [e.origin, e.currencyCode !== "USD" ? `${e.currencyCode} ${formatNum(e.value)} @ ${formatNum(e.fxRateToUsd)}` : ""].filter(Boolean).join(" · "),
-                      amount: `$${formatNum(e.value)}`,
-                      amountIsNeg: false,
-                      status: e.status,
-                      notes: [e.notes, (parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "")].filter(Boolean).join(" · ") || null,
-                      usdImpact: +parseFloat(e.value || "0"),
-                    })),
+                    ...(statementData.statement || []).map(e => {
+                      const rawVal = parseFloat(e.value || "0");
+                      const fxRate = parseFloat(e.fxRateToUsd || "1") || 1;
+                      const usdVal = rawVal * fxRate;
+                      return {
+                        key: `c-${e.id}`,
+                        date: e.date,
+                        type: "purchase" as RowType,
+                        ref: e.containerNumber,
+                        detail: [e.origin, e.currencyCode !== "USD" ? `${e.currencyCode} ${formatNum(e.value)} @ ${formatNum(e.fxRateToUsd)}` : ""].filter(Boolean).join(" · "),
+                        amount: `$${formatNum(String(usdVal.toFixed(2)))}`,
+                        amountIsNeg: false,
+                        status: e.status,
+                        notes: [e.notes, (parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "")].filter(Boolean).join(" · ") || null,
+                        usdImpact: +usdVal,
+                      };
+                    }),
                     ...(statementData.payments || []).map(p => ({
                       key: `p-${p.id}`,
                       date: p.date,
