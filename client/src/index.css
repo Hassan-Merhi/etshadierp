@@ -483,4 +483,28 @@
   .print-container .border-t-2 {
     border-top: 2px solid #999 !important;
   }
+
+  /* ── App chrome: hide sidebar, app header, and no-print elements ── */
+  [data-slot="sidebar-wrapper"],
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Expand content to fill the page width */
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Hide common action buttons when printing */
+  [data-testid="button-sidebar-toggle"],
+  [data-testid="button-export-pdf"],
+  [data-testid="button-export-excel"],
+  [data-testid="button-export-pdf-with-cost"],
+  [data-testid="button-export-pdf-no-cost"],
+  [data-testid="button-print"] {
+    display: none !important;
+  }
 }

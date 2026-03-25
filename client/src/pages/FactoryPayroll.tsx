@@ -275,6 +275,7 @@ export default function FactoryPayrollPage() {
 
   const handleExportPdf = async () => {
     if (!selectedCompanyId) return;
+    if (!navigator.onLine) { window.print(); return; }
     setExportingPdf(true);
     try {
       const res = await fetch("/api/factory/payroll/export-pdf", {

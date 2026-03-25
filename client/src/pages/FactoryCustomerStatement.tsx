@@ -121,7 +121,10 @@ export default function FactoryCustomerStatement() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/api/factory/customers/${customerId}/statement/export-pdf`, "_blank")}
+            onClick={() => {
+              if (!navigator.onLine) { window.print(); return; }
+              window.open(`/api/factory/customers/${customerId}/statement/export-pdf`, "_blank");
+            }}
             data-testid="button-export-pdf"
           >
             <Download className="mr-2 h-4 w-4" />

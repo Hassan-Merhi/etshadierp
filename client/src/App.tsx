@@ -538,7 +538,7 @@ function AuthenticatedApp() {
               </SidebarFooter>
             </Sidebar>
             <div className="flex flex-col flex-1 min-w-0">
-              <header className="flex items-center justify-between gap-2 p-2 border-b h-12">
+              <header className="flex items-center justify-between gap-2 p-2 border-b h-12 no-print">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <div className="flex items-center gap-2 ml-auto">
                   <PendingSyncIndicator />
@@ -604,7 +604,7 @@ function AuthenticatedApp() {
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
             <FactorySidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
+              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
                 <div className="flex items-center gap-2">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
                   <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-orange-600/10 border border-orange-600/20">
@@ -757,7 +757,7 @@ function AuthenticatedApp() {
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex flex-col flex-1 overflow-hidden">
-            <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
+            <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
                 <PendingSyncIndicator />

@@ -151,6 +151,7 @@ export default function FactoryInvoiceDetail() {
 
   const handleExportPdf = () => {
     if (!orderId) return;
+    if (!navigator.onLine) { window.print(); return; }
     window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
   };
 

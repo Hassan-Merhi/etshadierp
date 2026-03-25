@@ -105,6 +105,21 @@ export interface PooledRef {
   usedAt: number | null;
 }
 
+export interface BulkFxSupplierEntry {
+  id: number;
+  name: string;
+  available: number;
+  oldestDate: string | null;
+  newestDate: string | null;
+}
+
+export interface BulkFxCacheEntry {
+  brokerId: number;
+  currency: string;
+  suppliers: BulkFxSupplierEntry[];
+  cachedAt: number;
+}
+
 // ─── Dexie Database ───────────────────────────────────────────────────────────
 
 class ERPDatabase extends Dexie {
@@ -137,6 +152,8 @@ class ERPDatabase extends Dexie {
   offlineMeta!: Table<OfflineMeta, number>;
   // Pre-allocated label reference number pool
   refPool!: Table<PooledRef, number>;
+  // Bulk FX offline preview cache
+  bulkFxCache!: Table<BulkFxCacheEntry, [number, string]>;
 
   constructor() {
     super("ERPDatabase");
@@ -199,6 +216,11 @@ class ERPDatabase extends Dexie {
     // v5 — pre-allocated label reference number pool for offline printing
     this.version(5).stores({
       refPool: "++id, referenceNumber, status, allocatedAt",
+    });
+
+    // v6 — bulk FX offline preview cache keyed by [brokerId, currency]
+    this.version(6).stores({
+      bulkFxCache: "[brokerId+currency], cachedAt",
     });
   }
 }

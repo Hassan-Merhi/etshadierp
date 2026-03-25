@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { enqueueRequest } from "@/lib/offlineQueue";
+import { cacheBulkFxData, getCachedBulkFxData, computeBulkFxPreview } from "@/lib/bulkFxOffline";
 import type { FactorySupplier } from "@shared/schema";
 
 interface CurrencyBalance {
@@ -260,6 +261,16 @@ export default function FactorySuppliers() {
     notes: "",
     order: "oldest" as "oldest" | "newest",
   });
+
+  useEffect(() => {
+    if (!bulkFxOpen || !bulkFxBrokerId || !navigator.onLine) return;
+    factoryApiRequest("GET", `/api/factory/suppliers/${bulkFxBrokerId}/bulk-fx-prefetch?currency=${bulkFxForm.fromCurrencyCode}`)
+      .then(r => r.json())
+      .then((data: { suppliers: any[] }) => {
+        if (data?.suppliers) cacheBulkFxData(bulkFxBrokerId, bulkFxForm.fromCurrencyCode, data.suppliers);
+      })
+      .catch(() => {});
+  }, [bulkFxOpen, bulkFxBrokerId, bulkFxForm.fromCurrencyCode]);
   type BulkFxPreview = {
     transfers: Array<{ supplierId: number; supplierName: string; allocated: string; toAmountUsd: string }>;
     totalAllocated: string;
@@ -291,13 +302,38 @@ export default function FactorySuppliers() {
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Preview failed"); }
       return res.json() as Promise<BulkFxPreview>;
     },
-    onSuccess: (data) => { setBulkFxPreview(data); },
-    onError: (err: Error) => {
+    onSuccess: (data) => {
+      setBulkFxPreview(data);
+      if (bulkFxBrokerId && data?.transfers) {
+        cacheBulkFxData(bulkFxBrokerId, bulkFxForm.fromCurrencyCode,
+          data.transfers.map((t: any) => ({
+            id: t.supplierId, name: t.supplierName,
+            available: parseFloat(t.allocated),
+            oldestDate: null, newestDate: null,
+          }))
+        ).catch(() => {});
+      }
+    },
+    onError: async (err: Error) => {
       if (err?._handledGlobally) return;
-      if (!navigator.onLine) {
+      if (!navigator.onLine && bulkFxBrokerId) {
+        const cached = await getCachedBulkFxData(bulkFxBrokerId, bulkFxForm.fromCurrencyCode);
+        if (cached) {
+          const result = computeBulkFxPreview(
+            cached.suppliers,
+            parseFloat(bulkFxForm.totalAmount) || 0,
+            parseFloat(bulkFxForm.fxRateToUsd) || 0,
+            bulkFxForm.order
+          );
+          if (result) {
+            setBulkFxPreview(result as any);
+            toast({ title: "Preview (offline)", description: "Using cached supplier balances — amounts may differ slightly if data changed since last sync." });
+            return;
+          }
+        }
         toast({
           title: "Preview unavailable offline",
-          description: "Enter your amounts and confirm — the settlement will be queued and recorded when back online.",
+          description: "No cached data found. Enter your amounts and confirm to queue the settlement.",
         });
         return;
       }

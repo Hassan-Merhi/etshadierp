@@ -581,6 +581,7 @@ export default function FactoryLocationInventory() {
 
   const handleExportPdf = () => {
     if (!savedProformaId) return;
+    if (!navigator.onLine) { window.print(); return; }
     window.open(`/api/factory/customer-proformas/${savedProformaId}/export/pdf`, "_blank");
   };
 
