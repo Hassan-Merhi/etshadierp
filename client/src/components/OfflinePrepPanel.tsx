@@ -277,18 +277,21 @@ export function OfflinePrepPanel() {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-2 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Pages that remain server-dependent:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Voucher creation &amp; editing (write operations)</li>
-              <li>Container import, offload &amp; freight forms</li>
-              <li>Payroll runs and salary processing</li>
-              <li>Reports, analytics, and export (Excel/PDF)</li>
-              <li>Customer orders and invoicing</li>
-              <li>User management and company settings changes</li>
-              <li>Chat and notifications</li>
-            </ul>
-            <p className="mt-1">Viewing and browsing the above pages may work offline using cached data, but submitting forms requires a connection.</p>
+          <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-3 text-xs text-muted-foreground">
+            <div>
+              <p className="font-medium text-foreground mb-1">Forms &amp; write operations — work offline</p>
+              <p>Recording payments, container entries, daybook entries, vouchers, and other form submissions are saved locally and auto-synced the moment WiFi returns. The banner at the top shows how many are queued.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-1">Features that truly require internet:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Excel / PDF exports — files are generated server-side</li>
+                <li>Payroll processing — complex server-side calculations</li>
+                <li>Chat &amp; notifications — real-time only</li>
+                <li>First login — a valid session must already exist</li>
+              </ul>
+            </div>
+            <p>Everything else — browsing, searching, and submitting forms — works fully offline.</p>
           </div>
         </CollapsibleContent>
       </Collapsible>
