@@ -788,15 +788,10 @@ export default function FactorySuppliers() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Total Owed (approx. USD)</div>
+                <div className="text-xs text-muted-foreground">USD Balance</div>
                 <div className="text-2xl font-bold mt-1 tabular-nums" data-testid="text-parent-total-balance">
-                  ~${formatNum(parentSup.totalValue)}
+                  ${formatNum(String(((parentSup.currencyBalances?.find((b: any) => b.currencyCode === "USD")?.balance) ?? 0).toFixed(2)))}
                 </div>
-                {parentSup.approxFxRate && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    rate: 1 {[...new Set(foreignCurrencies.map(b => b.currencyCode))][0] || "EUR"} ≈ ${parseFloat(parentSup.approxFxRate).toFixed(2)} USD
-                  </div>
-                )}
               </CardContent>
             </Card>
             <Card>
@@ -2019,11 +2014,11 @@ export default function FactorySuppliers() {
                           ) : (
                             <>
                               <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                                {isParent ? "~" : ""}${formatNum(sup.totalValue)}
+                                ${formatNum(isParent
+                                  ? String(((sup.currencyBalances?.find((b: any) => b.currencyCode === "USD")?.balance) ?? 0).toFixed(2))
+                                  : sup.totalValue
+                                )}
                               </div>
-                              {isParent && (
-                                <div className="text-xs text-muted-foreground">approx. USD</div>
-                              )}
                             </>
                           )}
                         </div>
