@@ -429,12 +429,6 @@ export default function Payroll() {
     enabled: otherCompanies.length > 0,
   });
 
-  // Computed at component level so the location Select always gets fresh data
-  const pctSourceCompanyId = editEmployeeForm.watch("salesBonusPctSourceCompanyId") || "";
-  const pctLocations = pctSourceCompanyId
-    ? allCompanyLocations.filter(l => String(l.companyId) === pctSourceCompanyId)
-    : locations;
-
   // Employee Groups mutations
   const createGroupMutation = useMutation({
     mutationFn: async () => {
@@ -839,6 +833,12 @@ export default function Payroll() {
       balesBonusRate: "",
     },
   });
+
+  // Computed after editEmployeeForm is initialized — watches a field for dependent dropdown
+  const pctSourceCompanyId = editEmployeeForm.watch("salesBonusPctSourceCompanyId") || "";
+  const pctLocations = pctSourceCompanyId
+    ? allCompanyLocations.filter(l => String(l.companyId) === pctSourceCompanyId)
+    : locations;
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
@@ -1319,7 +1319,7 @@ export default function Payroll() {
         department: editingEmployee.department || "",
         joinDate: editingEmployee.joinDate || new Date().toISOString().split('T')[0],
         active: editingEmployee.active,
-        employeeGroupId: editingEmployee.employeeGroupId?.toString() || "",
+        employeeGroupId: (editingEmployee as any).employeeGroupId?.toString() || "",
         salesBonusPct: editingEmployee.salesBonusPct != null ? String(editingEmployee.salesBonusPct) : "",
         salesBonusPctSourceCompanyId: (editingEmployee as any).salesBonusPctSourceCompanyId != null ? String((editingEmployee as any).salesBonusPctSourceCompanyId) : "",
         salesBonusPctLocationId: (editingEmployee as any).salesBonusPctLocationId != null ? String((editingEmployee as any).salesBonusPctLocationId) : "",

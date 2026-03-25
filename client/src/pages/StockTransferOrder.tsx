@@ -121,8 +121,12 @@ export default function StockTransferOrder() {
   })();
 
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
   // Restore state from sessionStorage once (when navigating back from history view, only for new transfers)
   const _sessionSnapshot = (() => {
@@ -422,7 +426,7 @@ export default function StockTransferOrder() {
         sessionStorage.setItem(SESSION_STATE_KEY, JSON.stringify({
           orderItems,
           destinationLocationId,
-          expandedGroups: [...expandedGroups],
+          expandedGroups: Array.from(expandedGroups),
         }));
         navigate(`/locations/${loc.id}/stock-items/${item.id}/history`);
       }
