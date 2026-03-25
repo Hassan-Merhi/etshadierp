@@ -145,15 +145,17 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/factory\/mix-batches\/\d+$/ },
   { method: "POST",   pattern: /^\/api\/factory\/daybook$/ },
   { method: "PUT",    pattern: /^\/api\/factory\/daybook\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/daybook\/entry\/\d+\/void$/ },
   // Factory — categories
   { method: "POST",  pattern: /^\/api\/factory\/categories$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/categories\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/categories\/\d+$/ },
   // Factory — suppliers & financials
-  { method: "POST",  pattern: /^\/api\/factory\/suppliers$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/suppliers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/suppliers$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/suppliers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/suppliers\/\d+$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/suppliers\/\d+\/opening-balance$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/suppliers\/\d+\/permanent$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/suppliers\/\d+\/opening-balance$/ },
   { method: "POST",  pattern: /^\/api\/factory\/supplier-payments$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/supplier-payments\/\d+$/ },
   { method: "POST",  pattern: /^\/api\/factory\/supplier-fx-transfers$/ },
@@ -163,9 +165,10 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH", pattern: /^\/api\/factory\/raw-stock\/opening-balance\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/raw-stock\/opening-balance\/\d+$/ },
   // Factory — containers
-  { method: "POST",  pattern: /^\/api\/factory\/containers$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/containers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/containers$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/containers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/containers\/\d+\/other-charges\/sync$/ },
   // Factory — attendance
   { method: "POST",  pattern: /^\/api\/factory\/attendance\/bulk$/ },
   // Factory — waste
@@ -191,7 +194,10 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/factory\/customers\/\d+$/ },
   // Factory — proformas
   { method: "POST",   pattern: /^\/api\/factory\/customer-proformas$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-proformas\/bulk$/ },
   { method: "PUT",    pattern: /^\/api\/factory\/customer-proformas\/\d+$/ },
+  { method: "PUT",    pattern: /^\/api\/factory\/customer-proformas\/\d+\/replace-lines$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-proformas\/\d+\/apply-catalog-prices$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customer-proformas\/\d+$/ },
   { method: "POST",   pattern: /^\/api\/factory\/customer-proforma-lines$/ },
   { method: "PUT",    pattern: /^\/api\/factory\/customer-proforma-lines\/\d+$/ },
@@ -202,6 +208,7 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/factory\/alerts\/\d+$/ },
   // Factory — payroll
   { method: "PATCH",  pattern: /^\/api\/factory\/payroll\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/payroll\/\d+\/undo$/ },
   { method: "PATCH",  pattern: /^\/api\/factory\/payrolls\/\d+\/mark-paid$/ },
   { method: "POST",   pattern: /^\/api\/factory\/payrolls\/mark-paid-bulk$/ },
   // Stock adjustments & transfers
@@ -241,12 +248,15 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/factory\/vouchers/.test(url)) return "Factory Voucher";
   if (/\/api\/factory\/mix-batches\/\d+\/assign-bales/.test(url)) return "Mix Batch Bale Assignment";
   if (/\/api\/factory\/mix-batches/.test(url)) return "Mix Batch";
+  if (/\/api\/factory\/daybook\/entry\/\d+\/void/.test(url)) return "Daybook Void";
   if (/\/api\/factory\/daybook/.test(url)) return "Factory Daybook";
   if (/\/api\/factory\/supplier-payments/.test(url)) return "Supplier Payment";
   if (/\/api\/factory\/supplier-fx-transfers/.test(url)) return "FX Transfer";
   if (/\/api\/factory\/suppliers\/\d+\/opening-balance/.test(url)) return "Supplier Opening Balance";
+  if (/\/api\/factory\/suppliers\/\d+\/permanent/.test(url)) return "Supplier Permanent Delete";
   if (/\/api\/factory\/suppliers/.test(url)) return "Supplier";
   if (/\/api\/factory\/raw-stock\/opening-balance/.test(url)) return "Raw Stock Opening Balance";
+  if (/\/api\/factory\/containers\/\d+\/other-charges\/sync/.test(url)) return "Container Charges";
   if (/\/api\/factory\/containers/.test(url)) return "Container";
   if (/\/api\/factory\/attendance/.test(url)) return "Attendance";
   if (/\/api\/factory\/waste/.test(url)) return "Waste Entry";
@@ -261,9 +271,13 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/factory\/employees/.test(url)) return "Employee";
   if (/\/api\/factory\/customers/.test(url)) return "Customer";
   if (/\/api\/factory\/customer-proforma-lines/.test(url)) return "Proforma Line";
+  if (/\/api\/factory\/customer-proformas\/\d+\/apply-catalog-prices/.test(url)) return "Proforma Catalog Pricing";
+  if (/\/api\/factory\/customer-proformas\/\d+\/replace-lines/.test(url)) return "Proforma Lines";
+  if (/\/api\/factory\/customer-proformas\/bulk/.test(url)) return "Bulk Proforma";
   if (/\/api\/factory\/customer-proformas/.test(url)) return "Proforma";
   if (/\/api\/factory\/payrolls\/\d+\/mark-paid/.test(url)) return "Payroll Payment";
   if (/\/api\/factory\/payrolls\/mark-paid-bulk/.test(url)) return "Bulk Payroll Payment";
+  if (/\/api\/factory\/payroll\/\d+\/undo/.test(url)) return "Payroll Undo";
   if (/\/api\/factory\/payroll/.test(url)) return "Payroll";
   if (/\/api\/factory\/alerts/.test(url)) return "Alert";
   if (/\/api\/stock-adjustments/.test(url)) return "Stock Adjustment";

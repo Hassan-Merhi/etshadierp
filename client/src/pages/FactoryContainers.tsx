@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { enqueueRequest } from "@/lib/offlineQueue";
 import { formatNumber } from "@/lib/formatNumber";
 import {
   Tooltip,
@@ -232,20 +233,34 @@ export default function FactoryContainers() {
         otherCharges: data.otherCharges || "0",
         otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
-      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to update container");
+      const validCharges = otherChargeLines
+        .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
+        .map(l => ({
+          description: l.description,
+          amount: l.amount,
+          ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
+        }));
+      let container: any;
+      try {
+        const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || "Failed to update container");
+        }
+        container = await res.json();
+      } catch (err: any) {
+        if (err?.name === "OfflineQueued" && validCharges.length > 0) {
+          enqueueRequest(
+            `/api/factory/containers/${id}/other-charges/sync`,
+            "POST",
+            JSON.stringify({ charges: validCharges }),
+            "Container Charges"
+          );
+        }
+        throw err;
       }
-      const container = await res.json();
       await factoryApiRequest("POST", `/api/factory/containers/${id}/other-charges/sync`, {
-        charges: otherChargeLines
-          .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
-          .map(l => ({
-            description: l.description,
-            amount: l.amount,
-            ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
-          })),
+        charges: validCharges,
       });
       return container;
     },
