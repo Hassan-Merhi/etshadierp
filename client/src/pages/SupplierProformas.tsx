@@ -86,7 +86,7 @@ export default function SupplierProformas() {
       setSelectedProformaId(p.id);
       toast({ title: "Proforma created" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const deleteMutation = useMutation({
@@ -98,7 +98,7 @@ export default function SupplierProformas() {
       if (selectedProformaId) setSelectedProformaId(null);
       toast({ title: "Proforma deleted" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const addLineMutation = useMutation({
@@ -111,7 +111,7 @@ export default function SupplierProformas() {
       setAddingLine(false);
       setNewLine({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const updateLineMutation = useMutation({
@@ -123,7 +123,7 @@ export default function SupplierProformas() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       setEditingLineId(null);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const deleteLineMutation = useMutation({
@@ -133,7 +133,7 @@ export default function SupplierProformas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const importLinesMutation = useMutation({
@@ -145,7 +145,7 @@ export default function SupplierProformas() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       toast({ title: "Import complete", description: `${data.imported} lines imported` });
     },
-    onError: (e: Error) => toast({ title: "Import error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Import error", description: e.message, variant: "destructive" }); },
   });
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {

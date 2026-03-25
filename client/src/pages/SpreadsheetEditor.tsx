@@ -328,7 +328,7 @@ export default function SpreadsheetEditor() {
       setSheetName(sheet.name);
       setSaveStatus("saved");
     },
-    onError: () => toast({ title: "Error creating spreadsheet", variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error creating spreadsheet", variant: "destructive" }); },
   });
 
   const updateMutation = useMutation({
@@ -346,7 +346,7 @@ export default function SpreadsheetEditor() {
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
-    onError: () => setSaveStatus("unsaved"),
+    onError: (e: any) => { if (e?._handledGlobally) return; setSaveStatus("unsaved"); },
   });
 
   const deleteMutation = useMutation({
@@ -358,7 +358,7 @@ export default function SpreadsheetEditor() {
       if (openSheetId === deleteTarget) setOpenSheetId(null);
       setDeleteTarget(null);
     },
-    onError: () => toast({ title: "Error deleting spreadsheet", variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error deleting spreadsheet", variant: "destructive" }); },
   });
 
   const scheduleSave = useCallback(

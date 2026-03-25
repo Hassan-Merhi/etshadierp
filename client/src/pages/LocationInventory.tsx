@@ -810,6 +810,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       setSelectedLocationLocal(null);
       setDeleteDialogOpen(false);
     } catch (error: any) {
+      if (error?.name === "OfflineQueued") {
+        toast({ title: "Saved offline", description: "Location delete queued — will sync when connected" });
+        setDeleteDialogOpen(false);
+        setIsDeleting(false);
+        return;
+      }
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete location",
@@ -828,7 +834,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       await apiRequest("POST", "/api/stock-group-archives", {
         locationId: selectedLocationLocal.id,
         stockGroupId: selectedGroup.groupId,
-        notes: `Archived from Location Inventory page`,
+        notes: "Archived from Location Inventory page",
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
@@ -843,6 +849,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       setSelectedGroup(null);
       setArchiveDialogOpen(false);
     } catch (error: any) {
+      if (error?.name === "OfflineQueued") {
+        toast({ title: "Saved offline", description: "Archive queued — will sync when connected" });
+        setArchiveDialogOpen(false);
+        setIsArchiving(false);
+        return;
+      }
       toast({
         title: "Archive Failed",
         description: error.message || "Failed to archive stock group",

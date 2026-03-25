@@ -242,6 +242,52 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST",   pattern: /^\/api\/bale-label-prints$/ },
   // Bale transfers
   { method: "POST",   pattern: /^\/api\/bale-transfers$/ },
+  // ERP — containers
+  { method: "PATCH",  pattern: /^\/api\/containers\/\d+\/number$/ },
+  { method: "PATCH",  pattern: /^\/api\/containers\/\d+\/tracking$/ },
+  { method: "DELETE", pattern: /^\/api\/containers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/containers\/\d+\/reverse-offload$/ },
+  { method: "POST",   pattern: /^\/api\/containers\/\d+\/loaded-items$/ },
+  { method: "PATCH",  pattern: /^\/api\/container-loaded-items\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/container-loaded-items\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/containers\/\d+\/import-loaded-items$/ },
+  { method: "POST",   pattern: /^\/api\/container-sales$/ },
+  // ERP — container freight (routes under factory API)
+  { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+\/documents\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/containers\/\d+\/freight$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+\/freight\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/freight\/\d+\/payments$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/freight\/\d+\/payments\/\d+$/ },
+  // ERP — supplier proformas
+  { method: "POST",   pattern: /^\/api\/suppliers\/\d+\/proformas$/ },
+  { method: "DELETE", pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+\/lines$/ },
+  { method: "PATCH",  pattern: /^\/api\/supplier-proforma-lines\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/supplier-proforma-lines\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+\/import-lines$/ },
+  // ERP — barcodes
+  { method: "POST",   pattern: /^\/api\/pending-barcodes$/ },
+  { method: "DELETE", pattern: /^\/api\/pending-barcodes\/\d+$/ },
+  { method: "PATCH",  pattern: /^\/api\/pending-barcodes\/mark-printed$/ },
+  // ERP — stock items bulk ops
+  { method: "POST",   pattern: /^\/api\/stock-items\/bulk-delete$/ },
+  { method: "POST",   pattern: /^\/api\/stock-items\/bulk-update-uom$/ },
+  // ERP — locations & archives
+  { method: "DELETE", pattern: /^\/api\/locations\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/stock-group-archives$/ },
+  // Factory — waste dispatch & pressing
+  { method: "POST",   pattern: /^\/api\/factory\/waste-dispatch\/submit$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/pressing\/create-multi$/ },
+  // Spreadsheets
+  { method: "POST",   pattern: /^\/api\/spreadsheets$/ },
+  { method: "PATCH",  pattern: /^\/api\/spreadsheets\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/spreadsheets\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/live-spreadsheets$/ },
+  { method: "PATCH",  pattern: /^\/api\/live-spreadsheets\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/live-spreadsheets\/\d+$/ },
+  // Deleted items
+  { method: "POST",   pattern: /^\/api\/deleted-items\/\w+\/\d+\/restore$/ },
+  { method: "DELETE", pattern: /^\/api\/deleted-items\/\w+\/\d+\/permanent$/ },
 ];
 
 export function isSafeToQueue(method: string, url: string): boolean {

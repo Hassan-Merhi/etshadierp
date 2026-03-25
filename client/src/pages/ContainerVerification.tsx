@@ -106,7 +106,7 @@ export default function ContainerVerification() {
       setAddingItem(false);
       setNewItem({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const updateItemMutation = useMutation({
@@ -118,7 +118,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       setEditingItemId(null);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const deleteItemMutation = useMutation({
@@ -128,7 +128,7 @@ export default function ContainerVerification() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const autoPopulateMutation = useMutation({
@@ -141,7 +141,7 @@ export default function ContainerVerification() {
       const skippedMsg = data.skipped > 0 ? ` (${data.skipped} skipped - missing barcodes)` : "";
       toast({ title: "Items loaded", description: `${data.imported} items imported from purchase orders${skippedMsg}` });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   const importMutation = useMutation({
@@ -153,7 +153,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       toast({ title: "Import complete", description: `${data.imported} items imported` });
     },
-    onError: (e: Error) => toast({ title: "Import error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Import error", description: e.message, variant: "destructive" }); },
   });
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {

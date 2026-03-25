@@ -159,7 +159,7 @@ export default function ContainerDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({ title: "Document deleted" });
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Delete failed", description: e.message, variant: "destructive" }); },
   });
 
   const freightForm = useForm({
@@ -177,7 +177,7 @@ export default function ContainerDetail() {
       freightForm.reset();
       toast({ title: "Freight charge added" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
   });
 
   const deleteFreightMutation = useMutation({
@@ -188,7 +188,7 @@ export default function ContainerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Freight charge removed" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
   });
 
   const paymentForm = useForm({
@@ -206,7 +206,7 @@ export default function ContainerDetail() {
       paymentForm.reset({ paymentDate: new Date().toISOString().split("T")[0], amount: "", method: "", reference: "" });
       toast({ title: "Payment recorded" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
   });
 
   const deletePaymentMutation = useMutation({
@@ -217,7 +217,7 @@ export default function ContainerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Payment deleted" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
   });
 
   const handleExportContainer = async () => {
@@ -279,6 +279,7 @@ export default function ContainerDetail() {
       });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete purchase order",
@@ -301,6 +302,7 @@ export default function ContainerDetail() {
       setLocation("/containers");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete container",
@@ -324,6 +326,7 @@ export default function ContainerDetail() {
       });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Reverse Failed",
         description: error.message || "Failed to reverse offload",
@@ -362,6 +365,7 @@ export default function ContainerDetail() {
       form.reset();
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Sale Failed",
         description: error.message || "Failed to record container sale",

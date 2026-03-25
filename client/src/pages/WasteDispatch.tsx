@@ -289,6 +289,7 @@ export default function WasteDispatch() {
       });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConfirming(false);
     },

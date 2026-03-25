@@ -155,6 +155,7 @@ export default function DeletedItems() {
       setConfirmDialog({ open: false, action: "restore", item: null });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to restore item",
@@ -177,6 +178,7 @@ export default function DeletedItems() {
       setConfirmDialog({ open: false, action: "delete", item: null });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to permanently delete item",

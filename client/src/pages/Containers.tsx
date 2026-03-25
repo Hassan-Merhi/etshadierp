@@ -211,6 +211,7 @@ export default function Containers() {
       toast({ title: "Saved", description: "Tracking info updated" });
     },
     onError: (error: any, { id }) => {
+      if (error?._handledGlobally) return;
       setSavingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -238,6 +239,7 @@ export default function Containers() {
       toast({ title: "Updated", description: "Container number changed" });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

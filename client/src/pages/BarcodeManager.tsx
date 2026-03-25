@@ -70,6 +70,7 @@ export default function BarcodeManager() {
       setManualBarcode("");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error adding barcode", description: error.message, variant: "destructive" });
     },
   });

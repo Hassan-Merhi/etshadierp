@@ -89,6 +89,7 @@ function SheetFormDialog({
       onClose();
     },
     onError: (e: any) => {
+      if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
@@ -190,6 +191,7 @@ export default function LiveSheets() {
       setDeleteTarget(null);
     },
     onError: (e: any) => {
+      if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
