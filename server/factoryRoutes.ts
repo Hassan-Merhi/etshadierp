@@ -2829,6 +2829,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         };
       }).filter(g => parseFloat(g.netPayable) > 0.005);
 
+      // Compute the combined USD-equivalent net payable across all currency groups.
+      // Correctly accounts for FX transfers (already deducted in paidByCurrency) and
+      // converts non-USD remaining balances to USD using the containers' fxRateToUsd.
+      const totalNetPayableUsd = currencyGroups.reduce((sum: number, cg: any) => {
+        const netPay = parseFloat(cg.netPayable);
+        if (netPay <= 0) return sum;
+        if (cg.currencyCode === "USD") return sum + netPay;
+        // Weighted-average fxRateToUsd across this currency's containers
+        const ctrs: any[] = cg.containers;
+        const totalRawVal = ctrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0"), 0);
+        const weightedRate = totalRawVal > 0
+          ? ctrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0") * parseFloat(c.fxRateToUsd || "1"), 0) / totalRawVal
+          : 1;
+        return sum + netPay * weightedRate;
+      }, 0);
+
       // Build OB commissions list
       const containerMap: Record<number, any> = {};
       for (const c of containers) containerMap[c.id] = c;
@@ -3099,7 +3115,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           totalObCommissions: totalObCommissions.toFixed(2),
           totalPayments: totalPayments.toFixed(2),
           totalBrokerCommission: totalBrokerCommission.toFixed(2),
-          netPayable: (totalValue - totalCommissions - totalPayments).toFixed(2),
+          netPayable: totalNetPayableUsd.toFixed(2),
           totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },
       });
