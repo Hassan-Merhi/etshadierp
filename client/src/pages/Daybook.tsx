@@ -845,6 +845,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     const fetchAccountNames = async () => {
       const newCache = { ...accountNameCache };
       for (const voucher of paymentVouchers) {
+        if (voucher.id < 0) continue; // skip offline-pending vouchers
         if (!(voucher.id in newCache)) {
           try {
             const res = await fetch(
@@ -2006,6 +2007,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   );
                 }
                 const voucher = row.data as Voucher;
+                const isPendingSync = voucher.id < 0;
                 const vid = `voucher-${voucher.id}`;
                 const isVoucherHidden = hiddenRowIds.has(vid);
                 return (
@@ -2013,11 +2015,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     key={vid}
                     data-row-id={vid}
                     className={cn(
-                      "border rounded-md p-3 space-y-2 cursor-pointer transition-colors",
+                      "border rounded-md p-3 space-y-2 transition-colors",
+                      !isPendingSync && "cursor-pointer",
                       selectedRowId === vid && "bg-accent/30 border-accent",
+                      isPendingSync && "opacity-75 border-dashed",
                       isVoucherHidden && showHidden && "opacity-50",
                     )}
-                    onClick={() => setSelectedRowId(vid)}
+                    onClick={() => !isPendingSync && setSelectedRowId(vid)}
                     data-testid={`card-voucher-${voucher.id}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -2028,6 +2032,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         >
                           {voucher.voucherType}
                         </Badge>
+                        {isPendingSync && (
+                          <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-400">
+                            Pending sync
+                          </Badge>
+                        )}
                         {voucher.optional && (
                           <Badge
                             variant="outline"
@@ -2060,6 +2069,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           : "-")}
                     </p>
                     <div className="flex items-center gap-1 pt-1 border-t">
+                      {isPendingSync ? (
+                        <span className="text-xs text-muted-foreground italic px-1">Waiting for connection to sync</span>
+                      ) : (
+                      <>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -2104,6 +2117,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
+                      )}
+                      </>
                       )}
                     </div>
                   </div>
@@ -2345,6 +2360,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           );
                         } else {
                           const voucher = row.data as Voucher;
+                          const isDvPendingSync = voucher.id < 0;
                           const dvid = `voucher-${voucher.id}`;
                           const isDvHidden = hiddenRowIds.has(dvid);
                           const isExpanded = expandedVoucherId === voucher.id;
@@ -2355,12 +2371,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               data-row-id={dvid}
                               data-testid={`row-voucher-${voucher.id}`}
                               className={cn(
-                                "cursor-pointer",
+                                !isDvPendingSync && "cursor-pointer",
+                                isDvPendingSync && "opacity-75",
                                 selectedRowId === dvid && "bg-accent/30",
                                 isDvHidden && showHidden && "opacity-50",
                                 isExpanded && "bg-accent/20",
                               )}
                               onClick={() => {
+                                if (isDvPendingSync) return;
                                 setSelectedRowId(dvid);
                                 setExpandedVoucherId(isExpanded ? null : voucher.id);
                               }}
@@ -2376,6 +2394,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <Badge {...getVoucherTypeBadge(voucher.voucherType)} data-testid={`badge-type-${voucher.id}`}>
                                     {voucher.voucherType}
                                   </Badge>
+                                  {isDvPendingSync && (
+                                    <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-400">
+                                      Pending sync
+                                    </Badge>
+                                  )}
                                   {voucher.optional && (
                                     <Badge variant="outline" data-testid={`badge-optional-${voucher.id}`} className="text-xs">
                                       Optional
@@ -2403,6 +2426,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableCell>
                               )}
                               <TableCell className="text-right">
+                                {isDvPendingSync ? (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 italic">Pending sync</span>
+                                ) : (
                                 <div className="flex items-center justify-end gap-1">
                                   <Button
                                     variant="ghost"
@@ -2461,6 +2487,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     </Button>
                                   )}
                                 </div>
+                                )}
                               </TableCell>
                             </TableRow>,
                           );

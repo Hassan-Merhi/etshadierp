@@ -377,7 +377,36 @@
         printLabels(result.bales);
       },
       onError: (error: Error) => {
-        // Close any pre-opened windows if the mutation failed
+        if ((error as any).name === "OfflineQueued") {
+          // Offline: generate synthetic label data from cart without hitting the server
+          const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+          let globalIdx = 0;
+          const syntheticLabels: LabelData[] = [];
+          for (const item of cart) {
+            for (let i = 0; i < item.qty; i++) {
+              globalIdx++;
+              syntheticLabels.push({
+                referenceNumber: `OFFL-${today}-${String(globalIdx).padStart(3, "0")}`,
+                articleCode: item.product.articleCode || item.product.code || "",
+                pieces: 1,
+                approxWeightKg: String(item.weightPerBaleKg),
+                productName: item.product.name,
+              });
+            }
+          }
+          toast({
+            title: "Saved offline",
+            description: `${syntheticLabels.length} bale(s) queued for sync. Printing labels now...`,
+          });
+          discardCartDraft();
+          setConfirmDialogOpen(false);
+          setCart([]);
+          if (syntheticLabels.length > 0) {
+            openBrowserPrint(syntheticLabels);
+          }
+          return;
+        }
+        // Close any pre-opened windows if the mutation genuinely failed
         if (preOpenedWindowsRef.current) {
           preOpenedWindowsRef.current.a4?.close();
           preOpenedWindowsRef.current.sticker?.close();

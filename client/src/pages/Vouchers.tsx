@@ -1309,9 +1309,39 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: any, formData: VoucherFormData) => {
       if (error.name === "OfflineQueued") {
-        toast({ title: "Saved offline", description: "Will sync automatically when connected" });
+        const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
+        const voucherDate = format(formData.voucherDate, "yyyy-MM-dd");
+        const totalAmount = formData.entries
+          .filter((e: any) => parseFloat(e.amount || "0") > 0)
+          .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+          .toFixed(2);
+        const syntheticVoucher: any = {
+          id: -Date.now(),
+          voucherNumber: "PENDING",
+          voucherType,
+          voucherDate,
+          description: formData.notes || `${voucherType} (pending sync)`,
+          totalAmount,
+          optional: formData.optional || false,
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueriesData(
+          { queryKey: ["/api/vouchers"] },
+          (old: any) => Array.isArray(old) ? [syntheticVoucher, ...old] : old
+        );
+        discardPaymentDraft();
+        form.reset({
+          paymentAccountType: "ledger",
+          paymentAccountId: 0,
+          paymentAccountName: "",
+          voucherDate: new Date(),
+          entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
+          notes: "",
+          optional: false,
+        });
+        toast({ title: "Saved offline", description: "Will sync when connected — shown in daybook" });
         return;
       }
       const isEditMode = !!voucherIdToEdit;
@@ -1956,9 +1986,35 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: any, formData: JournalFormData) => {
       if (error.name === "OfflineQueued") {
-        toast({ title: "Saved offline", description: "Will sync automatically when connected" });
+        const voucherDate = format(formData.voucherDate, "yyyy-MM-dd");
+        const totalAmount = formData.entries
+          .filter((e: any) => parseFloat(e.amount || "0") > 0)
+          .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+          .toFixed(2);
+        const syntheticVoucher: any = {
+          id: -Date.now(),
+          voucherNumber: "PENDING",
+          voucherType: "Journal",
+          voucherDate,
+          description: formData.notes || "Journal (pending sync)",
+          totalAmount,
+          optional: formData.optional || false,
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueriesData(
+          { queryKey: ["/api/vouchers"] },
+          (old: any) => Array.isArray(old) ? [syntheticVoucher, ...old] : old
+        );
+        discardJournalDraft();
+        journalForm.reset({
+          voucherDate: new Date(),
+          entries: [{ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
+          notes: "",
+          optional: false,
+        });
+        toast({ title: "Saved offline", description: "Will sync when connected — shown in daybook" });
         return;
       }
       const isEditMode = !!voucherIdToEdit;
