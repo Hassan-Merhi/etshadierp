@@ -1014,7 +1014,6 @@ export default function FactorySuppliers() {
               const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
               const activeContainerCount = activeSt.length;
               const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
-              const netPayableAmt = parseFloat(statementData.summary.netPayable || "0");
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Card>
@@ -1049,10 +1048,18 @@ export default function FactorySuppliers() {
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-xs text-muted-foreground">Net Balance</div>
-                      <div className={`text-xl font-bold mt-1 ${netPayableAmt > 0 ? "text-red-600 dark:text-red-400" : netPayableAmt < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} data-testid="text-statement-total-owed">
-                        {netPayableAmt < 0 ? "-" : ""}${formatNum(String(Math.abs(netPayableAmt)))}
-                        <span className="text-sm font-normal ml-1">{netPayableAmt > 0 ? "CR" : netPayableAmt < 0 ? "DR" : ""}</span>
-                      </div>
+                      {(() => {
+                        const groups: any[] = statementData.currencyGroups || [];
+                        const primaryGroup = groups.find((g: any) => g.currencyCode !== "USD") || groups[0];
+                        const cc = primaryGroup?.currencyCode || "USD";
+                        const bal = primaryGroup ? parseFloat(primaryGroup.netPayable) : 0;
+                        return (
+                          <div className={`text-xl font-bold mt-1 ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} data-testid="text-statement-total-owed">
+                            {bal < 0 ? "-" : ""}{cc !== "USD" ? `${cc} ` : "$"}{formatNum(String(Math.abs(bal).toFixed(2)))}
+                            <span className="text-sm font-normal ml-1">{bal > 0 ? "CR" : bal < 0 ? "DR" : ""}</span>
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 </div>
