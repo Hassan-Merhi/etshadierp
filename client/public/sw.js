@@ -1,4 +1,4 @@
-const CACHE_VERSION = "erp-v3";
+const CACHE_VERSION = "erp-v4";
 const APP_SHELL = ["/", "/manifest.json"];
 
 // ── Install: cache app shell ──────────────────────────────────────────────────
@@ -36,8 +36,11 @@ self.addEventListener("fetch", (event) => {
   } else if (request.mode === "navigate") {
     // Navigation requests: network first, fall back to cached shell (SPA)
     event.respondWith(navigationHandler(request));
+  } else if (url.pathname.startsWith("/assets/")) {
+    // Vite hashed bundles: always network-first so stale caches never poison JS/CSS
+    event.respondWith(networkFirstAsset(request));
   } else {
-    // Static assets: stale-while-revalidate
+    // Other static assets (fonts, images, sw.js itself): stale-while-revalidate
     event.respondWith(staleWhileRevalidate(request));
   }
 });
@@ -84,6 +87,31 @@ async function navigationHandler(request) {
   }
 }
 
+// Network-first for /assets/* (Vite content-hashed bundles).
+// Never serve a cached HTML response as JavaScript — if the server returns
+// HTML (e.g. during a deployment transition), skip caching it entirely.
+async function networkFirstAsset(request) {
+  const cache = await caches.open(CACHE_VERSION);
+  try {
+    const response = await fetch(request.clone());
+    if (response.ok) {
+      const ct = response.headers.get("content-type") || "";
+      if (!ct.includes("text/html")) {
+        cache.put(request, response.clone());
+      }
+    }
+    return response;
+  } catch {
+    // Offline: serve from cache if available
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return new Response("Asset unavailable offline", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+}
+
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_VERSION);
   const cached = await cache.match(request);
@@ -91,7 +119,11 @@ async function staleWhileRevalidate(request) {
   const fetchPromise = fetch(request.clone())
     .then((response) => {
       if (response.ok) {
-        cache.put(request, response.clone());
+        // Never cache HTML under a non-navigation URL — prevents MIME corruption
+        const ct = response.headers.get("content-type") || "";
+        if (!ct.includes("text/html")) {
+          cache.put(request, response.clone());
+        }
       }
       return response;
     })

@@ -636,7 +636,14 @@ let migrationsDone = false;
       }
     }));
 
-    // Fallback to index.html with no-cache headers
+    // Return 404 for /assets/* that express.static didn't find.
+    // This prevents the SPA index.html fallback from being served as JavaScript,
+    // which would corrupt the service worker cache and cause MIME type errors in Safari.
+    app.use("/assets", (_req, res) => {
+      res.status(404).end();
+    });
+
+    // Fallback to index.html with no-cache headers (SPA routing)
     app.use("*", (_req, res) => {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
