@@ -455,6 +455,7 @@ export default function Payroll() {
       setCreateGroupDialogOpen(false);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create employee group",
@@ -493,6 +494,7 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete employee group",
@@ -521,6 +523,7 @@ export default function Payroll() {
       setCreateWorkerGroupDialogOpen(false);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create worker group",
@@ -541,6 +544,7 @@ export default function Payroll() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to add worker to group",
@@ -561,6 +565,7 @@ export default function Payroll() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to remove worker from group",
@@ -581,6 +586,7 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete worker group",
@@ -852,6 +858,7 @@ export default function Payroll() {
       setSelectedEmployee(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -878,6 +885,7 @@ export default function Payroll() {
       setSelectedEmployee(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -904,6 +912,7 @@ export default function Payroll() {
       setSelectedEmployee(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -932,6 +941,7 @@ export default function Payroll() {
       bulkPaymentForm.reset();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -972,6 +982,7 @@ export default function Payroll() {
       setBulkDepositNotes("");
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1013,6 +1024,7 @@ export default function Payroll() {
       setPendingBonuses({});
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1058,6 +1070,7 @@ export default function Payroll() {
       setBulkWithdrawalAccountId("");
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1087,6 +1100,7 @@ export default function Payroll() {
       advanceForm.reset();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1104,6 +1118,7 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -1124,6 +1139,7 @@ export default function Payroll() {
       setSelectedAdvance(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1152,6 +1168,7 @@ export default function Payroll() {
       newWorkerForm.reset();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1181,6 +1198,7 @@ export default function Payroll() {
       setSelectedWorkerForEdit(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1248,6 +1266,7 @@ export default function Payroll() {
       createEmployeeForm.reset();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1283,6 +1302,7 @@ export default function Payroll() {
       editEmployeeForm.reset();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

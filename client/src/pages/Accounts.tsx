@@ -843,6 +843,7 @@ export default function Accounts() {
       form.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create ledger account",
@@ -893,6 +894,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update account",
@@ -918,6 +920,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete account",
@@ -943,6 +946,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update supplier", variant: "destructive" });
     },
   });
@@ -960,6 +964,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete supplier", variant: "destructive" });
     },
   });
@@ -982,6 +987,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update customer", variant: "destructive" });
     },
   });
@@ -999,6 +1005,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete customer", variant: "destructive" });
     },
   });
@@ -1023,6 +1030,7 @@ export default function Accounts() {
       editForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update employee", variant: "destructive" });
     },
   });
@@ -1036,6 +1044,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete supplier", variant: "destructive" });
     },
   });
@@ -1062,6 +1071,7 @@ export default function Accounts() {
       bankForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create bank account",
@@ -1094,6 +1104,7 @@ export default function Accounts() {
       bankForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update bank account",
@@ -1119,6 +1130,7 @@ export default function Accounts() {
       bankForm.reset();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete bank account",
@@ -1157,6 +1169,7 @@ export default function Accounts() {
       }
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to delete vouchers",

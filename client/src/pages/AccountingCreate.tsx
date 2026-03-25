@@ -196,6 +196,7 @@ function EntityFormWrapper({
       onCreated?.();
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create record",
@@ -543,6 +544,7 @@ function LedgerAccountForm({
       parentForm.reset({ name: "", accountType: "" as any, active: true });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create parent account",
