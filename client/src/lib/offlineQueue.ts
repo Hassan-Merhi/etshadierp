@@ -120,15 +120,18 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH", pattern: /^\/api\/vouchers\/\d+\/sales$/ },
   { method: "PUT",   pattern: /^\/api\/vouchers\/\d+\/sales$/ },
   // Factory — stock & bales
-  { method: "POST",  pattern: /^\/api\/factory\/stock-entry$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/bale-products$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/bale-products\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/stock-entry$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/stock-entry\/remove$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/bale-products$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/bale-products\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/bale-products\/\d+$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/bale-products\/\d+\/cascade-update$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/bale-products\/\d+\/cascade-update$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/bales\/\d+\/assign-worker$/ },
   // Factory — containers / loading scans
-  { method: "POST",  pattern: /^\/api\/factory\/customer-orders-loading$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/customer-orders\/\d+\/bales$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/customer-orders\/\d+\/finalize-loading$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-orders-loading$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-orders\/\d+\/bales$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/customer-orders\/\d+\/bales\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customer-orders\/\d+\/finalize-loading$/ },
   // Factory — vouchers
   { method: "POST",  pattern: /^\/api\/factory\/vouchers$/ },
   { method: "POST",  pattern: /^\/api\/factory\/vouchers\/payment-receipt$/ },
@@ -136,10 +139,12 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH", pattern: /^\/api\/factory\/vouchers\/\d+\/payment-receipt$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/vouchers\/\d+\/journal$/ },
   // Factory — daybook / mix batches
-  { method: "POST",  pattern: /^\/api\/factory\/mix-batches$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/mix-batches\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/mix-batches$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/mix-batches\/\d+\/assign-bales$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/mix-batches\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/mix-batches\/\d+$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/daybook$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/daybook$/ },
+  { method: "PUT",    pattern: /^\/api\/factory\/daybook\/\d+$/ },
   // Factory — categories
   { method: "POST",  pattern: /^\/api\/factory\/categories$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/categories\/\d+$/ },
@@ -167,29 +172,38 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST",  pattern: /^\/api\/factory\/waste$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/waste\/\d+$/ },
   // Factory — workers & advances
-  { method: "POST",  pattern: /^\/api\/factory\/workers$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/workers\/\d+$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/workers\/\d+\/advances$/ },
-  { method: "POST",  pattern: /^\/api\/factory\/advances\/\d+\/repayments$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/workers$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/workers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/workers\/\d+\/advances$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/advances\/\d+\/repayments$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/advances\/bulk$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/advances\/\d+$/ },
+  { method: "DELETE", pattern: /^\/api\/factory\/workers\/\d+\/documents\/\d+$/ },
   // Factory — employees
   { method: "POST",  pattern: /^\/api\/factory\/employees$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/employees\/\d+$/ },
   { method: "POST",  pattern: /^\/api\/factory\/employees\/\d+\/deposit$/ },
   { method: "POST",  pattern: /^\/api\/factory\/employees\/\d+\/withdraw$/ },
   // Factory — customers
-  { method: "POST",  pattern: /^\/api\/factory\/customers$/ },
-  { method: "PATCH", pattern: /^\/api\/factory\/customers\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/customers$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/customers\/\d+$/ },
+  { method: "PUT",    pattern: /^\/api\/factory\/customers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customers\/\d+$/ },
   // Factory — alerts / settings
   { method: "POST",  pattern: /^\/api\/factory\/alerts$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/alerts\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/alerts\/\d+$/ },
+  // Factory — payroll
+  { method: "PATCH",  pattern: /^\/api\/factory\/payroll\/\d+$/ },
+  { method: "PATCH",  pattern: /^\/api\/factory\/payrolls\/\d+\/mark-paid$/ },
+  { method: "POST",   pattern: /^\/api\/factory\/payrolls\/mark-paid-bulk$/ },
   // Stock adjustments & transfers
-  { method: "POST",  pattern: /^\/api\/stock-adjustments$/ },
-  { method: "POST",  pattern: /^\/api\/stock-transfers$/ },
+  { method: "POST",   pattern: /^\/api\/stock-adjustments$/ },
+  { method: "PUT",    pattern: /^\/api\/stock-adjustments\/\d+$/ },
+  { method: "POST",   pattern: /^\/api\/stock-transfers$/ },
+  { method: "PUT",    pattern: /^\/api\/stock-transfers\/\d+$/ },
   // Bale transfers
-  { method: "POST",  pattern: /^\/api\/bale-transfers$/ },
+  { method: "POST",   pattern: /^\/api\/bale-transfers$/ },
 ];
 
 export function isSafeToQueue(method: string, url: string): boolean {
@@ -205,16 +219,20 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/vouchers\/journal/.test(url)) return "Journal Entry";
   if (/\/api\/vouchers\/\d+\/sales/.test(url)) return "Sales Voucher Update";
   if (/\/api\/vouchers/.test(url)) return "Voucher";
+  if (/\/api\/factory\/stock-entry\/remove/.test(url)) return "Stock Entry Removal";
   if (/\/api\/factory\/stock-entry/.test(url)) return "Factory Stock Entry";
   if (/\/api\/factory\/bale-products\/\d+\/cascade-update/.test(url)) return "Bale Product Update";
   if (/\/api\/factory\/bale-products/.test(url)) return "Bale Product";
+  if (/\/api\/factory\/bales\/\d+\/assign-worker/.test(url)) return "Worker Assignment";
   if (/\/api\/factory\/categories/.test(url)) return "Bale Category";
   if (/\/api\/factory\/customer-orders-loading/.test(url)) return "Loading Order";
+  if (/\/api\/factory\/customer-orders\/\d+\/bales\/\d+/.test(url)) return "Bale Removal";
   if (/\/api\/factory\/customer-orders\/\d+\/bales/.test(url)) return "Loading Scan";
   if (/\/api\/factory\/customer-orders\/\d+\/finalize-loading/.test(url)) return "Finalize Loading";
   if (/\/api\/factory\/vouchers\/payment-receipt/.test(url)) return "Factory Payment";
   if (/\/api\/factory\/vouchers\/journal/.test(url)) return "Factory Journal";
   if (/\/api\/factory\/vouchers/.test(url)) return "Factory Voucher";
+  if (/\/api\/factory\/mix-batches\/\d+\/assign-bales/.test(url)) return "Mix Batch Bale Assignment";
   if (/\/api\/factory\/mix-batches/.test(url)) return "Mix Batch";
   if (/\/api\/factory\/daybook/.test(url)) return "Factory Daybook";
   if (/\/api\/factory\/supplier-payments/.test(url)) return "Supplier Payment";
@@ -226,16 +244,22 @@ export function getDescriptionForRequest(url: string): string {
   if (/\/api\/factory\/attendance/.test(url)) return "Attendance";
   if (/\/api\/factory\/waste/.test(url)) return "Waste Entry";
   if (/\/api\/factory\/workers\/\d+\/advances/.test(url)) return "Worker Advance";
+  if (/\/api\/factory\/workers\/\d+\/documents/.test(url)) return "Worker Document";
   if (/\/api\/factory\/advances\/\d+\/repayments/.test(url)) return "Advance Repayment";
+  if (/\/api\/factory\/advances\/bulk/.test(url)) return "Bulk Advance";
   if (/\/api\/factory\/advances/.test(url)) return "Worker Advance";
   if (/\/api\/factory\/workers/.test(url)) return "Worker";
   if (/\/api\/factory\/employees\/\d+\/deposit/.test(url)) return "Employee Deposit";
   if (/\/api\/factory\/employees\/\d+\/withdraw/.test(url)) return "Employee Withdrawal";
   if (/\/api\/factory\/employees/.test(url)) return "Employee";
   if (/\/api\/factory\/customers/.test(url)) return "Customer";
+  if (/\/api\/factory\/payrolls\/\d+\/mark-paid/.test(url)) return "Payroll Payment";
+  if (/\/api\/factory\/payrolls\/mark-paid-bulk/.test(url)) return "Bulk Payroll Payment";
+  if (/\/api\/factory\/payroll/.test(url)) return "Payroll";
   if (/\/api\/factory\/alerts/.test(url)) return "Alert";
   if (/\/api\/stock-adjustments/.test(url)) return "Stock Adjustment";
   if (/\/api\/stock-transfers/.test(url)) return "Stock Transfer";
+  if (/\/api\/bale-label-prints/.test(url)) return "Label Print";
   if (/\/api\/bale-transfers/.test(url)) return "Bale Transfer";
   return "Action";
 }
