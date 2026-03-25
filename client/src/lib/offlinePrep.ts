@@ -184,7 +184,7 @@ function buildPacks(): PrepPack[] {
         {
           id: "posDrafts",
           label: "POS drafts",
-          endpoint: "/api/draft-pos-sales",
+          endpoint: "/api/pos/drafts",
           tableKey: null,
           extractItems: (data, cid) =>
             extractArray(data).map((d: any) => toEntity(`pos_draft_${d.id}`, cid, d)),
