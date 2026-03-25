@@ -1,5 +1,5 @@
 import { useCompany } from "@/contexts/CompanyContext";
-import { Building2, Check } from "lucide-react";
+import { Building2, Check, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,25 +11,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
 
 export function CompanySelector() {
   const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
+  const { isOnline } = useConnectivity();
   const { toast } = useToast();
 
   const handleCompanyChange = async (company: any) => {
+    if (company.id === selectedCompany?.id) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Cannot switch company while offline",
+        description: "Your queued work will stay saved. Reconnect to the internet, then switch companies.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      // Call API to set company in session
       await apiRequest("POST", "/api/auth/set-company", { companyId: company.id });
-      
-      // Update local context
       selectCompany(company);
-      
-      // Reload to get fresh data for new company
       window.location.reload();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to switch company",
+        title: "Failed to switch company",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     }
@@ -58,18 +66,32 @@ export function CompanySelector() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" data-testid="button-company-selector">
-          <Building2 className="h-4 w-4 mr-2" />
+          {isOnline ? (
+            <Building2 className="h-4 w-4 mr-2" />
+          ) : (
+            <WifiOff className="h-4 w-4 mr-2 text-muted-foreground" />
+          )}
           {selectedCompany.name}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Select Company</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        {!isOnline && (
+          <>
+            <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
+              <WifiOff className="h-3 w-3 shrink-0" />
+              Switching unavailable offline
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {isOnline && <DropdownMenuSeparator />}
         {companies.map((company) => (
           <DropdownMenuItem
             key={company.id}
             onClick={() => handleCompanyChange(company)}
             data-testid={`company-option-${company.id}`}
+            disabled={!isOnline && company.id !== selectedCompany.id}
           >
             <div className="flex items-center justify-between w-full">
               <span>{company.name}</span>
