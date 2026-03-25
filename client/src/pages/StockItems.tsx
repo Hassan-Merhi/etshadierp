@@ -255,7 +255,7 @@ export default function StockItems() {
 
   const unassignedItems = stockItems.filter(item => !item.stockGroupId);
 
-  const getStockGroupName = async (stockGroupId: number | null) => {
+  const getStockGroupName = (stockGroupId: number | null) => {
     if (!stockGroupId) return "— No Group —";
     const group = stockGroups.find(g => g.id === stockGroupId);
     return group ? group.name : "Unknown";

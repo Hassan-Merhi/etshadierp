@@ -396,13 +396,13 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       return `${diffHours} hours ago`;
     };
 
-    const getCompanyName = async (companyId: number | null) => {
+    const getCompanyName = (companyId: number | null) => {
       if (!companyId || !companies) return "—";
       const company = companies.find((c: any) => c.id === companyId);
       return company?.name || "Unknown";
     };
 
-    const getPageLabel = async (route: string) => {
+    const getPageLabel = (route: string) => {
       if (!route || route === "/") return "Dashboard";
       const routeLabels: Record<string, string> = {
         "/": "Dashboard",
@@ -1734,13 +1734,13 @@ function BulkRenameTab() {
     }
   };
 
-  const getPreviewName = async (name: string) => {
+  const getPreviewName = (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
     return name.replace(regex, replaceWith);
   };
 
-  const renderPreviewName = async (name: string) => {
+  const renderPreviewName = (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
     const parts: (string | JSX.Element)[] = [];

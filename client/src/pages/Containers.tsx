@@ -340,7 +340,7 @@ export default function Containers() {
     return true;
   });
 
-  const getSupplierName = async (supplierId: number) => {
+  const getSupplierName = (supplierId: number) => {
     const supplier = suppliers.find((s) => s.id === supplierId);
     return supplier ? supplier.legalName : "Unknown";
   };
@@ -581,7 +581,7 @@ export default function Containers() {
     }
   };
 
-  const getEditValue = async (container: Container, field: keyof Container) => {
+  const getEditValue = (container: Container, field: keyof Container) => {
     if (
       trackingEdits[container.id] &&
       trackingEdits[container.id][field] !== undefined
@@ -667,7 +667,7 @@ export default function Containers() {
       );
       if (containerIndex === -1) return;
 
-      const getInputId = async (cIdx: number, fIdx: number) => {
+      const getInputId = (cIdx: number, fIdx: number) => {
         const container = filteredOtwContainers[cIdx];
         if (!container) return null;
         const field = trackingFields[fIdx];

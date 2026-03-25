@@ -259,7 +259,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
-  const getFilteredInventory = async () => {
+  const getFilteredInventory = () => {
     if (!searchTerm.trim()) {
       return inventoryItems.map(inv => {
         const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
@@ -566,7 +566,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
   const filteredItems = getFilteredInventory();
 
-  const calculateTotal = async () => {
+  const calculateTotal = () => {
     return entries.reduce((sum, entry) => {
       const qty = parseFloat(entry.quantity || "0");
       return sum + (isNaN(qty) ? 0 : qty);
