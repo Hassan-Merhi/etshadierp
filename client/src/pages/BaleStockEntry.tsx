@@ -247,6 +247,9 @@
 
     const [designPickerOpen, setDesignPickerOpen] = useState(false);
     const [pendingPrintLabels, setPendingPrintLabels] = useState<LabelData[] | null>(null);
+    // Pre-opened windows reserved synchronously on button click (before any await),
+    // so the browser considers them user-initiated and doesn't block them.
+    const preOpenedWindowsRef = useRef<{ a4: Window | null; sticker: Window | null } | null>(null);
 
     const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
       const paperFormat = getPaperFormat();
@@ -255,15 +258,19 @@
         setDesignPickerOpen(true);
         return;
       }
+      // Consume pre-opened windows if available, otherwise fall back to window.open
+      const preOpened = preOpenedWindowsRef.current;
+      preOpenedWindowsRef.current = null;
+
       const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
-      const a4Window = window.open("", "_blank");
+      const a4Window = (preOpened?.a4 && !preOpened.a4.closed) ? preOpened.a4 : window.open("", "_blank");
       if (a4Window) {
         a4Window.document.write(labelHtml);
         a4Window.document.close();
         a4Window.focus();
         setTimeout(() => a4Window.print(), 500);
       }
-      const stickerWindow = window.open("", "_blank");
+      const stickerWindow = (preOpened?.sticker && !preOpened.sticker.closed) ? preOpened.sticker : window.open("", "_blank");
       if (stickerWindow) {
         stickerWindow.document.write(generateStickerLabelsHtml(labels));
         stickerWindow.document.close();
@@ -370,6 +377,12 @@
         printLabels(result.bales);
       },
       onError: (error: Error) => {
+        // Close any pre-opened windows if the mutation failed
+        if (preOpenedWindowsRef.current) {
+          preOpenedWindowsRef.current.a4?.close();
+          preOpenedWindowsRef.current.sticker?.close();
+          preOpenedWindowsRef.current = null;
+        }
         toast({ title: "Error", description: error.message, variant: "destructive" });
       },
     });
@@ -685,7 +698,15 @@
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
               <Button
-                onClick={() => stockEntryMutation.mutate()}
+                onClick={() => {
+                  // Pre-open print windows NOW (synchronous user-gesture context)
+                  // so the browser won't block them as popups when called after await.
+                  preOpenedWindowsRef.current = {
+                    a4: window.open("", "_blank"),
+                    sticker: window.open("", "_blank"),
+                  };
+                  stockEntryMutation.mutate();
+                }}
                 disabled={stockEntryMutation.isPending}
                 data-testid="button-dialog-confirm-entry"
               >
