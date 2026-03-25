@@ -383,15 +383,61 @@ export async function runOfflinePrep(
   // without needing a prior visit. Dynamic import() fetches the chunk; the
   // service worker caches it automatically via stale-while-revalidate.
   const pageChunks: Array<{ label: string; loader: () => Promise<any> }> = [
-    { label: "Bale Products",      loader: () => import("@/pages/BaleProducts") },
-    { label: "Waste Dispatch",     loader: () => import("@/pages/WasteDispatch") },
-    { label: "Factory Suppliers",  loader: () => import("@/pages/FactorySuppliers") },
-    { label: "Factory Containers", loader: () => import("@/pages/FactoryContainers") },
-    { label: "Factory Daybook",    loader: () => import("@/pages/FactoryDaybook") },
-    { label: "Bales Hub",          loader: () => import("@/pages/FactoryBalesHub") },
-    { label: "Raw Materials Hub",  loader: () => import("@/pages/FactoryRawMaterialsHub") },
-    { label: "Stock Entry",        loader: () => import("@/pages/BaleStockEntry") },
-    { label: "Factory Settings",   loader: () => import("@/pages/FactorySettings") },
+    // ── Core factory pages ───────────────────────────────────────────────
+    { label: "Dashboard",              loader: () => import("@/pages/FactoryDashboard") },
+    { label: "Daybook",                loader: () => import("@/pages/FactoryDaybook") },
+    { label: "Suppliers",              loader: () => import("@/pages/FactorySuppliers") },
+    { label: "Containers",             loader: () => import("@/pages/FactoryContainers") },
+    { label: "Container Create",       loader: () => import("@/pages/FactoryContainerCreate") },
+    // ── Stock & bales ────────────────────────────────────────────────────
+    { label: "Stock Entry",            loader: () => import("@/pages/BaleStockEntry") },
+    { label: "Bale Products",          loader: () => import("@/pages/BaleProducts") },
+    { label: "Raw Stock",              loader: () => import("@/pages/ProductionRawStock") },
+    { label: "Raw Materials Hub",      loader: () => import("@/pages/FactoryRawMaterialsHub") },
+    { label: "Mix Batches",            loader: () => import("@/pages/MixBatches") },
+    { label: "Bales Hub",              loader: () => import("@/pages/FactoryBalesHub") },
+    { label: "Bales History",          loader: () => import("@/pages/BalesHistory") },
+    { label: "Bale Product History",   loader: () => import("@/pages/FactoryBaleProductHistory") },
+    { label: "Bale Ledger",            loader: () => import("@/pages/BaleLedger") },
+    { label: "Bale Relabeling",        loader: () => import("@/pages/FactoryBaleRelabeling") },
+    { label: "Wipers Re-Entry",        loader: () => import("@/pages/WipersReEntry") },
+    { label: "Waste Dispatch",         loader: () => import("@/pages/WasteDispatch") },
+    // ── Inventory & stock queries ────────────────────────────────────────
+    { label: "Location Inventory",     loader: () => import("@/pages/FactoryLocationInventory") },
+    { label: "Stock Query",            loader: () => import("@/pages/StockQuery") },
+    { label: "Stock Item Detail",      loader: () => import("@/pages/FactoryStockItemDetail") },
+    { label: "Stock OTW",              loader: () => import("@/pages/StockOTW") },
+    // ── Accounting ───────────────────────────────────────────────────────
+    { label: "Accounts",               loader: () => import("@/pages/FactoryAccounts") },
+    { label: "Vouchers",               loader: () => import("@/pages/FactoryVouchers") },
+    { label: "Voucher Edit",           loader: () => import("@/pages/VoucherEdit") },
+    { label: "Voucher Detail",         loader: () => import("@/pages/VoucherDetail") },
+    { label: "New Voucher",            loader: () => import("@/pages/AccountingCreate") },
+    { label: "Ledger Monthly",         loader: () => import("@/pages/LedgerMonthlySummary") },
+    { label: "Ledger Vouchers",        loader: () => import("@/pages/LedgerVouchers") },
+    // ── Sales & loadings ─────────────────────────────────────────────────
+    { label: "Loadings Hub",           loader: () => import("@/pages/FactoryLoadingsHub") },
+    { label: "Pending Loadings",       loader: () => import("@/pages/FactoryPendingLoadings") },
+    { label: "Container Scan",         loader: () => import("@/pages/FactoryContainerLoadingScan") },
+    { label: "Invoices",               loader: () => import("@/pages/FactoryInvoices") },
+    { label: "Proformas",              loader: () => import("@/pages/FactoryProformas") },
+    { label: "Pending Invoices",       loader: () => import("@/pages/FactoryPendingInvoices") },
+    { label: "Customers",              loader: () => import("@/pages/FactoryCustomers") },
+    // ── People ───────────────────────────────────────────────────────────
+    { label: "Workers",                loader: () => import("@/pages/FactoryWorkersHub") },
+    { label: "Employees",              loader: () => import("@/pages/FactoryEmployees") },
+    // ── Intelligence ─────────────────────────────────────────────────────
+    { label: "KPIs",                   loader: () => import("@/pages/FactoryKpis") },
+    { label: "Cashflow",               loader: () => import("@/pages/FactoryCashflow") },
+    { label: "Alerts",                 loader: () => import("@/pages/FactoryAlerts") },
+    { label: "Waste Intelligence",     loader: () => import("@/pages/FactoryWaste") },
+    { label: "Production Summary",     loader: () => import("@/pages/ProductionSummary") },
+    // ── Reports & tools ──────────────────────────────────────────────────
+    { label: "Supplier Report",        loader: () => import("@/pages/FactorySupplierReport") },
+    { label: "Supplier Statement",     loader: () => import("@/pages/FactorySupplierStatement") },
+    { label: "Barcode Lookup",         loader: () => import("@/pages/BarcodeLookup") },
+    { label: "Import",                 loader: () => import("@/pages/FactoryImport") },
+    { label: "Factory Settings",       loader: () => import("@/pages/FactorySettings") },
   ];
   total += pageChunks.length;
   for (const chunk of pageChunks) {
