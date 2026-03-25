@@ -1300,6 +1300,7 @@ export default function FactorySuppliers() {
                       const typeLabel: Record<string, string> = {
                         container: "Container", payment: "Payment",
                         fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
+                        freight: "Freight",
                       };
                       const typeBadgeVariant = (t: string): "outline"|"secondary"|"default"|"destructive" => {
                         if (t === "payment") return "secondary";
@@ -1313,6 +1314,7 @@ export default function FactorySuppliers() {
                         if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
                         if (t === "commission") return "text-destructive";
                         if (t === "other_charge") return "text-purple-600 dark:text-purple-400";
+                        if (t === "freight") return "text-orange-600 dark:text-orange-400";
                         return "";
                       };
                       return (
@@ -1446,7 +1448,7 @@ export default function FactorySuppliers() {
               </CardHeader>
               <CardContent>
                 {(() => {
-                  type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge";
+                  type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge" | "freight";
                   const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
 
                   // Determine the supplier's primary currency from their containers
@@ -1483,28 +1485,49 @@ export default function FactorySuppliers() {
                     status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
                     nativeImpact: number;
                   }> = [
-                    ...stmts.map((e: any) => {
+                    ...stmts.flatMap((e: any) => {
                       const rawVal = parseFloat(e.value || "0");
                       const fxRate = parseFloat(e.fxRateToUsd || "1") || 1;
                       const cc = e.currencyCode || "USD";
-                      const dispAmt = cc !== "USD" ? `${cc} ${formatNum(e.value)}` : `$${formatNum(String(rawVal.toFixed(2)))}`;
                       const freightAmt = parseFloat(e.freight || "0");
                       const freightCc = e.freightCurrencyCode || cc;
-                      const freightNote = freightAmt > 0 ? `Freight: ${freightCc !== "USD" ? `${freightCc} ` : "$"}${formatNum(String(freightAmt.toFixed(2)))}` : "";
+                      const sameCcFreight = freightAmt > 0 && freightCc === cc;
+                      // Goods-only value (server's `value` includes same-currency freight — subtract it for the purchase row)
+                      const goodsVal = sameCcFreight ? rawVal - freightAmt : rawVal;
+                      const dispGoodsAmt = cc !== "USD" ? `${cc} ${formatNum(String(goodsVal.toFixed(2)))}` : `$${formatNum(String(goodsVal.toFixed(2)))}`;
                       const commNote = parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "";
-                      const fxNote = cc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((rawVal * fxRate).toFixed(2)))}` : "";
-                      return {
+                      const fxNote = cc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((goodsVal * fxRate).toFixed(2)))}` : "";
+                      const purchaseRow = {
                         key: `c-${e.id}`,
                         date: e.date,
                         type: "purchase" as RowType,
                         ref: e.containerNumber,
                         detail: [e.origin, fxNote].filter(Boolean).join(" · "),
-                        amount: dispAmt,
+                        amount: dispGoodsAmt,
                         amountIsNeg: false,
                         status: e.status,
-                        notes: [e.notes, freightNote, commNote].filter(Boolean).join(" · ") || null,
-                        nativeImpact: toNative(rawVal, cc, fxRate),
+                        notes: [e.notes, commNote].filter(Boolean).join(" · ") || null,
+                        nativeImpact: toNative(goodsVal, cc, fxRate),
                       };
+                      const rows: typeof purchaseRow[] = [purchaseRow];
+                      // Same-currency freight → separate Freight row in child's ledger
+                      if (sameCcFreight) {
+                        const dispFreightAmt = freightCc !== "USD" ? `${freightCc} ${formatNum(String(freightAmt.toFixed(2)))}` : `$${formatNum(String(freightAmt.toFixed(2)))}`;
+                        const fxFreightNote = freightCc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((freightAmt * fxRate).toFixed(2)))}` : "";
+                        rows.push({
+                          key: `f-${e.id}`,
+                          date: e.date,
+                          type: "freight" as RowType,
+                          ref: e.containerNumber,
+                          detail: fxFreightNote,
+                          amount: dispFreightAmt,
+                          amountIsNeg: false,
+                          status: undefined,
+                          notes: null,
+                          nativeImpact: toNative(freightAmt, freightCc, fxRate),
+                        });
+                      }
+                      return rows;
                     }),
                     ...(statementData.payments || []).map((p: any) => {
                       const cc = p.currencyCode || "USD";
@@ -1614,6 +1637,7 @@ export default function FactorySuppliers() {
                     if (type === "payment") return <Badge variant="secondary" className="text-xs font-normal">Payment</Badge>;
                     if (type === "fx") return <Badge className="text-xs font-normal bg-blue-500 dark:bg-blue-600">FX</Badge>;
                     if (type === "other_charge") return <Badge className="text-xs font-normal bg-purple-500 dark:bg-purple-700">Other Charge</Badge>;
+                    if (type === "freight") return <Badge className="text-xs font-normal bg-orange-500 dark:bg-orange-600">Freight</Badge>;
                     return <Badge variant="destructive" className="text-xs font-normal">Commission</Badge>;
                   };
 
@@ -1651,9 +1675,9 @@ export default function FactorySuppliers() {
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
-                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
-                                {row.type !== "payment" && row.type !== "purchase" && row.amountIsNeg ? "−" : ""}{row.amount}
-                                {row.type === "purchase" && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                                {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.amountIsNeg ? "−" : ""}{row.amount}
+                                {(row.type === "purchase" || row.type === "freight") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
                                 {row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>

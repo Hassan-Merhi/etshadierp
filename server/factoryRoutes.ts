@@ -3241,7 +3241,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     };
 
     const ledgerByCurrency: Record<string, LedgerRow[]> = {};
-    const freightByBucket: Record<string, number> = {}; // cross-currency freight totals keyed by freight currency code
     const addRow = (cc: string, row: LedgerRow) => {
       if (!ledgerByCurrency[cc]) ledgerByCurrency[cc] = [];
       ledgerByCurrency[cc].push(row);
@@ -3257,8 +3256,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
       const freightCc = c.freightCurrencyCode || cc;
       const freightSameCcy = freightCc === cc;
-      // Only include freight in the container row amount when it shares the container's currency
-      const mainAmt = kg * rate + (freightSameCcy ? freight : 0);
+      // Freight is always a separate row — container row shows goods only
+      const mainAmt = kg * rate;
       const commAmt = parseFloat(c.commissionAmount || "0");
       const commCc = c.commissionCurrencyCode || "USD";
       const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
@@ -3266,20 +3265,36 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       addRow(cc, {
         date: dateVal,
         type: "container",
-        description: freight > 0 && freightSameCcy
-          ? `${c.containerNumber} - ${supplierName} (incl. freight ${cc !== "USD" ? cc + " " : "$"}${freight.toFixed(2)})`
-          : `${c.containerNumber} - ${supplierName}`,
+        description: `${c.containerNumber} - ${supplierName}`,
         ref: c.containerNumber,
         amount: mainAmt,
         commissionAmount: commAmt > 0 && commCc === cc ? commAmt : null,
         commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
       });
 
-      // Cross-currency freight: accumulate into its own currency bucket total (shown in summary, not as a row)
+      // Cross-currency freight: add as an individual ledger row in the freight currency section
       if (freight > 0 && !freightSameCcy) {
-        freightByBucket[freightCc] = (freightByBucket[freightCc] || 0) + freight;
-        // Ensure the freight currency has a section even if there are no other rows for it
-        if (!ledgerByCurrency[freightCc]) ledgerByCurrency[freightCc] = [];
+        addRow(freightCc, {
+          date: dateVal,
+          type: "freight",
+          description: `Freight - ${c.containerNumber} (${supplierName})`,
+          ref: c.containerNumber,
+          amount: freight,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
+      // Same-currency freight: add a separate freight row in the container's currency section
+      if (freight > 0 && freightSameCcy) {
+        addRow(cc, {
+          date: dateVal,
+          type: "freight",
+          description: `Freight - ${c.containerNumber} (${supplierName})`,
+          ref: c.containerNumber,
+          amount: freight,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
       }
 
       // Commission row in different currency section
@@ -3421,9 +3436,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
       const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
       const totalOtherCharges = rows.filter(r => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
-      // Cross-currency freight owed in this currency (tracked separately from rows)
-      const totalFreight = freightByBucket[cc] || 0;
-      const netBalanceWithFreight = runBal + totalFreight;
+      // Freight rows are now real ledger rows, so they're already in runBal
+      const totalFreight = rows.filter(r => r.type === "freight").reduce((s, r) => s + r.amount, 0);
       return {
         currencyCode: cc,
         rows: rowsWithBal,
@@ -3435,7 +3449,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalPaid: totalPaid.toFixed(2),
         totalFxOut: totalFxOut.toFixed(2),
         totalFxIn: totalFxIn.toFixed(2),
-        netBalance: netBalanceWithFreight.toFixed(2),
+        netBalance: runBal.toFixed(2),
       };
     }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
 
@@ -3472,9 +3486,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const typeLabel: Record<string, string> = {
         container: "Container", payment: "Payment",
         fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
+        freight: "Freight",
       };
       const rowTypeFill: Record<string, string> = {
         container: "FFFAFAFA", payment: "FFE8F5E9", fx_out: "FFFFF8E1", fx_in: "FFE3F2FD", commission: "FFFFF3E0", other_charge: "FFEDE7F6",
+        freight: "FFFFF3E0",
       };
 
       for (const section of data.currencyLedgers) {
