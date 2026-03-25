@@ -259,6 +259,22 @@ function buildPacks(): PrepPack[] {
           extractItems: (data, cid) =>
             extractArray(data).map((s: any) => toEntity(`fsb_${s.id}`, cid, s)),
         },
+        {
+          id: "factoryDaybook",
+          label: "Factory daybook",
+          endpoint: "/api/factory/daybook",
+          tableKey: null,
+          extractItems: (data, cid) =>
+            extractArray(data).map((e: any) => toEntity(e.id ?? Math.random(), cid, e)),
+        },
+        {
+          id: "factoryFxRates",
+          label: "FX rates",
+          endpoint: "/api/factory/fx-rates",
+          tableKey: null,
+          extractItems: (data, cid) =>
+            extractArray(data).map((r: any) => toEntity(r.id ?? Math.random(), cid, r)),
+        },
       ],
     },
   ];
@@ -284,7 +300,7 @@ export async function runOfflinePrep(
 ): Promise<PrepProgress> {
   const packs = buildPacks();
   const allDatasets = packs.flatMap(p => p.datasets.map(d => ({ ...d, packId: p.id })));
-  const total = allDatasets.length;
+  let total = allDatasets.length;
   const results: DatasetResult[] = [];
   const errors: string[] = [];
 
@@ -361,6 +377,41 @@ export async function runOfflinePrep(
         results.push({ datasetId: dataset.id, label: dataset.label, packId: pack.id, success: false, count: 0, error: e?.message });
       }
     }
+  }
+
+  // Step 2b: Dynamic — pre-cache every supplier's broker statement so the
+  // supplier ledger page works offline without needing a prior visit.
+  try {
+    const supplierEntities = await db.factorySuppliers
+      .where("companyId").equals(companyId).toArray();
+    if (supplierEntities.length > 0) {
+      total += supplierEntities.length;
+      for (const entity of supplierEntities) {
+        let supplier: any = {};
+        try { supplier = JSON.parse(entity.data); } catch { /* skip */ }
+        const label = supplier.name || `Supplier ${supplier.id ?? entity.id}`;
+        emit("preparing", `Caching ledger: ${label}…`);
+        try {
+          const r = await fetch(
+            `/api/factory/suppliers/${supplier.id}/broker-statement`,
+            { credentials: "include" }
+          );
+          results.push({
+            datasetId: `ledger_${supplier.id}`,
+            label,
+            packId: "factory",
+            success: r.ok,
+            count: r.ok ? 1 : 0,
+            error: r.ok ? undefined : `HTTP ${r.status}`,
+          });
+        } catch {
+          // Non-fatal: network down or route not yet visited — SW cache miss is fine
+          results.push({ datasetId: `ledger_${supplier.id}`, label, packId: "factory", success: true, count: 0 });
+        }
+      }
+    }
+  } catch {
+    // Non-fatal — supplier ledger pre-cache is a best-effort step
   }
 
   // Step 3: Verify
