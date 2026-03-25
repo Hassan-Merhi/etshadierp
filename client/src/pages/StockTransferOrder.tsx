@@ -114,7 +114,7 @@ export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
 
-  const editVoucherId = async (() => {
+  const editVoucherId = (() => {
     const params = new URLSearchParams(window.location.search);
     const v = params.get("edit");
     return v ? parseInt(v) : null;
@@ -125,7 +125,7 @@ export default function StockTransferOrder() {
     return saved ? JSON.parse(saved) : [];
   });
   // Restore state from sessionStorage once (when navigating back from history view, only for new transfers)
-  const _sessionSnapshot = async (() => {
+  const _sessionSnapshot = (() => {
     if (editVoucherId !== null) return null; // don't restore when editing existing voucher
     try {
       const ss = sessionStorage.getItem(SESSION_STATE_KEY);
