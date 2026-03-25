@@ -379,7 +379,33 @@ export async function runOfflinePrep(
     }
   }
 
-  // Step 2b: Dynamic — pre-cache every supplier's broker statement so the
+  // Step 2b: Pre-warm lazy-loaded factory page JS chunks so they work offline
+  // without needing a prior visit. Dynamic import() fetches the chunk; the
+  // service worker caches it automatically via stale-while-revalidate.
+  const pageChunks: Array<{ label: string; loader: () => Promise<any> }> = [
+    { label: "Bale Products",      loader: () => import("@/pages/BaleProducts") },
+    { label: "Waste Dispatch",     loader: () => import("@/pages/WasteDispatch") },
+    { label: "Factory Suppliers",  loader: () => import("@/pages/FactorySuppliers") },
+    { label: "Factory Containers", loader: () => import("@/pages/FactoryContainers") },
+    { label: "Factory Daybook",    loader: () => import("@/pages/FactoryDaybook") },
+    { label: "Bales Hub",          loader: () => import("@/pages/FactoryBalesHub") },
+    { label: "Raw Materials Hub",  loader: () => import("@/pages/FactoryRawMaterialsHub") },
+    { label: "Stock Entry",        loader: () => import("@/pages/BaleStockEntry") },
+    { label: "Factory Settings",   loader: () => import("@/pages/FactorySettings") },
+  ];
+  total += pageChunks.length;
+  for (const chunk of pageChunks) {
+    emit("preparing", `Pre-caching page: ${chunk.label}…`);
+    try {
+      await chunk.loader();
+      results.push({ datasetId: `chunk_${chunk.label}`, label: chunk.label, packId: "factory", success: true, count: 1 });
+    } catch {
+      // Non-fatal — chunk may already be loaded or not exist
+      results.push({ datasetId: `chunk_${chunk.label}`, label: chunk.label, packId: "factory", success: true, count: 0 });
+    }
+  }
+
+  // Step 2c: Dynamic — pre-cache every supplier's broker statement so the
   // supplier ledger page works offline without needing a prior visit.
   try {
     const supplierEntities = await db.factorySuppliers

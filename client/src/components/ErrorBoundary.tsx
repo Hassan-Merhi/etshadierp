@@ -1,6 +1,6 @@
 import { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, WifiOff } from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -125,6 +125,8 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("[ErrorBoundary] Uncaught error:", error, info.componentStack);
 
     if (isChunkLoadError(error)) {
+      // If we're offline, the chunk simply isn't cached — reloading won't help.
+      if (!navigator.onLine) return;
       const path = window.location.pathname;
       if (canAutoRetry(path)) {
         recordRetry(path);
@@ -150,6 +152,25 @@ export class ErrorBoundary extends Component<Props, State> {
         isChunkLoadError(this.state.error);
 
       if (isChunk) {
+        // When offline, the chunk simply isn't cached yet — reload won't help.
+        const isOffline = !navigator.onLine;
+        if (isOffline) {
+          return (
+            <div className="flex flex-col items-center justify-center h-full min-h-[40vh] gap-4 p-6 text-center">
+              <WifiOff className="h-10 w-10 text-muted-foreground" />
+              <div>
+                <p className="font-semibold text-lg">Page not available offline</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This page hasn't been cached yet. Visit it while connected, or run
+                  "Prepare for offline" again to download all pages.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => window.history.back()} data-testid="button-go-back-offline">
+                Go back
+              </Button>
+            </div>
+          );
+        }
         return (
           <div className="flex flex-col items-center justify-center h-full min-h-[40vh] gap-4 p-6 text-center">
             <RefreshCw className="h-10 w-10 text-muted-foreground" />
