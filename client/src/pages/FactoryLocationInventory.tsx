@@ -191,6 +191,7 @@ export default function FactoryLocationInventory() {
       setNewCustomerName("");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,6 +206,7 @@ export default function FactoryLocationInventory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -221,6 +223,7 @@ export default function FactoryLocationInventory() {
       setTimeout(() => navigate("/factory/sales/proformas"), 800);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -243,6 +246,7 @@ export default function FactoryLocationInventory() {
       setDeleteReason("");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

@@ -112,6 +112,7 @@ export default function MixBatches() {
       toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to batch` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -134,6 +135,7 @@ export default function MixBatches() {
       toast({ title: "Saved", description: "Batch updated successfully" });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -154,6 +156,7 @@ export default function MixBatches() {
       toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

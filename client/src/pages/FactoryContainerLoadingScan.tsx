@@ -215,6 +215,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -269,6 +270,7 @@ export default function FactoryContainerLoadingScan() {
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
+      if ((error as any)?._handledGlobally) return;
       if ((error as any).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
         setScanFlash("error");
@@ -337,6 +339,7 @@ export default function FactoryContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -375,6 +378,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -395,12 +399,14 @@ export default function FactoryContainerLoadingScan() {
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      setShowFinalizeDialog(false);
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      setShowFinalizeDialog(false);
     },
   });
 

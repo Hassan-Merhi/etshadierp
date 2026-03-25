@@ -128,6 +128,7 @@ export default function FactoryOpeningBalanceEdit() {
       toast({ title: "Saved", description: "Opening balance updated successfully." });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -148,6 +149,7 @@ export default function FactoryOpeningBalanceEdit() {
       navigate("/factory/raw-materials");
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDeleteDialogOpen(false);
     },

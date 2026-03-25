@@ -90,6 +90,7 @@ export default function FactoryUsers() {
       setCreateOpen(false);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -110,6 +111,7 @@ export default function FactoryUsers() {
       setEditingUser(null);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -158,6 +160,7 @@ export default function FactoryUsers() {
       toast({ title: "Updated", description: "Access updated successfully" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -177,6 +180,7 @@ export default function FactoryUsers() {
       setDeletingUser(null);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

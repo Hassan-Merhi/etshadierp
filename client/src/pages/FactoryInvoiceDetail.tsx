@@ -120,6 +120,7 @@ export default function FactoryInvoiceDetail() {
       navigate("/factory/sales/invoices");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -138,6 +139,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

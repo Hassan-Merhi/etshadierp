@@ -129,6 +129,7 @@ export default function FactoryInvoiceCreate() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -146,11 +147,13 @@ export default function FactoryInvoiceCreate() {
       scannerRef.current?.focus();
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       setScanFlash("error");
       setTimeout(() => setScanFlash(null), 500);
-      toast({ title: "Scan Error", description: error.message, variant: "destructive" });
       setScanCode("");
       scannerRef.current?.focus();
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Scan Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -163,6 +166,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -178,6 +182,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Charge added" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -191,6 +196,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Charge removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,8 +211,10 @@ export default function FactoryInvoiceCreate() {
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -224,6 +232,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

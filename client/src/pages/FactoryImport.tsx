@@ -119,6 +119,7 @@ function SupplierImport() {
       toast({ title: "Import complete", description: `${data.imported} created, ${data.updated} updated` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
   });
@@ -271,6 +272,7 @@ function RawStockImport() {
       toast({ title: "Import complete", description: `${data.imported} raw stock records imported` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
   });
@@ -438,6 +440,7 @@ function BaleImport() {
       toast({ title: "Import complete", description: `${data.imported} bales imported` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
   });
@@ -755,6 +758,7 @@ function OpeningStockImport() {
       toast({ title: "Import complete", description: `${data.imported} opening stock records imported` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
   });
@@ -989,6 +993,7 @@ function SupplierObEdit() {
       setObValue("");
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

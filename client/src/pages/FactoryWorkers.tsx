@@ -106,7 +106,7 @@ export default function FactoryWorkers() {
       toast({ title: "Worker added" });
       resetForm(); setCreateOpen(false);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const updateMutation = useMutation({
@@ -120,7 +120,7 @@ export default function FactoryWorkers() {
       toast({ title: "Worker updated" });
       resetForm(); setEditingWorker(null);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {

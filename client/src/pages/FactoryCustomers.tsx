@@ -57,6 +57,7 @@ export default function FactoryCustomers() {
       resetForm();
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -72,6 +73,7 @@ export default function FactoryCustomers() {
       resetForm();
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -87,6 +89,7 @@ export default function FactoryCustomers() {
       setDeletingCustomer(null);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

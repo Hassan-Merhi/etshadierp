@@ -182,6 +182,7 @@ export default function FactoryPendingInvoiceVerify() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -195,6 +196,7 @@ export default function FactoryPendingInvoiceVerify() {
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -208,6 +210,7 @@ export default function FactoryPendingInvoiceVerify() {
       toast({ title: "Container info saved" });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -224,6 +227,7 @@ export default function FactoryPendingInvoiceVerify() {
       toast({ title: "Charge added" });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -237,6 +241,7 @@ export default function FactoryPendingInvoiceVerify() {
       toast({ title: "Charge removed" });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -250,6 +255,7 @@ export default function FactoryPendingInvoiceVerify() {
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -265,6 +271,7 @@ export default function FactoryPendingInvoiceVerify() {
       setShowFixBalesDialog(false);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

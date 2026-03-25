@@ -121,6 +121,7 @@ export default function BaleProducts() {
       toast({ title: "Category created" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -137,6 +138,7 @@ export default function BaleProducts() {
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -151,6 +153,7 @@ export default function BaleProducts() {
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -213,6 +216,7 @@ export default function BaleProducts() {
       setImportFile(null);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Import Error", description: error.message, variant: "destructive" });
     },
   });
@@ -232,6 +236,7 @@ export default function BaleProducts() {
       });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -248,6 +253,7 @@ export default function BaleProducts() {
       toast({ title: "Product deleted", description: "The product has been removed." });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

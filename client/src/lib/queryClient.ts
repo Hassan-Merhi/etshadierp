@@ -1,5 +1,6 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
+import { toast } from "@/hooks/use-toast";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -129,7 +130,26 @@ export const getQueryFn: <T>(options: {
     }
   };
 
+// Global mutation error handler — catches OfflineQueued for every mutation
+// so individual pages don't need to duplicate the offline toast logic.
+// Pages that need extra offline behaviour (BaleStockEntry, Vouchers) still
+// run their own onError AFTER this; they should skip another toast by checking
+// error._handledGlobally.
+const globalMutationCache = new MutationCache({
+  onError: (error: any) => {
+    if (error?.name === "OfflineQueued") {
+      error._handledGlobally = true;
+      const label = error.description ? `${error.description} saved` : "Action saved";
+      toast({
+        title: "Saved offline",
+        description: `${label} — will sync automatically when connected`,
+      });
+    }
+  },
+});
+
 export const queryClient = new QueryClient({
+  mutationCache: globalMutationCache,
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),

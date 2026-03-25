@@ -87,6 +87,7 @@ export default function FactoryProformas() {
       setNewProformaName("");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -100,6 +101,7 @@ export default function FactoryProformas() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -113,6 +115,7 @@ export default function FactoryProformas() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -128,6 +131,7 @@ export default function FactoryProformas() {
       setRenameValue("");
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -144,6 +148,7 @@ export default function FactoryProformas() {
       setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -162,6 +167,7 @@ export default function FactoryProformas() {
       setEditingLine(null);
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -175,6 +181,7 @@ export default function FactoryProformas() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -192,6 +199,7 @@ export default function FactoryProformas() {
       toast({ title: "Prices Applied", description: msg });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

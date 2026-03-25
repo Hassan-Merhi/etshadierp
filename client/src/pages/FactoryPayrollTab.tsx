@@ -198,7 +198,10 @@ export default function FactoryPayrollTab() {
       setExpandedAdvanceWorkers(new Set());
       setPreviewOpen(true);
     },
-    onError: (err: Error) => toast({ title: "Preview failed", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const generateMutation = useMutation({
@@ -229,7 +232,10 @@ export default function FactoryPayrollTab() {
       const key = `${runForm.periodStart}|${runForm.periodEnd}`;
       setExpandedGroups((prev) => new Set([...prev, key]));
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const markPaidMutation = useMutation({
@@ -250,7 +256,10 @@ export default function FactoryPayrollTab() {
       setPrintSummaryOpen(true);
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const bulkMarkPaidMutation = useMutation({
@@ -271,7 +280,10 @@ export default function FactoryPayrollTab() {
       setPrintSummaryOpen(true);
       setSelectedIds(new Set()); setBulkPayOpen(false); setBulkCashAccountId("");
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -285,7 +297,10 @@ export default function FactoryPayrollTab() {
       toast({ title: "Draft payroll deleted" });
       setDeleteTargetId(null);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const undoMutation = useMutation({
@@ -302,7 +317,10 @@ export default function FactoryPayrollTab() {
       toast({ title: "Undo successful", description: msg });
       setUndoTargetId(null);
     },
-    onError: (err: Error) => toast({ title: "Undo failed", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Undo failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const printSummaryPDF = async () => {

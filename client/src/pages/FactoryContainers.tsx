@@ -207,6 +207,7 @@ export default function FactoryContainers() {
       setCreateOpen(false);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -259,6 +260,7 @@ export default function FactoryContainers() {
       setEditingContainer(null);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -277,6 +279,7 @@ export default function FactoryContainers() {
       toast({ title: "Deleted", description: "Container removed" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -299,6 +302,7 @@ export default function FactoryContainers() {
       toast({ title: "Offload Reversed", description: "Container is back to RECEIVED status. Raw stock, accounting vouchers, and daybook entries have all been removed." });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -320,6 +324,7 @@ export default function FactoryContainers() {
       });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Backfill failed", description: err.message, variant: "destructive" });
     },
   });
@@ -349,6 +354,7 @@ export default function FactoryContainers() {
       });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Import Failed", description: err.message, variant: "destructive" });
     },
   });

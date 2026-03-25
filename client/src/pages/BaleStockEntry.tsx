@@ -112,6 +112,7 @@
         setCart((prev) => [...prev, { productId: newProduct.id, product: newProduct, qty: 1, weightPerBaleKg: defaultWeight }]);
       },
       onError: (error: Error) => {
+        if (error?._handledGlobally) return;
         toast({ title: "Error", description: error.message, variant: "destructive" });
       },
     });
@@ -377,6 +378,7 @@
         printLabels(result.bales);
       },
       onError: (error: Error) => {
+        if (error?._handledGlobally) return;
         if ((error as any).name === "OfflineQueued") {
           // Offline: generate synthetic label data from cart without hitting the server
           const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -394,10 +396,6 @@
               });
             }
           }
-          toast({
-            title: "Saved offline",
-            description: `${syntheticLabels.length} bale(s) queued for sync. Printing labels now...`,
-          });
           discardCartDraft();
           setConfirmDialogOpen(false);
           setCart([]);
@@ -926,6 +924,7 @@
         queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       },
       onError: (err: Error) => {
+        if (err?._handledGlobally) return;
         toast({ title: "Import failed", description: err.message, variant: "destructive" });
       },
       onSettled: () => setImportingNames(false),
@@ -955,6 +954,7 @@
         queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
       },
       onError: (err: Error) => {
+        if (err?._handledGlobally) return;
         toast({ title: "Reimport failed", description: err.message, variant: "destructive" });
       },
       onSettled: () => setReimporting(false),
@@ -1153,6 +1153,7 @@
         setRemoveDialogOpen(false);
       },
       onError: (error: Error) => {
+        if (error?._handledGlobally) return;
         setAuthError(error.message);
       },
     });
@@ -1717,6 +1718,7 @@
         if (fileInputRef.current) fileInputRef.current.value = "";
       },
       onError: (error: Error) => {
+        if (error?._handledGlobally) return;
         toast({ title: "Import Error", description: error.message, variant: "destructive" });
       },
     });

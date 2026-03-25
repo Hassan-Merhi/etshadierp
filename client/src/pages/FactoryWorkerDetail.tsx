@@ -338,7 +338,7 @@ export default function FactoryWorkerDetail() {
       setAdvanceCashAccountId("");
       setShowAdvanceForm(false);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const repaymentMutation = useMutation({
@@ -356,12 +356,12 @@ export default function FactoryWorkerDetail() {
       setRepayNotes("");
       setRepayCashAccountId("");
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const deleteAdvanceMutation = useMutation({
     mutationFn: async (advanceId: number) => {
-      const res = await fetch(`/api/factory/advances/${advanceId}`, { method: "DELETE", credentials: "include" });
+      const res = await apiRequest("DELETE", `/api/factory/advances/${advanceId}`);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
       return res.json();
     },
@@ -369,12 +369,12 @@ export default function FactoryWorkerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "advances"] });
       toast({ title: "Advance deleted" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const deleteDocMutation = useMutation({
     mutationFn: async (docId: number) => {
-      const res = await fetch(`/api/factory/workers/${workerId}/documents/${docId}`, { method: "DELETE", credentials: "include" });
+      const res = await apiRequest("DELETE", `/api/factory/workers/${workerId}/documents/${docId}`);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
       return res.json();
     },
@@ -382,7 +382,7 @@ export default function FactoryWorkerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId, "documents"] });
       toast({ title: "Document deleted" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -420,7 +420,7 @@ export default function FactoryWorkerDetail() {
       toast({ title: "Marked as paid" });
       setPayOpen(false); setPayTargetId(null); setPayCashAccountId("");
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

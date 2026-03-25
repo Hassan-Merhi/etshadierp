@@ -87,7 +87,7 @@ export default function FactoryEmployees() {
       setCreateOpen(false);
       setFormData({ ...emptyForm });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
   const updateMutation = useMutation({
@@ -105,7 +105,7 @@ export default function FactoryEmployees() {
       toast({ title: "Employee updated" });
       setEditingEmployee(null);
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
   const filtered = employees.filter((e) => {

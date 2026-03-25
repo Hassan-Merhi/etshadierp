@@ -179,7 +179,7 @@ export default function FactoryEmployeeDetail() {
       toast({ title: "Employee updated" });
       setEditOpen(false);
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
   const depositMutation = useMutation({
@@ -198,7 +198,7 @@ export default function FactoryEmployeeDetail() {
       setDepositOpen(false);
       setDepositAmount(""); setDepositNotes("");
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
   const withdrawMutation = useMutation({
@@ -217,7 +217,7 @@ export default function FactoryEmployeeDetail() {
       setWithdrawOpen(false);
       setWithdrawAmount(""); setWithdrawNotes(""); setWithdrawCashAccountId("");
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
 
   const bulkPayrollMutation = useMutation({
@@ -242,7 +242,10 @@ export default function FactoryEmployeeDetail() {
       setPayrollAmounts({});
       setPayrollNotes("");
     },
-    onError: (e: any) => toast({ variant: "destructive", title: e.message }),
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: e.message });
+    },
   });
 
   if (!employeeId) return <div className="p-8 text-muted-foreground">Invalid employee ID</div>;

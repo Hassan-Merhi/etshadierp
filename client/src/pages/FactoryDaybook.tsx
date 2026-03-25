@@ -472,7 +472,10 @@ export default function FactoryDaybook() {
       setEditReason("");
       toast({ title: "Entry updated", description: "Description synced to source record." });
     },
-    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const voidMutation = useMutation({
@@ -490,7 +493,10 @@ export default function FactoryDaybook() {
       setVoidEntry(null);
       toast({ title: "Voucher voided", description: "All accounting entries have been reversed." });
     },
-    onError: (e: any) => toast({ title: "Void failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Void failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const openEditDialog = (entry: DaybookEntry) => {

@@ -291,7 +291,10 @@ export default function FactorySuppliers() {
       return res.json() as Promise<BulkFxPreview>;
     },
     onSuccess: (data) => { setBulkFxPreview(data); },
-    onError: (err: Error) => { toast({ title: "Preview failed", description: err.message, variant: "destructive" }); },
+    onError: (err: Error) => { 
+      if (err?._handledGlobally) return;
+      toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const bulkFxMutation = useMutation({
@@ -326,6 +329,7 @@ export default function FactorySuppliers() {
       toast({ title: "Bulk FX Settlement recorded", description: `${data.transfers?.length} transfer(s) created, ${bulkFxForm.fromCurrencyCode} ${parseFloat(data.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} settled` });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -385,6 +389,7 @@ export default function FactorySuppliers() {
       setFxConversionOpen(false);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -420,6 +425,7 @@ export default function FactorySuppliers() {
       setPaymentDialogSupplier(null);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -437,6 +443,7 @@ export default function FactorySuppliers() {
       toast({ title: "Payment deleted" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -453,6 +460,7 @@ export default function FactorySuppliers() {
       toast({ title: "OB commission deleted" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -472,6 +480,7 @@ export default function FactorySuppliers() {
       toast({ title: "FX settlement reversed" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -494,6 +503,7 @@ export default function FactorySuppliers() {
       toast({ title: "Commission updated" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -527,6 +537,7 @@ export default function FactorySuppliers() {
       setCreateOpen(false);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -547,6 +558,7 @@ export default function FactorySuppliers() {
       setEditingSupplier(null);
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -565,6 +577,7 @@ export default function FactorySuppliers() {
       toast({ title: "Deleted", description: "Supplier deactivated" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -583,6 +596,7 @@ export default function FactorySuppliers() {
       toast({ title: "Deleted", description: "Supplier permanently removed" });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -603,6 +617,7 @@ export default function FactorySuppliers() {
       toast({ title: "Saved", description: "Opening balance updated." });
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

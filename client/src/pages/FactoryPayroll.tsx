@@ -201,6 +201,7 @@ export default function FactoryPayrollPage() {
       toast({ title: "Payroll generated", description: `${data.length} payroll records created.` });
     },
     onError: (e: any) => {
+      if (e?._handledGlobally) return;
       toast({ title: "Generation failed", description: e.message, variant: "destructive" });
     },
   });
@@ -217,6 +218,7 @@ export default function FactoryPayrollPage() {
       toast({ title: "Payroll updated" });
     },
     onError: (e: any) => {
+      if (e?._handledGlobally) return;
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
     },
   });

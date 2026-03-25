@@ -97,6 +97,7 @@ export default function FactorySettings() {
       }
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -112,6 +113,7 @@ export default function FactorySettings() {
       queryClient.invalidateQueries({ queryKey: ['/api/factory/bale-products'] });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -142,6 +144,7 @@ export default function FactorySettings() {
       });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
   });
@@ -171,6 +174,7 @@ export default function FactorySettings() {
       }
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
   });
@@ -203,6 +207,7 @@ export default function FactorySettings() {
       });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
   });
@@ -229,6 +234,7 @@ export default function FactorySettings() {
       toast({ title: "Settings saved", description: "Factory settings have been updated successfully." });
     },
     onError: (error: Error) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

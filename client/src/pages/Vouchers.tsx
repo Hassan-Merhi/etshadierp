@@ -1341,10 +1341,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           notes: "",
           optional: false,
         });
-        toast({ title: "Saved offline", description: "Will sync when connected — shown in daybook" });
         return;
       }
       const isEditMode = !!voucherIdToEdit;
+      if ((error as any)._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || `Failed to ${isEditMode ? "update" : "create"} voucher`,
@@ -2014,10 +2014,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           notes: "",
           optional: false,
         });
-        toast({ title: "Saved offline", description: "Will sync when connected — shown in daybook" });
         return;
       }
       const isEditMode = !!voucherIdToEdit;
+      if ((error as any)._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || `Failed to ${isEditMode ? "update" : "create"} journal voucher`,
@@ -2228,6 +2228,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -2258,6 +2259,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -2288,6 +2290,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       setImportNotes("");
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,
@@ -2716,6 +2719,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
@@ -3244,6 +3248,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",

@@ -84,6 +84,7 @@ export default function FactoryInvoices() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -102,6 +103,7 @@ export default function FactoryInvoices() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
     },
     onError: (error: any) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Cannot Revert", description: error.message, variant: "destructive" });
     },
   });

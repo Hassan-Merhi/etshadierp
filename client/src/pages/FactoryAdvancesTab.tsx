@@ -170,7 +170,10 @@ function AdvancesView() {
       setPostAccountingOpen(false);
       setPostCashAccountId("");
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const createMutation = useMutation({
@@ -193,7 +196,10 @@ function AdvancesView() {
       setAddOpen(false);
       setForm({ workerId: "", advanceDate: new Date().toISOString().split("T")[0], amount: "", cashAccountId: "", notes: "", repaymentType: "salary_deduction" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -208,7 +214,10 @@ function AdvancesView() {
       toast({ title: "Advance deleted" });
       setDeleteTarget(null);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const bulkMutation = useMutation({
@@ -236,7 +245,10 @@ function AdvancesView() {
       setBulkSelected(new Set());
       setBulkForm({ advanceDate: new Date().toISOString().split("T")[0], cashAccountId: "", repaymentType: "salary_deduction", notes: "" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const filtered = useMemo(() => {

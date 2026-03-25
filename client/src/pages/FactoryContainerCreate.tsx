@@ -149,6 +149,7 @@ export default function FactoryContainerCreate() {
       navigate("/factory/containers");
     },
     onError: (err: Error) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

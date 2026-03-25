@@ -256,7 +256,7 @@ export default function FactoryBaleRelabeling() {
       setValidationResults(data.results);
       setStep("validate");
     },
-    onError: (e: any) => toast({ title: "Validation failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Validation failed", description: e.message, variant: "destructive" }); },
   });
 
   const applyMutation = useMutation({
@@ -275,7 +275,7 @@ export default function FactoryBaleRelabeling() {
       setStep("done");
       toast({ title: "Relabeling applied", description: `${data.items.length} bales recoded successfully` });
     },
-    onError: (e: any) => toast({ title: "Apply failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Apply failed", description: e.message, variant: "destructive" }); },
   });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

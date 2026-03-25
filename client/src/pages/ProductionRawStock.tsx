@@ -273,7 +273,7 @@ export default function ProductionRawStock() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       toast({ title: "Used kg recalculated", description: data.message });
     },
-    onError: (err: any) => toast({ title: "Recalculate failed", description: err.message, variant: "destructive" }),
+    onError: (err: any) => { if (err?._handledGlobally) return; toast({ title: "Recalculate failed", description: err.message, variant: "destructive" }); },
   });
 
   const { data: availableContainers } = useQuery<ContainerOption[]>({
@@ -333,6 +333,7 @@ export default function ProductionRawStock() {
       toast({ title: "Consumption recorded", description: "Daily usage logged. Carry-forward batches created where needed." });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -351,6 +352,7 @@ export default function ProductionRawStock() {
       toast({ title: "Batch deleted", description: "Mix batch deleted. Bales have been unlinked." });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -374,6 +376,7 @@ export default function ProductionRawStock() {
       toast({ title: "Success", description: `Assigned ${data.balesUpdated} bale(s) (${data.totalKg.toFixed(3)} kg) to OB stock` });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -395,6 +398,7 @@ export default function ProductionRawStock() {
       toast({ title: "Deleted", description: "Opening balance removed. Bales remain intact." });
     },
     onError: (err: any) => {
+      if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDeleteObDialogOpen(false);
     },
@@ -480,6 +484,7 @@ export default function ProductionRawStock() {
       handleCloseDialog();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -666,6 +671,7 @@ export default function ProductionRawStock() {
       setConfirmDutyNotes("");
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -693,6 +699,7 @@ export default function ProductionRawStock() {
       handleCloseObDialog();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -727,6 +734,7 @@ export default function ProductionRawStock() {
       toast({ title: "Recalculated", description: data.message || "Remaining balances updated" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
