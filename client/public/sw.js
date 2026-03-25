@@ -10,6 +10,11 @@ self.addEventListener("install", (event) => {
 });
 
 // ── Activate: prune old caches ────────────────────────────────────────────────
+// NOTE: No clients.claim() here. Claiming all clients immediately when the SW
+// updates disrupts every open tab at once (cache cleared mid-session → all
+// in-flight requests re-routed → connectivity blip → all queries refetch).
+// Instead we let existing pages finish their session under the old SW.
+// New navigations / new tabs automatically pick up this SW straight away.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -17,7 +22,6 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
       )
-      .then(() => self.clients.claim())
   );
 });
 
@@ -129,7 +133,16 @@ async function staleWhileRevalidate(request) {
     })
     .catch(() => null);
 
-  return cached || fetchPromise;
+  // If there is no cached version, await the network. Guard against the network
+  // returning null (offline failure) — return a proper 503 so the browser sees
+  // a meaningful failure rather than an invalid null Response.
+  if (cached) return cached;
+  const networkResponse = await fetchPromise;
+  if (networkResponse) return networkResponse;
+  return new Response("Asset unavailable", {
+    status: 503,
+    headers: { "Content-Type": "text/plain" },
+  });
 }
 
 // ── Background sync (triggered by ConnectivityContext) ────────────────────────
