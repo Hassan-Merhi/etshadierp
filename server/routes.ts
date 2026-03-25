@@ -11769,7 +11769,7 @@ if (asOfDate) {
       const poIds = purchaseOrders.map(po => po.id);
       const [[offloadRecord], allPoLineItems] = await Promise.all([
         db.select().from(containerOffloads).where(eq(containerOffloads.containerId, containerId)).limit(1).execute(),
-        poIds.length > 0 ? db.select().from(poLineItems).where(inArray(poLineItems.purchaseOrderId, poIds)).execute() : [],
+        poIds.length > 0 ? db.select().from(poLineItems).where(inArray(poLineItems.poId, poIds)).execute() : [],
       ]);
 
       const poStockIds = [...new Set(allPoLineItems.map(li => li.stockItemId).filter(Boolean) as number[])];
@@ -11786,9 +11786,9 @@ if (asOfDate) {
       const stockMap = new Map([...poStockRows, ...offloadStockRows].map(s => [s.id, s]));
       const lineItemsByPO = new Map<number, typeof allPoLineItems>();
       for (const li of allPoLineItems) {
-        const arr = lineItemsByPO.get(li.purchaseOrderId!) || [];
+        const arr = lineItemsByPO.get(li.poId!) || [];
         arr.push(li);
-        lineItemsByPO.set(li.purchaseOrderId!, arr);
+        lineItemsByPO.set(li.poId!, arr);
       }
 
       const posWithItems = purchaseOrders.map(po => {

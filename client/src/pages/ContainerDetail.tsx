@@ -224,6 +224,7 @@ export default function ContainerDetail() {
     try {
       const response = await fetch(`/api/containers/${containerId}/export`);
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Export failed");
 
       const rows: { Code: string; Name: string; Qty: string; Rate: string; Value: string }[] = [];
       for (const po of data.purchaseOrders || []) {
