@@ -12,6 +12,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { enqueueRequest } from "@/lib/offlineQueue";
 
 export function CompanySelector() {
   const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
@@ -22,10 +23,19 @@ export function CompanySelector() {
     if (company.id === selectedCompany?.id) return;
 
     if (!isOnline) {
+      // Update local context + localStorage immediately so UI reflects new company
+      selectCompany(company);
+      // Queue the session update — plays back first when reconnected, before any
+      // subsequent mutations, so they land under the correct company on the server
+      enqueueRequest(
+        "/api/auth/set-company",
+        "POST",
+        JSON.stringify({ companyId: company.id }),
+        `Switch to ${company.name}`
+      );
       toast({
-        title: "Cannot switch company while offline",
-        description: "Your queued work will stay saved. Reconnect to the internet, then switch companies.",
-        variant: "destructive",
+        title: `Switched to ${company.name}`,
+        description: "Your work will be saved under this company. The data view will refresh when you reconnect.",
       });
       return;
     }
@@ -80,7 +90,7 @@ export function CompanySelector() {
           <>
             <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
               <WifiOff className="h-3 w-3 shrink-0" />
-              Switching unavailable offline
+              Offline — switch will sync on reconnect
             </div>
             <DropdownMenuSeparator />
           </>
@@ -91,7 +101,6 @@ export function CompanySelector() {
             key={company.id}
             onClick={() => handleCompanyChange(company)}
             data-testid={`company-option-${company.id}`}
-            disabled={!isOnline && company.id !== selectedCompany.id}
           >
             <div className="flex items-center justify-between w-full">
               <span>{company.name}</span>

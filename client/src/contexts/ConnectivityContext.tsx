@@ -15,6 +15,7 @@ import {
   getConflictCount,
 } from "@/lib/db";
 import { getQueue } from "@/lib/offlineQueue";
+import { queryClient } from "@/lib/queryClient";
 
 export type ConnectivityStatus = "online" | "offline" | "syncing" | "error";
 
@@ -190,6 +191,9 @@ export function ConnectivityProvider({ children }: Props) {
       if (evt.detail.lastSyncedAt) {
         setLastSyncedAt(evt.detail.lastSyncedAt);
         void upsertGlobalSyncState({ lastSyncedAt: evt.detail.lastSyncedAt });
+        // Invalidate all data queries so the UI reflects server state after sync
+        // (covers company switches and any mutations applied while offline)
+        void queryClient.invalidateQueries();
       }
       void refreshCounts();
     };

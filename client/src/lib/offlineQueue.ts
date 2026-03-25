@@ -107,6 +107,8 @@ export function setLastSynced(): void {
 }
 
 const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
+  // Session
+  { method: "POST", pattern: /^\/api\/auth\/set-company$/ },
   // POS
   { method: "POST",  pattern: /^\/api\/pos\/sales$/ },
   { method: "POST",  pattern: /^\/api\/pos\/drafts$/ },
