@@ -137,6 +137,7 @@ export default function POImport() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -167,6 +168,7 @@ export default function POImport() {
       }
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -190,6 +192,7 @@ export default function POImport() {
       setShowPrintDialog(true);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,

@@ -52,6 +52,7 @@ export default function BarcodeLookup() {
       setReferenceResult(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Not Found",
         description: error.message,
@@ -75,6 +76,7 @@ export default function BarcodeLookup() {
       setArticleResult(null);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Not Found",
         description: error.message,
@@ -100,6 +102,7 @@ export default function BarcodeLookup() {
       toast({ title: "Scanned", description: "Label marked as scanned" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

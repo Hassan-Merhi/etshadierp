@@ -97,6 +97,7 @@ export function StockItemCreateDialog({
       onOpenChange(false);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create stock item",

@@ -22,6 +22,7 @@ export default function Login() {
       window.location.href = "/";
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Login Failed",
         description: error.message || "Invalid username or password",

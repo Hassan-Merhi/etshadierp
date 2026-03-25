@@ -297,6 +297,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
       onBack();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

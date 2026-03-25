@@ -1222,6 +1222,7 @@ export default function Payroll() {
       setSelectedWorkerForEdit(null);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       // Don't show toast for 409 - let the confirmation dialog handle it
       if (error.status !== 409) {
         toast({
@@ -1355,6 +1356,7 @@ export default function Payroll() {
       setEmployeeToDelete(null);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       // Don't show toast for 409 - let the confirmation dialog handle it
       if (error.status !== 409) {
         toast({

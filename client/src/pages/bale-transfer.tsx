@@ -46,6 +46,7 @@ export default function BaleTransferPage() {
       setNotes("");
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -59,6 +60,7 @@ export default function BaleTransferPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bale-transfers"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

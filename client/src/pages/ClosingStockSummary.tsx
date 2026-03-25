@@ -91,6 +91,7 @@ export default function ClosingStockSummary() {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/opening-stock-summary"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Failed",
         description: error.message || "Failed to carry forward closing stock",

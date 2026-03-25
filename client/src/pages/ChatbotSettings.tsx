@@ -67,6 +67,7 @@ export default function ChatbotSettings() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update chatbot access",
@@ -88,6 +89,7 @@ export default function ChatbotSettings() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update AI provider",

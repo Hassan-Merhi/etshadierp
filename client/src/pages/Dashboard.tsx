@@ -264,6 +264,7 @@ export default function Dashboard() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to add account",
@@ -287,6 +288,7 @@ export default function Dashboard() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to remove account",
@@ -312,6 +314,7 @@ export default function Dashboard() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to add payable account",
@@ -338,6 +341,7 @@ export default function Dashboard() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to remove payable account",

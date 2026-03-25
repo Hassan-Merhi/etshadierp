@@ -146,6 +146,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
         toast({ title: "Saved", description: "Parent credit account updated" });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({ title: "Error", description: error.message, variant: "destructive" });
       },
     });
@@ -167,6 +168,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
         setNewAccountName("");
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({ title: "Error creating account", description: error.message, variant: "destructive" });
       },
     });
@@ -285,6 +287,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
         setIsEditing(false);
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to update adjustment",
@@ -580,6 +583,7 @@ function DataToolsTab() {
       });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update UOM",
@@ -601,6 +605,7 @@ function DataToolsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -1422,6 +1427,7 @@ function PosSettingsTab() {
       toast({ title: "Updated", description: "POS Excel Import setting has been saved." });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -1504,6 +1510,7 @@ function FileStorageTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     },
   });
@@ -1516,6 +1523,7 @@ function FileStorageTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     },
   });
@@ -2798,6 +2806,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to update permission",
@@ -2827,6 +2836,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to update parent company setting",
@@ -2960,6 +2970,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to save company",
@@ -2983,6 +2994,7 @@ function OfflineSyncPanel() {
         setCompanyToDelete(null);
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to delete company",
@@ -3016,6 +3028,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to save user",
@@ -3038,6 +3051,7 @@ function OfflineSyncPanel() {
         setUserToDelete(null);
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to delete user",
@@ -3060,6 +3074,7 @@ function OfflineSyncPanel() {
         setNewPasswordForReset("");
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to reset password",
@@ -3082,6 +3097,7 @@ function OfflineSyncPanel() {
         setChangePasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to change password",
@@ -3126,6 +3142,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to save role",
@@ -3149,6 +3166,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to delete role",
@@ -3172,6 +3190,7 @@ function OfflineSyncPanel() {
         setSelectedAccountsToZero([]);
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to zero balances",
@@ -3195,6 +3214,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         console.error("Initialize balances error:", error);
         toast({
           title: "Error",
@@ -3221,6 +3241,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         console.error("Fix PO credits error:", error);
         toast({
           title: "Error",
@@ -3246,6 +3267,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: ["/api/import-cycle-balance"] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         console.error("Fix parent PO supplier entries error:", error);
         toast({
           title: "Error",
@@ -3271,6 +3293,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         console.error("Reset company data error:", error);
         toast({
           title: "Error",
@@ -3295,6 +3318,7 @@ function OfflineSyncPanel() {
         queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         console.error("Reverse PO credits error:", error);
         toast({
           title: "Error",
@@ -3349,6 +3373,7 @@ function OfflineSyncPanel() {
         });
       },
       onError: (error: any) => {
+        if ((error as any)?._handledGlobally) return;
         toast({
           title: "Error",
           description: error.message || "Failed to update permission",

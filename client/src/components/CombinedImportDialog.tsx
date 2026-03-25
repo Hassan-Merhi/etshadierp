@@ -43,6 +43,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       setIsProcessing(false);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to import prices",
@@ -68,6 +69,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       onOpenChange(false);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to import opening balances",

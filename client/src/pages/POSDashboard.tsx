@@ -172,6 +172,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to open shift",
@@ -205,6 +206,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to close shift",

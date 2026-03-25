@@ -156,6 +156,7 @@ export default function ContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -249,6 +250,7 @@ export default function ContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -263,6 +265,7 @@ export default function ContainerLoadingScan() {
       navigate("/factory/sales/pending-invoices");
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
     },

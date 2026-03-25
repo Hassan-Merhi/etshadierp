@@ -379,6 +379,7 @@ export function OffloadDialog({
       setLocation("/containers");
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Offload failed",
         description: error.message,

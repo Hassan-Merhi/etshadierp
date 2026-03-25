@@ -58,6 +58,7 @@ export default function CompanyDataReset() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Reset Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -78,6 +79,7 @@ export default function CompanyDataReset() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Undo Failed", description: error.message, variant: "destructive" });
     },
   });

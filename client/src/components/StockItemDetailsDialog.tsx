@@ -163,6 +163,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update stock item",
@@ -190,6 +191,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update transaction",
@@ -214,6 +216,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create code alias",
@@ -235,6 +238,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete code alias",
@@ -259,6 +263,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Failed",
         description: error.message || "Failed to save location price",
@@ -280,6 +285,7 @@ export function StockItemDetailsDialog({
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete location price",

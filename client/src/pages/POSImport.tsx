@@ -124,6 +124,7 @@ export default function POSImport() {
       });
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -154,6 +155,7 @@ export default function POSImport() {
       }
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -203,6 +205,7 @@ export default function POSImport() {
       setShowPrintDialog(true);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,
@@ -246,6 +249,7 @@ export default function POSImport() {
       setShowPrintDialog(true);
     },
     onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
       toast({
         title: "Credit Import error",
         description: error.message,

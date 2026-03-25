@@ -129,6 +129,7 @@ export default function CustomerInvoiceCreate() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -146,6 +147,7 @@ export default function CustomerInvoiceCreate() {
       scannerRef.current?.focus();
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       setScanFlash("error");
       setTimeout(() => setScanFlash(null), 500);
       toast({ title: "Scan Error", description: error.message, variant: "destructive" });
@@ -163,6 +165,7 @@ export default function CustomerInvoiceCreate() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -178,6 +181,7 @@ export default function CustomerInvoiceCreate() {
       toast({ title: "Charge added" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -191,6 +195,7 @@ export default function CustomerInvoiceCreate() {
       toast({ title: "Charge removed" });
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,6 +210,7 @@ export default function CustomerInvoiceCreate() {
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
     },
