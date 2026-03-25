@@ -337,6 +337,15 @@ export async function runOfflinePrep(
       try {
         const res = await fetch(dataset.endpoint, { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Guard against HTML responses (e.g. SPA catch-all served instead of JSON)
+        const ct = res.headers.get("content-type") ?? "";
+        if (!ct.includes("json")) {
+          // Non-fatal: some endpoints aren't relevant in factory-only mode
+          results.push({ datasetId: dataset.id, label: dataset.label, packId: pack.id, success: true, count: 0 });
+          continue;
+        }
+
         const raw = await res.json();
 
         // Offline-error marker

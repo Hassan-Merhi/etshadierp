@@ -551,6 +551,27 @@ let migrationsDone = false;
     )`,
     // Factory waste type column (missed in original factory_waste_entries creation)
     `ALTER TABLE factory_waste_entries ADD COLUMN IF NOT EXISTS waste_type varchar(50)`,
+    // POS draft sales (saved cart state for POS users)
+    `CREATE TABLE IF NOT EXISTS draft_pos_sales (
+      id serial PRIMARY KEY,
+      user_id varchar(255) NOT NULL,
+      location_id integer NOT NULL,
+      payment_account_type text,
+      payment_account_id integer,
+      is_credit_sale boolean DEFAULT false,
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS draft_pos_sale_items (
+      id serial PRIMARY KEY,
+      draft_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      quantity decimal(15,3) NOT NULL,
+      rate decimal(15,2) NOT NULL,
+      amount decimal(15,2) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
