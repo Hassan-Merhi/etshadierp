@@ -1289,7 +1289,9 @@ export default function FactoryLocationInventory() {
   const allCategoryNamesForProducts = isAllItems
     ? [...new Set(selectedCategory.products.map((p) => p.category || ""))].filter(Boolean).sort()
     : [];
-  const colSpanAll = (isAllItems ? (proformaMode ? 13 : 11) : (proformaMode ? 12 : 10)) - (hideAvgRate ? 2 : 0) - (hideTotalValue ? 2 : 0);
+  const colSpanAll = proformaMode
+    ? (isAllItems ? 9 : 8) + (!hideAvgRate ? 1 : 0) + (!hideTotalValue ? 1 : 0)
+    : (isAllItems ? 7 : 6) + (!hideAvgRate ? 2 : 0) + (!hideTotalValue ? 2 : 0);
   const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
 
   return (
@@ -1584,22 +1586,22 @@ export default function FactoryLocationInventory() {
         </div>
 
         <div className="hidden md:block space-y-0 w-full">
-          <div className="rounded-md border overflow-hidden w-full">
-            <table className="w-full table-fixed text-sm">
+          <div className="rounded-md border overflow-x-auto w-full">
+            <table className="table-fixed text-sm" style={{ minWidth: "900px", width: "100%" }}>
               <colgroup>
                 {proformaMode && <col style={{ width: "36px" }} />}
                 {isAllItems && <col style={{ width: "120px" }} />}
                 <col style={{ width: "110px" }} />
-                <col style={{ minWidth: "160px" }} />
+                <col style={{ minWidth: "180px" }} />
                 <col style={{ width: "70px" }} />
                 {proformaMode && <col style={{ width: "80px" }} />}
                 {proformaMode && <col style={{ width: "110px" }} />}
+                <col style={{ width: "110px" }} />
+                {!hideAvgRate && !proformaMode && <col style={{ width: "110px" }} />}
+                {!hideAvgRate && <col style={{ width: "110px" }} />}
+                {!hideTotalValue && !proformaMode && <col style={{ width: "130px" }} />}
+                {!hideTotalValue && <col style={{ width: "130px" }} />}
                 <col style={{ width: "100px" }} />
-                {!hideAvgRate && <col style={{ width: "100px" }} />}
-                {!hideAvgRate && <col style={{ width: "100px" }} />}
-                {!hideTotalValue && <col style={{ width: "120px" }} />}
-                {!hideTotalValue && <col style={{ width: "120px" }} />}
-                <col style={{ width: "90px" }} />
                 {!proformaMode && <col style={{ width: "44px" }} />}
               </colgroup>
               <thead className="bg-muted/50 sticky top-0 z-10">
@@ -1612,9 +1614,9 @@ export default function FactoryLocationInventory() {
                   {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                   {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                   <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                  {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
+                  {!hideAvgRate && !proformaMode && <th className="text-right px-3 font-medium">Cost/Bale</th>}
                   {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
-                  {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                  {!hideTotalValue && !proformaMode && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
                   {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                   <th className="text-right px-3 font-medium">Total KG</th>
                   {!proformaMode && <th></th>}
@@ -1664,9 +1666,9 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                          {!hideAvgRate && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
                           {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
+                          {!hideTotalValue && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                           {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
@@ -1693,9 +1695,9 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <td></td>}
                       {proformaMode && <td></td>}
                       <td className="text-right px-3 font-mono"></td>
+                      {!hideAvgRate && !proformaMode && <td className="text-right px-3 font-mono"></td>}
                       {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                      {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
+                      {!hideTotalValue && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(totalCost)}</td>}
                       {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(totalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
                       {!proformaMode && <td></td>}
@@ -1709,22 +1711,22 @@ export default function FactoryLocationInventory() {
           {isAllItems && specialProducts.length > 0 && (
             <div className="mt-6">
               <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
-              <div className="rounded-md border overflow-hidden w-full">
-                <table className="w-full table-fixed text-sm">
+              <div className="rounded-md border overflow-x-auto w-full">
+                <table className="table-fixed text-sm" style={{ minWidth: "900px", width: "100%" }}>
                   <colgroup>
                     {proformaMode && <col style={{ width: "36px" }} />}
                     <col style={{ width: "120px" }} />
                     <col style={{ width: "110px" }} />
-                    <col style={{ minWidth: "160px" }} />
+                    <col style={{ minWidth: "180px" }} />
                     <col style={{ width: "70px" }} />
                     {proformaMode && <col style={{ width: "80px" }} />}
                     {proformaMode && <col style={{ width: "110px" }} />}
+                    <col style={{ width: "110px" }} />
+                    {!hideAvgRate && !proformaMode && <col style={{ width: "110px" }} />}
+                    {!hideAvgRate && <col style={{ width: "110px" }} />}
+                    {!hideTotalValue && !proformaMode && <col style={{ width: "130px" }} />}
+                    {!hideTotalValue && <col style={{ width: "130px" }} />}
                     <col style={{ width: "100px" }} />
-                    {!hideAvgRate && <col style={{ width: "100px" }} />}
-                    {!hideAvgRate && <col style={{ width: "100px" }} />}
-                    {!hideTotalValue && <col style={{ width: "120px" }} />}
-                    {!hideTotalValue && <col style={{ width: "120px" }} />}
-                    <col style={{ width: "90px" }} />
                     {!proformaMode && <col style={{ width: "44px" }} />}
                   </colgroup>
                   <thead className="bg-muted/50 sticky top-0 z-10">
@@ -1737,9 +1739,9 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                       {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                       <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
-                      {!hideAvgRate && <th className="text-right px-3 font-medium">Cost/Bale</th>}
+                      {!hideAvgRate && !proformaMode && <th className="text-right px-3 font-medium">Cost/Bale</th>}
                       {!hideAvgRate && <th className="text-right px-3 font-medium">Sell Price</th>}
-                      {!hideTotalValue && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
+                      {!hideTotalValue && !proformaMode && <th className="text-right px-3 font-medium">Cost/Total Value</th>}
                       {!hideTotalValue && <th className="text-right px-3 font-medium">Sell/Total Value</th>}
                       <th className="text-right px-3 font-medium">Total KG</th>
                       {!proformaMode && <th></th>}
@@ -1781,9 +1783,9 @@ export default function FactoryLocationInventory() {
                             </td>
                           )}
                           <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-                          {!hideAvgRate && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
+                          {!hideAvgRate && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(avgRate)}</td>}
                           {!hideAvgRate && <td className="text-right px-3 font-mono text-primary">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-                          {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
+                          {!hideTotalValue && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(prod.totalCost)}</td>}
                           {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
                           <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
                           {!proformaMode && (
@@ -1810,9 +1812,9 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <td></td>}
                       {proformaMode && <td></td>}
                       <td className="text-right px-3 font-mono"></td>
+                      {!hideAvgRate && !proformaMode && <td className="text-right px-3 font-mono"></td>}
                       {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                      {!hideAvgRate && <td className="text-right px-3 font-mono"></td>}
-                      {!hideTotalValue && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalCost)}</td>}
+                      {!hideTotalValue && !proformaMode && <td className="text-right px-3 font-mono">{formatAmount(spProdTotalCost)}</td>}
                       {!hideTotalValue && <td className="text-right px-3 font-mono text-primary">{formatAmount(spProdTotalSellValue)}</td>}
                       <td className="text-right px-3 font-mono">{fmt(spProdTotalKg)}</td>
                       {!proformaMode && <td></td>}
