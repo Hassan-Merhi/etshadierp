@@ -1,9 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, Eye, ExternalLink, List, AlignJustify, Package, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
+  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
+  LayoutList, Layers,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +19,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -23,24 +33,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
+import { utils, writeFile } from "@/lib/excelHelper";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { cn } from "@/lib/utils";
+import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 
 interface DaybookEntry {
   id: number;
@@ -78,19 +83,11 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
   }
 }
 
-function renderBaleStockAmount(entry: DaybookEntry, sym: string, amt: number): string {
-  return `${sym}${formatNumber(amt)}`;
-}
-
 function formatDaybookDescription(entry: DaybookEntry): string {
   if (entry.txType === "BALE_STOCK_ENTRY") {
     const bales = parseBalesMeta(entry);
-    if (bales.length === 1) {
-      return bales[0].productName || bales[0].ref || "Unknown";
-    }
-    if (bales.length > 1) {
-      return `${bales.length} bales`;
-    }
+    if (bales.length === 1) return bales[0].productName || bales[0].ref || "Unknown";
+    if (bales.length > 1) return `${bales.length} bales`;
     return entry.description
       .replace(/^Stock entry:\s*/i, "")
       .replace(/\d+ bales? - /i, "")
@@ -158,6 +155,55 @@ function formatTxType(type: string): string {
   return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary" | "destructive" | "outline"; className?: string } {
+  switch (type) {
+    case "PAYMENT":
+    case "SUPPLIER_PAYMENT":
+    case "FREIGHT_PAYMENT":
+    case "PAYROLL_PAYMENT":
+      return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
+    case "RECEIPT":
+      return { variant: "outline", className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40" };
+    case "JOURNAL":
+      return { variant: "outline", className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40" };
+    case "INVOICE":
+      return { variant: "outline", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40" };
+    case "CONTAINER_IMPORT":
+      return { variant: "outline", className: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40" };
+    case "COMMISSION":
+    case "DUTY":
+      return { variant: "outline", className: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/40" };
+    case "BALE_PRESSING":
+    case "BALE_FINALIZE":
+      return { variant: "outline", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/40" };
+    case "BALE_STOCK_ENTRY":
+    case "BALE_IMPORT":
+    case "BALE_REIMPORT":
+    case "OPENING_BALANCE_RAW":
+      return { variant: "outline", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" };
+    case "BALE_REMOVAL":
+    case "BALE_TRANSFER":
+      return { variant: "outline", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40" };
+    case "OFFLOAD_RAW_STOCK":
+      return { variant: "outline", className: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40" };
+    case "FREIGHT_ADD":
+      return { variant: "outline", className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40" };
+    case "LOADING_CREATED":
+    case "LOADING_SUBMITTED":
+    case "ORDER_VERIFIED":
+      return { variant: "outline", className: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40" };
+    case "PAYROLL_GENERATED":
+    case "WORKER_CREATED":
+    case "WORKER_EDITED":
+    case "WORKER_IMPORT":
+    case "CONTRACT_ENDED":
+    case "CONTRACT_SETTLED":
+      return { variant: "outline", className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40" };
+    default:
+      return { variant: "outline" };
+  }
+}
+
 const VOUCHER_TX_TYPES: Record<string, string> = {
   PAYMENT: "payment",
   RECEIPT: "receipt",
@@ -165,6 +211,39 @@ const VOUCHER_TX_TYPES: Record<string, string> = {
   INVOICE: "receipt",
   FREIGHT_PAYMENT: "payment",
 };
+
+// ─── Factory Daybook sessionStorage persistence ───────────────────────────────
+const FACTORY_DAYBOOK_STATE_KEY = "factory-daybook-ui-state";
+
+interface FactoryDaybookUIState {
+  periodFilter: PeriodFilterValue;
+  txTypeFilter: string;
+  currencyFilter: string;
+  statusFilter: string;
+  searchQuery: string;
+  minAmount: string;
+  maxAmount: string;
+  hiddenRowIds: string[];
+  showHidden: boolean;
+  viewMode: "detailed" | "condensed";
+  scrollY: number;
+}
+
+function loadFactoryDaybookState(): FactoryDaybookUIState | null {
+  try {
+    const raw = sessionStorage.getItem(FACTORY_DAYBOOK_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as FactoryDaybookUIState;
+  } catch {
+    return null;
+  }
+}
+
+function saveFactoryDaybookState(state: FactoryDaybookUIState): void {
+  try {
+    sessionStorage.setItem(FACTORY_DAYBOOK_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
 
 function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   entry: DaybookEntry;
@@ -177,8 +256,6 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const isBaleRemoval = entry.txType === "BALE_REMOVAL";
   const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
 
-  // Use the view-entries endpoint — same as ERP Daybook — which returns
-  // normalized { id, accountName, debitAmount, creditAmount } shape.
   const { data: viewEntries = [] } = useQuery<any[]>({
     queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
     enabled: isVoucherBacked && !!entry.referenceId,
@@ -188,21 +265,19 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const amt = parseFloat(entry.amountCurrency || "0");
   const sym = currencySymbol(entry.currencyCode);
 
-  // Derived totals from actual entry amounts
   const totalDebit = viewEntries.reduce((s, e) => s + parseFloat(e.debitAmount || "0"), 0);
   const totalCredit = viewEntries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
 
+  const { variant: badgeVariant, className: badgeClass } = getFactoryTxTypeBadge(entry.txType);
+
   if (isVoucherBacked) {
-    // ── Voucher-backed: match ERP "Voucher Details" experience exactly ──
     return (
       <>
         <DialogHeader>
           <DialogTitle>Voucher Details</DialogTitle>
           <DialogDescription>View voucher information</DialogDescription>
         </DialogHeader>
-
         <div className="space-y-4 md:space-y-6">
-          {/* Date + Type metadata grid */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Date</p>
@@ -210,17 +285,13 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Type</p>
-              <Badge variant="default">{formatTxType(entry.txType)}</Badge>
+              <Badge variant={badgeVariant} className={badgeClass}>{formatTxType(entry.txType)}</Badge>
             </div>
           </div>
-
-          {/* Description */}
           <div>
             <p className="text-sm text-muted-foreground mb-1">Description</p>
             <p className="text-sm">{formatDaybookDescription(entry)}</p>
           </div>
-
-          {/* Entries table — same structure as ERP Journal rendering */}
           <div>
             <h3 className="font-semibold mb-3">Entries</h3>
             {viewEntries.length === 0 ? (
@@ -271,29 +342,24 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
     );
   }
 
-  // ── Non-voucher entry (bale stock, removals, etc.): keep original layout ──
   return (
     <>
       <DialogHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <DialogTitle>Transaction Details</DialogTitle>
-          <Badge variant="default">{formatTxType(entry.txType)}</Badge>
+          <Badge variant={badgeVariant} className={badgeClass}>{formatTxType(entry.txType)}</Badge>
         </div>
         <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
       </DialogHeader>
-
       <div className="space-y-4">
-        {/* Description */}
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
           <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
         </div>
-
-        {/* Amount summary */}
         <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">{renderBaleStockAmount(entry, sym, amt)}</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
           </div>
           {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
             <div className="text-right">
@@ -302,15 +368,11 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             </div>
           )}
         </div>
-
-        {/* Fallback for old bale removal entries without saved bale details */}
         {isBaleRemoval && bales.length === 0 && (
           <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
             Bale details were not recorded for this entry (created before bale tracking was enabled).
           </div>
         )}
-
-        {/* Bale list for stock entries and removals */}
         {hasBalesMeta && bales.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
@@ -348,50 +410,78 @@ export default function FactoryDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const today = new Date().toISOString().split("T")[0];
 
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-  });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
-  const daybookEditDays = currentUser?.daybookEditDays || 0;
-  const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
 
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
   const [txTypeFilter, setTxTypeFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState<"all" | "exclude" | "only">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+
+  // ── View/UX state ─────────────────────────────────────────────────────────
   const [isDetailed, setIsDetailed] = useState(false);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const scrollYRef = useRef(0);
+
+  // ── Dialog state ──────────────────────────────────────────────────────────
   const [editEntry, setEditEntry] = useState<DaybookEntry | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
   const [editAmountUsd, setEditAmountUsd] = useState("");
   const [editReason, setEditReason] = useState("");
   const [viewEntry, setViewEntry] = useState<DaybookEntry | null>(null);
-  const [optionalFilter, setOptionalFilter] = useState<"all" | "exclude" | "only">("all");
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
+  const [isExportingDetailed, setIsExportingDetailed] = useState(false);
 
-  // Keyboard date navigation: "-" = back 1 day, Shift+"+" = forward 1 day
+  // ── Derive API date params from periodFilter ──────────────────────────────
+  const startDate = periodFilter.fromDate;
+  const endDate = periodFilter.toDate;
+
+  // ── Keyboard date navigation ──────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog()) return;
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const fmt = "yyyy-MM-dd";
-      if (e.key === "-") {
+      const isBack = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+      if (isBack) {
         e.preventDefault();
-        setStartDate((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
-        setEndDate((prev) => format(addDays(new Date(prev + "T00:00:00"), -1), fmt));
-      } else if (e.key === "+" && e.shiftKey) {
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
+          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
+          preset: "custom",
+        }));
+      } else if (isForward) {
         e.preventDefault();
-        setStartDate((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
-        setEndDate((prev) => format(addDays(new Date(prev + "T00:00:00"), 1), fmt));
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
+          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
+          preset: "custom",
+        }));
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // ── Scroll selected row into view ─────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedRowId) return;
+    const el = document.querySelector(`[data-row-id="${selectedRowId}"]`);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "auto" });
+  }, [selectedRowId]);
+
+  // ── API query ─────────────────────────────────────────────────────────────
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.set("startDate", startDate);
   if (endDate) queryParams.set("endDate", endDate);
@@ -407,43 +497,110 @@ export default function FactoryDaybook() {
     },
   });
 
+  // ── Client-side filters (search, amount range, status) ────────────────────
   const filteredEntries = useMemo(() => {
-    if (optionalFilter === "exclude") return entries.filter((e) => !e.optional);
-    if (optionalFilter === "only") return entries.filter((e) => e.optional);
-    return entries;
-  }, [entries, optionalFilter]);
+    let result = entries;
+    if (statusFilter === "exclude") result = result.filter((e) => !e.optional);
+    else if (statusFilter === "only") result = result.filter((e) => e.optional);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((e) =>
+        formatDaybookDescription(e).toLowerCase().includes(q) ||
+        formatTxType(e.txType).toLowerCase().includes(q) ||
+        e.txType.toLowerCase().includes(q)
+      );
+    }
+    const minAmt = minAmount ? parseFloat(minAmount) : null;
+    const maxAmt = maxAmount ? parseFloat(maxAmount) : null;
+    if (minAmt !== null || maxAmt !== null) {
+      result = result.filter((e) => {
+        const amt = parseFloat(e.amountCurrency || "0");
+        if (minAmt !== null && amt < minAmt) return false;
+        if (maxAmt !== null && amt > maxAmt) return false;
+        return true;
+      });
+    }
+    return result;
+  }, [entries, statusFilter, searchQuery, minAmount, maxAmount]);
 
+  // Visible entries in detailed view (hide/unhide logic)
+  const visibleEntries = useMemo(() => {
+    if (showHidden) return filteredEntries;
+    return filteredEntries.filter((e) => !hiddenRowIds.has(String(e.id)));
+  }, [filteredEntries, hiddenRowIds, showHidden]);
+
+  // ── Keyboard navigation: arrows, Ctrl+H / Ctrl+U (detailed view only) ────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog()) return;
+      const tag = (document.activeElement?.tagName || "").toLowerCase();
+      const isEditable = document.activeElement?.getAttribute("contenteditable");
+      if (["input", "textarea", "select"].includes(tag) || isEditable) return;
+
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && isDetailed) {
+        e.preventDefault();
+        if (visibleEntries.length === 0) return;
+        const currentIndex = selectedRowId
+          ? visibleEntries.findIndex((en) => String(en.id) === selectedRowId)
+          : -1;
+        if (e.key === "ArrowDown") {
+          const next = currentIndex < visibleEntries.length - 1 ? currentIndex + 1 : 0;
+          setSelectedRowId(String(visibleEntries[next].id));
+        } else {
+          const prev = currentIndex > 0 ? currentIndex - 1 : visibleEntries.length - 1;
+          setSelectedRowId(String(visibleEntries[prev].id));
+        }
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "h" && isDetailed) {
+        e.preventDefault();
+        if (selectedRowId && !hiddenRowIds.has(selectedRowId)) {
+          const toHide = selectedRowId;
+          const nextVisible = visibleEntries.filter((en) => String(en.id) !== toHide);
+          const idx = visibleEntries.findIndex((en) => String(en.id) === toHide);
+          const nextSel = nextVisible[idx] ?? nextVisible[idx - 1] ?? null;
+          setHiddenRowIds((prev) => { const next = new Set(prev); next.add(toHide); return next; });
+          setSelectedRowId(nextSel ? String(nextSel.id) : null);
+        }
+        return;
+      }
+
+      if (e.ctrlKey && e.key === "u" && isDetailed) {
+        e.preventDefault();
+        if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
+          const rid = selectedRowId;
+          setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(rid); return next; });
+        } else {
+          const arr = Array.from(hiddenRowIds);
+          if (arr.length > 0) {
+            const last = arr[arr.length - 1];
+            setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(last); return next; });
+          }
+        }
+        return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedRowId, visibleEntries, hiddenRowIds, isDetailed]);
+
+  // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {
     const grouped: Record<string, {
-      date: string;
-      txType: string;
-      currencyCode: string;
-      count: number;
-      totalAmountCurrency: number;
-      fxRateToUsd: string | null;
-      totalAmountUsd: number;
-      key: string;
+      date: string; txType: string; currencyCode: string;
+      count: number; totalAmountCurrency: number;
+      fxRateToUsd: string | null; totalAmountUsd: number; key: string;
     }> = {};
     filteredEntries.forEach((e) => {
       const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
       if (!grouped[key]) {
-        grouped[key] = {
-          date: e.txDate,
-          txType: e.txType,
-          currencyCode: e.currencyCode,
-          count: 0,
-          totalAmountCurrency: 0,
-          fxRateToUsd: e.fxRateToUsd,
-          totalAmountUsd: 0,
-          key: key,
-        };
+        grouped[key] = { date: e.txDate, txType: e.txType, currencyCode: e.currencyCode, count: 0, totalAmountCurrency: 0, fxRateToUsd: e.fxRateToUsd, totalAmountUsd: 0, key };
       }
       grouped[key].count += 1;
       grouped[key].totalAmountCurrency += parseFloat(e.amountCurrency || "0");
       grouped[key].totalAmountUsd += parseFloat(e.amountUsd || "0");
-      if (grouped[key].fxRateToUsd !== e.fxRateToUsd) {
-        grouped[key].fxRateToUsd = null;
-      }
+      if (grouped[key].fxRateToUsd !== e.fxRateToUsd) grouped[key].fxRateToUsd = null;
     });
     return Object.values(grouped).sort((a, b) => {
       if (b.date !== a.date) return b.date.localeCompare(a.date);
@@ -456,14 +613,198 @@ export default function FactoryDaybook() {
     return filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
   };
 
+  // ── Active filters detection ──────────────────────────────────────────────
+  const hasActiveFilters =
+    periodFilter.preset !== "today" ||
+    txTypeFilter !== "ALL" ||
+    currencyFilter !== "ALL" ||
+    statusFilter !== "all" ||
+    !!searchQuery ||
+    !!minAmount ||
+    !!maxAmount;
+
+  const clearFilters = () => {
+    setPeriodFilter(getDefaultPeriodValue("today"));
+    setTxTypeFilter("ALL");
+    setCurrencyFilter("ALL");
+    setStatusFilter("all");
+    setSearchQuery("");
+    setMinAmount("");
+    setMaxAmount("");
+  };
+
+  // ── Session persistence: restore on mount ─────────────────────────────────
+  useEffect(() => {
+    const saved = loadFactoryDaybookState();
+    if (!saved) return;
+    setPeriodFilter(saved.periodFilter);
+    setTxTypeFilter(saved.txTypeFilter || "ALL");
+    setCurrencyFilter(saved.currencyFilter || "ALL");
+    setStatusFilter((saved.statusFilter as "all" | "exclude" | "only") || "all");
+    setSearchQuery(saved.searchQuery || "");
+    setMinAmount(saved.minAmount || "");
+    setMaxAmount(saved.maxAmount || "");
+    setHiddenRowIds(new Set(saved.hiddenRowIds || []));
+    setShowHidden(saved.showHidden || false);
+    if (saved.viewMode) setIsDetailed(saved.viewMode === "detailed");
+    const scrollY = saved.scrollY || 0;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Session persistence: save on every state change ───────────────────────
+  useEffect(() => {
+    saveFactoryDaybookState({
+      periodFilter,
+      txTypeFilter,
+      currencyFilter,
+      statusFilter,
+      searchQuery,
+      minAmount,
+      maxAmount,
+      hiddenRowIds: Array.from(hiddenRowIds),
+      showHidden,
+      viewMode: isDetailed ? "detailed" : "condensed",
+      scrollY: scrollYRef.current,
+    });
+  }, [periodFilter, txTypeFilter, currencyFilter, statusFilter, searchQuery, minAmount, maxAmount, hiddenRowIds, showHidden, isDetailed]);
+
+  // ── Session persistence: track scroll ────────────────────────────────────
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollYRef.current = window.scrollY;
+      try {
+        const raw = sessionStorage.getItem(FACTORY_DAYBOOK_STATE_KEY);
+        if (raw) {
+          const state = JSON.parse(raw);
+          state.scrollY = window.scrollY;
+          sessionStorage.setItem(FACTORY_DAYBOOK_STATE_KEY, JSON.stringify(state));
+        }
+      } catch {}
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // ── Session persistence: clear on unmount if leaving daybook flow ─────────
+  useEffect(() => {
+    return () => {
+      const path = window.location.pathname;
+      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers");
+      if (!isDaybookFlow) sessionStorage.removeItem(FACTORY_DAYBOOK_STATE_KEY);
+    };
+  }, []);
+
+  // ── Excel export: summary ─────────────────────────────────────────────────
+  const handleExportToExcel = async () => {
+    if (filteredEntries.length === 0) {
+      toast({ title: "No data to export", description: "No entries found for the current filters.", variant: "destructive" });
+      return;
+    }
+    const exportData = filteredEntries.map((e) => ({
+      Date: formatDisplayDate(e.txDate + "T00:00:00"),
+      Type: formatTxType(e.txType),
+      Description: formatDaybookDescription(e),
+      Currency: e.currencyCode,
+      Amount: parseFloat(e.amountCurrency || "0"),
+      "FX Rate": parseFloat(e.fxRateToUsd || "1"),
+      "Amount (USD)": parseFloat(e.amountUsd || "0"),
+      Optional: e.optional ? "Yes" : "No",
+    }));
+    const worksheet = utils.json_to_sheet(exportData);
+    worksheet["!cols"] = [
+      { wch: 12 }, { wch: 22 }, { wch: 40 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 },
+    ];
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Factory Daybook");
+    const fileName = `FactoryDaybook_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    await writeFile(workbook, fileName);
+    toast({ title: "Export successful", description: `Downloaded ${fileName} with ${filteredEntries.length} entries.` });
+  };
+
+  // ── Excel export: detailed (with voucher debit/credit entries) ────────────
+  const handleExportDetailedToExcel = async () => {
+    if (filteredEntries.length === 0) {
+      toast({ title: "No data to export", description: "No entries found for the current filters.", variant: "destructive" });
+      return;
+    }
+    setIsExportingDetailed(true);
+    try {
+      type DetailRow = {
+        Date: string; Type: string; Description: string;
+        Currency: string; Amount: number; "Amount (USD)": number;
+        Optional: string; "Account Name": string; Debit: string; Credit: string;
+      };
+      const detailedData: DetailRow[] = [];
+
+      for (const entry of filteredEntries) {
+        const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+        const baseRow = {
+          Date: formatDisplayDate(entry.txDate + "T00:00:00"),
+          Type: formatTxType(entry.txType),
+          Description: formatDaybookDescription(entry),
+          Currency: entry.currencyCode,
+          Amount: parseFloat(entry.amountCurrency || "0"),
+          "Amount (USD)": parseFloat(entry.amountUsd || "0"),
+          Optional: entry.optional ? "Yes" : "No",
+        };
+        if (isVoucherBacked) {
+          try {
+            const res = await fetch(`/api/vouchers/${entry.referenceId}/view-entries`, { credentials: "include" });
+            if (res.ok) {
+              const raw = await res.json();
+              const vEntries: any[] = Array.isArray(raw) ? raw : (raw.entries || []);
+              if (vEntries.length > 0) {
+                for (const ve of vEntries) {
+                  detailedData.push({
+                    ...baseRow,
+                    "Account Name": ve.accountName || "",
+                    Debit: parseFloat(ve.debitAmount || "0") > 0 ? String(parseFloat(ve.debitAmount)) : "",
+                    Credit: parseFloat(ve.creditAmount || "0") > 0 ? String(parseFloat(ve.creditAmount)) : "",
+                  });
+                }
+                continue;
+              }
+            }
+          } catch {}
+        }
+        detailedData.push({ ...baseRow, "Account Name": "", Debit: "", Credit: "" });
+      }
+
+      const workbook = utils.book_new();
+      const dataByType: Record<string, DetailRow[]> = {};
+      for (const row of detailedData) {
+        if (!dataByType[row.Type]) dataByType[row.Type] = [];
+        dataByType[row.Type].push(row);
+      }
+      for (const type of Object.keys(dataByType).sort()) {
+        const ws = utils.json_to_sheet(dataByType[type]);
+        ws["!cols"] = [
+          { wch: 12 }, { wch: 22 }, { wch: 40 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
+        ];
+        const sheetName = type.substring(0, 31).replace(/[\\/*?[\]:]/g, "_");
+        utils.book_append_sheet(workbook, ws, sheetName);
+      }
+
+      const fileName = `FactoryDaybook_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      await writeFile(workbook, fileName);
+      toast({ title: "Export successful", description: `Downloaded ${fileName} with ${detailedData.length} entries.` });
+    } catch (error) {
+      toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/daybook/${entryId}`, data);
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate daybook and all accounts/transaction queries so Accounts statements
-      // immediately reflect the synced description
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/vouchers"] });
@@ -509,23 +850,17 @@ export default function FactoryDaybook() {
 
   const handleEntryClick = (entry: DaybookEntry, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
-    if (entry.txType === "BALE_TRANSFER") {
-      navigate("/factory/bale-transfers");
-    }
+    if (entry.txType === "BALE_TRANSFER") navigate("/factory/bale-transfers");
   };
 
   const editSourceRecord = (entry: DaybookEntry) => {
-    if (entry.txType === "BALE_STOCK_ENTRY") {
-      return;
-    }
+    if (entry.txType === "BALE_STOCK_ENTRY") return;
     if (entry.txType === "INVOICE" && entry.referenceId) {
       navigate(`/factory/sales/invoices/${entry.referenceId}`);
       return;
     }
     const tab = VOUCHER_TX_TYPES[entry.txType];
-    if (tab && entry.referenceId) {
-      navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
-    }
+    if (tab && entry.referenceId) navigate(`/factory/vouchers?edit=${entry.referenceId}&tab=${tab}`);
   };
 
   const handleEditSubmit = () => {
@@ -535,50 +870,114 @@ export default function FactoryDaybook() {
       entryId: editEntry.id,
       data: {
         description: editDescription,
-        // For voucher-backed entries, amounts must be edited through the source record
-        ...(!isVoucherBacked && {
-          amountCurrency: editAmountCurrency,
-          amountUsd: editAmountUsd,
-        }),
+        ...(!isVoucherBacked && { amountCurrency: editAmountCurrency, amountUsd: editAmountUsd }),
         reason: editReason.trim(),
       },
     });
   };
 
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const renderEntryActions = (entry: DaybookEntry, size: "icon" | "sm" = "icon") => {
+    const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+    const canEditEntry = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+    const rid = String(entry.id);
+    const isHidden = hiddenRowIds.has(rid);
+    return (
+      <div className="flex gap-1">
+        <Button size={size} variant="ghost" title="View details"
+          onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+          data-testid={`button-view-${entry.id}`}
+        ><Eye className="h-3 w-3" /></Button>
+        {canEditEntry && (
+          <Button size={size} variant="ghost" title="Edit source"
+            onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+            data-testid={`button-edit-source-${entry.id}`}
+          ><ExternalLink className="h-3 w-3" /></Button>
+        )}
+        <Button size={size} variant="ghost"
+          title={isHidden ? "Unhide row" : "Hide row"}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isHidden) {
+              setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(rid); return next; });
+            } else {
+              setHiddenRowIds((prev) => { const next = new Set(prev); next.add(rid); return next; });
+              if (selectedRowId === rid) setSelectedRowId(null);
+            }
+          }}
+          data-testid={isHidden ? `button-unhide-${entry.id}` : `button-hide-${entry.id}`}
+        >{isHidden ? <Eye className="h-3 w-3 text-muted-foreground" /> : <EyeOff className="h-3 w-3 text-muted-foreground" />}</Button>
+        {isAdminOrOwner && isVoucherBacked && (
+          <Button size={size} variant="ghost" title="Void voucher"
+            onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+            data-testid={`button-void-voucher-${entry.id}`}
+          ><Trash2 className="h-3 w-3" /></Button>
+        )}
+      </div>
+    );
+  };
+
+  const hasNonUsd = filteredEntries.some((e) => e.currencyCode !== "USD");
+
+  // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Daybook</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-title">
+            Factory Daybook
+          </h1>
           <p className="text-muted-foreground mt-1">All factory transactions in one view</p>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              disabled={filteredEntries.length === 0 || isExportingDetailed}
+              data-testid="button-export-excel"
+              className="gap-2"
+            >
+              <FileDown className="w-4 h-4" />
+              {isExportingDetailed ? "Exporting..." : "Export"}
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportToExcel} data-testid="export-simple">
+              Summary Export
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportDetailedToExcel} data-testid="export-detailed">
+              Detailed Export (with entries)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
+      {/* Filters */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">From</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-40"
-                data-testid="input-start-date"
-              />
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              <CardTitle>Filters</CardTitle>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">To</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-40"
-                data-testid="input-end-date"
-              />
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1">
+                <X className="w-4 h-4" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-2">
+              <Label>Period</Label>
+              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Type</Label>
+            <div className="space-y-2">
+              <Label>Type</Label>
               <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
                 <SelectTrigger className="w-48" data-testid="select-tx-type">
                   <SelectValue />
@@ -588,24 +987,26 @@ export default function FactoryDaybook() {
                   <SelectItem value="PAYMENT">Payment</SelectItem>
                   <SelectItem value="RECEIPT">Receipt</SelectItem>
                   <SelectItem value="JOURNAL">Journal</SelectItem>
-                  <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
                   <SelectItem value="INVOICE">Invoice</SelectItem>
+                  <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
                   <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
                   <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
                   <SelectItem value="COMMISSION">Commission</SelectItem>
                   <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
                   <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
+                  <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
+                  <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
+                  <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
+                  <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
+                  <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
                   <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
                   <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
                   <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
-                  <SelectItem value="FREIGHT_DELETE">Freight Delete</SelectItem>
-                  <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
-                  <SelectItem value="FREIGHT_PAYMENT_DELETE">Freight Pmt Delete</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Currency</Label>
+            <div className="space-y-2">
+              <Label>Currency</Label>
               <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
                 <SelectTrigger className="w-32" data-testid="select-currency-filter">
                   <SelectValue />
@@ -620,10 +1021,10 @@ export default function FactoryDaybook() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Optional</Label>
-              <Select value={optionalFilter} onValueChange={(v) => setOptionalFilter(v as "all" | "exclude" | "only")}>
-                <SelectTrigger className="w-40" data-testid="select-optional-filter">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
+                <SelectTrigger className="w-40" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -633,284 +1034,350 @@ export default function FactoryDaybook() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Min Amount</Label>
+              <Input
+                type="number" placeholder="0" value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+                data-testid="input-min-amount" className="w-[110px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Amount</Label>
+              <Input
+                type="number" placeholder="∞" value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+                data-testid="input-max-amount" className="w-[110px]"
+              />
+            </div>
+            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
+              <Label>Search</Label>
+              <Input
+                placeholder="Description or type..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Transactions Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5" />
               Transactions
-            </CardTitle>
-            <Button
-              variant={isDetailed ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIsDetailed(!isDetailed)}
-              data-testid="button-toggle-detailed"
-            >
-              {isDetailed ? (
-                <><List className="h-4 w-4 mr-1" />Condensed</>
-              ) : (
-                <><AlignJustify className="h-4 w-4 mr-1" />Detailed</>
+              {filteredEntries.length > 0 && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  ({isDetailed
+                    ? `${visibleEntries.length}${hiddenRowIds.size > 0 && !showHidden ? ` of ${filteredEntries.length}` : ""} ${visibleEntries.length === 1 ? "entry" : "entries"}`
+                    : `${condensedRows.length} group${condensedRows.length === 1 ? "" : "s"}`})
+                </span>
               )}
-            </Button>
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isDetailed && hiddenRowIds.size > 0 && (
+                <Button
+                  variant={showHidden ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setShowHidden((v) => !v)}
+                  className="gap-1"
+                  data-testid="button-toggle-show-hidden"
+                >
+                  <EyeOff className="w-4 h-4" />
+                  {showHidden ? "Hide hidden rows" : "Show hidden"}
+                  <Badge className="ml-1">{hiddenRowIds.size}</Badge>
+                </Button>
+              )}
+              <div className="flex items-center border rounded-md overflow-hidden">
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => setIsDetailed(false)}
+                  data-testid="button-view-condensed"
+                  className={cn("rounded-none h-8 px-3 gap-1", !isDetailed && "bg-muted")}
+                  title="Condensed view"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Condensed</span>
+                </Button>
+                <div className="w-px bg-border h-6" />
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => setIsDetailed(true)}
+                  data-testid="button-view-detailed"
+                  className={cn("rounded-none h-8 px-3 gap-1", isDetailed && "bg-muted")}
+                  title="Detailed view"
+                >
+                  <LayoutList className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Detailed</span>
+                </Button>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="space-y-2 p-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : filteredEntries.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              {hasActiveFilters ? (
+                <div>
+                  <p className="mb-2">No transactions found matching your filters.</p>
+                  <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters-empty">
+                    Clear Filters
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
+                  <p className="mt-2">Factory transactions will appear here as you perform operations</p>
+                </>
+              )}
             </div>
           ) : !isDetailed ? (
-            condensedRows.length > 0 ? (
-              <div className="overflow-x-auto">
-                {(() => {
-                  const hasNonUsdC = condensedRows.some((r) => r.currencyCode !== "USD");
-                  return (
+            /* ── CONDENSED VIEW ── */
+            <div className="overflow-x-auto">
+              {(() => {
+                const hasNonUsdC = condensedRows.some((r) => r.currencyCode !== "USD");
+                return (
                   <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        {hasNonUsdC && <TableHead className="text-right">FX Rate</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {condensedRows.map((row) => {
+                        const isExpanded = expandedRowKey === row.key;
+                        const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                        const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
+                        return (
+                          <tbody key={row.key}>
+                            <TableRow
+                              data-testid={`row-condensed-${row.date}-${row.txType}`}
+                              onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                              className="cursor-pointer hover-elevate"
+                            >
+                              <TableCell className="font-mono text-sm whitespace-nowrap">
+                                <div className="flex items-center gap-1">
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                  {formatDisplayDate(row.date + "T00:00:00")}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={bv} className={bc}>{formatTxType(row.txType)}</Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {row.count === 1 ? "1 entry" : `${row.count} entries`}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium">
+                                {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
+                              </TableCell>
+                              {hasNonUsdC && (
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                  {row.currencyCode === "USD" ? "-" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                            {isExpanded && expandedEntries.map((entry) => {
+                              const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                              const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                              const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+                              const { variant: ev, className: ec } = getFactoryTxTypeBadge(entry.txType);
+                              return (
+                                <TableRow
+                                  key={entry.id}
+                                  data-testid={`row-expanded-${entry.id}`}
+                                  className={`bg-muted/30 ${isBaleTransfer ? "cursor-pointer" : ""}`}
+                                  onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
+                                >
+                                  <TableCell className="pl-8 font-mono text-sm whitespace-nowrap">
+                                    {formatDisplayDate(entry.txDate + "T00:00:00")}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={ev} className={ec}>{formatTxType(entry.txType)}</Badge>
+                                  </TableCell>
+                                  <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
+                                    {formatDaybookDescription(entry)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono font-medium">
+                                    {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
+                                  </TableCell>
+                                  {hasNonUsdC && (
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {entry.currencyCode === "USD" ? "-" : entry.fxRateToUsd ? parseFloat(entry.fxRateToUsd).toFixed(4) : "-"}
+                                    </TableCell>
+                                  )}
+                                  <TableCell>
+                                    <div className="flex gap-1">
+                                      <Button size="icon" variant="ghost" title="View details"
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                        data-testid={`button-view-${entry.id}`}
+                                      ><Eye className="h-3 w-3" /></Button>
+                                      {canEdit && (
+                                        <Button size="icon" variant="ghost" title="Edit"
+                                          onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+                                          data-testid={`button-edit-source-${entry.id}`}
+                                        ><ExternalLink className="h-3 w-3" /></Button>
+                                      )}
+                                      {isAdminOrOwner && isVoucherBacked && (
+                                        <Button size="icon" variant="ghost" title="Void"
+                                          onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+                                          data-testid={`button-void-voucher-${entry.id}`}
+                                        ><Trash2 className="h-3 w-3" /></Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </tbody>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+            </div>
+          ) : (
+            /* ── DETAILED VIEW ── */
+            <>
+              {/* Mobile card layout */}
+              <div className="md:hidden space-y-3 p-3">
+                {visibleEntries.map((entry) => {
+                  const rid = String(entry.id);
+                  const isHidden = hiddenRowIds.has(rid);
+                  const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
+                  return (
+                    <div
+                      key={entry.id}
+                      data-row-id={rid}
+                      className={cn(
+                        "border rounded-md p-3 space-y-2 transition-colors",
+                        selectedRowId === rid && "bg-accent/30 border-accent",
+                        isHidden && showHidden && "opacity-50",
+                        entry.optional && "opacity-70",
+                      )}
+                      onClick={() => setSelectedRowId(rid)}
+                      data-testid={`card-entry-${entry.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={bv} className={bc} data-testid={`badge-type-${entry.id}`}>
+                            {formatTxType(entry.txType)}
+                          </Badge>
+                          {entry.optional && (
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
+                          )}
+                          {isHidden && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
+                          )}
+                        </div>
+                        <span className="font-mono font-medium text-sm whitespace-nowrap">
+                          {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDisplayDate(entry.txDate + "T00:00:00")}
+                      </div>
+                      <p className="text-sm truncate">{formatDaybookDescription(entry)}</p>
+                      <div className="flex items-center gap-1 pt-1 border-t">
+                        {renderEntryActions(entry)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
-                      {hasNonUsdC && <TableHead className="text-right">FX Rate</TableHead>}
+                      {hasNonUsd && <TableHead className="text-right">FX Rate</TableHead>}
+                      <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {condensedRows.map((row) => {
-                      const isExpanded = expandedRowKey === row.key;
-                      const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                    {visibleEntries.map((entry) => {
+                      const rid = String(entry.id);
+                      const isHidden = hiddenRowIds.has(rid);
+                      const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                      const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
                       return (
-                        <tbody key={row.key}>
-                          <TableRow 
-                            data-testid={`row-condensed-${row.date}-${row.txType}`}
-                            onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
-                            className="cursor-pointer hover-elevate"
-                          >
-                            <TableCell className="font-mono text-sm whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                {formatDisplayDate(row.date + "T00:00:00")}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="default">{formatTxType(row.txType)}</Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {row.count === 1 ? "1 entry" : `${row.count} entries`}
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-medium">
-                              {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
-                            </TableCell>
-                            {hasNonUsdC && (
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {row.currencyCode === "USD"
-                                  ? "-"
-                                  : row.fxRateToUsd
-                                  ? parseFloat(row.fxRateToUsd).toFixed(4)
-                                  : "mixed"}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                          {isExpanded && expandedEntries.map((entry) => {
-                            const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                            const isRowClickable = isBaleTransfer;
-                            const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                            const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-                            return (
-                            <TableRow 
-                              key={entry.id} 
-                              data-testid={`row-expanded-${entry.id}`}
-                              className={`bg-muted/30 ${isRowClickable ? "cursor-pointer" : ""}`}
-                              onClick={isRowClickable ? (e) => handleEntryClick(entry, e) : undefined}
-                            >
-                              <TableCell className="pl-8 font-mono text-sm whitespace-nowrap">
-                                {formatDisplayDate(entry.txDate + "T00:00:00")}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{formatTxType(entry.txType)}</Badge>
-                              </TableCell>
-                              <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
-                                {formatDaybookDescription(entry)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-medium">
-                                {currencySymbol(entry.currencyCode)}{formatNumber(entry.amountCurrency)}
-                              </TableCell>
-                              {hasNonUsdC && (
-                                <TableCell className="text-right font-mono text-muted-foreground">
-                                  {entry.currencyCode === "USD"
-                                    ? "-"
-                                    : entry.fxRateToUsd
-                                    ? parseFloat(entry.fxRateToUsd).toFixed(4)
-                                    : "-"}
-                                </TableCell>
+                        <TableRow
+                          key={entry.id}
+                          data-testid={`row-daybook-${entry.id}`}
+                          data-row-id={rid}
+                          className={cn(
+                            isBaleTransfer ? "cursor-pointer hover-elevate" : "",
+                            entry.optional && "opacity-60",
+                            selectedRowId === rid && "bg-accent/20",
+                            isHidden && showHidden && "opacity-40",
+                          )}
+                          onClick={(e) => {
+                            setSelectedRowId(rid);
+                            if (isBaleTransfer) handleEntryClick(entry, e);
+                          }}
+                        >
+                          <TableCell className="font-mono text-sm whitespace-nowrap">
+                            {formatDisplayDate(entry.txDate + "T00:00:00")}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <Badge variant={bv} className={bc} data-testid={`badge-type-${entry.id}`}>
+                                {formatTxType(entry.txType)}
+                              </Badge>
+                              {entry.optional && (
+                                <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>
+                                  Optional
+                                </Badge>
                               )}
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    title="View details"
-                                    onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
-                                    data-testid={`button-view-${entry.id}`}
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                  </Button>
-                                  {canEdit && (
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      title="Edit"
-                                      onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-                                      data-testid={`button-edit-source-${entry.id}`}
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                  {isAdminOrOwner && isVoucherBacked && (
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      title="Void voucher"
-                                      onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-                                      data-testid={`button-void-voucher-${entry.id}`}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            );
-                          })}
-                        </tbody>
+                              {isHidden && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
+                            {formatDaybookDescription(entry)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
+                          </TableCell>
+                          {hasNonUsd && (
+                            <TableCell className="text-right font-mono text-muted-foreground">
+                              {entry.currencyCode === "USD" ? "-" : parseFloat(entry.fxRateToUsd).toFixed(4)}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            {renderEntryActions(entry)}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
-                  );
-                })()}
               </div>
-            ) : (
-              <div className="text-center py-12">
-                <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-                <p className="text-muted-foreground mt-2">Factory transactions will appear here as you perform operations</p>
-              </div>
-            )
-          ) : filteredEntries.length > 0 ? (
-            <div className="overflow-x-auto">
-              {(() => {
-                const hasNonUsd = filteredEntries.some((e) => e.currencyCode !== "USD");
-                return (
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    {hasNonUsd && <TableHead className="text-right">FX Rate</TableHead>}
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEntries.map((entry) => {
-                    const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                    const isRowClickable = isBaleTransfer;
-                    const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                    const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-                    return (
-                    <TableRow
-                      key={entry.id}
-                      data-testid={`row-daybook-${entry.id}`}
-                      className={`${isRowClickable ? "cursor-pointer hover-elevate" : ""} ${entry.optional ? "opacity-50" : ""}`}
-                      onClick={isRowClickable ? (e) => handleEntryClick(entry, e) : undefined}
-                    >
-                      <TableCell className="font-mono text-sm whitespace-nowrap">
-                        {formatDisplayDate(entry.txDate + "T00:00:00")}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <Badge variant="default">
-                            {formatTxType(entry.txType)}
-                          </Badge>
-                          {entry.optional && (
-                            <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-optional-${entry.id}`}>
-                              Optional
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
-                        {formatDaybookDescription(entry)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {renderBaleStockAmount(entry, currencySymbol(entry.currencyCode), parseFloat(entry.amountCurrency || "0"))}
-                      </TableCell>
-                      {hasNonUsd && (
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {entry.currencyCode === "USD" ? "-" : parseFloat(entry.fxRateToUsd).toFixed(4)}
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="View details"
-                            onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
-                            data-testid={`button-view-${entry.id}`}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          {canEdit && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Edit"
-                              onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-                              data-testid={`button-edit-source-${entry.id}`}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          )}
-                          {isAdminOrOwner && isVoucherBacked && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Void voucher"
-                              onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-                              data-testid={`button-void-voucher-${entry.id}`}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                  })}
-                </TableBody>
-              </Table>
-                );
-              })()}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-              <p className="text-muted-foreground mt-2">Factory transactions will appear here as you perform operations</p>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
 
+      {/* Edit Dialog */}
       <Dialog open={editEntry !== null} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
         <DialogContent data-testid="dialog-edit-daybook">
           <DialogHeader>
@@ -965,17 +1432,14 @@ export default function FactoryDaybook() {
         </DialogContent>
       </Dialog>
 
+      {/* Void Alert */}
       <AlertDialog open={voidEntry !== null} onOpenChange={(open) => { if (!open) setVoidEntry(null); }}>
         <AlertDialogContent data-testid="dialog-void-voucher">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
             <AlertDialogDescription>
               This will reverse all accounting entries. This action cannot be undone.
-              {voidEntry && (
-                <span className="block mt-2 font-medium text-foreground">
-                  {voidEntry.description}
-                </span>
-              )}
+              {voidEntry && <span className="block mt-2 font-medium text-foreground">{voidEntry.description}</span>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
