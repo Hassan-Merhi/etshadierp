@@ -15544,6 +15544,27 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     }
   });
 
+  // DELETE /api/factory/employees/:id - soft-delete employee
+  app.delete("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
+
+      const [deleted] = await db.update(employees)
+        .set({ deletedAt: new Date(), active: false })
+        .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")))
+        .returning({ id: employees.id });
+
+      if (!deleted) return res.status(404).json({ message: "Employee not found" });
+      res.json({ message: "Employee deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/employees/:id/statement - running ledger from voucher entries
   app.get("/api/factory/employees/:id/statement", requireAuth, async (req: any, res: any) => {
     try {

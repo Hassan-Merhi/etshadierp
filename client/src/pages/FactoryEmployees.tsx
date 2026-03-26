@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Pencil, Users } from "lucide-react";
+import { Plus, Search, Pencil, Users, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +61,7 @@ export default function FactoryEmployees() {
   const [statusFilter, setStatusFilter] = useState("Active");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -104,6 +105,22 @@ export default function FactoryEmployees() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees", emp.id] });
       toast({ title: "Employee updated" });
       setEditingEmployee(null);
+    },
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/employees/${id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to delete employee");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
+      toast({ title: "Employee deleted" });
+      setDeletingEmployee(null);
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
@@ -255,14 +272,24 @@ export default function FactoryEmployees() {
                       </div>
                     </div>
 
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={(e) => { e.stopPropagation(); openEdit(emp); }}
-                      data-testid={`button-edit-employee-${emp.id}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEdit(emp)}
+                        data-testid={`button-edit-employee-${emp.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeletingEmployee(emp)}
+                        data-testid={`button-delete-employee-${emp.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -373,6 +400,31 @@ export default function FactoryEmployees() {
               data-testid="button-save"
             >
               {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingEmployee} onOpenChange={(open) => { if (!open) setDeletingEmployee(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Employee</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <span className="font-semibold text-foreground">{deletingEmployee?.firstName} {deletingEmployee?.lastName}</span>? This cannot be undone.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeletingEmployee(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deletingEmployee && deleteMutation.mutate(deletingEmployee.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-employee"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
