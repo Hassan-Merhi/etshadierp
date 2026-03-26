@@ -20,7 +20,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
 
-type OtherChargeLine = { description: string; amount: string; ledgerAccountId: string };
+type OtherChargeLine = { description: string; amount: string; currencyCode: string; ledgerAccountId: string };
 
 export default function FactoryContainerCreate() {
   const [, navigate] = useLocation();
@@ -128,6 +128,7 @@ export default function FactoryContainerCreate() {
           charges: validLines.map(l => ({
             description: l.description,
             amount: l.amount,
+            currencyCode: l.currencyCode || currency,
             ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
           })),
         });
@@ -422,7 +423,7 @@ export default function FactoryContainerCreate() {
                 size="sm"
                 variant="outline"
                 className="h-7 px-2 text-xs"
-                onClick={() => setOtherChargeLines(prev => [...prev, { description: "", amount: "", ledgerAccountId: "" }])}
+                onClick={() => setOtherChargeLines(prev => [...prev, { description: "", amount: "", currencyCode: currency, ledgerAccountId: "" }])}
                 data-testid="button-add-other-charge"
               >
                 <Plus className="h-3 w-3 mr-1" />
@@ -433,7 +434,7 @@ export default function FactoryContainerCreate() {
               <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
             )}
             {otherChargeLines.map((line, idx) => (
-              <div key={idx} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
+              <div key={idx} className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-2 items-end">
                 <div>
                   {idx === 0 && <Label className="text-xs text-muted-foreground">Description</Label>}
                   <Input
@@ -452,6 +453,24 @@ export default function FactoryContainerCreate() {
                     placeholder="0.00"
                     data-testid={`input-other-charge-amount-${idx}`}
                   />
+                </div>
+                <div>
+                  {idx === 0 && <Label className="text-xs text-muted-foreground">CCY</Label>}
+                  <Select
+                    value={line.currencyCode || currency}
+                    onValueChange={val => updateOtherChargeLine(idx, "currencyCode", val)}
+                  >
+                    <SelectTrigger className="w-20" data-testid={`select-other-charge-currency-${idx}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   {idx === 0 && <Label className="text-xs text-muted-foreground">Account (optional)</Label>}
@@ -487,8 +506,17 @@ export default function FactoryContainerCreate() {
               </div>
             ))}
             {otherChargeLines.length > 0 && (
-              <div className="text-xs text-muted-foreground text-right pt-1">
-                <div>Total: {currency} {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0))}</div>
+              <div className="text-xs text-muted-foreground text-right pt-1 space-y-0.5">
+                {(() => {
+                  const totals: Record<string, number> = {};
+                  for (const l of otherChargeLines) {
+                    const cc = l.currencyCode || currency;
+                    totals[cc] = (totals[cc] || 0) + parseFloat(l.amount || "0");
+                  }
+                  return Object.entries(totals).map(([cc, amt]) => (
+                    <div key={cc}>Total: {cc} {formatNumber(amt)}</div>
+                  ));
+                })()}
               </div>
             )}
           </div>

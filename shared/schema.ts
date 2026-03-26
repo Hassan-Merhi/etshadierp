@@ -2438,6 +2438,7 @@ export const factoryContainerOtherCharges = pgTable("factory_container_other_cha
   containerId: integer("container_id").notNull(),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  currencyCode: text("currency_code").default("USD"),
   ledgerAccountId: integer("ledger_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

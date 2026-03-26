@@ -5312,7 +5312,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const companyId = (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseInt(req.params.id);
-      const { charges, isCreate } = req.body as { charges: { description: string; amount: string; ledgerAccountId?: number | null }[]; isCreate?: boolean };
+      const { charges, isCreate } = req.body as { charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[]; isCreate?: boolean };
 
       // Void any previously created other-charge vouchers for this container (to avoid duplicates on edit)
       const ocPrefix = `FACTORY-OC-${containerId}-%`;
@@ -5344,7 +5344,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               const code = ("OC_" + c.description.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 50);
               ledgerAccountId = await getOrCreateLedgerAccount(companyId, code, c.description);
             }
-            return { companyId, containerId, description: c.description, amount: c.amount, ledgerAccountId };
+            return { companyId, containerId, description: c.description, amount: c.amount, currencyCode: c.currencyCode || "USD", ledgerAccountId };
           })
         );
         newCharges = await db.insert(factoryContainerOtherCharges).values(resolvedCharges).returning();
