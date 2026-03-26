@@ -2884,22 +2884,26 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const currencyGroups = Object.entries(byCurrency).map(([cc, data]) => {
         const paid = paidByCurrency[cc] || 0;
-        const netPayable = data.totalValue - data.totalCommission - paid;
-        // Phase 2: commission remaining = totalCommission minus what was settled via FX
-        // "both" is treated as commission-first (capped at totalCommission), then supplier
-        const commFxReduction = Math.min(data.totalCommission, (fxCommOut[cc] || 0) + (fxBothOut[cc] || 0));
-        const remainingCommission = Math.max(0, data.totalCommission - commFxReduction);
+        // effectiveCommission: before offload only commissionAmount (directCommission) exists;
+        // after offload factoryContainerCommissions records exist. Use whichever is greater so
+        // the commission always shows in the currency pool even before offloading.
+        const effectiveCommission = Math.max(data.totalCommission, data.totalDirectCommission);
+        const netPayable = data.totalValue - effectiveCommission - paid;
+        // Phase 2: commission remaining = effectiveCommission minus what was settled via FX
+        // "both" is treated as commission-first (capped at effectiveCommission), then supplier
+        const commFxReduction = Math.min(effectiveCommission, (fxCommOut[cc] || 0) + (fxBothOut[cc] || 0));
+        const remainingCommission = Math.max(0, effectiveCommission - commFxReduction);
         return {
           currencyCode: cc,
           containers: data.containers,
           totalKg: data.totalKg.toFixed(3),
           totalValue: data.totalValue.toFixed(2),
-          totalCommission: data.totalCommission.toFixed(2),
+          totalCommission: effectiveCommission.toFixed(2),
           remainingCommission: remainingCommission.toFixed(2),
           totalDirectCommission: data.totalDirectCommission.toFixed(2),
           totalPaid: paid.toFixed(2),
           netPayable: netPayable.toFixed(2),
-          totalOwed: (data.totalValue + data.totalDirectCommission).toFixed(2),
+          totalOwed: (data.totalValue + effectiveCommission).toFixed(2),
           totalFreight: data.totalFreight.toFixed(2),
         };
       }).filter(g => parseFloat(g.netPayable) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD"));
