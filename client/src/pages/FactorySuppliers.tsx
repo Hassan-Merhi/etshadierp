@@ -1140,8 +1140,9 @@ export default function FactorySuppliers() {
               const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
               const activeContainerCount = activeSt.length;
               const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
+              const currencyGroups: any[] = statementData.currencyGroups || [];
               return (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-xs text-muted-foreground">Active Containers</div>
@@ -1161,42 +1162,49 @@ export default function FactorySuppliers() {
                       </div>
                     </CardContent>
                   </Card>
-                  {parseFloat(statementData.summary.totalDirectCommissions || "0") > 0 && (
+                  {currencyGroups.length === 0 && (
                     <Card>
                       <CardContent className="p-4">
-                        <div className="text-xs text-muted-foreground">Commission Owed</div>
-                        <div className="text-xl font-bold mt-1 text-amber-600 dark:text-amber-400" data-testid="text-statement-direct-commissions">
-                          ${formatNum(statementData.summary.totalDirectCommissions)}
+                        <div className="text-xs text-muted-foreground">Net Balance</div>
+                        <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
+                          $— <span className="text-sm font-normal">Settled</span>
                         </div>
                       </CardContent>
                     </Card>
                   )}
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground">Net Balance</div>
-                      {(() => {
-                        const groups: any[] = statementData.currencyGroups || [];
-                        const primaryGroup = groups.find((g: any) => g.currencyCode !== "USD") || groups[0];
-                        const cc = primaryGroup?.currencyCode || "USD";
-                        const bal = primaryGroup ? parseFloat(primaryGroup.netPayable) : 0;
-                        const usdGroup = cc !== "USD" ? groups.find((g: any) => g.currencyCode === "USD") : null;
-                        const usdBal = usdGroup ? parseFloat(usdGroup.netPayable) : 0;
-                        return (
-                          <div data-testid="text-statement-total-owed">
-                            <div className={`text-xl font-bold mt-1 ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                              {bal < 0 ? "-" : ""}{cc !== "USD" ? `${cc} ` : "$"}{formatNum(String(Math.abs(bal).toFixed(2)))}
-                              <span className="text-sm font-normal ml-1">{bal > 0 ? "CR" : bal < 0 ? "DR" : bal === 0 ? "Settled" : ""}</span>
-                            </div>
-                            {usdBal > 0.005 && (
-                              <div className="text-sm font-medium mt-0.5 text-red-600 dark:text-red-400">
-                                + ${formatNum(String(usdBal.toFixed(2)))} <span className="font-normal opacity-70">USD CR</span>
-                              </div>
+                  {currencyGroups.map((g: any) => {
+                    const bal = parseFloat(g.netPayable);
+                    const isOverpaid = bal < -0.005;
+                    const isSettled = Math.abs(bal) <= 0.005;
+                    const ccPrefix = g.currencyCode !== "USD" ? `${g.currencyCode} ` : "$";
+                    return (
+                      <Card key={g.currencyCode}>
+                        <CardContent className="p-4">
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="font-medium">{g.currencyCode}</span>
+                            <span>Balance</span>
+                          </div>
+                          <div
+                            className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                            data-testid={`text-statement-balance-${g.currencyCode}`}
+                          >
+                            {isSettled ? (
+                              <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
+                            ) : isOverpaid ? (
+                              <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
+                            ) : (
+                              <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
                             )}
                           </div>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
+                          {parseFloat(g.totalFreight || "0") > 0.005 && (
+                            <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                              incl. {ccPrefix}{formatNum(g.totalFreight)} freight
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               );
             })()}
