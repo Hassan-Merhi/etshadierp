@@ -33,13 +33,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { PageHeader } from "@/components/PageHeader";
 import {
-  ShoppingCart, Printer, Plus, Trash2, Search, Package, Receipt, History, X, Check, MapPin
+  ShoppingCart, Printer, Plus, Trash2, Search, Package, History,
+  X, Check, MapPin, Wallet, User, ChevronRight,
 } from "lucide-react";
 
-interface CartItem {
-  productId: number;
+interface CartRow {
+  id: string;
+  productId: number | null;
   productName: string;
   articleCode: string;
   availableQty: number;
@@ -56,30 +59,59 @@ interface InventoryItem {
   sellingPrice: string;
 }
 
+function emptyRow(id?: string): CartRow {
+  return {
+    id: id ?? String(Date.now()),
+    productId: null,
+    productName: "",
+    articleCode: "",
+    availableQty: 0,
+    quantity: 1,
+    unitPrice: 0,
+  };
+}
+
 function formatNum(v: string | number) {
   const n = parseFloat(String(v));
   if (isNaN(n)) return "0.00";
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const COLUMNS = [
+  { key: "productName", label: "Description", width: "flex-1" },
+  { key: "quantity",    label: "Qty",         width: "w-20"   },
+  { key: "unitPrice",   label: "Price",        width: "w-28"   },
+  { key: "amount",      label: "Amount",       width: "w-28"   },
+  { key: "delete",      label: "",             width: "w-10"   },
+];
+
 export default function FactoryPOS() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-  const [locationId, setLocationId] = useState<string>("");
+  const [locationId, setLocationId]     = useState<string>("");
   const [customerName, setCustomerName] = useState("");
-  const [notes, setNotes] = useState("");
-  const [txDate, setTxDate] = useState(new Date().toISOString().split("T")[0]);
+  const [notes, setNotes]               = useState("");
+  const [txDate, setTxDate]             = useState(new Date().toISOString().split("T")[0]);
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [cashAccountId, setCashAccountId] = useState<string>("");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [printSale, setPrintSale] = useState<any>(null);
+  const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
+  const [search, setSearch]             = useState("");
+  const [savedSale, setSavedSale]       = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [voidId, setVoidId] = useState<number | null>(null);
-  const [tab, setTab] = useState("pos");
+  const [voidId, setVoidId]             = useState<number | null>(null);
+  const [showHistory, setShowHistory]   = useState(false);
 
+  // Mobile state
+  const [mobileRowEditOpen, setMobileRowEditOpen] = useState(false);
+  const [mobileRowEditIdx, setMobileRowEditIdx]   = useState<number | null>(null);
+  const [mobileBrowseOpen, setMobileBrowseOpen]   = useState(false);
+  const [mobileBrowseSearch, setMobileBrowseSearch] = useState("");
+  const [mobileRowTarget, setMobileRowTarget]     = useState<number | null>(null);
+
+  // Queries
   const { data: locations } = useQuery<any[]>({ queryKey: ["/api/locations"] });
   const { data: inventory, isLoading: invLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/factory/location-inventory", locationId],
@@ -93,85 +125,141 @@ export default function FactoryPOS() {
   });
   const { data: ledgerAccounts } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"] });
   const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
-
   const { data: sales, isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pos/sales"],
+    enabled: showHistory,
   });
-
-  const { data: companyInfo } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-  });
+  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "User";
 
   const filteredInventory = (inventory || []).filter(item =>
-    !search || item.productName.toLowerCase().includes(search.toLowerCase()) || item.articleCode?.toLowerCase().includes(search.toLowerCase())
+    !search ||
+    item.productName.toLowerCase().includes(search.toLowerCase()) ||
+    (item.articleCode || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const addToCart = (item: InventoryItem) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.productId === item.productId);
-      if (existing) {
+  const mobileFilteredInventory = (inventory || []).filter(item =>
+    !mobileBrowseSearch ||
+    item.productName.toLowerCase().includes(mobileBrowseSearch.toLowerCase()) ||
+    (item.articleCode || "").toLowerCase().includes(mobileBrowseSearch.toLowerCase())
+  );
+
+  // ---- Row helpers ----
+  const addOrIncrementProduct = (item: InventoryItem) => {
+    setRows(prev => {
+      const existingIdx = prev.findIndex(r => r.productId === item.productId);
+      if (existingIdx !== -1) {
+        const existing = prev[existingIdx];
         if (existing.quantity >= item.quantity) {
           toast({ title: "Not enough stock", description: `Only ${item.quantity} available`, variant: "destructive" });
           return prev;
         }
-        return prev.map(c => c.productId === item.productId ? { ...c, quantity: c.quantity + 1 } : c);
+        return prev.map((r, i) => i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r);
       }
-      return [...prev, {
+      // Add new row before trailing empty row if one exists
+      const newRow: CartRow = {
+        id: String(Date.now()),
         productId: item.productId,
         productName: item.productName,
         articleCode: item.articleCode,
         availableQty: item.quantity,
         quantity: 1,
         unitPrice: parseFloat(item.sellingPrice || "0"),
-      }];
+      };
+      const lastRow = prev[prev.length - 1];
+      if (lastRow && !lastRow.productId) {
+        return [...prev.slice(0, -1), newRow, lastRow];
+      }
+      return [...prev, newRow];
     });
   };
 
-  const updateCartItem = (productId: number, field: "quantity" | "unitPrice", value: string) => {
-    setCart(prev => prev.map(c => {
-      if (c.productId !== productId) return c;
+  const addProductFromMobile = (item: InventoryItem) => {
+    const targetIdx = mobileRowTarget ?? (rows.length > 0 ? rows.length - 1 : 0);
+    setRows(prev => {
+      const existingIdx = prev.findIndex(r => r.productId === item.productId);
+      if (existingIdx !== -1) {
+        return prev.map((r, i) => i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r);
+      }
+      const newRow: CartRow = {
+        id: String(Date.now()),
+        productId: item.productId,
+        productName: item.productName,
+        articleCode: item.articleCode,
+        availableQty: item.quantity,
+        quantity: 1,
+        unitPrice: parseFloat(item.sellingPrice || "0"),
+      };
+      const arr = [...prev];
+      arr.splice(targetIdx, 0, newRow);
+      return arr;
+    });
+    setMobileBrowseOpen(false);
+    setMobileBrowseSearch("");
+    setMobileRowEditIdx(rows.findIndex(r => r.productId === item.productId) !== -1
+      ? rows.findIndex(r => r.productId === item.productId)
+      : targetIdx);
+    setMobileRowEditOpen(true);
+  };
+
+  const updateRow = (idx: number, field: "quantity" | "unitPrice", value: string) => {
+    setRows(prev => prev.map((r, i) => {
+      if (i !== idx) return r;
       if (field === "quantity") {
         const qty = parseInt(value) || 1;
-        if (qty > c.availableQty) {
-          toast({ title: "Not enough stock", description: `Only ${c.availableQty} available`, variant: "destructive" });
-          return c;
+        if (r.availableQty > 0 && qty > r.availableQty) {
+          toast({ title: "Not enough stock", description: `Only ${r.availableQty} available`, variant: "destructive" });
+          return r;
         }
-        return { ...c, quantity: Math.max(1, qty) };
+        return { ...r, quantity: Math.max(1, qty) };
       }
-      return { ...c, unitPrice: parseFloat(value) || 0 };
+      return { ...r, unitPrice: parseFloat(value) || 0 };
     }));
   };
 
-  const removeFromCart = (productId: number) => {
-    setCart(prev => prev.filter(c => c.productId !== productId));
+  const deleteRow = (idx: number) => {
+    setRows(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length === 0) return [emptyRow()];
+      return next;
+    });
   };
 
-  const total = cart.reduce((s, c) => s + c.quantity * c.unitPrice, 0);
+  const validRows = rows.filter(r => r.productId && r.quantity > 0);
+  const total = validRows.reduce((s, r) => s + r.quantity * r.unitPrice, 0);
+  const totalQty = validRows.reduce((s, r) => s + r.quantity, 0);
   const ccPrefix = currencyCode !== "USD" ? `${currencyCode} ` : "$";
 
-  const handlePrint = useReactToPrint({ contentRef: printRef });
+  // ---- Print ----
+  const fmtPrint = (n: number, prefix = "") => {
+    const fixed = Math.abs(n).toFixed(2);
+    const clean = fixed.replace(/\.00$/, "");
+    const parts = clean.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const num = parts.join(".");
+    return prefix ? prefix + "\u00A0" + num : num;
+  };
+  const fmtPrintAmt = (n: number) => fmtPrint(n, ccPrefix);
 
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `FactoryPOS_${txDate}`,
+    onAfterPrint: () => setShowPrintDialog(false),
+  });
+
+  // ---- Mutations ----
   const saleMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/factory/pos/sale", data),
     onSuccess: async (res) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory", locationId] });
-      // Build print data
-      setPrintSale({
-        ...data,
-        items: cart,
-        customerName,
-        currencyCode,
-        total,
-        txDate,
-        companyName: selectedCompany?.name || "",
-      });
-      setCart([]);
+      setSavedSale({ ...data, cartRows: validRows, customerName, notes, currencyCode, total, txDate, companyName: selectedCompany?.name || "" });
+      setRows([emptyRow()]);
       setCustomerName("");
       setNotes("");
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
-      setTimeout(() => handlePrint(), 300);
+      setShowPrintDialog(true);
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message || "Failed to create sale", variant: "destructive" });
@@ -193,7 +281,7 @@ export default function FactoryPOS() {
 
   const handleSubmit = () => {
     if (!locationId) return toast({ title: "Select a location", variant: "destructive" });
-    if (cart.length === 0) return toast({ title: "Cart is empty", variant: "destructive" });
+    if (validRows.length === 0) return toast({ title: "No items in sale", variant: "destructive" });
     saleMutation.mutate({
       locationId: parseInt(locationId),
       customerName: customerName || null,
@@ -201,327 +289,659 @@ export default function FactoryPOS() {
       txDate,
       currencyCode,
       cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-      items: cart.map(c => ({
-        productId: c.productId,
-        productName: c.productName,
-        articleCode: c.articleCode,
-        quantity: c.quantity,
-        unitPrice: String(c.unitPrice),
+      items: validRows.map(r => ({
+        productId: r.productId,
+        productName: r.productName,
+        articleCode: r.articleCode,
+        quantity: r.quantity,
+        unitPrice: String(r.unitPrice),
       })),
     });
   };
 
+  // Mobile row being edited
+  const mobileRow = mobileRowEditIdx !== null ? rows[mobileRowEditIdx] : null;
+
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <ShoppingCart className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Factory POS</h1>
+    <div className="space-y-4">
+      <PageHeader title="Factory POS">
+        <div className="flex flex-wrap gap-1 sm:gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowHistory(h => !h)}
+            data-testid="button-toggle-history"
+          >
+            <History className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">History</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={validRows.length === 0 || saleMutation.isPending}
+            className="gap-1 sm:gap-2"
+            data-testid="button-complete-sale"
+          >
+            {saleMutation.isPending ? "..." : <><span className="hidden sm:inline">Save</span><Check className="h-4 w-4" /></>}
+          </Button>
+        </div>
+      </PageHeader>
+
+      {/* ── Toolbar ── */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
+        {/* Location */}
+        <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+          <Select value={locationId} onValueChange={setLocationId}>
+            <SelectTrigger className="w-full sm:w-48" data-testid="select-location">
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              {(locations || []).map((l: any) => (
+                <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={txDate}
+            onChange={e => setTxDate(e.target.value)}
+            className="w-full sm:w-36"
+            data-testid="input-sale-date"
+          />
+        </div>
+
+        {/* Currency */}
+        <div className="flex items-center gap-2">
+          <Select value={currencyCode} onValueChange={setCurrencyCode}>
+            <SelectTrigger className="w-24 sm:w-28" data-testid="select-currency">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="GBP">GBP</SelectItem>
+              <SelectItem value="LBP">LBP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Cash Account */}
+        <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+          <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+          <Select value={cashAccountId} onValueChange={setCashAccountId}>
+            <SelectTrigger className="w-full sm:w-48" data-testid="select-cash-account">
+              <SelectValue placeholder="Cash account" />
+            </SelectTrigger>
+            <SelectContent>
+              {cashAccounts.map((a: any) => (
+                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Customer */}
+        <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+          <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+          <Input
+            placeholder="Customer name (optional)"
+            value={customerName}
+            onChange={e => setCustomerName(e.target.value)}
+            className="w-full sm:w-44"
+            data-testid="input-customer-name"
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="col-span-2 sm:col-span-1 sm:flex-1 flex items-center gap-2 order-last sm:order-none">
+          <Textarea
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="resize-none h-9"
+            data-testid="input-notes"
+          />
+        </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="pos" data-testid="tab-pos"><ShoppingCart className="h-4 w-4 mr-1" />New Sale</TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history"><History className="h-4 w-4 mr-1" />History</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pos" className="mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Left: Product Browser */}
-            <div className="lg:col-span-2 space-y-3">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <Select value={locationId} onValueChange={setLocationId}>
-                      <SelectTrigger className="w-52" data-testid="select-location">
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(locations || []).map((l: any) => (
-                          <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="relative flex-1 min-w-40">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        className="pl-8"
-                        placeholder="Search products..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        data-testid="input-product-search"
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {!locationId ? (
-                    <div className="p-8 text-center text-muted-foreground">
-                      <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      Select a location to browse products
-                    </div>
-                  ) : invLoading ? (
-                    <div className="p-8 text-center text-muted-foreground">Loading inventory...</div>
-                  ) : filteredInventory.length === 0 ? (
-                    <div className="p-8 text-center text-muted-foreground">No products in stock</div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
-                      {filteredInventory.map(item => {
-                        const inCart = cart.find(c => c.productId === item.productId);
-                        const price = parseFloat(item.sellingPrice || "0");
-                        return (
-                          <button
-                            key={item.productId}
-                            onClick={() => addToCart(item)}
-                            className="text-left rounded-md border p-3 hover-elevate active-elevate-2 space-y-1"
-                            data-testid={`card-product-${item.productId}`}
-                          >
-                            <div className="font-medium text-sm leading-tight line-clamp-2">{item.productName}</div>
-                            {item.articleCode && <div className="text-xs text-muted-foreground">{item.articleCode}</div>}
-                            {item.category && <div className="text-xs text-muted-foreground">{item.category}</div>}
-                            <div className="flex items-center justify-between gap-1 mt-1">
-                              <Badge variant="outline" className="text-xs">Qty: {item.quantity}</Badge>
-                              {price > 0 && <span className="text-xs font-semibold text-primary">{ccPrefix}{formatNum(price)}</span>}
-                            </div>
-                            {inCart && <div className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"><Check className="h-3 w-3" />In cart: {inCart.quantity}</div>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+      {/* ── MOBILE card list (hidden on md+) ── */}
+      <div className="md:hidden space-y-1 pb-36">
+        {rows.map((row, idx) => {
+          if (!row.productId) return null;
+          return (
+            <div
+              key={row.id}
+              className="rounded-md border bg-card px-3 py-2.5 flex items-center gap-2 hover-elevate active-elevate-2 cursor-pointer"
+              onClick={() => { setMobileRowEditIdx(idx); setMobileRowEditOpen(true); }}
+              data-testid={`mobile-row-card-${idx}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground shrink-0">{idx + 1}.</span>
+                  <span className="text-sm font-medium truncate">{row.productName}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                  Qty: {row.quantity} · Price: {ccPrefix}{formatNum(row.unitPrice)}
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center gap-1.5">
+                <span className="text-sm font-semibold font-mono">{ccPrefix}{formatNum(row.quantity * row.unitPrice)}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => { e.stopPropagation(); deleteRow(idx); }}
+                  data-testid={`mobile-delete-row-${idx}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
             </div>
+          );
+        })}
 
-            {/* Right: Cart + Form */}
-            <div className="space-y-3">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Receipt className="h-4 w-4" />Sale Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Date</Label>
-                      <Input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} data-testid="input-sale-date" />
+        {/* Tap to add item */}
+        <div
+          className="rounded-md border border-dashed border-muted-foreground/30 px-3 py-3 flex items-center gap-2 text-muted-foreground cursor-pointer hover-elevate active-elevate-2"
+          onClick={() => {
+            setMobileRowTarget(rows.length);
+            setMobileBrowseOpen(true);
+          }}
+          data-testid="mobile-add-item-card"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="text-sm">Tap to add item</span>
+        </div>
+
+        {/* Mobile summary */}
+        <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">
+            {validRows.length} items · Qty {totalQty}
+          </span>
+          <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">
+            {ccPrefix}{formatNum(total)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── DESKTOP: table + right product panel (hidden on mobile) ── */}
+      <div className="hidden md:flex flex-col lg:flex-row gap-4">
+        {/* Main Table */}
+        <Card className="flex-1 overflow-hidden min-w-0">
+          <div className="overflow-x-auto">
+            <div className="min-w-[400px]">
+              {/* Header */}
+              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-10">
+                <div className="w-10 flex items-center justify-center border-r border-muted h-10 text-xs text-muted-foreground">#</div>
+                {COLUMNS.map(col => (
+                  <div key={col.key} className={`${col.width} flex items-center px-3 border-r border-muted h-10 text-xs text-muted-foreground`}>
+                    {col.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Rows */}
+              <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
+                {rows.map((row, idx) => (
+                  <div key={row.id} className="flex border-b border-muted/50 hover-elevate">
+                    <div className="w-10 flex items-center justify-center border-r border-muted/50 h-10 text-xs text-muted-foreground">
+                      {row.productId ? idx + 1 : ""}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select value={currencyCode} onValueChange={setCurrencyCode}>
-                        <SelectTrigger data-testid="select-currency">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="LBP">LBP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Customer Name (optional)</Label>
-                    <Input placeholder="Walk-in customer" value={customerName} onChange={e => setCustomerName(e.target.value)} data-testid="input-customer-name" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cash Account</Label>
-                    <Select value={cashAccountId} onValueChange={setCashAccountId}>
-                      <SelectTrigger data-testid="select-cash-account">
-                        <SelectValue placeholder="Select account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cashAccounts.map((a: any) => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Notes</Label>
-                    <Textarea placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} className="resize-none text-sm" rows={2} data-testid="input-notes" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Cart */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" />Cart</span>
-                    {cart.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => setCart([])} className="text-xs h-7">
-                        <X className="h-3 w-3 mr-1" />Clear
-                      </Button>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {cart.length === 0 ? (
-                    <div className="p-6 text-center text-muted-foreground text-sm">Cart is empty</div>
-                  ) : (
-                    <div className="divide-y">
-                      {cart.map(item => (
-                        <div key={item.productId} className="p-3 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium leading-tight">{item.productName}</div>
-                              {item.articleCode && <div className="text-xs text-muted-foreground">{item.articleCode}</div>}
-                            </div>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 flex-shrink-0" onClick={() => removeFromCart(item.productId)} data-testid={`button-remove-cart-${item.productId}`}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-0.5">
-                              <Label className="text-xs text-muted-foreground">Qty (max {item.availableQty})</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                max={item.availableQty}
-                                value={item.quantity}
-                                onChange={e => updateCartItem(item.productId, "quantity", e.target.value)}
-                                className="h-8 text-sm"
-                                data-testid={`input-qty-${item.productId}`}
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <Label className="text-xs text-muted-foreground">Price ({currencyCode})</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.unitPrice}
-                                onChange={e => updateCartItem(item.productId, "unitPrice", e.target.value)}
-                                className="h-8 text-sm"
-                                data-testid={`input-price-${item.productId}`}
-                              />
-                            </div>
-                          </div>
-                          <div className="text-right text-sm font-semibold">
-                            {ccPrefix}{formatNum(item.quantity * item.unitPrice)}
-                          </div>
-                        </div>
-                      ))}
-                      <div className="p-3 bg-muted/30 flex items-center justify-between">
-                        <span className="font-semibold text-sm">Total</span>
-                        <span className="text-xl font-bold tabular-nums">{ccPrefix}{formatNum(total)}</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleSubmit}
-                disabled={cart.length === 0 || saleMutation.isPending}
-                data-testid="button-submit-sale"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                {saleMutation.isPending ? "Processing..." : `Charge ${ccPrefix}${formatNum(total)}`}
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="history" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Sales History</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {salesLoading ? (
-                <div className="p-6 text-center text-muted-foreground">Loading...</div>
-              ) : !sales || sales.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground">No sales yet</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sale #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sales.map(sale => {
-                      const pfx = sale.currencyCode !== "USD" ? `${sale.currencyCode} ` : "$";
-                      return (
-                        <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
-                          <TableCell className="font-mono text-sm">{sale.saleNumber}</TableCell>
-                          <TableCell className="text-sm">{sale.txDate}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{sale.customerName || "—"}</TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums">{pfx}{formatNum(sale.totalAmount)}</TableCell>
-                          <TableCell>
-                            <Badge variant={sale.status === "VOIDED" ? "secondary" : "outline"}>
-                              {sale.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {sale.status !== "VOIDED" && (
+                    {COLUMNS.map(col => (
+                      <div
+                        key={col.key}
+                        className={`${col.width} border-r h-10 ${col.key === "amount" ? "bg-muted/30" : ""}`}
+                      >
+                        {col.key === "delete" ? (
+                          row.productId ? (
+                            <div className="flex items-center justify-center h-full">
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="text-xs h-7 text-destructive"
-                                onClick={() => setVoidId(sale.id)}
-                                data-testid={`button-void-${sale.id}`}
+                                size="icon"
+                                onClick={() => deleteRow(idx)}
+                                data-testid={`button-delete-row-${idx}`}
                               >
-                                Void
+                                <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
+                            </div>
+                          ) : null
+                        ) : col.key === "amount" ? (
+                          <div className="flex items-center justify-end h-full px-3 font-mono text-sm text-muted-foreground">
+                            {row.productId ? `${ccPrefix}${formatNum(row.quantity * row.unitPrice)}` : ""}
+                          </div>
+                        ) : col.key === "productName" ? (
+                          <div className="flex items-center h-full px-3 text-sm font-medium">
+                            {row.productId ? (
+                              <div className="min-w-0">
+                                <div className="truncate">{row.productName}</div>
+                                {row.articleCode && <div className="text-xs text-muted-foreground truncate">{row.articleCode}</div>}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/50 text-xs">Click a product →</span>
                             )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Print Receipt (hidden) */}
-      {printSale && (
-        <div className="hidden">
-          <div ref={printRef} className="p-6 font-mono text-sm max-w-sm mx-auto">
-            <div className="text-center mb-4">
-              <div className="text-lg font-bold">{printSale.companyName}</div>
-              <div className="text-xs text-gray-500">Factory POS Receipt</div>
-              <div className="mt-1 text-xs">#{printSale.saleNumber}</div>
-              <div className="text-xs">{printSale.txDate}</div>
-            </div>
-            {printSale.customerName && (
-              <div className="mb-2 text-xs">Customer: {printSale.customerName}</div>
-            )}
-            <div className="border-t border-b py-2 my-2 space-y-1">
-              {printSale.items.map((item: CartItem, i: number) => (
-                <div key={i} className="flex justify-between gap-2">
-                  <div>
-                    <div>{item.productName}</div>
-                    <div className="text-xs text-gray-500">{item.quantity} × {ccPrefix}{formatNum(item.unitPrice)}</div>
+                          </div>
+                        ) : (
+                          <input
+                            ref={el => { inputRefs.current[`${idx}-${col.key}`] = el; }}
+                            type="number"
+                            inputMode="decimal"
+                            value={
+                              !row.productId ? "" :
+                              col.key === "quantity" ? row.quantity :
+                              row.unitPrice === 0 ? "" : row.unitPrice
+                            }
+                            onChange={e => row.productId && updateRow(idx, col.key as "quantity" | "unitPrice", e.target.value)}
+                            readOnly={!row.productId}
+                            className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 text-sm font-mono text-right ${!row.productId ? "cursor-default" : ""}`}
+                            data-testid={`input-${col.key}-${idx}`}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="font-semibold">{ccPrefix}{formatNum(item.quantity * item.unitPrice)}</div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-            <div className="flex justify-between font-bold text-base mt-2">
-              <span>TOTAL</span>
-              <span>{ccPrefix}{formatNum(printSale.total)}</span>
-            </div>
-            <div className="text-center mt-4 text-xs text-gray-400">Thank you!</div>
           </div>
-        </div>
+
+          {/* Total Section */}
+          <div className="border-t border-muted bg-muted/20 p-4">
+            <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-lg ml-auto">
+              <div className="flex items-center justify-between sm:justify-start gap-2 text-sm">
+                <span className="text-muted-foreground">Items:</span>
+                <span className="font-mono">{validRows.length}</span>
+                <span className="text-muted-foreground ml-2">Qty:</span>
+                <span className="font-mono" data-testid="text-total-qty">{totalQty}</span>
+              </div>
+              <div className="flex items-center justify-between sm:justify-start gap-2">
+                <span className="text-lg font-medium">Total:</span>
+                <span className="text-2xl font-semibold font-mono" data-testid="text-grand-total">
+                  {ccPrefix}{formatNum(total)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Right: Product Browser */}
+        <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
+          <div className="p-4 border-b">
+            <h3 className="text-sm font-medium mb-3">Products</h3>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search bales..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-product-search"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {!locationId ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                <Package className="h-8 w-8 opacity-40" />
+                <span className="text-sm">Select a location first</span>
+              </div>
+            ) : invLoading ? (
+              <div className="text-center text-muted-foreground text-sm py-8">Loading inventory...</div>
+            ) : filteredInventory.length === 0 ? (
+              <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
+            ) : (
+              <div className="space-y-1">
+                {filteredInventory.map(item => {
+                  const inCart = rows.find(r => r.productId === item.productId);
+                  const price = parseFloat(item.sellingPrice || "0");
+                  return (
+                    <button
+                      key={item.productId}
+                      onClick={() => addOrIncrementProduct(item)}
+                      className="w-full text-left rounded-md px-3 py-2.5 border hover-elevate active-elevate-2 flex items-center justify-between gap-2"
+                      data-testid={`card-product-${item.productId}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{item.productName}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                          {item.articleCode && <span>{item.articleCode}</span>}
+                          <span>Stock: {item.quantity}</span>
+                          {price > 0 && <span className="font-semibold text-primary">{ccPrefix}{formatNum(price)}</span>}
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        {inCart && (
+                          <Badge variant="outline" className="text-xs">×{inCart.quantity}</Badge>
+                        )}
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* ── History ── */}
+      {showHistory && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Sales History
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {salesLoading ? (
+              <div className="p-6 text-center text-muted-foreground">Loading...</div>
+            ) : !sales || sales.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">No sales yet</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sale #</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sales.map((sale: any) => {
+                    const pfx = sale.currencyCode !== "USD" ? `${sale.currencyCode} ` : "$";
+                    return (
+                      <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
+                        <TableCell className="font-mono text-sm">{sale.saleNumber}</TableCell>
+                        <TableCell className="text-sm">{sale.txDate}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{sale.customerName || "—"}</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">{pfx}{formatNum(sale.totalAmount)}</TableCell>
+                        <TableCell>
+                          <Badge variant={sale.status === "VOIDED" ? "secondary" : "outline"}>{sale.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {sale.status !== "VOIDED" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-destructive"
+                              onClick={() => setVoidId(sale.id)}
+                              data-testid={`button-void-${sale.id}`}
+                            >
+                              Void
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       )}
 
-      {/* Void confirmation */}
+      {/* ── MOBILE: product browse sheet ── */}
+      <Sheet open={mobileBrowseOpen} onOpenChange={setMobileBrowseOpen}>
+        <SheetContent side="bottom" className="h-[80vh] flex flex-col">
+          <div className="pb-3 border-b">
+            <div className="text-base font-semibold mb-3">Add Product</div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search bales..."
+                value={mobileBrowseSearch}
+                onChange={e => setMobileBrowseSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1 pt-3">
+            {!locationId ? (
+              <div className="text-center text-muted-foreground text-sm py-8">Select a location first</div>
+            ) : mobileFilteredInventory.length === 0 ? (
+              <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
+            ) : (
+              mobileFilteredInventory.map(item => {
+                const price = parseFloat(item.sellingPrice || "0");
+                return (
+                  <button
+                    key={item.productId}
+                    onClick={() => addProductFromMobile(item)}
+                    className="w-full text-left rounded-md px-3 py-2.5 border hover-elevate active-elevate-2 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{item.productName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Stock: {item.quantity}{price > 0 ? ` · ${ccPrefix}${formatNum(price)}` : ""}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── MOBILE: row edit sheet ── */}
+      <Sheet open={mobileRowEditOpen} onOpenChange={setMobileRowEditOpen}>
+        <SheetContent side="bottom" className="h-auto">
+          {mobileRow && mobileRowEditIdx !== null && (
+            <>
+              <div className="pb-3 border-b">
+                <div className="text-base font-semibold truncate">{mobileRow.productName}</div>
+                {mobileRow.articleCode && <div className="text-xs text-muted-foreground">{mobileRow.articleCode}</div>}
+              </div>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Quantity (max {mobileRow.availableQty || "∞"})</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={mobileRow.quantity}
+                    onChange={e => updateRow(mobileRowEditIdx, "quantity", e.target.value)}
+                    className="text-right font-mono h-12 text-lg"
+                    style={{ fontSize: "18px" }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Unit Price ({currencyCode})</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={mobileRow.unitPrice === 0 ? "" : mobileRow.unitPrice}
+                    onChange={e => updateRow(mobileRowEditIdx, "unitPrice", e.target.value)}
+                    className="text-right font-mono h-12 text-lg"
+                    placeholder="0"
+                    style={{ fontSize: "18px" }}
+                  />
+                </div>
+                <div className="rounded-md bg-muted/30 border px-3 py-2.5 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount</span>
+                  <span className="text-lg font-semibold font-mono">{ccPrefix}{formatNum(mobileRow.quantity * mobileRow.unitPrice)}</span>
+                </div>
+                <div className="flex gap-2 pt-1 pb-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => { deleteRow(mobileRowEditIdx); setMobileRowEditOpen(false); }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1.5" />Remove
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setMobileRowEditOpen(false)}
+                  >
+                    <Check className="h-4 w-4 mr-1.5" />Done
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── MOBILE: FAB ── */}
+      <button
+        className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        onClick={() => { setMobileRowTarget(rows.length); setMobileBrowseOpen(true); }}
+        data-testid="button-mobile-fab-add"
+        aria-label="Add product"
+      >
+        <Plus className="h-7 w-7" />
+      </button>
+
+      {/* ── MOBILE: Sticky save bar ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-3 py-2 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-muted-foreground">{validRows.length} items · Qty {totalQty}</div>
+          <div className="text-base font-semibold font-mono leading-tight" data-testid="text-sticky-total">
+            {ccPrefix}{formatNum(total)}
+          </div>
+        </div>
+        <Button
+          onClick={handleSubmit}
+          disabled={saleMutation.isPending || validRows.length === 0}
+          className="shrink-0 h-10 px-5"
+          data-testid="button-mobile-sticky-save"
+        >
+          {saleMutation.isPending ? "..." : <><Check className="h-4 w-4 mr-1.5" />Save</>}
+        </Button>
+      </div>
+
+      {/* ── Print Dialog ── */}
+      <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Print Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sale recorded successfully. Print the invoice?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* Hidden Print Template */}
+          <div className="hidden">
+            <div
+              ref={printRef}
+              style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "8pt", padding: "8px", backgroundColor: "white", color: "black", width: "100%", fontWeight: "normal", fontVariantNumeric: "tabular-nums" }}
+            >
+              <style dangerouslySetInnerHTML={{ __html: `
+                @media print {
+                  body { font-family: Arial, Helvetica, sans-serif !important; }
+                  * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; }
+                }
+              `}} />
+
+              {/* Title */}
+              <div style={{ textAlign: "center", fontWeight: "900", fontSize: "13pt", letterSpacing: "1px", marginBottom: "4px" }}>
+                FACTORY POS INVOICE
+              </div>
+
+              {/* Sale # centered */}
+              {savedSale?.saleNumber && (
+                <div style={{ textAlign: "center", fontSize: "8pt", fontWeight: "700", marginBottom: "3px" }}>
+                  #{savedSale.saleNumber}
+                </div>
+              )}
+
+              {/* Date / User row */}
+              <div style={{ fontSize: "8pt", fontWeight: "700", display: "flex", justifyContent: "space-between", borderTop: "1.5px solid black", borderBottom: "1.5px solid black", padding: "3px 0", marginBottom: "4px" }}>
+                <span>Date: {savedSale?.txDate}</span>
+                <span>User: {printUserName}</span>
+              </div>
+
+              {/* Customer info */}
+              {savedSale?.customerName && (
+                <div style={{ fontSize: "8pt", fontWeight: "700", marginBottom: "4px", padding: "3px", border: "1.5px solid black" }}>
+                  <div style={{ fontWeight: "900" }}>Customer</div>
+                  <div>{savedSale.customerName}</div>
+                </div>
+              )}
+
+              {/* Items table */}
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "0", fontVariantNumeric: "tabular-nums", border: "1px solid #999" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left",    padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>Description</th>
+                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "8%" }}>Qty</th>
+                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "14%" }}>Rate</th>
+                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "16%" }}>Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(savedSale?.cartRows ?? []).map((row: CartRow, idx: number) => {
+                    const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
+                    return (
+                      <tr key={idx} style={{ backgroundColor: rowBg }}>
+                        <td style={{ padding: "2px 5px", verticalAlign: "top", fontWeight: "600", lineHeight: "1.2", fontSize: "7pt", border: "1px solid #c8c8c8" }}>
+                          {row.productName}
+                          {row.articleCode ? <span style={{ color: "#666", fontSize: "6.5pt" }}> ({row.articleCode})</span> : null}
+                        </td>
+                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrint(row.quantity)}</td>
+                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.unitPrice)}</td>
+                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.quantity * row.unitPrice)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>TOTAL</td>
+                    <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>
+                      {fmtPrint((savedSale?.cartRows ?? []).reduce((s: number, r: CartRow) => s + r.quantity, 0))}
+                    </td>
+                    <td style={{ padding: "2px 5px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                    <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>
+                      {fmtPrintAmt(savedSale?.total ?? 0)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Total Paid */}
+              <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "5px", paddingTop: "5px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
+                <span>TOTAL PAID:</span>
+                <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
+              </div>
+
+              {/* Notes */}
+              {savedSale?.notes && (
+                <div dir="auto" style={{ fontSize: "8pt", fontWeight: "600", marginTop: "5px", padding: "3px", border: "1.5px solid black" }}>
+                  <span style={{ fontWeight: "900" }}>Note:</span> {savedSale.notes}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div style={{ textAlign: "center", fontSize: "7.5pt", fontWeight: "700", marginTop: "6px", paddingTop: "4px", borderTop: "1.5px solid black" }}>
+                <div>Thank you for your business!</div>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintDialog(false)} data-testid="button-cancel-print">
+              Close
+            </Button>
+            <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
+              <Printer className="h-4 w-4" />
+              Print Invoice
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Void confirmation ── */}
       <AlertDialog open={voidId !== null} onOpenChange={() => setVoidId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
