@@ -3981,3 +3981,52 @@ export const factoryBaleWasteDispatches = pgTable("factory_bale_waste_dispatches
 export const insertFactoryBaleWasteDispatchSchema = createInsertSchema(factoryBaleWasteDispatches).omit({ id: true, createdAt: true });
 export type InsertFactoryBaleWasteDispatch = z.infer<typeof insertFactoryBaleWasteDispatchSchema>;
 export type FactoryBaleWasteDispatch = typeof factoryBaleWasteDispatches.$inferSelect;
+
+// Factory POS Sales
+export const factoryPosSales = pgTable("factory_pos_sales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  saleNumber: text("sale_number").notNull(),
+  txDate: date("tx_date").notNull(),
+  locationId: integer("location_id"),
+  customerName: text("customer_name"),
+  notes: text("notes"),
+  totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+  cashAccountId: integer("cash_account_id"),
+  status: text("status").notNull().default("COMPLETED"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryPosSaleSchema = createInsertSchema(factoryPosSales).omit({ id: true, createdAt: true }).extend({
+  companyId: z.number().min(1),
+  saleNumber: z.string().min(1),
+  txDate: z.string().min(1),
+  totalAmount: z.string().optional(),
+  currencyCode: z.string().optional(),
+  cashAccountId: z.number().optional().nullable(),
+  locationId: z.number().optional().nullable(),
+  customerName: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  status: z.string().optional(),
+  createdBy: z.number().optional().nullable(),
+});
+export type InsertFactoryPosSale = z.infer<typeof insertFactoryPosSaleSchema>;
+export type FactoryPosSale = typeof factoryPosSales.$inferSelect;
+
+export const factoryPosSaleItems = pgTable("factory_pos_sale_items", {
+  id: serial("id").primaryKey(),
+  saleId: integer("sale_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  productId: integer("product_id"),
+  productName: text("product_name").notNull(),
+  articleCode: text("article_code"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 20, scale: 2 }).notNull().default("0"),
+  totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
+});
+export const insertFactoryPosSaleItemSchema = createInsertSchema(factoryPosSaleItems).omit({ id: true });
+export type InsertFactoryPosSaleItem = z.infer<typeof insertFactoryPosSaleItemSchema>;
+export type FactoryPosSaleItem = typeof factoryPosSaleItems.$inferSelect;

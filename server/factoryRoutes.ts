@@ -97,6 +97,8 @@ import {
   factoryWorkerAdvances,
   factoryAdvanceRepayments,
   factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
 } from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
 
@@ -16577,6 +16579,222 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       });
     } catch (error: any) {
       console.error("Error submitting waste dispatch:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ─── Factory POS ────────────────────────────────────────────────────────────
+
+  // GET /api/factory/pos/sales — list factory POS sales
+  app.get("/api/factory/pos/sales", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const sales = await db
+        .select()
+        .from(factoryPosSales)
+        .where(eq(factoryPosSales.companyId, companyId))
+        .orderBy(desc(factoryPosSales.createdAt));
+      res.json(sales);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/factory/pos/sales/:id — single sale with items
+  app.get("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const saleId = parseInt(req.params.id);
+      const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      if (!sale) return res.status(404).json({ message: "Sale not found" });
+      const items = await db.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
+      res.json({ ...sale, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/pos/sale — create a factory POS sale
+  app.post("/api/factory/pos/sale", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      const userId = (req.session as any).userId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { locationId, customerName, notes, txDate, currencyCode, cashAccountId, items } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Validate item quantities against available stock
+      for (const item of items) {
+        if (!item.productId && !item.productName) return res.status(400).json({ message: "Each item needs a product" });
+        if (!item.quantity || item.quantity <= 0) return res.status(400).json({ message: "Quantity must be positive" });
+      }
+
+      const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
+
+      // Generate sale number
+      const [seqRow] = await db.select({ count: sql<number>`count(*)` }).from(factoryPosSales).where(eq(factoryPosSales.companyId, companyId));
+      const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
+      const saleNumber = `FPOS-${nextNum}`;
+
+      const result = await db.transaction(async (tx: any) => {
+        // 1. Create sale record
+        const [sale] = await tx.insert(factoryPosSales).values({
+          companyId,
+          saleNumber,
+          txDate: txDate || new Date().toISOString().split("T")[0],
+          locationId: locationId || null,
+          customerName: customerName || null,
+          notes: notes || null,
+          totalAmount: totalAmount.toFixed(2),
+          currencyCode: currencyCode || "USD",
+          cashAccountId: cashAccountId || null,
+          status: "COMPLETED",
+          createdBy: userId,
+        }).returning();
+
+        // 2. Create sale items
+        for (const item of items) {
+          const qty = parseInt(item.quantity || "1");
+          const price = parseFloat(item.unitPrice || "0");
+          await tx.insert(factoryPosSaleItems).values({
+            saleId: sale.id,
+            companyId,
+            productId: item.productId || null,
+            productName: item.productName,
+            articleCode: item.articleCode || null,
+            quantity: qty,
+            unitPrice: price.toFixed(2),
+            totalAmount: (price * qty).toFixed(2),
+            currencyCode: currencyCode || "USD",
+          });
+
+          // 3. Mark N bales as SOLD (pick oldest available by id)
+          if (item.productId && locationId) {
+            const availableBales = await tx
+              .select({ id: factoryBales.id })
+              .from(factoryBales)
+              .where(and(
+                eq(factoryBales.companyId, companyId),
+                eq(factoryBales.productId, item.productId),
+                eq(factoryBales.erpLocationId, locationId),
+                or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+              ))
+              .orderBy(factoryBales.id)
+              .limit(qty);
+            const baleIds = availableBales.map((b: any) => b.id);
+            if (baleIds.length > 0) {
+              await tx.update(factoryBales)
+                .set({ status: "SOLD", updatedAt: new Date() })
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+            }
+          }
+        }
+
+        // 4. Create daybook entry
+        await tx.insert(factoryDaybookEntries).values({
+          companyId,
+          txDate: txDate || new Date().toISOString().split("T")[0],
+          txType: "BALE_SALE",
+          referenceId: sale.id,
+          referenceTable: "factory_pos_sales",
+          description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
+          currencyCode: currencyCode || "USD",
+          amountCurrency: totalAmount.toFixed(2),
+          fxRateToUsd: "1",
+          amountUsd: totalAmount.toFixed(2),
+          createdBy: userId,
+        });
+
+        // 5. Create ERP voucher for cash account (DR Cash / CR Factory Sales Income)
+        if (cashAccountId) {
+          const voucherNum = `FPOS-${sale.id}-${Date.now()}`;
+          const [vch] = await tx.insert(vouchers).values({
+            companyId,
+            voucherType: "Receipt",
+            voucherNumber: voucherNum,
+            voucherDate: txDate || new Date().toISOString().split("T")[0],
+            description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
+            totalAmount: totalAmount.toFixed(2),
+            currency: currencyCode || "USD",
+            exchangeRate: "1",
+            sourceModule: "FACTORY_POS",
+          }).returning();
+          // DR Cash
+          await tx.insert(voucherEntries).values({
+            voucherId: vch.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: totalAmount.toFixed(2),
+            creditAmount: "0",
+            narration: `Factory POS cash receipt – ${saleNumber}`,
+          });
+          // CR Factory Sales Income
+          const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
+          await tx.insert(voucherEntries).values({
+            voucherId: vch.id,
+            ledgerAccountId: salesIncomeAccId,
+            debitAmount: "0",
+            creditAmount: totalAmount.toFixed(2),
+            narration: `Factory POS sales income – ${saleNumber}`,
+          });
+        }
+
+        return sale;
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error creating factory POS sale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/pos/sales/:id — void a factory POS sale
+  app.delete("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const saleId = parseInt(req.params.id);
+      const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      if (!sale) return res.status(404).json({ message: "Sale not found" });
+      if (sale.status === "VOIDED") return res.status(400).json({ message: "Sale already voided" });
+
+      await db.transaction(async (tx: any) => {
+        // Restore bales to IN_STOCK by finding bales that were sold around the sale date/product
+        const items = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
+        for (const item of items) {
+          if (item.productId && sale.locationId) {
+            // Re-open the most recently SOLD bales for that product at that location
+            const soldBales = await tx
+              .select({ id: factoryBales.id })
+              .from(factoryBales)
+              .where(and(
+                eq(factoryBales.companyId, companyId),
+                eq(factoryBales.productId, item.productId),
+                eq(factoryBales.erpLocationId, sale.locationId),
+                eq(factoryBales.status, "SOLD"),
+              ))
+              .orderBy(desc(factoryBales.id))
+              .limit(item.quantity);
+            const baleIds = soldBales.map((b: any) => b.id);
+            if (baleIds.length > 0) {
+              await tx.update(factoryBales)
+                .set({ status: "IN_STOCK", updatedAt: new Date() })
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+            }
+          }
+        }
+        // Mark sale as voided
+        await tx.update(factoryPosSales).set({ status: "VOIDED" }).where(eq(factoryPosSales.id, saleId));
+      });
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Error voiding factory POS sale:", error);
       res.status(400).json({ message: error.message });
     }
   });

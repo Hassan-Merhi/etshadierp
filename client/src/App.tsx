@@ -145,6 +145,7 @@ const FactoryMixOptimizer = lazy(() => import("@/pages/FactoryMixOptimizer"));
 const FactoryCashflow = lazy(() => import("@/pages/FactoryCashflow"));
 const FactoryWaste = lazy(() => import("@/pages/FactoryWaste"));
 const WasteDispatchPage = lazy(() => import("@/pages/WasteDispatch"));
+const FactoryPOS = lazy(() => import("@/pages/FactoryPOS"));
 const FactoryIntelSettings = lazy(() => import("@/pages/FactorySettings"));
 const ConflictCenter = lazy(() => import("@/pages/ConflictCenter"));
 const Chat = lazy(() => import("@/pages/Chat"));
@@ -716,6 +717,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
                     <Route path="/factory/intelligence/waste" component={FactoryWaste} />
                     <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
+                    <Route path="/factory/pos" component={FactoryPOS} />
                     <Route path="/factory/bale-ledger" component={BaleLedger} />
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
                     <Route path="/factory/chat" component={Chat} />
