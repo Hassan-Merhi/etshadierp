@@ -1588,17 +1588,18 @@ export default function FactoryLocationInventory() {
             <table className="w-full table-fixed text-sm">
               <colgroup>
                 {proformaMode && <col style={{ width: "36px" }} />}
-                {isAllItems && <col style={{ width: "110px" }} />}
-                <col style={{ width: "100px" }} />
-                <col />
+                {isAllItems && <col style={{ width: "120px" }} />}
+                <col style={{ width: "110px" }} />
+                <col style={{ minWidth: "160px" }} />
                 <col style={{ width: "70px" }} />
                 {proformaMode && <col style={{ width: "80px" }} />}
-                {proformaMode && <col style={{ width: "100px" }} />}
-                <col style={{ width: "90px" }} />
-                <col style={{ width: "90px" }} />
+                {proformaMode && <col style={{ width: "110px" }} />}
                 <col style={{ width: "100px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "100px" }} />
+                {!hideAvgRate && <col style={{ width: "100px" }} />}
+                {!hideAvgRate && <col style={{ width: "100px" }} />}
+                {!hideTotalValue && <col style={{ width: "120px" }} />}
+                {!hideTotalValue && <col style={{ width: "120px" }} />}
+                <col style={{ width: "90px" }} />
                 {!proformaMode && <col style={{ width: "44px" }} />}
               </colgroup>
               <thead className="bg-muted/50 sticky top-0 z-10">
@@ -1606,8 +1607,8 @@ export default function FactoryLocationInventory() {
                   {proformaMode && <th className="px-2"></th>}
                   {isAllItems && <th className="text-left px-3 font-medium">Category</th>}
                   <th className="text-left px-3 font-medium">Article Code</th>
-                  <th className="text-left px-3 font-medium">Bale Name</th>
-                  <th className="text-right px-3 font-medium">Bales</th>
+                  <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
+                  <th className="text-right px-3 font-medium whitespace-nowrap">Bales</th>
                   {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                   {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                   <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
@@ -1643,11 +1644,11 @@ export default function FactoryLocationInventory() {
                           {isAllItems && <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>}
                           <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                           <td className="px-3 font-medium">
-                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
+                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-${prod.productId}`}>
                               {prod.productName}
                             </button>
                           </td>
-                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono whitespace-nowrap">{prod.baleCount.toLocaleString()}</td>
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (
@@ -1712,17 +1713,18 @@ export default function FactoryLocationInventory() {
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     {proformaMode && <col style={{ width: "36px" }} />}
+                    <col style={{ width: "120px" }} />
                     <col style={{ width: "110px" }} />
-                    <col style={{ width: "100px" }} />
-                    <col />
+                    <col style={{ minWidth: "160px" }} />
                     <col style={{ width: "70px" }} />
                     {proformaMode && <col style={{ width: "80px" }} />}
-                    {proformaMode && <col style={{ width: "100px" }} />}
-                    <col style={{ width: "90px" }} />
-                    <col style={{ width: "90px" }} />
+                    {proformaMode && <col style={{ width: "110px" }} />}
                     <col style={{ width: "100px" }} />
-                    <col style={{ width: "110px" }} />
-                    <col style={{ width: "100px" }} />
+                    {!hideAvgRate && <col style={{ width: "100px" }} />}
+                    {!hideAvgRate && <col style={{ width: "100px" }} />}
+                    {!hideTotalValue && <col style={{ width: "120px" }} />}
+                    {!hideTotalValue && <col style={{ width: "120px" }} />}
+                    <col style={{ width: "90px" }} />
                     {!proformaMode && <col style={{ width: "44px" }} />}
                   </colgroup>
                   <thead className="bg-muted/50 sticky top-0 z-10">
@@ -1730,8 +1732,8 @@ export default function FactoryLocationInventory() {
                       {proformaMode && <th className="px-2"></th>}
                       <th className="text-left px-3 font-medium">Category</th>
                       <th className="text-left px-3 font-medium">Article Code</th>
-                      <th className="text-left px-3 font-medium">Bale Name</th>
-                      <th className="text-right px-3 font-medium">Bales</th>
+                      <th className="text-left px-3 font-medium whitespace-nowrap">Bale Name</th>
+                      <th className="text-right px-3 font-medium whitespace-nowrap">Bales</th>
                       {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
                       {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
                       <th className="text-right px-3 font-medium">Wt/Bale (KG)</th>
@@ -1759,11 +1761,11 @@ export default function FactoryLocationInventory() {
                           <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
                           <td className="px-3 text-muted-foreground font-mono text-xs">{prod.articleCode}</td>
                           <td className="px-3 font-medium">
-                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
+                            <button onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation!.id}`)} className={`text-left whitespace-nowrap ${proformaMode ? "" : "text-primary hover:underline cursor-pointer"}`} data-testid={`link-product-desktop-sp-${prod.productId}`}>
                               {prod.productName}
                             </button>
                           </td>
-                          <td className="text-right px-3 font-mono">{prod.baleCount.toLocaleString()}</td>
+                          <td className="text-right px-3 font-mono whitespace-nowrap">{prod.baleCount.toLocaleString()}</td>
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (
