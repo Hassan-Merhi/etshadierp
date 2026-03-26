@@ -2750,6 +2750,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherNumber: vouchers.voucherNumber,
           currency: vouchers.currency,
           exchangeRate: vouchers.exchangeRate,
+          optional: vouchers.optional,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -2760,8 +2761,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .orderBy(desc(vouchers.voucherDate));
 
-      // Convert voucher payments to USD for total calculation
+      // Convert voucher payments to USD for total calculation (exclude optional payments)
       const voucherPaymentsTotal = (voucherPaymentRows as any[]).reduce((sum: number, p: any) => {
+        if (p.optional) return sum; // optional payments don't affect the balance
         const amt = parseFloat(p.debitAmount || "0");
         const fx = parseFloat(p.exchangeRate || "1") || 1;
         const currency = p.currency || "USD";
@@ -3114,8 +3116,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           ref: p.voucherNumber || null,
           detail: p.description || `${p.voucherType || "Payment"} voucher`,
           amount: fmtAmt(p.debitAmount, p.currency || "USD", true),
-          amountIsNeg: true,
+          amountIsNeg: !p.optional,
           notes: null,
+          optional: !!p.optional,
         })),
         ...enrichedFxTransfers.map((t: any) => {
           const isOut = t.fromSupplierId === supplierId;

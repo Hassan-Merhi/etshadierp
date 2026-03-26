@@ -1572,7 +1572,7 @@ export default function FactorySuppliers() {
                   const allRows: Array<{
                     key: string; date: string | null; type: RowType;
                     ref: string; detail: string; amount: string; amountIsNeg: boolean;
-                    status?: string; notes?: string | null; onDelete?: () => void; onEdit?: () => void;
+                    status?: string; notes?: string | null; optional?: boolean; onDelete?: () => void; onEdit?: () => void;
                     nativeImpact: number;
                   }> = [
                     ...stmts.flatMap((e: any) => {
@@ -1643,6 +1643,7 @@ export default function FactorySuppliers() {
                       .map((vp: any) => {
                         const rawAmt = String(vp.amount || "0").replace(/[^0-9.]/g, "");
                         const usdAmt = parseFloat(rawAmt) || 0;
+                        const isOptional = !!vp.optional;
                         return {
                           key: vp.key,
                           date: vp.date,
@@ -1650,9 +1651,10 @@ export default function FactorySuppliers() {
                           ref: vp.ref || "Voucher Payment",
                           detail: vp.detail || "Payment Voucher",
                           amount: `$${formatNum(String(usdAmt))}`,
-                          amountIsNeg: false,
+                          amountIsNeg: !isOptional,
+                          optional: isOptional,
                           notes: vp.notes || null,
-                          nativeImpact: -toNative(usdAmt, "USD"),
+                          nativeImpact: isOptional ? 0 : -toNative(usdAmt, "USD"),
                         };
                       }),
                     ...(statementData.fxTransfers || []).map((t: any) => {
@@ -1765,10 +1767,11 @@ export default function FactorySuppliers() {
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
-                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
                                 {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.amountIsNeg ? "−" : ""}{row.amount}
-                                {(row.type === "purchase" || row.type === "freight") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
-                                {row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
+                                {!row.optional && (row.type === "purchase" || row.type === "freight") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
+                                {!row.optional && row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
+                                {row.optional && <span className="ml-1 text-xs font-normal opacity-70">(Optional)</span>}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                                 {fmtNative(bal)}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
