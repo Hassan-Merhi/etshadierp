@@ -694,6 +694,7 @@ let migrationsDone = false;
         ["factory_container_other_charges", "factory_container_other_charges_id_seq"],
         ["vouchers", "vouchers_id_seq"],
         ["voucher_entries", "voucher_entries_id_seq"],
+        ["login_history", "login_history_id_seq"],
       ];
       for (const [table, seq] of seqFixes) {
         try {

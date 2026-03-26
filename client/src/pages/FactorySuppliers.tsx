@@ -1608,13 +1608,12 @@ export default function FactorySuppliers() {
                     return primaryCc === "USD" ? usd : usd / avgFxRate;
                   };
 
-                  const fmtNative = (amt: number) => `${primaryCc !== "USD" ? `${primaryCc} ` : "$"}${formatNum(String(Math.abs(amt).toFixed(2)))}`;
-
                   const allRows: Array<{
                     key: string; date: string | null; type: RowType;
                     ref: string; detail: string; amount: string; amountIsNeg: boolean;
                     status?: string; notes?: string | null; optional?: boolean; onDelete?: () => void; onEdit?: () => void;
                     nativeImpact: number;
+                    rowCc: string; rowNativeAmt: number;
                   }> = [
                     ...stmts.flatMap((e: any) => {
                       const rawVal = parseFloat(e.value || "0");
@@ -1639,6 +1638,7 @@ export default function FactorySuppliers() {
                         status: e.status,
                         notes: e.notes || null,
                         nativeImpact: toNative(goodsVal, cc, fxRate),
+                        rowCc: cc, rowNativeAmt: goodsVal,
                       };
                       const rows: typeof purchaseRow[] = [purchaseRow];
                       // Same-currency freight → separate Freight row in child's ledger
@@ -1655,6 +1655,7 @@ export default function FactorySuppliers() {
                           status: undefined,
                           notes: null,
                           nativeImpact: toNative(freightAmt, freightCc, fxRate),
+                          rowCc: freightCc, rowNativeAmt: freightAmt,
                         });
                       }
                       // Commission → its own row (attributable to the supplier's balance)
@@ -1671,6 +1672,7 @@ export default function FactorySuppliers() {
                           status: undefined,
                           notes: null,
                           nativeImpact: toNative(commAmt, commCc, fxRate),
+                          rowCc: commCc, rowNativeAmt: commAmt,
                         });
                       }
                       return rows;
@@ -1691,6 +1693,7 @@ export default function FactorySuppliers() {
                         notes: p.notes,
                         onDelete: () => { setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)); },
                         nativeImpact: -toNative(amt, cc, fxRate),
+                        rowCc: cc, rowNativeAmt: -amt,
                       };
                     }),
                     ...(statementData.ledger || [])
@@ -1710,12 +1713,12 @@ export default function FactorySuppliers() {
                           optional: isOptional,
                           notes: vp.notes || null,
                           nativeImpact: isOptional ? 0 : -toNative(usdAmt, "USD"),
+                          rowCc: "USD", rowNativeAmt: isOptional ? 0 : -usdAmt,
                         };
                       }),
                     ...(statementData.fxTransfers || []).map((t: any) => {
                       const isOut = t.fromSupplierId === statementSupplierId;
                       const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
-                      const refs = !isOut && t.containerRefs?.length ? ` · Covers: ${t.containerRefs.map((r: any) => r.containerNumber).join(", ")}` : "";
                       const fromAmt = parseFloat(t.fromAmount || "0");
                       const fromCc = t.fromCurrencyCode || "USD";
                       const toUsd = parseFloat(t.toAmountUsd || "0");
@@ -1726,13 +1729,14 @@ export default function FactorySuppliers() {
                         ref: isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`,
                         detail: isOut
                           ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))} → $${formatNum(String(toUsd.toFixed(2)))}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}`
-                          : `+$${formatNum(String(toUsd.toFixed(2)))} received${refs}`,
+                          : `+$${formatNum(String(toUsd.toFixed(2)))}`,
                         amount: isOut
                           ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))}`
                           : `$${formatNum(String(toUsd.toFixed(2)))}`,
                         amountIsNeg: isOut,
                         notes: t.notes,
                         nativeImpact: isOut ? -toNative(fromAmt, fromCc, toUsd / (fromAmt || 1)) : 0,
+                        rowCc: isOut ? fromCc : "USD", rowNativeAmt: isOut ? -fromAmt : toUsd,
                         onDelete: () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); },
                       };
                     }),
@@ -1745,11 +1749,12 @@ export default function FactorySuppliers() {
                         date: oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null,
                         type: "other_charge" as RowType,
                         ref: "Other Charge",
-                        detail: [oc.description, cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : ""].filter(Boolean).join(" · "),
+                        detail: oc.description || "",
                         amount: cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : `$${formatNum(String(amt))}`,
                         amountIsNeg: false,
                         notes: null,
                         nativeImpact: toNative(amt, cc, fxRate),
+                        rowCc: cc, rowNativeAmt: amt,
                       };
                     }),
                     ...(statementData.obCommissions || []).map((oc: any) => ({
@@ -1764,6 +1769,7 @@ export default function FactorySuppliers() {
                       onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
                       onDelete: () => { setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)); },
                       nativeImpact: -toNative(parseFloat(oc.amount || "0"), oc.currencyCode || "USD"),
+                      rowCc: oc.currencyCode || "USD", rowNativeAmt: -parseFloat(oc.amount || "0"),
                     })),
                   ].sort((a, b) => {
                     const da = a.date ? new Date(a.date).getTime() : 0;
@@ -1771,13 +1777,16 @@ export default function FactorySuppliers() {
                     return db - da;
                   });
 
-                  // Compute per-row running balance in primary currency (oldest → newest)
-                  const balanceByKey: Record<string, number> = {};
-                  let runBal = 0;
+                  // Compute per-row running balance in each row's native currency (oldest → newest)
+                  const balanceByKey: Record<string, { cc: string; bal: number }> = {};
+                  const currencyRunning: Record<string, number> = {};
                   for (const r of [...allRows].reverse()) {
-                    runBal += r.nativeImpact;
-                    balanceByKey[r.key] = runBal;
+                    const cc = r.rowCc;
+                    currencyRunning[cc] = (currencyRunning[cc] || 0) + r.rowNativeAmt;
+                    balanceByKey[r.key] = { cc, bal: currencyRunning[cc] };
                   }
+                  // Final per-currency totals (for summary rows at bottom)
+                  const currencyTotals = { ...currencyRunning };
 
                   const typeBadge = (type: RowType) => {
                     if (type === "purchase") return <Badge variant="outline" className="text-xs font-normal">Purchase</Badge>;
@@ -1796,6 +1805,9 @@ export default function FactorySuppliers() {
                     </div>
                   );
 
+                  const fmtCcAmt = (cc: string, amt: number) =>
+                    cc !== "USD" ? `${cc} ${formatNum(String(Math.abs(amt).toFixed(2)))}` : `$${formatNum(String(Math.abs(amt).toFixed(2)))}`;
+
                   return (
                     <div className="overflow-x-auto">
                       <Table>
@@ -1804,16 +1816,16 @@ export default function FactorySuppliers() {
                             <TableHead>Date</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Reference</TableHead>
-                            <TableHead>Detail</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
-                            <TableHead className="text-right">Balance ({primaryCc})</TableHead>
-                            <TableHead>Notes</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                             <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {allRows.map(row => {
-                            const bal = balanceByKey[row.key] ?? 0;
+                            const balEntry = balanceByKey[row.key];
+                            const balCc = balEntry?.cc ?? row.rowCc;
+                            const bal = balEntry?.bal ?? 0;
                             return (
                             <TableRow key={row.key} data-testid={row.type === "purchase" ? `row-statement-${row.key}` : undefined}>
                               <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date || "")}</TableCell>
@@ -1822,7 +1834,6 @@ export default function FactorySuppliers() {
                                 <span>{row.ref}</span>
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" || row.type === "commission" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
                                 {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.type !== "commission" && row.amountIsNeg ? "−" : ""}{row.amount}
                                 {!row.optional && (row.type === "purchase" || row.type === "freight" || row.type === "commission") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
@@ -1830,9 +1841,8 @@ export default function FactorySuppliers() {
                                 {row.optional && <span className="ml-1 text-xs font-normal opacity-70">(Optional)</span>}
                               </TableCell>
                               <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                {fmtNative(bal)}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
+                                {fmtCcAmt(balCc, bal)}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{row.notes || "—"}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   {row.onEdit && (
@@ -1849,6 +1859,19 @@ export default function FactorySuppliers() {
                               </TableCell>
                             </TableRow>
                           ); })}
+                          {/* Currency totals summary rows */}
+                          {Object.entries(currencyTotals).filter(([, v]) => v !== 0).map(([cc, total]) => (
+                            <TableRow key={`total-${cc}`} className="border-t-2 bg-muted/30">
+                              <TableCell colSpan={3} className="text-sm font-semibold text-muted-foreground">
+                                {cc} Total
+                              </TableCell>
+                              <TableCell />
+                              <TableCell className={`text-right text-sm tabular-nums font-bold ${total > 0 ? "text-red-600 dark:text-red-400" : total < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                {fmtCcAmt(cc, total)}{total > 0 ? " CR" : total < 0 ? " DR" : ""}
+                              </TableCell>
+                              <TableCell />
+                            </TableRow>
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
