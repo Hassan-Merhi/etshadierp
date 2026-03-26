@@ -376,6 +376,8 @@ export default function SalesReport() {
     }
     if (selectedLocation && selectedLocation !== "all") params.set("locationId", selectedLocation);
     if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
+    if (selectedStockGroup && selectedStockGroup !== "all") params.set("stockGroupId", selectedStockGroup);
+    if (searchTerm) params.set("searchTerm", searchTerm);
     navigate(`/sales-report/detail?${params.toString()}`);
   };
 
