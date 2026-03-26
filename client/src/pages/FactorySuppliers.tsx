@@ -821,6 +821,21 @@ export default function FactorySuppliers() {
     const foreignCurrencies = children.flatMap(c => (c.currencyBalances || []).filter(b => b.currencyCode !== "USD" && b.balance > 0));
     const hasFX = foreignCurrencies.length > 0;
 
+    // Aggregate all currency balances: broker bucket + every linked child
+    const allBalances = [
+      ...(parentSup?.currencyBalances || []),
+      ...children.flatMap(c => c.currencyBalances || []),
+    ];
+    const currencyTotals: Record<string, number> = {};
+    for (const b of allBalances) {
+      if (b.balance > 0) {
+        currencyTotals[b.currencyCode] = (currencyTotals[b.currencyCode] || 0) + b.balance;
+      }
+    }
+    // Show USD first, then other currencies alphabetically
+    const currencyOrder = ["USD", ...Object.keys(currencyTotals).filter(c => c !== "USD").sort()];
+    const activeCurrencies = currencyOrder.filter(c => (currencyTotals[c] || 0) > 0);
+
     const openChildStatement = (childId: number) => {
       setStatementReturnToParent(true);
       setStatementSupplierId(childId);
@@ -867,14 +882,20 @@ export default function FactorySuppliers() {
         {/* Broker summary cards */}
         {parentSup && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">USD Balance</div>
-                <div className="text-2xl font-bold mt-1 tabular-nums" data-testid="text-parent-total-balance">
-                  ${formatNum(String(((parentSup.currencyBalances?.find((b: any) => b.currencyCode === "USD")?.balance) ?? 0).toFixed(2)))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* One card per currency (USD first, then alphabetical) */}
+            {activeCurrencies.map((cc, idx) => (
+              <Card key={cc}>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground">Total {cc}</div>
+                  <div
+                    className={`text-2xl font-bold mt-1 tabular-nums ${cc !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}
+                    data-testid={idx === 0 ? "text-parent-total-balance" : undefined}
+                  >
+                    {cc === "USD" ? "$" : `${cc} `}{formatNum((currencyTotals[cc] || 0).toFixed(2))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
             <Card>
               <CardContent className="p-4">
                 <div className="text-xs text-muted-foreground">Total Commission (USD)</div>
@@ -896,21 +917,6 @@ export default function FactorySuppliers() {
                 <div className="text-xs text-muted-foreground">Linked Suppliers</div>
                 <div className="text-2xl font-bold mt-1">
                   {children.length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Foreign Currency Pending</div>
-                <div className="text-2xl font-bold mt-1">
-                  {hasFX ? (
-                    <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <Globe className="h-5 w-5" />
-                      {[...new Set(foreignCurrencies.map(b => b.currencyCode))].join(", ")}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-base">None</span>
-                  )}
                 </div>
               </CardContent>
             </Card>
