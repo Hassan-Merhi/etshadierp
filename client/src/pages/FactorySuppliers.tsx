@@ -1251,15 +1251,16 @@ export default function FactorySuppliers() {
                       <Globe className="h-4 w-4" />
                       Currency Pools
                     </span>
-                    {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0) && (
+                    {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && parseFloat(g.netPayable) > 0);
+                          const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0));
                           if (firstNonUsd && statementSupplierId && statementData.supplier.parentId) {
-                            setFxSourceType("supplier");
-                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, firstNonUsd.netPayable, firstNonUsd.totalCommission);
+                            const hasBalance = parseFloat(firstNonUsd.netPayable) > 0;
+                            setFxSourceType(hasBalance ? "supplier" : "commission");
+                            openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, firstNonUsd.currencyCode, hasBalance ? firstNonUsd.netPayable : "0", firstNonUsd.totalCommission);
                           }
                         }}
                         data-testid="button-fx-convert"
@@ -1308,15 +1309,19 @@ export default function FactorySuppliers() {
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
                               {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.netPayable)}
-                              {group.currencyCode !== "USD" && parseFloat(group.netPayable) > 0 && statementData.supplier.parentId && (
+                              {group.currencyCode !== "USD" && (parseFloat(group.netPayable) > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
-                                  onClick={() => { setFxSourceType("supplier"); statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, group.netPayable, group.totalCommission); }}
+                                  onClick={() => {
+                                    const hasBalance = parseFloat(group.netPayable) > 0;
+                                    setFxSourceType(hasBalance ? "supplier" : "commission");
+                                    statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, hasBalance ? group.netPayable : "0", group.totalCommission);
+                                  }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  Settle
+                                  {parseFloat(group.netPayable) <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>
