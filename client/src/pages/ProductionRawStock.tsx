@@ -218,6 +218,11 @@ export default function ProductionRawStock() {
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
   const [otherChargesCurrencyCode, setOtherChargesCurrencyCode] = useState("USD");
   const [otherChargesFxRate, setOtherChargesFxRate] = useState("1");
+  // Flags: were these charges pre-filled from the container import (read-only)?
+  const [freightFromContainer, setFreightFromContainer] = useState(false);
+  const [otherChargesFromContainer, setOtherChargesFromContainer] = useState(false);
+  const [commissionFromContainer, setCommissionFromContainer] = useState(false);
+  const [containerCommissionCcy, setContainerCommissionCcy] = useState("USD");
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
@@ -492,6 +497,12 @@ export default function ProductionRawStock() {
   const handleContainerSelect = (id: string) => {
     setSelectedContainerId(id);
     const container = availableContainers?.find((c) => c.id.toString() === id);
+    if (!container) {
+      setFreightFromContainer(false);
+      setOtherChargesFromContainer(false);
+      setCommissionFromContainer(false);
+      setContainerCommissionCcy("USD");
+    }
     setActualReceivedKg(container?.totalKg || "");
     setCostPerKg(container?.ratePerKg || "");
     const ccy = container?.currencyCode || "USD";
@@ -501,6 +512,7 @@ export default function ProductionRawStock() {
     // Pre-fill freight from container (amount + account — not editable during offload)
     const freightVal = parseFloat(container?.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
+    setFreightFromContainer(freightVal > 0);
     // Use the stored freight currency, falling back to the container's own currency (not USD).
     // Only a container that explicitly has a freight supplier uses a cross-currency rate.
     const storedFreightCcy = container?.freightCurrencyCode;
@@ -515,9 +527,10 @@ export default function ProductionRawStock() {
       setFreightAccountId("");
     }
 
-    // Pre-fill other charges from container (amount + account)
+    // Pre-fill other charges from container (read-only — shown in summary in native currency)
     const ocVal = parseFloat(container?.otherCharges || "0");
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
+    setOtherChargesFromContainer(ocVal > 0);
     setOtherChargesCurrencyCode(ccy);
     setOtherChargesFxRate("1");
     if (container?.otherChargesSupplierId) {
@@ -528,15 +541,20 @@ export default function ProductionRawStock() {
       setOtherChargesAccountId("");
     }
 
-    // Pre-populate commission from the container's pre-registered data
+    // Pre-populate commission from the container's pre-registered data (read-only)
     const commAmt = parseFloat(container?.commissionAmount || "0");
     if (commAmt > 0) {
       setCommissionType("FIXED");
       setCommissionRate(String(commAmt));
+      setCommissionFromContainer(true);
+      const commCcy = container?.commissionCurrencyCode || ccy;
+      setContainerCommissionCcy(commCcy);
       const commSupplierId = container?.commissionSupplierId;
       const broker = commSupplierId ? factorySuppliers?.find((s: any) => s.id === commSupplierId) : null;
       setCommissionPersonName(broker?.name || "Commission");
     } else {
+      setCommissionFromContainer(false);
+      setContainerCommissionCcy("USD");
       setCommissionPersonName("");
       setCommissionRate("");
       setCommissionType("PER_KG");
@@ -1460,40 +1478,49 @@ export default function ProductionRawStock() {
                         <span className="font-mono font-medium">{freightCurrencyCode} {formatNumber(freightVal)}</span>
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Other Charges (USD)</Label>
-                          <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
+                    {otherChargesFromContainer ? (
+                      parseFloat(otherCharges || "0") > 0 && (
+                        <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
+                          <span className="text-muted-foreground">Other Charges (from container)</span>
+                          <span className="font-mono font-medium">{otherChargesCurrencyCode} {formatNumber(parseFloat(otherCharges))}</span>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Other Charges Account / Broker</Label>
-                          <AccountCombobox
-                            value={otherChargesAccountId}
-                            onValueChange={v => { setOtherChargesAccountId(v); if (!v.startsWith("SUP:")) { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}
-                            accounts={ledgerAccounts || []}
-                            suppliers={factorySuppliers || []}
-                            placeholder="Select account or broker"
-                            testId="select-other-charges-account"
-                          />
+                      )
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Other Charges (USD)</Label>
+                            <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Other Charges Account / Broker</Label>
+                            <AccountCombobox
+                              value={otherChargesAccountId}
+                              onValueChange={v => { setOtherChargesAccountId(v); if (!v.startsWith("SUP:")) { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}
+                              accounts={ledgerAccounts || []}
+                              suppliers={factorySuppliers || []}
+                              placeholder="Select account or broker"
+                              testId="select-other-charges-account"
+                            />
+                          </div>
                         </div>
+                        {parseAccountValue(otherChargesAccountId)?.type === "supplier" && (
+                          <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
+                            <div className="space-y-1">
+                              <Label className="text-muted-foreground text-xs">Balance Currency</Label>
+                              <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
+                                <SelectTrigger data-testid="select-oc-currency"><SelectValue /></SelectTrigger>
+                                <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
+                              <Input type="number" value={otherChargesFxRate} onChange={(e) => setOtherChargesFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={otherChargesCurrencyCode === "USD"} data-testid="input-oc-fx-rate" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {parseAccountValue(otherChargesAccountId)?.type === "supplier" && (
-                        <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Balance Currency</Label>
-                            <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
-                              <SelectTrigger data-testid="select-oc-currency"><SelectValue /></SelectTrigger>
-                              <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                            <Input type="number" value={otherChargesFxRate} onChange={(e) => setOtherChargesFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={otherChargesCurrencyCode === "USD"} data-testid="input-oc-fx-rate" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -1565,62 +1592,75 @@ export default function ProductionRawStock() {
                 <Separator />
 
                 <div>
-                  <Label className="text-sm font-semibold">Commission (optional)</Label>
+                  <Label className="text-sm font-semibold">Commission {commissionFromContainer ? "(from container)" : "(optional)"}</Label>
                   <div className="space-y-3 mt-2">
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">Commission Person</Label>
-                      <Input
-                        value={commissionPersonName}
-                        onChange={(e) => setCommissionPersonName(e.target.value)}
-                        placeholder="Person name"
-                        data-testid="input-commission-person"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Commission Type</Label>
-                        <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
-                          <SelectTrigger data-testid="select-commission-type">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PER_KG">Per KG</SelectItem>
-                            <SelectItem value="FIXED">Fixed Amount</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">
-                          {commissionType === "PER_KG" ? "Rate per KG (USD)" : "Fixed Amount (USD)"}
-                        </Label>
-                        <Input
-                          type="number"
-                          value={commissionRate}
-                          onChange={(e) => setCommissionRate(e.target.value)}
-                          placeholder={commissionType === "PER_KG" ? "e.g. 0.05" : "e.g. 500"}
-                          step="0.01"
-                          data-testid="input-commission-rate"
-                        />
-                      </div>
-                    </div>
-                    {commissionPersonName && commRateNum > 0 && (
-                      <>
-                        <div className="text-sm text-muted-foreground">
-                          Commission Total: <span className="font-mono font-medium text-foreground">$ {formatNumber(commissionTotalUsd)}</span>
-                          {currencyCode !== "USD" && (
-                            <span className="ml-2 text-xs">≈ {currencyCode} {formatNumber(commissionInContainerCcy)}</span>
-                          )}
+                    {commissionFromContainer ? (
+                      commRateNum > 0 && (
+                        <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
+                          <span className="text-muted-foreground">
+                            {commissionPersonName || "Commission"} — fixed from import
+                          </span>
+                          <span className="font-mono font-medium">{containerCommissionCcy} {formatNumber(commRateNum)}</span>
                         </div>
+                      )
+                    ) : (
+                      <>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Commission Account</Label>
-                          <AccountCombobox
-                            value={commissionLedgerAccountId}
-                            onValueChange={setCommissionLedgerAccountId}
-                            accounts={ledgerAccounts || []}
-                            placeholder="Select account"
-                            testId="select-commission-account"
+                          <Label className="text-muted-foreground text-xs">Commission Person</Label>
+                          <Input
+                            value={commissionPersonName}
+                            onChange={(e) => setCommissionPersonName(e.target.value)}
+                            placeholder="Person name"
+                            data-testid="input-commission-person"
                           />
                         </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Commission Type</Label>
+                            <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
+                              <SelectTrigger data-testid="select-commission-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="PER_KG">Per KG</SelectItem>
+                                <SelectItem value="FIXED">Fixed Amount</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">
+                              {commissionType === "PER_KG" ? "Rate per KG (USD)" : "Fixed Amount (USD)"}
+                            </Label>
+                            <Input
+                              type="number"
+                              value={commissionRate}
+                              onChange={(e) => setCommissionRate(e.target.value)}
+                              placeholder={commissionType === "PER_KG" ? "e.g. 0.05" : "e.g. 500"}
+                              step="0.01"
+                              data-testid="input-commission-rate"
+                            />
+                          </div>
+                        </div>
+                        {commissionPersonName && commRateNum > 0 && (
+                          <>
+                            <div className="text-sm text-muted-foreground">
+                              Commission Total: <span className="font-mono font-medium text-foreground">$ {formatNumber(commissionTotalUsd)}</span>
+                              {currencyCode !== "USD" && (
+                                <span className="ml-2 text-xs">≈ {currencyCode} {formatNumber(commissionInContainerCcy)}</span>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-muted-foreground text-xs">Commission Account</Label>
+                              <AccountCombobox
+                                value={commissionLedgerAccountId}
+                                onValueChange={setCommissionLedgerAccountId}
+                                accounts={ledgerAccounts || []}
+                                placeholder="Select account"
+                                testId="select-commission-account"
+                              />
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -1713,18 +1753,18 @@ export default function ProductionRawStock() {
                   </div>
                   {freightVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>
-                        {freightCurrencyCode === "USD"
-                          ? "Freight (from container)"
-                          : `Freight (from container, ${freightCurrencyCode} converted @ ${freightCurrencyCode === currencyCode ? fxRate : freightFxRateVal})`}
-                      </span>
-                      <span className="font-mono">$ {formatNumber(freightUsd)}</span>
+                      <span>Freight (from container)</span>
+                      <span className="font-mono">{freightCurrencyCode} {formatNumber(freightVal)}</span>
                     </div>
                   )}
                   {otherChargesVal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Other Charges</span>
-                      <span className="font-mono">$ {formatNumber(otherChargesUsd)}</span>
+                      <span>Other Charges {otherChargesFromContainer ? "(from container)" : ""}</span>
+                      <span className="font-mono">
+                        {otherChargesFromContainer
+                          ? `${otherChargesCurrencyCode} ${formatNumber(otherChargesVal)}`
+                          : `$ ${formatNumber(otherChargesUsd)}`}
+                      </span>
                     </div>
                   )}
                   {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
@@ -1736,7 +1776,11 @@ export default function ProductionRawStock() {
                   {commissionPersonName && commRateNum > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Commission ({commissionPersonName})</span>
-                      <span className="font-mono">$ {formatNumber(commissionTotalUsd)}</span>
+                      <span className="font-mono">
+                        {commissionFromContainer
+                          ? `${containerCommissionCcy} ${formatNumber(commRateNum)}`
+                          : `$ ${formatNumber(commissionTotalUsd)}`}
+                      </span>
                     </div>
                   )}
                   {dutyUsd > 0 && !dutyPending && (
