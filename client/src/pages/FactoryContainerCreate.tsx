@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Trash2, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,23 +65,34 @@ export default function FactoryContainerCreate() {
 
   const activeSuppliers = suppliers?.filter(s => s.isActive) ?? [];
 
-  const brokerIdNum = formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null;
-  const filteredSupplierList = brokerIdNum
-    ? activeSuppliers.filter(s => s.parentId === brokerIdNum || !s.parentId)
-    : activeSuppliers;
-
   const selectedSupplier = formData.supplierId
     ? activeSuppliers.find(s => s.id === parseInt(formData.supplierId)) ?? null
     : null;
 
-  const brokerMismatch =
-    selectedSupplier?.parentId &&
-    formData.commissionSupplierId &&
-    selectedSupplier.parentId !== parseInt(formData.commissionSupplierId);
+  // Auto-derive broker from supplier's parentId (true broker balance model)
+  const linkedBroker = selectedSupplier?.parentId
+    ? activeSuppliers.find(s => s.id === selectedSupplier.parentId) ?? null
+    : null;
 
+  // When supplier changes: if it has a linked broker, auto-set commissionSupplierId
+  useEffect(() => {
+    if (selectedSupplier?.parentId) {
+      setFormData(f => ({ ...f, commissionSupplierId: String(selectedSupplier.parentId) }));
+    }
+    // If supplier has no parent, clear any previously auto-set broker only if it was auto-derived
+    // (we leave manually-chosen broker intact when supplier has no parent)
+  }, [selectedSupplier?.id, selectedSupplier?.parentId]);
+
+  // For the standalone broker selector (when supplier has no parent), show all top-level suppliers
+  const brokerIdNum = formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null;
   const selectedBroker = brokerIdNum
     ? activeSuppliers.find(s => s.id === brokerIdNum) ?? null
     : null;
+
+  // Suppliers to show: when a broker is manually chosen, show their linked suppliers + standalones
+  const filteredSupplierList = brokerIdNum && !selectedSupplier?.parentId
+    ? activeSuppliers.filter(s => s.parentId === brokerIdNum || !s.parentId)
+    : activeSuppliers;
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -141,7 +152,7 @@ export default function FactoryContainerCreate() {
     },
   });
 
-  const canSubmit = !!formData.containerNumber && !brokerMismatch && !createMutation.isPending;
+  const canSubmit = !!formData.containerNumber && !createMutation.isPending;
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
@@ -191,36 +202,7 @@ export default function FactoryContainerCreate() {
           <CardTitle className="text-base">Supplier &amp; Broker</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label>Broker / Commission To <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-            <Select
-              value={formData.commissionSupplierId || "__none__"}
-              onValueChange={val => {
-                const newBroker = val === "__none__" ? "" : val;
-                setFormData(f => ({
-                  ...f,
-                  commissionSupplierId: newBroker,
-                  supplierId: (() => {
-                    if (!newBroker || !f.supplierId) return f.supplierId;
-                    const sup = activeSuppliers.find(s => s.id === parseInt(f.supplierId));
-                    if (sup?.parentId && sup.parentId !== parseInt(newBroker)) return "";
-                    return f.supplierId;
-                  })(),
-                }));
-              }}
-            >
-              <SelectTrigger data-testid="select-container-broker">
-                <SelectValue placeholder="Select broker..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {activeSuppliers.map(s => (
-                  <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+          {/* Purchase Supplier — always shown first */}
           <div>
             <Label>Purchase Supplier</Label>
             <Select
@@ -239,30 +221,40 @@ export default function FactoryContainerCreate() {
                 ))}
               </SelectContent>
             </Select>
-            {formData.commissionSupplierId && (
-              <p className="text-xs text-muted-foreground mt-1">Showing suppliers linked to broker + standalone suppliers</p>
-            )}
           </div>
 
-          {selectedSupplier?.parentId && !brokerMismatch && formData.commissionSupplierId && (
-            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-              Linked to Broker:{" "}
-              <span className="font-medium text-foreground">
-                {activeSuppliers.find(s => s.id === selectedSupplier.parentId)?.name ?? `#${selectedSupplier.parentId}`}
+          {/* Broker section: auto-derived when supplier has a linked broker */}
+          {linkedBroker ? (
+            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground">
+                Linked Broker:{" "}
+                <span className="font-medium text-foreground">{linkedBroker.name}</span>
               </span>
             </div>
-          )}
-
-          {brokerMismatch && (
-            <div className="rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-300 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>
-                This supplier belongs to{" "}
-                <strong>{activeSuppliers.find(s => s.id === selectedSupplier?.parentId)?.name ?? `Broker #${selectedSupplier?.parentId}`}</strong>,
-                not the selected broker. Please fix the mismatch before saving.
-              </span>
+          ) : formData.supplierId ? (
+            /* Supplier selected but no linked broker — show optional broker selector */
+            <div>
+              <Label>Broker / Commission To <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Select
+                value={formData.commissionSupplierId || "__none__"}
+                onValueChange={val => {
+                  const newBroker = val === "__none__" ? "" : val;
+                  setFormData(f => ({ ...f, commissionSupplierId: newBroker }));
+                }}
+              >
+                <SelectTrigger data-testid="select-container-broker">
+                  <SelectValue placeholder="Select broker..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {activeSuppliers.filter(s => !s.parentId && s.id !== parseInt(formData.supplierId || "0")).map(s => (
+                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 

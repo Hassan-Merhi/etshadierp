@@ -1945,6 +1945,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         totalKg: factoryContainers.totalKg, actualReceivedKg: factoryContainers.actualReceivedKg,
         ratePerKg: factoryContainers.ratePerKg, freight: factoryContainers.freight,
         freightCurrencyCode: factoryContainers.freightCurrencyCode, currencyCode: factoryContainers.currencyCode,
+        commissionAmount: factoryContainers.commissionAmount, commissionCurrencyCode: factoryContainers.commissionCurrencyCode,
         createdAt: factoryContainers.createdAt, arrivalDate: factoryContainers.arrivalDate,
       }).from(factoryContainers).where(and(
         eq(factoryContainers.companyId, companyId),
@@ -1974,7 +1975,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || c.currencyCode || currency;
-          return s + (kg * rate + (freightCc === currency ? freight : 0));
+          // Commission accumulates under supplier (true broker balance model)
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          const commCc = c.commissionCurrencyCode || c.currencyCode || currency;
+          return s + (kg * rate + (freightCc === currency ? freight : 0) + (commCc === currency ? commAmt : 0));
         }, 0);
         const available = Math.max(0, totalValue - (paymentsBySupplier[sup.id] || 0) - (fxOutBySupplier[sup.id] || 0));
         const dates = supContainers.map((c: any) => c.arrivalDate || c.createdAt).filter(Boolean) as string[];
@@ -2037,6 +2041,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         freight: factoryContainers.freight,
         freightCurrencyCode: factoryContainers.freightCurrencyCode,
         currencyCode: factoryContainers.currencyCode,
+        commissionAmount: factoryContainers.commissionAmount,
+        commissionCurrencyCode: factoryContainers.commissionCurrencyCode,
         createdAt: factoryContainers.createdAt,
         arrivalDate: factoryContainers.arrivalDate,
       })
@@ -2110,8 +2116,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
           const containerCcy = c.currencyCode || fromCurrencyCode;
           const freightCc = c.freightCurrencyCode || containerCcy;
-          // Only include freight if it shares the container's currency
-          return s + (kg * rate + (freightCc === fromCurrencyCode ? freight : 0));
+          // Commission accumulates under supplier (true broker balance model) — include in available for settlement
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          const commCc = c.commissionCurrencyCode || containerCcy;
+          return s + (kg * rate + (freightCc === fromCurrencyCode ? freight : 0) + (commCc === fromCurrencyCode ? commAmt : 0));
         }, 0);
         const paid = paymentsBySupplier[sup.id] || 0;
         const fxOut = fxOutBySupplier[sup.id] || 0;
@@ -2289,9 +2297,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usdAmt;
       }
 
-      // computeBalance: IDENTICAL formula to computeStats in the with-balances endpoint.
-      // Includes freight, commission, and voucher-based payments; excludes FX transfers
-      // from the USD total (FX transfers are per-currency conversions, not USD settlements).
+      // computeBalance: TRUE BROKER BALANCE MODEL.
+      // Commission from a supplier's own containers is included in the supplier's balance.
+      // For brokers, their balance = only direct entries + FX-in (no child rollup).
       const computeBalance = (sid: number, openingBal: number) => {
         const supplierContainers = allContainers.filter((c: any) => c.supplierId === sid);
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
@@ -2301,11 +2309,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const fx = parseFloat(c.fxRateToUsd || "1");
           return sum + (kg * rate + freight) * fx;
         }, 0);
-        const commissionContainers = allContainers.filter((c: any) =>
-          c.commissionSupplierId === sid && c.supplierId !== sid && parseFloat(c.commissionAmount || "0") > 0
-        );
-        const commissionValue = commissionContainers.reduce((sum: number, c: any) => {
+        // Commission from supplier's OWN containers (not broker-earned from other suppliers' containers)
+        const ownCommission = supplierContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
+          if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
           const commFx = parseFloat(c.fxRateToUsd || "1");
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
@@ -2313,14 +2320,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const supplierPayments = allPayments.filter((p: any) => p.supplierId === sid);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
-        return openingBal + containerValue + commissionValue - totalPaid - voucherPaid;
+        return openingBal + containerValue + ownCommission - totalPaid - voucherPaid;
       };
 
-      // Aggregate: broker's own balance + all children
-      const suppliersToAggregate = [{ id: supplierId, openingBalance: supplier.openingBalance }, ...children.map((c: any) => ({ id: c.id, openingBalance: c.openingBalance }))];
-      const outstandingUsd = suppliersToAggregate.reduce((sum: number, s: any) => {
-        return sum + computeBalance(s.id, parseFloat(s.openingBalance || "0"));
-      }, 0);
+      // True broker balance: only the broker's own balance (NOT children aggregated in)
+      const outstandingUsd = computeBalance(supplierId, parseFloat(supplier.openingBalance || "0"));
 
       res.json({ balance: outstandingUsd, outstandingUsd });
     } catch (error: any) {
@@ -2403,13 +2407,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const fx = parseFloat(c.fxRateToUsd || "1");
           return sum + ((kg * rate + freight) * fx);
         }, 0);
-        // Commission owed to this supplier from containers where they are the commission/broker supplier
-        // Exclude containers where this supplier is also the main purchase supplier (avoid double-counting)
-        const commissionContainers = containers.filter((c: any) =>
-          c.commissionSupplierId === s.id && c.supplierId !== s.id && parseFloat(c.commissionAmount || "0") > 0
-        );
-        const commissionValue = commissionContainers.reduce((sum: number, c: any) => {
+        // TRUE BROKER BALANCE MODEL:
+        // Commission from this supplier's OWN containers accumulates under the SUPPLIER (not the broker).
+        // The broker's balance starts at 0 and only increases via explicit FX-in transfers or direct entries.
+        const commissionValue = supplierContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
+          if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
           const commFx = parseFloat(c.fxRateToUsd || "1");
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
@@ -2430,7 +2433,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid - voucherPaidUsd;
 
         // Per-currency balances (original currency, not converted).
-        // Use kg * ratePerKg + freight (exclude offload charges which are our cost, not supplier's).
+        // Use kg * ratePerKg + freight + commission from own containers.
         // Freight is tracked in its own currency (freightCurrencyCode) which may differ from the container currency.
         const byCurrency: Record<string, number> = {};
         for (const c of supplierContainers) {
@@ -2439,17 +2442,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
-          // Freight always shows in its own currency bucket in the balance totals;
-          // it just doesn't show as individual ledger rows until the user does an FX conversion
+          // Freight always shows in its own currency bucket
           if (freightAmt > 0) {
             byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
           }
-        }
-        // Add commission amounts (in their own currency) for containers where this supplier is the broker
-        for (const c of commissionContainers) {
-          const cc = c.commissionCurrencyCode || c.currencyCode || "USD";
+          // Commission from own containers goes into supplier's currency bucket (true broker balance model)
           const commAmt = parseFloat(c.commissionAmount || "0");
-          byCurrency[cc] = (byCurrency[cc] || 0) + commAmt;
+          if (commAmt > 0) {
+            const commCc = c.commissionCurrencyCode || cc;
+            byCurrency[commCc] = (byCurrency[commCc] || 0) + commAmt;
+          }
         }
         // Subtract regular payments by currency
         for (const p of supplierPayments) {
@@ -2537,57 +2539,60 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           };
         }
 
-        // Parent supplier — aggregate own + children stats
+        // TRUE BROKER BALANCE MODEL — parent supplier (broker) aggregation:
+        // The broker's own balance (totalValue / currencyBalances) reflects ONLY direct broker entries
+        // and explicit FX-in transfers. Linked supplier balances are NOT merged into broker-owned totals.
+        // They are returned separately as linkedSupplierExposure for informational display.
         const childStats = children.map((c: any) => statsById[c.id]);
+        // Informational aggregates that span all parties (container counts, kg, dates)
         const aggContainers = own.totalContainers + childStats.reduce((n: number, cs: any) => n + cs.totalContainers, 0);
         const aggKg = own.totalKg + childStats.reduce((n: number, cs: any) => n + cs.totalKg, 0);
-        const aggBalance = own.balance + childStats.reduce((n: number, cs: any) => n + cs.balance, 0);
-        const aggPaid = own.totalPaid + childStats.reduce((n: number, cs: any) => n + cs.totalPaid, 0);
         const aggPending = own.pendingContainers + childStats.reduce((n: number, cs: any) => n + cs.pendingContainers, 0);
         const aggReceived = own.receivedContainers + childStats.reduce((n: number, cs: any) => n + cs.receivedContainers, 0);
         const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
         const aggDueContainers = [...own.dueContainers, ...childStats.flatMap((cs: any) => cs.dueContainers)];
-        // Aggregate commission across own + all children
-        const aggCommission = own.commissionValue + childStats.reduce((n: number, cs: any) => n + cs.commissionValue, 0);
-        // Weighted average FX rate across own + children (weight by container value)
-        const allStats = [own, ...childStats];
-        const totalFxWeightedSum = allStats.reduce((s: number, cs: any) => {
-          const base = cs.approxFxRate > 0 ? (cs.containerValue > 0 ? cs.containerValue : 0) : 0;
-          return s + (cs.approxFxRate * base);
-        }, 0);
-        const totalFxWeightBase = allStats.reduce((s: number, cs: any) => s + (cs.approxFxRate > 0 ? cs.containerValue : 0), 0);
-        const aggApproxFxRate = totalFxWeightBase > 0 ? totalFxWeightedSum / totalFxWeightBase : 0;
 
-        // Aggregate currency balances across own + children
-        const aggCurrencyMap: Record<string, number> = {};
-        for (const cb of own.currencyBalances) {
-          aggCurrencyMap[cb.currencyCode] = (aggCurrencyMap[cb.currencyCode] || 0) + cb.balance;
-        }
+        // Linked supplier exposure: per-child per-currency balances (informational, NOT counted in broker totals)
+        const linkedSupplierExposure = children.map((c: any, i: number) => ({
+          supplierId: c.id,
+          supplierName: c.name,
+          currencyBalances: childStats[i].currencyBalances,
+        }));
+
+        // Aggregate exposure totals for summary display (informational only)
+        const exposureCurrencyMap: Record<string, number> = {};
         for (const cs of childStats) {
           for (const cb of cs.currencyBalances) {
-            aggCurrencyMap[cb.currencyCode] = (aggCurrencyMap[cb.currencyCode] || 0) + cb.balance;
+            if (cb.balance > 0) {
+              exposureCurrencyMap[cb.currencyCode] = (exposureCurrencyMap[cb.currencyCode] || 0) + cb.balance;
+            }
           }
         }
-        const aggCurrencyBalances = Object.entries(aggCurrencyMap)
+        const exposureCurrencyBalances = Object.entries(exposureCurrencyMap)
           .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
-          .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
+          .filter(({ balance: bal }) => bal > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
 
         return {
           ...s,
           totalContainers: aggContainers,
           totalKg: aggKg.toFixed(3),
-          totalValue: aggBalance.toFixed(2),
-          totalPaid: aggPaid.toFixed(2),
-          totalCommissionUsd: aggCommission.toFixed(2),
-          approxFxRate: aggApproxFxRate > 0 ? aggApproxFxRate.toFixed(4) : null,
+          // Broker true balance = own balance ONLY (no child rollup)
+          totalValue: own.balance.toFixed(2),
+          totalPaid: own.totalPaid.toFixed(2),
+          totalCommissionUsd: own.commissionValue.toFixed(2),
+          approxFxRate: own.approxFxRate > 0 ? own.approxFxRate.toFixed(4) : null,
           pendingContainers: aggPending,
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,
-          currencyBalances: aggCurrencyBalances,
+          // Broker's own per-currency balances (direct entries + FX-in only)
+          currencyBalances: own.currencyBalances,
           dueContainers: aggDueContainers,
           dueContainersCount: aggDueContainers.length,
+          // Linked supplier exposure (informational only — NOT broker-owned)
+          linkedSupplierExposure,
+          exposureCurrencyBalances,
         };
       });
 

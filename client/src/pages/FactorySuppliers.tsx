@@ -60,6 +60,14 @@ interface SupplierWithBalance extends FactorySupplier {
   currencyBalances?: CurrencyBalance[];
   totalCommissionUsd?: string;
   approxFxRate?: string | null;
+  /** Broker-only: per-linked-supplier exposure (informational, NOT broker-owned) */
+  linkedSupplierExposure?: Array<{
+    supplierId: number;
+    supplierName: string;
+    currencyBalances: CurrencyBalance[];
+  }>;
+  /** Broker-only: aggregated exposure totals across all linked suppliers */
+  exposureCurrencyBalances?: CurrencyBalance[];
 }
 
 
@@ -822,23 +830,24 @@ export default function FactorySuppliers() {
   if (parentViewSupplierId && !statementSupplierId) {
     const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
     const children = subAccountsByParent[parentViewSupplierId] || [];
-    const foreignCurrencies = children.flatMap(c => (c.currencyBalances || []).filter(b => b.currencyCode !== "USD" && b.balance > 0));
-    const hasFX = foreignCurrencies.length > 0;
 
-    // Aggregate all currency balances: broker bucket + every linked child
-    const allBalances = [
-      ...(parentSup?.currencyBalances || []),
-      ...children.flatMap(c => c.currencyBalances || []),
-    ];
-    const currencyTotals: Record<string, number> = {};
-    for (const b of allBalances) {
-      if (b.balance > 0) {
-        currencyTotals[b.currencyCode] = (currencyTotals[b.currencyCode] || 0) + b.balance;
-      }
-    }
-    // Show USD first, then other currencies alphabetically
-    const currencyOrder = ["USD", ...Object.keys(currencyTotals).filter(c => c !== "USD").sort()];
-    const activeCurrencies = currencyOrder.filter(c => (currencyTotals[c] || 0) > 0);
+    // Broker True Balance — only the broker's own direct entries + FX-in transfers
+    const brokerOwnBalances = (parentSup?.currencyBalances || []).filter(b => Math.abs(b.balance) > 0.001);
+
+    // Linked Supplier Exposure — from server's linkedSupplierExposure or children's own currencyBalances
+    // Server returns exposureCurrencyBalances (aggregate) and linkedSupplierExposure (per-supplier)
+    const exposureBalances: CurrencyBalance[] = parentSup?.exposureCurrencyBalances
+      ?? (() => {
+        const map: Record<string, number> = {};
+        for (const child of children) {
+          for (const b of (child.currencyBalances || [])) {
+            if (b.balance > 0) map[b.currencyCode] = (map[b.currencyCode] || 0) + b.balance;
+          }
+        }
+        return Object.entries(map).map(([currencyCode, balance]) => ({ currencyCode, balance }));
+      })();
+    const activeExposure = exposureBalances.filter(b => b.balance > 0.001)
+      .sort((a, b) => a.currencyCode === "USD" ? 1 : -1);
 
     const openChildStatement = (childId: number) => {
       setStatementReturnToParent(true);
@@ -883,47 +892,79 @@ export default function FactorySuppliers() {
           )}
         </div>
 
-        {/* Broker summary cards */}
+        {/* ── Broker True Balance ───────────────────────────────────────────── */}
         {parentSup && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {/* One card per currency (USD first, then alphabetical) */}
-            {activeCurrencies.map((cc, idx) => (
-              <Card key={cc}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Broker True Balance</h2>
+              <span className="text-xs text-muted-foreground">— direct entries &amp; FX-in transfers only</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {brokerOwnBalances.length === 0 ? (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Broker Balance</div>
+                    <div className="text-2xl font-bold mt-1 tabular-nums text-muted-foreground" data-testid="text-parent-total-balance">
+                      $0.00
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">No direct entries yet</div>
+                  </CardContent>
+                </Card>
+              ) : (
+                brokerOwnBalances.map((b, idx) => (
+                  <Card key={b.currencyCode}>
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground">Broker {b.currencyCode}</div>
+                      <div
+                        className={`text-2xl font-bold mt-1 tabular-nums ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}
+                        data-testid={idx === 0 ? "text-parent-total-balance" : undefined}
+                      >
+                        {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(b.balance.toFixed(2))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+              <Card>
                 <CardContent className="p-4">
-                  <div className="text-xs text-muted-foreground">Total {cc}</div>
-                  <div
-                    className={`text-2xl font-bold mt-1 tabular-nums ${cc !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}
-                    data-testid={idx === 0 ? "text-parent-total-balance" : undefined}
-                  >
-                    {cc === "USD" ? "$" : `${cc} `}{formatNum((currencyTotals[cc] || 0).toFixed(2))}
+                  <div className="text-xs text-muted-foreground">Total Containers</div>
+                  <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
+                    {parentSup.totalContainers}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Total Commission (USD)</div>
-                <div className="text-2xl font-bold mt-1 tabular-nums text-amber-600 dark:text-amber-400" data-testid="text-parent-total-commission">
-                  ~${formatNum(parentSup.totalCommissionUsd || "0")}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Total Containers</div>
-                <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
-                  {parentSup.totalContainers}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-muted-foreground">Linked Suppliers</div>
-                <div className="text-2xl font-bold mt-1">
-                  {children.length}
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-xs text-muted-foreground">Linked Suppliers</div>
+                  <div className="text-2xl font-bold mt-1">
+                    {children.length}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ── Linked Supplier Exposure ──────────────────────────────────────── */}
+        {activeExposure.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Linked Supplier Exposure</h2>
+              <span className="text-xs text-muted-foreground">— supplier-owned balances (not broker-owned)</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {activeExposure.map((b) => (
+                <Card key={b.currencyCode} className="border-dashed">
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Exposure {b.currencyCode}</div>
+                    <div className={`text-2xl font-bold mt-1 tabular-nums ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                      {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(b.balance.toFixed(2))}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Linked supplier funds</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
 
