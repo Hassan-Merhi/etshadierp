@@ -466,23 +466,44 @@ export default function FactoryContainerCreate() {
                 ))}
               </div>
             )}
-            {otherChargeLines.length > 0 && (
-              <div className="text-xs text-muted-foreground text-right pt-1 space-y-0.5">
-                {(() => {
-                  const totals: Record<string, number> = {};
-                  for (const l of otherChargeLines) {
-                    const cc = l.currencyCode || currency;
-                    totals[cc] = (totals[cc] || 0) + parseFloat(l.amount || "0");
-                  }
-                  return Object.entries(totals).map(([cc, amt]) => (
-                    <div key={cc}>Total: {cc} {formatNumber(amt)}</div>
-                  ));
-                })()}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Grand Total Summary Bar ───────────────────────────────────────────── */}
+      {(() => {
+        const totals: Record<string, number> = {};
+        const add = (cc: string, amt: string) => {
+          const v = parseFloat(amt || "0");
+          if (v > 0) totals[cc] = (totals[cc] || 0) + v;
+        };
+        // Container purchase value
+        const kg = parseFloat(totalKg || "0");
+        const rate = parseFloat(ratePerKg || "0");
+        if (kg > 0 && rate > 0) totals[currency] = (totals[currency] || 0) + kg * rate;
+        // Freight
+        add(formData.freightCurrencyCode || currency, formData.freight);
+        // Commission
+        add(formData.commissionCurrencyCode || currency, formData.commissionAmount);
+        // Other charges
+        for (const l of otherChargeLines) add(l.currencyCode || currency, l.amount);
+
+        const entries = Object.entries(totals).sort(([a], [b]) =>
+          a === currency ? -1 : b === currency ? 1 : a.localeCompare(b)
+        );
+        if (entries.length === 0) return null;
+        return (
+          <div className="rounded-md border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Container Total</span>
+            {entries.map(([cc, amt]) => (
+              <div key={cc} className="flex items-baseline gap-1">
+                <span className="text-xs text-muted-foreground">{cc}</span>
+                <span className="text-lg font-bold tabular-nums">{formatNumber(amt)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       <div className="flex justify-end gap-3 pb-6">
         <Button
