@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers, AlertTriangle
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -1141,71 +1141,155 @@ export default function FactorySuppliers() {
               const activeContainerCount = activeSt.length;
               const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
               const currencyGroups: any[] = statementData.currencyGroups || [];
+
+              // For broker statements: aggregate linked supplier balances by currency for KPIs
+              const linkedGroups: any[] = statementData.linkedSupplierGroups || [];
+              const linkedBalMap: Record<string, number> = {};
+              if (isBrokerStatement) {
+                for (const lg of linkedGroups) {
+                  for (const cg of (lg.currencyGroups || [])) {
+                    const val = parseFloat(cg.netPayable || "0");
+                    if (Math.abs(val) > 0.005) {
+                      linkedBalMap[cg.currencyCode] = (linkedBalMap[cg.currencyCode] || 0) + val;
+                    }
+                  }
+                }
+              }
+              // Merge own currencyGroups + linked balances into one map
+              const kpiMap: Record<string, { own: number; linked: number; totalFreight: number }> = {};
+              for (const g of currencyGroups) {
+                const cc = g.currencyCode;
+                if (!kpiMap[cc]) kpiMap[cc] = { own: 0, linked: 0, totalFreight: 0 };
+                kpiMap[cc].own += parseFloat(g.netPayable || "0");
+                kpiMap[cc].totalFreight += parseFloat(g.totalFreight || "0");
+              }
+              for (const [cc, val] of Object.entries(linkedBalMap)) {
+                if (!kpiMap[cc]) kpiMap[cc] = { own: 0, linked: 0, totalFreight: 0 };
+                kpiMap[cc].linked += val;
+              }
+              const kpiEntries = Object.entries(kpiMap).filter(([, v]) => Math.abs(v.own + v.linked) > 0.005);
+
+              // Detect issues
+              const issues: Array<{ kind: "warn" | "info"; msg: string }> = [];
+              if (isBrokerStatement) {
+                for (const lg of linkedGroups) {
+                  for (const cg of (lg.currencyGroups || [])) {
+                    const bal = parseFloat(cg.netPayable || "0");
+                    if (bal > 0.005) {
+                      issues.push({ kind: "warn", msg: `${lg.supplierName}: ${cg.currencyCode} ${cg.currencyCode !== "USD" ? cg.currencyCode + " " : "$"}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                    }
+                  }
+                }
+              }
+              for (const g of currencyGroups) {
+                const bal = parseFloat(g.netPayable || "0");
+                if (bal > 0.005) {
+                  const cc = g.currencyCode;
+                  const pfx = cc !== "USD" ? `${cc} ` : "$";
+                  issues.push({ kind: "warn", msg: `Own ${cc} pool: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                }
+              }
+
               return (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground">Active Containers</div>
-                      <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
-                        {activeContainerCount}
-                        {statementData.summary.totalContainers > activeContainerCount && (
-                          <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground">Active Weight</div>
-                      <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
-                        {formatKg(String(activeKg.toFixed(3)))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  {currencyGroups.length === 0 && (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     <Card>
                       <CardContent className="p-4">
-                        <div className="text-xs text-muted-foreground">Net Balance</div>
-                        <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
-                          $— <span className="text-sm font-normal">Settled</span>
+                        <div className="text-xs text-muted-foreground">
+                          {isBrokerStatement ? "Linked Containers" : "Active Containers"}
                         </div>
+                        <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
+                          {isBrokerStatement
+                            ? linkedGroups.reduce((s, lg) => s + lg.containerCount, 0)
+                            : activeContainerCount}
+                          {!isBrokerStatement && statementData.summary.totalContainers > activeContainerCount && (
+                            <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                          )}
+                        </div>
+                        {isBrokerStatement && (
+                          <div className="text-xs text-muted-foreground mt-1">{linkedGroups.length} linked supplier{linkedGroups.length !== 1 ? "s" : ""}</div>
+                        )}
                       </CardContent>
                     </Card>
-                  )}
-                  {currencyGroups.map((g: any) => {
-                    const bal = parseFloat(g.netPayable);
-                    const isOverpaid = bal < -0.005;
-                    const isSettled = Math.abs(bal) <= 0.005;
-                    const ccPrefix = g.currencyCode !== "USD" ? `${g.currencyCode} ` : "$";
-                    return (
-                      <Card key={g.currencyCode}>
+                    {!isBrokerStatement && (
+                      <Card>
                         <CardContent className="p-4">
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <span className="font-medium">{g.currencyCode}</span>
-                            <span>Balance</span>
+                          <div className="text-xs text-muted-foreground">Active Weight</div>
+                          <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
+                            {formatKg(String(activeKg.toFixed(3)))}
                           </div>
-                          <div
-                            className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                            data-testid={`text-statement-balance-${g.currencyCode}`}
-                          >
-                            {isSettled ? (
-                              <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
-                            ) : isOverpaid ? (
-                              <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
-                            ) : (
-                              <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
-                            )}
-                          </div>
-                          {parseFloat(g.totalFreight || "0") > 0.005 && (
-                            <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                              incl. {ccPrefix}{formatNum(g.totalFreight)} freight
-                            </div>
-                          )}
                         </CardContent>
                       </Card>
-                    );
-                  })}
-                </div>
+                    )}
+                    {kpiEntries.length === 0 && (
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-xs text-muted-foreground">Net Balance</div>
+                          <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
+                            $— <span className="text-sm font-normal">Settled</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {kpiEntries.map(([cc, v]) => {
+                      const bal = v.own + v.linked;
+                      const isOverpaid = bal < -0.005;
+                      const isSettled = Math.abs(bal) <= 0.005;
+                      const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
+                      return (
+                        <Card key={cc}>
+                          <CardContent className="p-4">
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="font-medium">{cc}</span>
+                              <span>Balance</span>
+                              {isBrokerStatement && v.linked !== 0 && v.own !== 0 && (
+                                <span className="text-xs opacity-60">(combined)</span>
+                              )}
+                            </div>
+                            <div
+                              className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                              data-testid={`text-statement-balance-${cc}`}
+                            >
+                              {isSettled ? (
+                                <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
+                              ) : isOverpaid ? (
+                                <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
+                              ) : (
+                                <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
+                              )}
+                            </div>
+                            {v.totalFreight > 0.005 && (
+                              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                                incl. {ccPrefix}{formatNum(String(v.totalFreight.toFixed(2)))} freight
+                              </div>
+                            )}
+                            {isBrokerStatement && v.linked !== 0 && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {ccPrefix}{formatNum(String(Math.abs(v.linked).toFixed(2)))} from linked suppliers
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {/* Issues panel */}
+                  {issues.length > 0 && (
+                    <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                        {issues.length} Pending Issue{issues.length !== 1 ? "s" : ""}
+                      </div>
+                      {issues.map((issue, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
+                          <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                          {issue.msg}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               );
             })()}
 
