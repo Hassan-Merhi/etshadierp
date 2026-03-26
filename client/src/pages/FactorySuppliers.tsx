@@ -1287,6 +1287,7 @@ export default function FactorySuppliers() {
                       <TableBody>
                         {statementData.currencyGroups.map((group) => {
                           const isCommissionOnly = group.containers.length === 0 && parseFloat(group.totalCommission) > 0;
+                          const isFreightOnly = group.containers.length === 0 && parseFloat(group.totalCommission) === 0 && parseFloat(group.totalFreight || "0") > 0;
                           const netPay = parseFloat(group.netPayable);
                           const commissionOwed = isCommissionOnly && netPay < 0;
                           const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
@@ -1295,11 +1296,12 @@ export default function FactorySuppliers() {
                             <TableCell className="font-semibold">
                               <Badge variant="outline">{group.currencyCode}</Badge>
                               {commissionOwed && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
+                              {isFreightOnly && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
                             </TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{isCommissionOnly ? "—" : group.containers.length}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{isCommissionOnly ? "—" : formatKg(group.totalKg)}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(isCommissionOnly || isFreightOnly) ? "—" : group.containers.length}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(isCommissionOnly || isFreightOnly) ? "—" : formatKg(group.totalKg)}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-medium">
-                              {isCommissionOnly ? "—" : `${ccPrefix}${formatNum(group.totalValue)}`}
+                              {(isCommissionOnly || isFreightOnly) ? "—" : `${ccPrefix}${formatNum(group.totalValue)}`}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums text-destructive">
                               {parseFloat(group.totalCommission) > 0 ? (
@@ -1319,33 +1321,33 @@ export default function FactorySuppliers() {
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {(group.currencyCode !== "USD" || commissionOwed) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
+                              {(group.currencyCode !== "USD" || commissionOwed || isFreightOnly) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
                                   onClick={() => {
                                     const hasBalance = netPay > 0;
-                                    setFxSourceType("commission");
+                                    const freightAmt = hasBalance ? group.netPayable : "0";
                                     const form = {
                                       fromSupplierId: statementSupplierId!,
                                       toSupplierId: statementData.supplier.parentId!,
                                       selectedCurrency: group.currencyCode,
-                                      amount: group.totalCommission,
-                                      availableBalance: group.totalCommission,
+                                      amount: isFreightOnly ? freightAmt : group.totalCommission,
+                                      availableBalance: isFreightOnly ? freightAmt : group.totalCommission,
                                       supplierBalance: hasBalance ? group.netPayable : "0",
-                                      commissionBalance: group.totalCommission,
+                                      commissionBalance: isFreightOnly ? "0" : group.totalCommission,
                                       fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
                                       date: today,
-                                      notes: "",
+                                      notes: isFreightOnly ? "Freight settlement" : "",
                                     };
                                     setFxConversionForm(form);
-                                    setFxSourceType("commission");
+                                    setFxSourceType(isFreightOnly ? "supplier" : "commission");
                                     setFxConversionOpen(true);
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {commissionOwed ? "Transfer" : netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
+                                  {commissionOwed ? "Transfer" : isFreightOnly ? "Settle Freight" : netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>
@@ -1937,11 +1939,15 @@ export default function FactorySuppliers() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4" />
-                {fxConversionForm.selectedCurrency === "USD" ? "Transfer Commission to Broker" : "FX Settlement to Broker (USD)"}
+                {fxConversionForm.selectedCurrency === "USD"
+                  ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0 ? "Transfer Commission to Broker" : "Transfer Freight to Broker")
+                  : "FX Settlement to Broker (USD)"}
               </DialogTitle>
               <DialogDescription>
                 {fxConversionForm.selectedCurrency === "USD"
-                  ? "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
+                  ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                    ? "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
+                    : "Direct USD transfer: moves this freight obligation from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
                   : "Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment."}
               </DialogDescription>
             </DialogHeader>

@@ -2913,9 +2913,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             fxBothOut[cc] = (fxBothOut[cc] || 0) + parseFloat(t.fromAmount || "0");
           }
         }
-        // FX transfers into this supplier (parent) add to its USD bucket
-        if (t.toSupplierId === supplierId) {
-          paidByCurrency["USD"] = (paidByCurrency["USD"] || 0) - parseFloat(t.toAmountUsd || "0");
+        // FX transfers INTO this supplier reduce what they're still owed.
+        // Only commission-type transfers (and "both") affect the USD commission pool;
+        // supplier goods settlements are irrelevant to the commission balance.
+        if (t.toSupplierId === supplierId && (t.sourceType === "commission" || t.sourceType === "both")) {
+          paidByCurrency["USD"] = (paidByCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
         }
       }
 
@@ -3060,11 +3062,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             notes: c.notes,
           });
           linkedByCurrency[cc].totalValue += value;
-          // Cross-currency freight gets its own bucket
-          if (freight > 0 && !freightSameCcy) {
-            if (!linkedByCurrency[freightCc]) linkedByCurrency[freightCc] = { containers: [], totalValue: 0, totalCommission: 0 };
-            linkedByCurrency[freightCc].totalValue += freight;
-          }
+          // Cross-currency freight (e.g. USD freight on an AUD container) belongs to the
+          // child supplier's own statement — NOT to the broker's linked-supplier view.
+          // Once the child transfers it via an FX transfer, it settles on the child's
+          // statement and disappears. The broker does not need to track it here.
           // Commission goes into its own currency bucket
           if (totalComm > 0) {
             if (!linkedByCurrency[commCc]) linkedByCurrency[commCc] = { containers: [], totalValue: 0, totalCommission: 0 };
