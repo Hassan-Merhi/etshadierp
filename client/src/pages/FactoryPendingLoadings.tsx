@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,7 +7,19 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
-import { Clock, Package, Play } from "lucide-react";
+import { Clock, Package, Play, Trash2, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { apiRequest } from "@/lib/queryClient";
 
 interface PendingLoad {
   id: number;
@@ -24,6 +37,9 @@ export default function FactoryPendingLoadings() {
   const { formatDisplayDate } = useDateFormat();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<PendingLoad | null>(null);
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
     queryKey: ["/api/factory/customer-orders", "LOADING"],
@@ -35,6 +51,25 @@ export default function FactoryPendingLoadings() {
     enabled: !!selectedCompany?.id,
     refetchInterval: 30000,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/factory/customer-orders/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", "LOADING"] });
+      toast({ title: "Loading deleted", description: "Bales have been returned to stock." });
+      setDeleteTarget(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+      setDeleteTarget(null);
+    },
+  });
+
+  const handleExport = (load: PendingLoad) => {
+    window.open(`/api/factory/customer-orders/${load.id}/pending-export`, "_blank");
+  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
@@ -96,18 +131,62 @@ export default function FactoryPendingLoadings() {
                     </span>
                   </div>
                 </div>
-                <Button
-                  onClick={() => navigate(`/factory/sales/loading/new?orderId=${load.id}`)}
-                  data-testid={`button-resume-${load.id}`}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Resume
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleExport(load)}
+                    data-testid={`button-export-${load.id}`}
+                    title="Export to Excel"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setDeleteTarget(load)}
+                    data-testid={`button-delete-${load.id}`}
+                    title="Delete loading (returns bales to stock)"
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => navigate(`/factory/sales/loading/new?orderId=${load.id}`)}
+                    data-testid={`button-resume-${load.id}`}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Resume
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete pending loading?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete Loading #{deleteTarget?.id} for{" "}
+              <strong>{deleteTarget?.customerName}</strong> and return all{" "}
+              {deleteTarget?.totalQtyBales} scanned bales back to stock. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete & Return to Stock"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

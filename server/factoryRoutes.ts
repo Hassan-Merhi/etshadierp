@@ -13341,6 +13341,90 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   // ───────────────────────────────────────────────
+  // PENDING LOADING — BALE-LEVEL EXCEL EXPORT
+  // ───────────────────────────────────────────────
+
+  app.get("/api/factory/customer-orders/:id/pending-export", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+
+      const [customer] = await db.select().from(customers).where(eq(customers.id, order.customerId));
+
+      const baleLinks = await db.select().from(customerOrderBales)
+        .where(eq(customerOrderBales.orderId, orderId))
+        .orderBy(customerOrderBales.id);
+
+      const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
+      const baleRows: any[] = baleIds.length > 0
+        ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
+        : [];
+      const baleMap = new Map<number, any>(baleRows.map((b: any) => [b.id, b]));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Loading");
+
+      sheet.columns = [
+        { header: "#", key: "seq", width: 6 },
+        { header: "Ref Code", key: "refCode", width: 20 },
+        { header: "Article Code", key: "articleCode", width: 16 },
+        { header: "Name", key: "name", width: 32 },
+        { header: "Weight (kg)", key: "weight", width: 14 },
+        { header: "Total Weight (kg)", key: "totalWeight", width: 18 },
+      ];
+      sheet.getRow(1).font = { bold: true };
+
+      let runningTotal = 0;
+      for (let i = 0; i < baleLinks.length; i++) {
+        const link = baleLinks[i];
+        const bale = baleMap.get(link.baleId);
+        const weight = parseFloat(link.weight || bale?.weightKg || "0");
+        runningTotal += weight;
+        const row = sheet.addRow({
+          seq: i + 1,
+          refCode: link.baleReference || bale?.referenceNumber || bale?.baleCode || "",
+          articleCode: link.articleCode || bale?.articleCode || "",
+          name: link.baleName || bale?.productName || "",
+          weight: Math.round(weight * 100) / 100,
+          totalWeight: Math.round(runningTotal * 100) / 100,
+        });
+        row.getCell("weight").numFmt = "#,##0.00";
+        row.getCell("totalWeight").numFmt = "#,##0.00";
+      }
+
+      const totalRow = sheet.addRow({
+        seq: "",
+        refCode: "",
+        articleCode: "",
+        name: "TOTAL",
+        weight: Math.round(runningTotal * 100) / 100,
+        totalWeight: Math.round(runningTotal * 100) / 100,
+      });
+      totalRow.font = { bold: true };
+      totalRow.getCell("weight").numFmt = "#,##0.00";
+      totalRow.getCell("totalWeight").numFmt = "#,##0.00";
+
+      const customerName = customer?.legalName || `order_${orderId}`;
+      const safeName = customerName.replace(/[^a-zA-Z0-9_\-]/g, "_");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="loading_${orderId}_${safeName}.xlsx"`);
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error exporting pending loading:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ───────────────────────────────────────────────
   // INVOICE EXPORT (PDF as HTML)
   // ───────────────────────────────────────────────
 
