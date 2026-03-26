@@ -139,8 +139,8 @@ function AccountCombobox({ value, onValueChange, accounts, suppliers, placeholde
 
 interface AdditionalChargeRow {
   id: string;
-  description: string;
   amount: string;
+  currencyCode: string;
   ledgerAccountId: string;
   supplierId: string;
 }
@@ -434,8 +434,14 @@ export default function ProductionRawStock() {
   // Duty is entered in USD
   const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
 
-  // Additional charges are all entered in USD
-  const additionalChargesTotalUsd = additionalCharges.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  // Additional charges — convert to USD using container FX rate for display estimate
+  const additionalChargesTotalUsd = additionalCharges.reduce((sum, c) => {
+    const amt = parseFloat(c.amount || "0");
+    const ccy = c.currencyCode || "USD";
+    if (ccy === "USD") return sum + amt;
+    if (ccy === currencyCode) return sum + (fxRate > 0 ? amt * fxRate : amt);
+    return sum + amt; // other currencies: treat as-is (best estimate)
+  }, 0);
 
   // Freight: convert to USD using the freight's own currency code
   // - If freight currency is USD → use directly
@@ -607,14 +613,11 @@ export default function ProductionRawStock() {
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
       dutyNotes: dutyNotes || null,
-      // Additional charges entered in USD → send as USD so backend converts correctly
-      additionalCharges: additionalCharges.filter(c => c.description.trim() && parseFloat(c.amount || "0") > 0).map(c => {
+      additionalCharges: additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map(c => {
         const p = parseAccountValue(c.ledgerAccountId);
         return {
-          description: c.description.trim(),
           amount: c.amount,
-          currencyCode: "USD",
-          fxRateToUsd: "1",
+          currencyCode: c.currencyCode || "USD",
           ledgerAccountId: p?.type === "ledger" ? p.id : null,
           supplierId: p?.type === "supplier" ? p.id : null,
         };
@@ -1500,49 +1503,57 @@ export default function ProductionRawStock() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", ledgerAccountId: "", supplierId: "" }])}
+                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), amount: "", currencyCode: currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])}
                       data-testid="button-add-additional-charge"
                     >
                       <Plus className="h-3 w-3 mr-1" /> Add Row
                     </Button>
                   </div>
                   {additionalCharges.length > 0 && (
-                    <div className="space-y-3 mt-2">
-                      {additionalCharges.map((charge, idx) => (
-                        <div key={charge.id} className="space-y-1 p-2 border border-border rounded-md">
-                          <div className="grid grid-cols-[1fr_120px_1fr_auto] gap-2 items-end">
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Description</Label>
-                              <Input
-                                value={charge.description}
-                                onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
-                                placeholder="e.g. Handling fee"
-                                data-testid={`input-addl-desc-${idx}`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Amount (USD)</Label>
-                              <Input
-                                type="number"
-                                value={charge.amount}
-                                onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
-                                placeholder="0.00"
-                                step="0.01"
-                                data-testid={`input-addl-amount-${idx}`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Account / Broker</Label>
-                              <AccountCombobox
-                                value={charge.ledgerAccountId}
-                                onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))}
-                                accounts={ledgerAccounts || []}
-                                suppliers={factorySuppliers || []}
-                                placeholder="Select account or broker"
-                                testId={`select-addl-account-${idx}`}
-                              />
-                            </div>
+                    <div className="mt-2">
+                      <div className="grid grid-cols-[1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                        <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                        <div className="text-xs text-muted-foreground font-medium">CCY</div>
+                        <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
+                        <div />
+                        {additionalCharges.map((charge, idx) => (
+                          <>
+                            <Input
+                              key={`amt-${charge.id}`}
+                              type="number"
+                              value={charge.amount}
+                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
+                              placeholder="0.00"
+                              step="0.01"
+                              data-testid={`input-addl-amount-${idx}`}
+                            />
+                            <Select
+                              key={`ccy-${charge.id}`}
+                              value={charge.currencyCode || "USD"}
+                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}
+                            >
+                              <SelectTrigger className="w-20" data-testid={`select-addl-currency-${idx}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="AUD">AUD</SelectItem>
+                                <SelectItem value="LBP">LBP</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <AccountCombobox
+                              key={`acc-${charge.id}`}
+                              value={charge.ledgerAccountId}
+                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))}
+                              accounts={ledgerAccounts || []}
+                              suppliers={factorySuppliers || []}
+                              placeholder="Select account or broker"
+                              testId={`select-addl-account-${idx}`}
+                            />
                             <Button
+                              key={`del-${charge.id}`}
                               variant="ghost"
                               size="icon"
                               onClick={() => setAdditionalCharges(prev => prev.filter(c => c.id !== charge.id))}
@@ -1550,9 +1561,9 @@ export default function ProductionRawStock() {
                             >
                               <X className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </div>
-                      ))}
+                          </>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1737,8 +1748,8 @@ export default function ProductionRawStock() {
                   )}
                   {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
                     <div key={c.id} className="flex justify-between text-muted-foreground">
-                      <span>{c.description || `Additional #${i + 1}`}</span>
-                      <span className="font-mono">$ {formatNumber(parseFloat(c.amount))}</span>
+                      <span>Additional #{i + 1}</span>
+                      <span className="font-mono">{c.currencyCode || "USD"} {formatNumber(parseFloat(c.amount))}</span>
                     </div>
                   ))}
                   {commissionPersonName && commRateNum > 0 && (
