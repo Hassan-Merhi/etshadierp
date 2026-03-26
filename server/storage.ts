@@ -181,7 +181,7 @@ export interface IStorage {
   createImportLog(log: InsertImportLog): Promise<ImportLog>;
 
   // Stock Items - Additional methods for barcode lookup
-  getStockItemByBarcode(barcode: string): Promise<StockItem | undefined>;
+  getStockItemByBarcode(barcode: string, companyId?: number): Promise<StockItem | undefined>;
 
   // Stock Item Location Prices
   getStockItemLocationPrices(stockItemId: number): Promise<(schema.StockItemLocationPrice & { locationName: string })[]>;
@@ -1929,8 +1929,10 @@ export class DbStorage implements IStorage {
   }
 
   // Stock Items - Code/Barcode lookup
-  async getStockItemByBarcode(barcode: string): Promise<StockItem | undefined> {
-    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.code, barcode));
+  async getStockItemByBarcode(barcode: string, companyId?: number): Promise<StockItem | undefined> {
+    const conditions: any[] = [eq(schema.stockItems.code, barcode)];
+    if (companyId) conditions.push(eq(schema.stockItems.companyId, companyId));
+    const [item] = await db.select().from(schema.stockItems).where(and(...conditions));
     return item;
   }
 

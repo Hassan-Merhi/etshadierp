@@ -31,14 +31,18 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
   const importMutation = useMutation({
     mutationFn: async (data: Array<{ barcode: string; sellingPrice: string; locationId?: number }>) => {
-      return await apiRequest("POST", "/api/stock-items/bulk-update-prices", { prices: data });
+      const res = await apiRequest("POST", "/api/stock-items/bulk-update-prices", { prices: data });
+      return res.json() as Promise<{ message: string; updated: number; notFound: number }>;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
+      const noneUpdated = result.updated === 0;
       toast({
-        title: "Success",
-        description: result.message || "Prices imported successfully",
+        title: noneUpdated ? "No Items Updated" : "Import Complete",
+        description: result.message,
+        variant: noneUpdated ? "destructive" : "default",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-item-location-prices"] });
       setPricesFile(null);
       setIsProcessing(false);
     },
@@ -81,8 +85,8 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
   const downloadPricesTemplate = async () => {
     const template = [
-      { Barcode: "BAR001", "Selling Price": 100.00 },
-      { Barcode: "BAR002", "Selling Price": 200.00 },
+      { "Barcode (Item Code)": "ITEM-001", "Selling Price": 100.00 },
+      { "Barcode (Item Code)": "ITEM-002", "Selling Price": 200.00 },
     ];
 
     const ws = utils.json_to_sheet(template);
@@ -140,7 +144,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
       const prices = data
         .map((row) => ({
-          barcode: String(row.Barcode || "").trim(),
+          barcode: String(row["Barcode (Item Code)"] || row.Barcode || "").trim(),
           sellingPrice: String(row["Selling Price"] || "0").trim(),
           locationId: parseInt(selectedLocation),
         }))
@@ -350,7 +354,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
                   data-testid="input-import-prices-file"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Excel file should have columns: "Barcode" and "Selling Price"
+                  Excel columns: "Barcode (Item Code)" and "Selling Price". Use the item's code (e.g. ITEM-001) as the barcode.
                 </p>
               </div>
 

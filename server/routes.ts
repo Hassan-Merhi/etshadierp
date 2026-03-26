@@ -7394,7 +7394,8 @@ if (asOfDate) {
         const { barcode, sellingPrice, locationId } = priceEntry;
         if (!barcode || !sellingPrice) continue;
 
-        const item = await storage.getStockItemByBarcode(barcode);
+        const companyId = req.session.currentCompanyId;
+        const item = await storage.getStockItemByBarcode(barcode, companyId);
         if (item) {
           if (locationId) {
             // Update location-specific price
