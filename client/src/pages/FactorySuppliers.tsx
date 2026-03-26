@@ -986,7 +986,6 @@ export default function FactorySuppliers() {
                                 )}
                               </div>
                             ))}
-                            <div className="text-xs text-muted-foreground">~${formatNum(child.totalValue)} USD</div>
                           </div>
                         ) : (
                           <>
