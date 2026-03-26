@@ -536,13 +536,17 @@ export default function FactorySuppliers() {
       const res = await factoryApiRequest("DELETE", `/api/factory/supplier-fx-transfers/${transferId}`);
       if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to reverse FX settlement"); }
     },
-    onSuccess: () => {
+    onSuccess: (_data, transferId) => {
+      // Invalidate the current supplier's statement
       if (statementSupplierId) {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
-        if (statementData?.supplier?.parentId) {
-          queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementData.supplier.parentId, "statement"] });
-        }
       }
+      // Invalidate the parent broker's statement (if current is a child)
+      if (statementData?.supplier?.parentId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementData.supplier.parentId, "statement"] });
+      }
+      // Invalidate the supplier list so KPI cards (currency totals) refresh
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       toast({ title: "FX settlement reversed" });
     },
     onError: (err: Error) => {
@@ -1672,7 +1676,7 @@ export default function FactorySuppliers() {
                         amountIsNeg: isOut,
                         notes: t.notes,
                         nativeImpact: isOut ? -toNative(fromAmt, fromCc, toUsd / (fromAmt || 1)) : 0,
-                        onDelete: isOut ? () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); } : undefined,
+                        onDelete: () => { setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)); },
                       };
                     }),
                     ...(statementData.offloadCharges || []).map((oc: any) => {
