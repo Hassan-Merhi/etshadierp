@@ -76,7 +76,7 @@ export default function FactoryContainers() {
   const [fxRateSource, setFxRateSource] = useState<"auto" | "manual">("auto");
   const [fxEffectiveDate, setFxEffectiveDate] = useState("");
 
-  type OtherChargeLine = { description: string; amount: string; ledgerAccountId: string };
+  type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string };
   const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
 
   const updateOtherChargeLine = (idx: number, field: keyof OtherChargeLine, value: string) => {
@@ -153,8 +153,8 @@ export default function FactoryContainers() {
       .then(res => res.ok ? res.json() : [])
       .then((charges: any[]) => {
         setOtherChargeLines(charges.map((c: any) => ({
-          description: c.description || "",
           amount: c.amount || "",
+          currencyCode: c.currencyCode || currency || "USD",
           ledgerAccountId: c.ledgerAccountId ? String(c.ledgerAccountId) : "",
         })));
       })
@@ -188,10 +188,11 @@ export default function FactoryContainers() {
       const container = await res.json();
       await factoryApiRequest("POST", `/api/factory/containers/${container.id}/other-charges/sync`, {
         charges: otherChargeLines
-          .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
+          .filter(l => parseFloat(l.amount || "0") > 0)
           .map(l => ({
-            description: l.description,
+            description: "Other Charge",
             amount: l.amount,
+            currencyCode: l.currencyCode || currency,
             ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
           })),
       });
@@ -234,10 +235,11 @@ export default function FactoryContainers() {
         otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
       const validCharges = otherChargeLines
-        .filter(l => l.description.trim() && parseFloat(l.amount || "0") > 0)
+        .filter(l => parseFloat(l.amount || "0") > 0)
         .map(l => ({
-          description: l.description,
+          description: "Other Charge",
           amount: l.amount,
+          currencyCode: l.currencyCode || currency,
           ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
         }));
       let container: any;
@@ -483,8 +485,8 @@ export default function FactoryContainers() {
       if (res.ok) {
         const lines = await res.json();
         setOtherChargeLines(lines.map((l: any) => ({
-          description: l.description || "",
           amount: l.amount || "",
+          currencyCode: l.currencyCode || currency || "USD",
           ledgerAccountId: l.ledgerAccountId ? String(l.ledgerAccountId) : "",
         })));
       }
@@ -1136,7 +1138,7 @@ export default function FactoryContainers() {
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setOtherChargeLines(prev => [...prev, { description: "", amount: "", ledgerAccountId: "" }])}
+                    onClick={() => setOtherChargeLines(prev => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "" }])}
                     data-testid="button-add-other-charge"
                   >
                     <Plus className="h-3 w-3 mr-1" />
@@ -1146,66 +1148,82 @@ export default function FactoryContainers() {
                 {otherChargeLines.length === 0 && (
                   <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
                 )}
-                {otherChargeLines.map((line, idx) => (
-                  <div key={idx} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
-                    <div>
-                      {idx === 0 && <Label className="text-xs text-muted-foreground">Description</Label>}
-                      <Input
-                        value={line.description}
-                        onChange={(e) => updateOtherChargeLine(idx, "description", e.target.value)}
-                        placeholder="e.g. Port handling"
-                        data-testid={`input-other-charge-description-${idx}`}
-                      />
-                    </div>
-                    <div>
-                      {idx === 0 && <Label className="text-xs text-muted-foreground">Amount</Label>}
-                      <Input
-                        type="number"
-                        value={line.amount}
-                        onChange={(e) => updateOtherChargeLine(idx, "amount", e.target.value)}
-                        placeholder="0.00"
-                        data-testid={`input-other-charge-amount-${idx}`}
-                      />
-                    </div>
-                    <div>
-                      {idx === 0 && <Label className="text-xs text-muted-foreground">Account (optional)</Label>}
-                      <Select
-                        value={line.ledgerAccountId || "__none__"}
-                        onValueChange={(val) => updateOtherChargeLine(idx, "ledgerAccountId", val === "__none__" ? "" : val)}
-                      >
-                        <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {ledgerAccounts.map((acc: any) => (
-                            <SelectItem key={acc.id} value={String(acc.id)}>
-                              {acc.name}{acc.code ? ` (${acc.code})` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      {idx === 0 && <div className="h-4" />}
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeOtherChargeLine(idx)}
-                        data-testid={`button-remove-other-charge-${idx}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {otherChargeLines.length > 0 && (
+                  <div className="grid grid-cols-[1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                    <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                    <div className="text-xs text-muted-foreground font-medium">CCY</div>
+                    <div className="text-xs text-muted-foreground font-medium">Account</div>
+                    <div />
+                    {otherChargeLines.map((line, idx) => (
+                      <>
+                        <Input
+                          key={`amt-${idx}`}
+                          type="number"
+                          value={line.amount}
+                          onChange={(e) => updateOtherChargeLine(idx, "amount", e.target.value)}
+                          placeholder="0.00"
+                          data-testid={`input-other-charge-amount-${idx}`}
+                        />
+                        <Select
+                          key={`ccy-${idx}`}
+                          value={line.currencyCode || currency}
+                          onValueChange={(val) => updateOtherChargeLine(idx, "currencyCode", val)}
+                        >
+                          <SelectTrigger className="w-20" data-testid={`select-other-charge-currency-${idx}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                            <SelectItem value="AUD">AUD</SelectItem>
+                            <SelectItem value="LBP">LBP</SelectItem>
+                            <SelectItem value="GBP">GBP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          key={`acc-${idx}`}
+                          value={line.ledgerAccountId || "__none__"}
+                          onValueChange={(val) => updateOtherChargeLine(idx, "ledgerAccountId", val === "__none__" ? "" : val)}
+                        >
+                          <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
+                            <SelectValue placeholder="No account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">No account</SelectItem>
+                            {ledgerAccounts.map((acc: any) => (
+                              <SelectItem key={acc.id} value={String(acc.id)}>
+                                {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          key={`del-${idx}`}
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeOtherChargeLine(idx)}
+                          data-testid={`button-remove-other-charge-${idx}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ))}
                   </div>
-                ))}
+                )}
                 {otherChargeLines.length > 0 && (
                   <div className="text-xs text-muted-foreground text-right pt-1 space-y-0.5">
-                    <div>Total: {currency} {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0))}</div>
-                    {currency !== "USD" && fxRate && parseFloat(fxRate) > 0 && (
-                      <div>= {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0) * parseFloat(fxRate))} USD</div>
-                    )}
+                    {(() => {
+                      const totals: Record<string, number> = {};
+                      for (const l of otherChargeLines) {
+                        const cc = l.currencyCode || currency;
+                        const v = parseFloat(l.amount || "0");
+                        if (v > 0) totals[cc] = (totals[cc] || 0) + v;
+                      }
+                      return Object.entries(totals).map(([cc, amt]) => (
+                        <div key={cc}>Additional {cc} {formatNumber(amt)}</div>
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
