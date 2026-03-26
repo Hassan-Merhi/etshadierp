@@ -1743,8 +1743,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const fromSupId = parsed.fromSupplierId;
       const sourceType = (parsed as any).sourceType || "supplier";
 
-      // 1. Containers for this supplier in this currency
-      const contRows = await db
+      // 1a. Containers for this supplier in this currency (for supplier-bucket validation)
+      const contRowsInCurrency = await db
         .select({
           finalPayableAmount: factoryContainers.finalPayableAmount,
           actualReceivedKg: factoryContainers.actualReceivedKg,
@@ -1760,25 +1760,61 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(factoryContainers.currencyCode, currCode)
         ));
 
-      const containerIds = contRows.map((c: any) => c.id);
-      const totalValue = contRows.reduce((s: number, c: any) => {
+      const containerIds = contRowsInCurrency.map((c: any) => c.id);
+      const totalValue = contRowsInCurrency.reduce((s: number, c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
         const freight = parseFloat(c.freight || "0");
         return s + (kg * rate + freight);
       }, 0);
 
-      // 2. Commissions from factoryContainerCommissions for these containers
+      // 1b. For commission validation: ALL containers for this supplier (commission may be in a
+      //     different currency than the container, e.g. EUR container with USD commission).
+      const allContainerIds: number[] = containerIds.slice(); // start with same-currency containers
+      if (sourceType === "commission" || sourceType === "both") {
+        const allContRows = await db
+          .select({ id: factoryContainers.id })
+          .from(factoryContainers)
+          .where(and(
+            eq(factoryContainers.companyId, companyId),
+            eq(factoryContainers.supplierId, fromSupId)
+          ));
+        for (const c of allContRows) {
+          if (!allContainerIds.includes(c.id)) allContainerIds.push(c.id);
+        }
+      }
+
+      // 2. Commissions from factoryContainerCommissions for relevant containers,
+      //    filtered by commission currency code (handles cross-currency commissions).
       let totalCommission = 0;
-      if (containerIds.length > 0) {
+      if (allContainerIds.length > 0) {
         const commRows = await db
-          .select({ commissionTotal: factoryContainerCommissions.commissionTotal })
+          .select({ commissionTotal: factoryContainerCommissions.commissionTotal, currencyCode: factoryContainerCommissions.currencyCode })
           .from(factoryContainerCommissions)
           .where(and(
             eq(factoryContainerCommissions.companyId, companyId),
-            inArray(factoryContainerCommissions.containerId, containerIds)
+            inArray(factoryContainerCommissions.containerId, allContainerIds)
           ));
-        totalCommission = commRows.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
+        // Only count commissions denominated in the transfer currency
+        totalCommission = commRows
+          .filter((cm: any) => (cm.currencyCode || "USD") === currCode)
+          .reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
+
+        // Also include direct commissions from containers (commissionAmount / commissionCurrencyCode)
+        if (sourceType === "commission" || sourceType === "both") {
+          const directRows = await db
+            .select({ commissionAmount: factoryContainers.commissionAmount, commissionCurrencyCode: factoryContainers.commissionCurrencyCode })
+            .from(factoryContainers)
+            .where(and(
+              eq(factoryContainers.companyId, companyId),
+              eq(factoryContainers.supplierId, fromSupId)
+            ));
+          const directAmt = directRows
+            .filter((r: any) => (r.commissionCurrencyCode || "USD") === currCode)
+            .reduce((s: number, r: any) => s + parseFloat(r.commissionAmount || "0"), 0);
+          // Use whichever is larger (factoryContainerCommissions may supersede commissionAmount)
+          if (directAmt > totalCommission) totalCommission = directAmt;
+        }
       }
 
       // 3. Payments in this currency
@@ -1873,12 +1909,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
       // ─────────────────────────────────────────────────────────────────────────
 
+      const transferKind = (created as any).sourceType === "commission" ? "Commission Transfer" : "FX Transfer";
       await writeDaybookEntry(db, {
         companyId,
         txDate: created.date,
         txType: "SUPPLIER_FX_TRANSFER",
         referenceId: created.id,
-        description: `FX Transfer: ${fromSupplier.name} ${created.fromCurrencyCode} ${parseFloat(created.fromAmount).toFixed(2)} → ${toSupplier.name} USD ${parseFloat(created.toAmountUsd).toFixed(2)}`,
+        description: `${transferKind}: ${fromSupplier.name} ${created.fromCurrencyCode} ${parseFloat(created.fromAmount).toFixed(2)} → ${toSupplier.name} USD ${parseFloat(created.toAmountUsd).toFixed(2)}`,
         amountCurrency: parseFloat(created.fromAmount),
         amountUsd: parseFloat(created.toAmountUsd),
         currencyCode: created.fromCurrencyCode,
