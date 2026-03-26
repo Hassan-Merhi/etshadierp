@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -351,6 +352,8 @@ export default function FactoryContainers() {
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reversingContainer, setReversingContainer] = useState<ContainerWithSupplier | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const importMutation = useMutation({
     mutationFn: async (rows: any[]) => {
@@ -416,13 +419,127 @@ export default function FactoryContainers() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const downloadTemplate = async () => {
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await factoryApiRequest("POST", "/api/factory/containers/bulk-delete", { ids });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Bulk delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+      toast({ title: "Deleted", description: `${data.deleted} container${data.deleted !== 1 ? "s" : ""} and all linked data removed successfully.` });
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const exportContainers = async (rows: ContainerWithSupplier[]) => {
     const XLSX = await import("xlsx");
-    const headers = ["Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes", "Commission Amount", "Commission Currency"];
-    const sample = ["CNTR-2024-001", "ABC Trading", "China", 25000, 1.50, "USD", "", "AUTO", "2024-06-01", "PENDING", "Sample row", 500, "USD"];
-    const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+    const headers = [
+      "Container Number", "Supplier", "Broker / Commission To", "Origin",
+      "Total Kg", "Rate/Kg", "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes",
+      "Commission Amount", "Commission Currency", "Commission Notes",
+      "Freight Amount", "Freight Currency",
+      "Other Charges (legacy)",
+    ];
+    const dataRows = rows.map((c: any) => {
+      const brokerSupId = c.commissionSupplierId;
+      const brokerName = brokerSupId ? (suppliers?.find((s: any) => s.id === brokerSupId)?.name ?? "") : "";
+      return [
+        c.containerNumber,
+        c.supplierName || "",
+        brokerName,
+        c.origin || "",
+        c.totalKg || "",
+        c.ratePerKg || "",
+        c.currencyCode || "USD",
+        c.fxRateToUsd || "1",
+        c.fxRateSource || "auto",
+        c.arrivalDate || "",
+        c.status,
+        c.notes || "",
+        c.commissionAmount || "",
+        c.commissionCurrencyCode || "USD",
+        c.commissionNotes || "",
+        c.freight || "",
+        c.freightCurrencyCode || "USD",
+        c.otherCharges || "",
+      ];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+    // Column widths
+    ws["!cols"] = [20,20,20,12,10,10,8,8,8,12,12,30,12,10,30,12,10,12].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Containers");
+    XLSX.writeFile(wb, `factory_containers_export_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
+
+    // Sheet 1: Template with sample data
+    const headers = [
+      "Container Number", "Supplier", "Origin", "Total Kg", "Rate/Kg",
+      "Currency", "FX Rate", "FX Source", "Arrival Date", "Status", "Notes",
+      "Commission Amount", "Commission Currency",
+    ];
+    const sample1 = ["CNTR-2024-001", "ABC Trading Co", "Australia", 20000, 0.50, "AUD", "", "AUTO", "2024-06-01", "PENDING", "First container", 1000, "USD"];
+    const sample2 = ["CNTR-2024-002", "XYZ Suppliers", "China", 15000, 1.20, "USD", "1", "MANUAL", "2024-06-15", "IN_TRANSIT", "Second container - manual FX", "", "USD"];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample1, sample2]);
+    ws["!cols"] = [18,18,12,10,10,8,8,8,12,12,25,14,14].map(w => ({ wch: w }));
+
+    // Sheet 2: Instructions
+    const instructions = [
+      ["FACTORY CONTAINERS IMPORT — INSTRUCTIONS"],
+      [""],
+      ["HOW TO USE THIS TEMPLATE"],
+      ["1. Fill in the 'Containers' sheet with your data. Do NOT change column headers."],
+      ["2. Each row = one container. Container Number is required; all other fields are optional."],
+      ["3. Save as .xlsx and upload via the Import Excel button in Factory Containers."],
+      ["4. When re-importing, status is forced to PENDING regardless of what you enter."],
+      [""],
+      ["COLUMN GUIDE"],
+      ["Column", "Required", "Example", "Notes"],
+      ["Container Number", "YES", "CNTR-2024-001", "Must be unique"],
+      ["Supplier", "No", "ABC Trading Co", "Exact name match or new supplier created automatically"],
+      ["Origin", "No", "Australia", "Country or city of origin"],
+      ["Total Kg", "No", "20000", "Total weight in kg"],
+      ["Rate/Kg", "No", "0.50", "Price per kg in the chosen currency"],
+      ["Currency", "No", "AUD", "USD / EUR / AUD / LBP / GBP (default: USD)"],
+      ["FX Rate", "No", "1.55", "Leave blank for auto (fetched from FX API)"],
+      ["FX Source", "No", "AUTO", "AUTO or MANUAL (default: AUTO)"],
+      ["Arrival Date", "No", "2024-06-01", "YYYY-MM-DD format"],
+      ["Status", "No", "PENDING", "PENDING / IN_TRANSIT / AVAILABLE / OFFLOADED"],
+      ["Notes", "No", "Any text", "Free-form notes"],
+      ["Commission Amount", "No", "1000", "Commission charged to broker, in commission currency"],
+      ["Commission Currency", "No", "USD", "Currency of the commission amount (default: USD)"],
+      [""],
+      ["TIPS FOR RE-IMPORTING AFTER BULK DELETE"],
+      ["• Export your containers first using the 'Export All' button — this gives you the exact data."],
+      ["• Delete the containers using 'Select All → Delete Selected' — this removes ALL linked data."],
+      ["• Then import the exported file. Containers come back as PENDING with all financial details intact."],
+      ["• After importing, re-do offloads manually for containers that had been processed."],
+      [""],
+      ["VALID CURRENCIES: USD, EUR, AUD, LBP, GBP, XOF, XAF, CFA"],
+      ["VALID STATUSES: PENDING, IN_TRANSIT, AVAILABLE, OFFLOADED"],
+    ];
+    const wsInstr = XLSX.utils.aoa_to_sheet(instructions);
+    wsInstr["!cols"] = [40, 12, 20, 50].map(w => ({ wch: w }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Containers");
+    XLSX.utils.book_append_sheet(wb, wsInstr, "Instructions");
     XLSX.writeFile(wb, "factory_containers_template.xlsx");
   };
 
@@ -552,6 +669,24 @@ export default function FactoryContainers() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              onClick={() => setBulkDeleteOpen(true)}
+              data-testid="button-delete-selected"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => exportContainers(containers || [])}
+            data-testid="button-export-containers"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export All
+          </Button>
           <Button
             variant="outline"
             onClick={() => backfillMutation.mutate()}
@@ -559,8 +694,7 @@ export default function FactoryContainers() {
             data-testid="button-backfill-import-credits"
             title="Create missing supplier credit entries for all existing containers"
           >
-            <Download className="h-4 w-4 mr-2" />
-            {backfillMutation.isPending ? "Running..." : "Backfill Supplier Credits"}
+            {backfillMutation.isPending ? "Running..." : "Backfill Credits"}
           </Button>
           <Button
             variant="outline"
@@ -620,6 +754,19 @@ export default function FactoryContainers() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={filteredContainers.length > 0 && filteredContainers.every(c => selectedIds.has(c.id))}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedIds(new Set(filteredContainers.map(c => c.id)));
+                        } else {
+                          setSelectedIds(new Set());
+                        }
+                      }}
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
                   <TableHead>Container #</TableHead>
                   <TableHead>Supplier / Broker</TableHead>
                   <TableHead>Commission</TableHead>
@@ -649,7 +796,21 @@ export default function FactoryContainers() {
                   const totalOtherAmt = legacyOtherAmt + preRegisteredAmt + additionalAmt;
                   const totalValue = baseValue + (freightSameCcy ? freightAmt : 0) + totalOtherAmt;
                   return (
-                    <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`}>
+                    <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`} className={selectedIds.has(c.id) ? "bg-muted/50" : ""}>
+                      <TableCell className="w-10">
+                        <Checkbox
+                          checked={selectedIds.has(c.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (checked) next.add(c.id);
+                              else next.delete(c.id);
+                              return next;
+                            });
+                          }}
+                          data-testid={`checkbox-container-${c.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium font-mono">{c.containerNumber}</TableCell>
                       <TableCell>
                         <div className="space-y-0.5">
@@ -1358,6 +1519,47 @@ export default function FactoryContainers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setImportOpen(false); setImportPreview([]); setImportResult(null); }}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={(open) => { if (!open) setBulkDeleteOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete {selectedIds.size} Container{selectedIds.size !== 1 ? "s" : ""}?
+            </DialogTitle>
+            <DialogDescription>
+              This action is <strong>permanent and cannot be undone</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2 text-sm text-muted-foreground">
+            <p>For each selected container, all of the following will be permanently removed:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Daybook / journal entries</li>
+              <li>Vouchers and accounting entries</li>
+              <li>FX allocation records</li>
+              <li>Mix batch source links</li>
+              <li>Offload charges (additional and pre-registered)</li>
+              <li>Commission records</li>
+              <li>Raw stock entries</li>
+            </ul>
+            <p className="text-destructive font-medium pt-1">Tip: Export All first if you need a backup.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={bulkDeleteMutation.isPending}
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedIds.size} Container${selectedIds.size !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>

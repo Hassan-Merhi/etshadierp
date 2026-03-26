@@ -5204,6 +5204,123 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // ── Bulk cascade-delete containers ───────────────────────────────────────────
+  app.post("/api/factory/containers/bulk-delete", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { ids } = req.body as { ids: number[] };
+      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "No container IDs provided" });
+
+      // Verify all containers belong to this company
+      const owned = await db.select({ id: factoryContainers.id }).from(factoryContainers)
+        .where(and(inArray(factoryContainers.id, ids), eq(factoryContainers.companyId, companyId)));
+      const ownedIds = owned.map((c: any) => c.id);
+      if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
+
+      await db.transaction(async (tx: any) => {
+        // 1. Gather commission record IDs and raw stock IDs before deleting (needed for daybook cleanup)
+        const commRows = await tx.select({ id: factoryContainerCommissions.id })
+          .from(factoryContainerCommissions)
+          .where(and(eq(factoryContainerCommissions.companyId, companyId), inArray(factoryContainerCommissions.containerId, ownedIds)));
+        const commIds = commRows.map((r: any) => r.id);
+
+        const rsRows = await tx.select({ id: factoryRawStock.id })
+          .from(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, ownedIds)));
+        const rsIds = rsRows.map((r: any) => r.id);
+
+        // 2. Delete daybook entries linked to these containers
+        //    a. OFFLOAD_RAW_STOCK / COMMISSION linked by referenceId = raw stock or commission ids
+        if (rsIds.length > 0) {
+          await tx.delete(factoryDaybookEntries).where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+            inArray(factoryDaybookEntries.referenceId, rsIds)
+          ));
+        }
+        if (commIds.length > 0) {
+          await tx.delete(factoryDaybookEntries).where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "COMMISSION"),
+            inArray(factoryDaybookEntries.referenceId, commIds)
+          ));
+        }
+        //    b. FREIGHT / OTHER_CHARGE / DUTY / CONTAINER_IMPORT / PURCHASE linked by referenceId = containerId
+        await tx.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY", "CONTAINER_IMPORT", "PURCHASE"]),
+          inArray(factoryDaybookEntries.referenceId, ownedIds)
+        ));
+
+        // 3. Delete accounting vouchers for these containers
+        //    Patterns: FACTORY-IMPORT-{id}-*, FACTORY-COMM-{id}-*, FACTORY-FREIGHT-{id}-*, FACTORY-OC-{id}-*
+        for (const cid of ownedIds) {
+          const containerVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY"),
+            or(
+              ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${cid}-%`),
+              ilike(vouchers.voucherNumber, `FACTORY-COMM-${cid}-%`),
+              ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${cid}-%`),
+              ilike(vouchers.voucherNumber, `FACTORY-OC-${cid}-%`)
+            )
+          ));
+          if (containerVouchers.length > 0) {
+            const vIds = containerVouchers.map((v: any) => v.id);
+            await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+            await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+          }
+        }
+
+        // 4. Delete FX allocations and transfer records referencing these containers
+        await tx.delete(factoryFxAllocations).where(and(
+          eq(factoryFxAllocations.companyId, companyId),
+          inArray(factoryFxAllocations.containerId, ownedIds)
+        ));
+
+        // 5. Delete mix batch sources
+        await tx.delete(factoryMixBatchSources).where(inArray(factoryMixBatchSources.containerId, ownedIds));
+
+        // 6. Delete offload additional charges
+        await tx.delete(factoryOffloadAdditionalCharges).where(and(
+          eq(factoryOffloadAdditionalCharges.companyId, companyId),
+          inArray(factoryOffloadAdditionalCharges.containerId, ownedIds)
+        ));
+
+        // 7. Delete pre-registered other charges (container-level charges, not offload)
+        await tx.delete(factoryContainerOtherCharges).where(and(
+          eq(factoryContainerOtherCharges.companyId, companyId),
+          inArray(factoryContainerOtherCharges.containerId, ownedIds)
+        ));
+
+        // 8. Delete commission records
+        await tx.delete(factoryContainerCommissions).where(and(
+          eq(factoryContainerCommissions.companyId, companyId),
+          inArray(factoryContainerCommissions.containerId, ownedIds)
+        ));
+
+        // 9. Delete raw stock records
+        await tx.delete(factoryRawStock).where(and(
+          eq(factoryRawStock.companyId, companyId),
+          inArray(factoryRawStock.containerId, ownedIds)
+        ));
+
+        // 10. Finally delete the containers themselves
+        await tx.delete(factoryContainers).where(and(
+          inArray(factoryContainers.id, ownedIds),
+          eq(factoryContainers.companyId, companyId)
+        ));
+      });
+
+      res.json({ deleted: ownedIds.length, ids: ownedIds });
+    } catch (error: any) {
+      console.error("Error bulk-deleting factory containers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
