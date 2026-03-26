@@ -16,9 +16,16 @@ export function useWsInvalidation() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current) {
-          // Only refetch queries that are currently active (mounted) and stale
-          // Avoid blasting all cached queries simultaneously
-          queryClient.invalidateQueries({ refetchType: "active" });
+          // Only refetch queries that are currently active (mounted) and stale.
+          // Exclude the auth session query — its staleTime is Infinity on purpose;
+          // re-checking auth on every WS event causes spurious login redirects.
+          queryClient.invalidateQueries({
+            refetchType: "active",
+            predicate: (query) => {
+              const key = query.queryKey[0];
+              return typeof key !== "string" || !key.includes("/api/auth/me");
+            },
+          });
         }
       }, 800);
     }

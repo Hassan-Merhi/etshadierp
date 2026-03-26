@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, getQueryFn } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -301,7 +301,9 @@ function AuthenticatedApp() {
   
   const { data: user, isLoading, error } = useQuery<any>({
     queryKey: ["/api/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
+    staleTime: Infinity,
   });
 
   const handleGoBack = useCallback(() => {
@@ -361,12 +363,6 @@ function AuthenticatedApp() {
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [handleGoBack]);
-
-  useEffect(() => {
-    if (!isLoading && (error || !user)) {
-      setLocation("/login");
-    }
-  }, [isLoading, error, user, setLocation]);
 
   // Safety-net: if still loading after 12 seconds, force redirect to login
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
