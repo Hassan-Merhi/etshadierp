@@ -1575,15 +1575,18 @@ export default function FactoryContainers() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2 text-sm text-muted-foreground">
-            <p>The following will be permanently removed:</p>
+            <p>The following offload data will be permanently removed:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>Raw stock entry from Raw Production</li>
-              <li>All offload charges (freight, duty, other charges, commission)</li>
-              <li>All accounting journal vouchers (commission, freight, other charges)</li>
-              <li>All related daybook entries</li>
+              <li>Commission record and daybook entry</li>
+              <li>Freight, other charges, and additional charge entries (fields cleared to zero)</li>
+              <li>Duty amount and status (reset to NONE)</li>
+              <li>Mix-batch source allocations linked to this container</li>
+              <li>All accounting journal vouchers (freight, other charges, commission)</li>
+              <li>All related daybook entries (OFFLOAD_RAW_STOCK, FREIGHT, OTHER_CHARGE, DUTY, COMMISSION)</li>
             </ul>
             <p className="text-foreground font-medium pt-1">
-              The container will return to <strong>RECEIVED</strong> status and can be offloaded again from scratch.
+              The container returns to <strong>RECEIVED</strong> status. Supplier import voucher and any payments made are <em>not</em> removed.
             </p>
           </div>
           <DialogFooter className="gap-2">

@@ -6372,8 +6372,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .from(factoryContainerCommissions)
           .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId)));
         const commissionIds = commissionRows.map((r: any) => r.id);
+        const hadOffloadCommission = commissionRows.length > 0;
 
-        // 3. Delete daybook entries tied to this offload
+        // 3. Delete daybook entries tied to this offload:
         //    - OFFLOAD_RAW_STOCK referencing the raw stock row id
         //    - COMMISSION referencing each commission record id
         //    - FREIGHT / OTHER_CHARGE / DUTY referencing the container id
@@ -6395,6 +6396,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             )
           );
         }
+        // FREIGHT, OTHER_CHARGE, DUTY entries all reference containerId directly
         await tx.delete(factoryDaybookEntries).where(
           and(
             eq(factoryDaybookEntries.companyId, companyId),
@@ -6403,8 +6405,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           )
         );
 
-        // 4. Delete all double-entry accounting vouchers for this container
-        //    Patterns: FACTORY-COMM-{id}-*, FACTORY-FREIGHT-{id}-*, FACTORY-OC-{id}-*
+        // 4. Delete all double-entry accounting vouchers created at or after offload for this container:
+        //    FACTORY-COMM-{id}-*   commission vouchers (from offload or pre-registration)
+        //    FACTORY-FREIGHT-{id}-*  freight vouchers
+        //    FACTORY-OC-{id}-*       other-charge and additional-charge vouchers
+        //    (FACTORY-IMPORT-{id}-* and FACTORY-PAY-* are intentionally preserved)
         const containerVouchers = await tx
           .select({ id: vouchers.id })
           .from(vouchers)
@@ -6425,7 +6430,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
 
-        // 5a. Delete raw stock, commission records, and additional charges
+        // 5. Delete offload records: raw stock, commission records, additional charges, mix-batch links
         await tx.delete(factoryRawStock).where(
           and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId))
         );
@@ -6435,23 +6440,43 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         await tx.delete(factoryOffloadAdditionalCharges).where(
           and(eq(factoryOffloadAdditionalCharges.companyId, companyId), eq(factoryOffloadAdditionalCharges.containerId, containerId))
         );
+        // Remove mix-batch source links created during offload for this container
+        await tx.delete(factoryMixBatchSources).where(
+          eq(factoryMixBatchSources.containerId, containerId)
+        );
 
-        // 5. Reset container back to RECEIVED state, clearing offload-computed fields only.
-        //    Pre-registered fields (freight, otherCharges, commission) are kept as-is so
-        //    they remain visible on the containers list after the reverse.
+        // 6. Reset container to RECEIVED, clearing ALL offload-specific data:
+        //    - Offload measurements (actualReceivedKg, differenceKg, declaredKg)
+        //    - Offload charges entered in the offload dialog (freight, OC)
+        //    - Duty details
+        //    - Computed financials (finalPayable, ratePerKgUsd, fxRateOffload)
+        //    - Commission amount if it was set from offload (not pre-registered)
         await tx.update(factoryContainers).set({
           status: "RECEIVED",
           actualReceivedKg: null,
           differenceKg: null,
+          declaredKg: null,
+          // Clear freight set during offload
+          freight: "0",
+          freightAccountId: null,
+          freightSupplierId: null,
+          // Clear other-charges set during offload
+          otherCharges: "0",
+          otherChargesAccountId: null,
+          otherChargesSupplierId: null,
+          // Clear duty
           dutyAmount: null,
           dutyAccountId: null,
           dutyStatus: "NONE",
           dutyNotes: null,
+          // Clear computed financials
           finalPayableAmount: null,
           finalPayableAmountUsd: null,
           ratePerKgUsd: null,
           fxRateToUsdOffload: null,
           fxRateDateOffload: null,
+          // Reset commission amount if it was created from offload dialog
+          ...(hadOffloadCommission ? { commissionAmount: "0" } : {}),
           updatedAt: new Date(),
         }).where(eq(factoryContainers.id, containerId));
       });
