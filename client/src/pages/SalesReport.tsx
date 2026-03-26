@@ -106,6 +106,7 @@ export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
+  const [selectedStockGroup, setSelectedStockGroup] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
@@ -154,12 +155,26 @@ export default function SalesReport() {
     queryKey: ["/api/stock-items"],
   });
 
+  // Fetch stock groups
+  const { data: stockGroups = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-groups"],
+  });
+
+  // Filter stock items to those in the selected group
+  const filteredStockItems = stockItems.filter((item: any) =>
+    !selectedStockGroup || selectedStockGroup === "all" || item.stockGroupId === parseInt(selectedStockGroup)
+  );
+
+  // Resolve selected group name (for multi-company query)
+  const selectedStockGroupName = stockGroups.find((g: any) => g.id === parseInt(selectedStockGroup))?.name || "";
+
   // Build query params for single-company mode
   const queryParams = new URLSearchParams();
   if (periodFilter.fromDate) queryParams.append("startDate", periodFilter.fromDate);
   if (periodFilter.toDate) queryParams.append("endDate", periodFilter.toDate);
   if (selectedLocation && selectedLocation !== "all") queryParams.append("locationId", selectedLocation);
   if (selectedStockItem && selectedStockItem !== "all") queryParams.append("stockItemId", selectedStockItem);
+  if (selectedStockGroup && selectedStockGroup !== "all") queryParams.append("stockGroupId", selectedStockGroup);
 
   const queryString = queryParams.toString();
   const singleCompanyQueryKey = queryString ? `/api/sales-report?${queryString}` : "/api/sales-report";
@@ -168,9 +183,11 @@ export default function SalesReport() {
   const multiCompanyParams = new URLSearchParams();
   if (periodFilter.fromDate) multiCompanyParams.append("startDate", periodFilter.fromDate);
   if (periodFilter.toDate) multiCompanyParams.append("endDate", periodFilter.toDate);
-  if (selectedLocation && selectedLocation !== "all") multiCompanyParams.append("locationId", selectedLocation);
-  if (selectedStockItem && selectedStockItem !== "all") multiCompanyParams.append("stockItemId", selectedStockItem);
+  // Note: locationId and stockItemId are company-specific so not passed in multi-company mode
   if (selectedCompanies.length > 0) multiCompanyParams.append("companyFilter", selectedCompanies.join(","));
+  if (selectedStockGroup && selectedStockGroup !== "all" && selectedStockGroupName) {
+    multiCompanyParams.append("stockGroupName", selectedStockGroupName);
+  }
 
   const multiCompanyQueryString = multiCompanyParams.toString();
   const multiCompanyQueryKey = multiCompanyQueryString 
@@ -295,6 +312,7 @@ export default function SalesReport() {
     setPeriodFilter(getDefaultPeriodValue("this_month"));
     setSelectedLocation("");
     setSelectedStockItem("");
+    setSelectedStockGroup("");
     setSearchTerm("");
     setProfitFilter("all");
     setSelectedCompanies([]);
@@ -474,8 +492,14 @@ export default function SalesReport() {
             variant={isMultiCompanyMode ? "default" : "outline"}
             size="sm"
             onClick={() => {
-              setIsMultiCompanyMode(!isMultiCompanyMode);
+              const next = !isMultiCompanyMode;
+              setIsMultiCompanyMode(next);
               setSelectedCompanies([]);
+              // Location and stock item IDs are company-specific — clear them when entering multi-company mode
+              if (next) {
+                setSelectedLocation("");
+                setSelectedStockItem("");
+              }
             }}
             className="gap-2"
             data-testid="button-toggle-multi-company"
@@ -609,7 +633,7 @@ export default function SalesReport() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="space-y-2">
               <Label htmlFor="grouping">View By</Label>
               <Select
@@ -647,9 +671,10 @@ export default function SalesReport() {
               <Select
                 value={selectedLocation}
                 onValueChange={setSelectedLocation}
+                disabled={isMultiCompanyMode}
               >
                 <SelectTrigger id="location" data-testid="select-location">
-                  <SelectValue placeholder="All Locations" />
+                  <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Locations"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
@@ -662,17 +687,40 @@ export default function SalesReport() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="stockGroup">Stock Group</Label>
+              <Select
+                value={selectedStockGroup}
+                onValueChange={(val) => {
+                  setSelectedStockGroup(val);
+                  setSelectedStockItem(""); // reset item when group changes
+                }}
+              >
+                <SelectTrigger id="stockGroup" data-testid="select-stock-group">
+                  <SelectValue placeholder="All Groups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
+                  {stockGroups.map((g: any) => (
+                    <SelectItem key={g.id} value={g.id.toString()}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="stockItem">Stock Item</Label>
               <Select
                 value={selectedStockItem}
                 onValueChange={setSelectedStockItem}
+                disabled={isMultiCompanyMode}
               >
                 <SelectTrigger id="stockItem" data-testid="select-stock-item">
-                  <SelectValue placeholder="All Items" />
+                  <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Items"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Items</SelectItem>
-                  {stockItems.map((item: any) => (
+                  {filteredStockItems.map((item: any) => (
                     <SelectItem key={item.id} value={item.id.toString()}>
                       {item.name}
                     </SelectItem>

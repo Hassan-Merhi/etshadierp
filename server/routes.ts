@@ -23500,7 +23500,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { startDate, endDate, locationId, stockItemId } = req.query;
+      const { startDate, endDate, locationId, stockItemId, stockGroupId } = req.query;
 
       // Apply filters
       const conditions = [eq(vouchers.companyId, companyId)];
@@ -23521,6 +23521,11 @@ if (asOfDate) {
           eq(salesItems.stockItemId, parseInt(stockItemId as string)),
         );
       }
+      if (stockGroupId) {
+        conditions.push(
+          eq(stockItems.stockGroupId, parseInt(stockGroupId as string)),
+        );
+      }
 
       const salesData = await db
         .select({
@@ -23533,6 +23538,7 @@ if (asOfDate) {
           stockItemId: salesItems.stockItemId,
           stockItemCode: stockItems.code,
           stockItemName: stockItems.name,
+          stockGroupId: stockItems.stockGroupId,
           quantity: salesItems.quantity,
           actualSellingPrice: salesItems.sellingPrice, // Price item was actually sold at
           configuredSellingPrice: stockItemLocationPrices.sellingPrice, // Location-specific price
@@ -23624,7 +23630,7 @@ if (asOfDate) {
       const allCompanies = await storage.getAllCompanies();
       const companyMap = new Map(allCompanies.map(c => [c.id, c]));
 
-      const { startDate, endDate, locationId, stockItemId, companyFilter } = req.query;
+      const { startDate, endDate, locationId, stockItemId, companyFilter, stockGroupName } = req.query;
 
       // Parse company filter if provided
       let filteredCompanyIds = companyIds;
@@ -23668,6 +23674,8 @@ if (asOfDate) {
             stockItemId: salesItems.stockItemId,
             stockItemCode: stockItems.code,
             stockItemName: stockItems.name,
+            stockGroupId: stockItems.stockGroupId,
+            stockGroupName: stockGroups.name,
             quantity: salesItems.quantity,
             actualSellingPrice: salesItems.sellingPrice,
             configuredSellingPrice: stockItemLocationPrices.sellingPrice,
@@ -23680,6 +23688,7 @@ if (asOfDate) {
           .from(salesItems)
           .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
           .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+          .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
           .leftJoin(locations, eq(vouchers.locationId, locations.id))
           .leftJoin(
             stockItemLocationPrices,
@@ -23688,7 +23697,7 @@ if (asOfDate) {
               eq(stockItemLocationPrices.locationId, vouchers.locationId)
             )
           )
-          .where(and(...conditions))
+          .where(and(...conditions, ...(stockGroupName ? [eq(stockGroups.name, stockGroupName as string)] : [])))
           .orderBy(vouchers.voucherDate);
 
         // Enhance with computed values and company info

@@ -4,10 +4,11 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, TrendingUp, TrendingDown, LayoutList } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 type PLFilter = "all" | "gain" | "loss";
 type PLBasis = "config" | "cost";
@@ -36,6 +37,22 @@ interface SalesReportItem {
   createdAt: string;
 }
 
+interface LocationGroup {
+  locationKey: string;
+  locationId: number | null;
+  locationName: string;
+  totalQty: number;
+  totalSales: number;
+  totalCost: number;
+  totalConfiguredCost: number;
+  costProfit: number;
+  configuredProfit: number;
+  avgSoldPrice: number;
+  avgCostPrice: number;
+  avgConfiguredPrice: number;
+  items: SalesReportItem[];
+}
+
 const formatNumericValue = (value: string | number): string => {
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return "0";
@@ -51,6 +68,7 @@ export default function SalesReportDetail() {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [plFilter, setPlFilter] = useState<PLFilter>("all");
   const [plBasis, setPlBasis] = useState<PLBasis>("config");
+  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
 
   const params = new URLSearchParams(window.location.search);
   const startDate = params.get("startDate") || "";
@@ -72,21 +90,72 @@ export default function SalesReportDetail() {
     enabled: !!startDate,
   });
 
-  const sortedItems = [...items]
-    .sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""))
-    .filter((item) => {
-      if (plFilter === "all") return true;
-      const value = plBasis === "cost" ? parseFloat(item.costProfit) : item.configuredProfit;
-      if (plFilter === "gain") return value > 0;
-      if (plFilter === "loss") return value < 0;
-      return true;
+  const filteredItems = items.filter((item) => {
+    if (plFilter === "all") return true;
+    const value = plBasis === "cost" ? parseFloat(item.costProfit) : item.configuredProfit;
+    if (plFilter === "gain") return value > 0;
+    if (plFilter === "loss") return value < 0;
+    return true;
+  });
+
+  // Group items by location
+  const locationGroups: LocationGroup[] = [];
+  const groupMap = new Map<string, LocationGroup>();
+
+  filteredItems.forEach((item) => {
+    const key = String(item.locationId ?? "no-location");
+    const locName = item.locationName || "No Location";
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        locationKey: key,
+        locationId: item.locationId,
+        locationName: locName,
+        totalQty: 0,
+        totalSales: 0,
+        totalCost: 0,
+        totalConfiguredCost: 0,
+        costProfit: 0,
+        configuredProfit: 0,
+        avgSoldPrice: 0,
+        avgCostPrice: 0,
+        avgConfiguredPrice: 0,
+        items: [],
+      });
+    }
+    const g = groupMap.get(key)!;
+    const qty = parseFloat(item.quantity);
+    g.totalQty += qty;
+    g.totalSales += parseFloat(item.totalSales || "0");
+    g.totalCost += parseFloat(item.totalCost || "0");
+    g.totalConfiguredCost += item.totalConfiguredCost || 0;
+    g.costProfit += parseFloat(item.costProfit || "0");
+    g.configuredProfit += item.configuredProfit || 0;
+    g.items.push(item);
+  });
+
+  groupMap.forEach((g) => {
+    g.avgSoldPrice = g.totalQty > 0 ? g.totalSales / g.totalQty : 0;
+    g.avgCostPrice = g.totalQty > 0 ? g.totalCost / g.totalQty : 0;
+    g.avgConfiguredPrice = g.totalQty > 0 ? g.totalConfiguredCost / g.totalQty : 0;
+    locationGroups.push(g);
+  });
+
+  locationGroups.sort((a, b) => a.locationName.localeCompare(b.locationName));
+
+  const toggleLocation = (key: string) => {
+    setExpandedLocations((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === "s" || e.key === "ß")) {
         if (selectedItemId == null) return;
-        const item = sortedItems.find((i) => i.id === selectedItemId);
+        const item = filteredItems.find((i) => i.id === selectedItemId);
         if (item?.stockItemId) {
           e.preventDefault();
           navigate(`/stock-query/${item.stockItemId}`);
@@ -95,12 +164,12 @@ export default function SalesReportDetail() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selectedItemId, sortedItems, navigate]);
+  }, [selectedItemId, filteredItems, navigate]);
 
-  const totalQty = sortedItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-  const totalSales = sortedItems.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
-  const totalCost = sortedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
-  const totalConfiguredCost = sortedItems.reduce((sum, item) => sum + (item.totalConfiguredCost || 0), 0);
+  const totalQty = filteredItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+  const totalSales = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
+  const totalCost = filteredItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
+  const totalConfiguredCost = filteredItems.reduce((sum, item) => sum + (item.totalConfiguredCost || 0), 0);
   const costProfit = totalSales - totalCost;
   const configuredProfit = totalSales - totalConfiguredCost;
 
@@ -192,6 +261,7 @@ export default function SalesReportDetail() {
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card>
               <CardHeader className="pb-2">
@@ -235,85 +305,132 @@ export default function SalesReportDetail() {
             </Card>
           </div>
 
+          {/* Location-grouped table */}
           <Card>
             <CardContent className="p-0">
               <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Location</TableHead>
+                      <TableHead className="w-6"></TableHead>
+                      <TableHead>Location / Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Sold Price</TableHead>
-                      <TableHead className="text-right">Cost Price</TableHead>
-                      <TableHead className="text-right">Hassan's Price</TableHead>
-                      <TableHead className="text-right">Unit Profit</TableHead>
+                      <TableHead className="text-right">Avg Sold</TableHead>
+                      <TableHead className="text-right">Avg Cost</TableHead>
+                      <TableHead className="text-right">Avg Config</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
                       <TableHead className="text-right">Cost %</TableHead>
-                      <TableHead className="text-right">Hassan's Profit</TableHead>
-                      <TableHead className="text-right">Hassan's %</TableHead>
+                      <TableHead className="text-right">Config Profit</TableHead>
+                      <TableHead className="text-right">Config %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedItems.map((item) => {
-                      const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
-                      const isSelected = selectedItemId === item.id;
+                    {locationGroups.map((group) => {
+                      const isExpanded = expandedLocations.has(group.locationKey);
+                      const costPct = group.totalSales > 0 ? (group.costProfit / group.totalSales) * 100 : 0;
+                      const configPct = group.totalConfiguredCost > 0 ? (group.configuredProfit / group.totalConfiguredCost) * 100 : 0;
                       return (
-                        <TableRow
-                          key={item.id}
-                          data-testid={`row-detail-${item.id}`}
-                          className={`cursor-pointer ${isSelected ? "bg-muted" : ""}`}
-                          onClick={() => setSelectedItemId(isSelected ? null : item.id)}
-                        >
-                          <TableCell className="font-medium">
-                            {(item.locationId || item.stockItemId) ? (
-                              <a
-                                href={item.locationId
-                                  ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
-                                  : `/stock-items/${item.stockItemId}/history`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:underline text-foreground"
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`link-bale-${item.stockItemId}`}
+                        <>
+                          {/* Location summary row */}
+                          <TableRow
+                            key={`loc-${group.locationKey}`}
+                            data-testid={`row-location-${group.locationKey}`}
+                            className="cursor-pointer bg-muted/30 hover-elevate font-medium"
+                            onClick={() => toggleLocation(group.locationKey)}
+                          >
+                            <TableCell className="py-2 pr-0 w-6">
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              }
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <div className="flex items-center gap-2">
+                                <span>{group.locationName}</span>
+                                <Badge variant="secondary" className="text-xs font-normal">
+                                  {group.items.length} item{group.items.length !== 1 ? "s" : ""}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono py-2">{formatNumber(group.totalQty)}</TableCell>
+                            <TableCell className="text-right font-mono py-2">{formatAmount(group.avgSoldPrice)}</TableCell>
+                            <TableCell className="text-right font-mono py-2">{formatAmount(group.avgCostPrice)}</TableCell>
+                            <TableCell className="text-right font-mono py-2">{formatAmount(group.avgConfiguredPrice)}</TableCell>
+                            <TableCell className="text-right font-mono py-2">{formatAmount(group.totalCost)}</TableCell>
+                            <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>
+                              {formatAmount(Math.abs(group.costProfit))}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(costPct)}`}>
+                              {Math.abs(costPct).toFixed(1)}%
+                            </TableCell>
+                            <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>
+                              {formatAmount(Math.abs(group.configuredProfit))}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(configPct)}`}>
+                              {Math.abs(configPct).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Expanded individual items */}
+                          {isExpanded && group.items.map((item) => {
+                            const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
+                            const isSelected = selectedItemId === item.id;
+                            return (
+                              <TableRow
+                                key={item.id}
+                                data-testid={`row-detail-${item.id}`}
+                                className={`cursor-pointer text-sm border-l-2 border-l-muted-foreground/20 ${isSelected ? "bg-muted" : "bg-background"}`}
+                                onClick={() => setSelectedItemId(isSelected ? null : item.id)}
                               >
-                                {item.stockItemName}
-                              </a>
-                            ) : (
-                              item.stockItemName
-                            )}
-                          </TableCell>
-                          <TableCell>{item.locationName || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumericValue(item.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(item.actualSellingPrice)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(item.costPrice)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(item.configuredSellingPrice)}</TableCell>
-                          <TableCell className={`text-right font-mono ${profitColor(unitProfit)}`}>
-                            {formatAmount(Math.abs(unitProfit))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(item.totalCost)}</TableCell>
-                          <TableCell className={`text-right font-mono ${profitColor(parseFloat(item.costProfit))}`}>
-                            {formatAmount(Math.abs(parseFloat(item.costProfit)))}
-                          </TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${profitColor(item.costProfitPercentage)}`}>
-                            {Math.abs(item.costProfitPercentage).toFixed(1)}%
-                          </TableCell>
-                          <TableCell className={`text-right font-mono ${profitColor(item.configuredProfit)}`}>
-                            {formatAmount(Math.abs(item.configuredProfit))}
-                          </TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${profitColor(item.configuredProfitPercentage)}`}>
-                            {Math.abs(item.configuredProfitPercentage).toFixed(1)}%
-                          </TableCell>
-                        </TableRow>
+                                <TableCell className="py-1.5"></TableCell>
+                                <TableCell className="py-1.5 pl-6">
+                                  {(item.locationId || item.stockItemId) ? (
+                                    <a
+                                      href={item.locationId
+                                        ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
+                                        : `/stock-items/${item.stockItemId}/history`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:underline text-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                      data-testid={`link-bale-${item.stockItemId}`}
+                                    >
+                                      {item.stockItemName}
+                                    </a>
+                                  ) : (
+                                    item.stockItemName
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-mono py-1.5">{formatNumericValue(item.quantity)}</TableCell>
+                                <TableCell className="text-right font-mono py-1.5">{formatAmount(item.actualSellingPrice)}</TableCell>
+                                <TableCell className="text-right font-mono py-1.5">{formatAmount(item.costPrice)}</TableCell>
+                                <TableCell className="text-right font-mono py-1.5">{formatAmount(item.configuredSellingPrice)}</TableCell>
+                                <TableCell className="text-right font-mono py-1.5">{formatAmount(item.totalCost)}</TableCell>
+                                <TableCell className={`text-right font-mono py-1.5 ${profitColor(parseFloat(item.costProfit))}`}>
+                                  {formatAmount(Math.abs(parseFloat(item.costProfit)))}
+                                </TableCell>
+                                <TableCell className={`text-right font-mono text-sm py-1.5 ${profitColor(item.costProfitPercentage)}`}>
+                                  {Math.abs(item.costProfitPercentage).toFixed(1)}%
+                                </TableCell>
+                                <TableCell className={`text-right font-mono py-1.5 ${profitColor(item.configuredProfit)}`}>
+                                  {formatAmount(Math.abs(item.configuredProfit))}
+                                </TableCell>
+                                <TableCell className={`text-right font-mono text-sm py-1.5 ${profitColor(item.configuredProfitPercentage)}`}>
+                                  {Math.abs(item.configuredProfitPercentage).toFixed(1)}%
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </>
                       );
                     })}
                   </TableBody>
                   <TableFooter className="sticky bottom-0 bg-background border-t">
                     <TableRow className="font-semibold">
-                      <TableCell colSpan={2}>Total ({sortedItems.length} items{plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})</TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>
                       <TableCell></TableCell>
+                      <TableCell>Total ({filteredItems.length} items{plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
@@ -331,52 +448,97 @@ export default function SalesReportDetail() {
                 </Table>
               </div>
 
+              {/* Mobile view — location-grouped cards */}
               <div className="md:hidden space-y-3 p-3">
-                {sortedItems.map((item) => {
-                  const unitProfit = parseFloat(item.actualSellingPrice) - parseFloat(item.costPrice);
-                  const isSelected = selectedItemId === item.id;
+                {locationGroups.map((group) => {
+                  const isExpanded = expandedLocations.has(group.locationKey);
                   return (
-                    <Card
-                      key={item.id}
-                      className={`cursor-pointer ${isSelected ? "bg-muted" : ""}`}
-                      onClick={() => setSelectedItemId(isSelected ? null : item.id)}
-                    >
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          {(item.locationId || item.stockItemId) ? (
-                            <a
-                              href={item.locationId
-                                ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
-                                : `/stock-items/${item.stockItemId}/history`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-sm hover:underline text-foreground"
-                              onClick={(e) => e.stopPropagation()}
-                              data-testid={`link-bale-mobile-${item.stockItemId}`}
-                            >
-                              {item.stockItemName}
-                            </a>
-                          ) : (
-                            <span className="font-medium text-sm">{item.stockItemName}</span>
-                          )}
-                          <span className="text-xs text-muted-foreground">{item.locationName || "-"}</span>
+                    <div key={group.locationKey}>
+                      <Card
+                        className={`cursor-pointer ${isExpanded ? "rounded-b-none border-b-0" : ""}`}
+                        onClick={() => toggleLocation(group.locationKey)}
+                        data-testid={`card-location-${group.locationKey}`}
+                      >
+                        <CardContent className="p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              }
+                              <span className="font-medium text-sm">{group.locationName}</span>
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {group.items.length}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 text-xs">
+                            <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumber(group.totalQty)}</span></div>
+                            <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(group.totalSales)}</span></div>
+                            <div><span className="text-muted-foreground">Avg Sold: </span><span className="font-mono">{formatAmount(group.avgSoldPrice)}</span></div>
+                            <div><span className="text-muted-foreground">Avg Cost: </span><span className="font-mono">{formatAmount(group.avgCostPrice)}</span></div>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
+                            <span className={`font-mono font-semibold ${profitColor(group.costProfit)}`}>
+                              Cost: {formatAmount(Math.abs(group.costProfit))}
+                            </span>
+                            <span className={`font-mono font-semibold ${profitColor(group.configuredProfit)}`}>
+                              Config: {formatAmount(Math.abs(group.configuredProfit))}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {isExpanded && (
+                        <div className="border border-t-0 rounded-b-md p-2 space-y-2 bg-background">
+                          {group.items.map((item) => {
+                            const isSelected = selectedItemId === item.id;
+                            return (
+                              <Card
+                                key={item.id}
+                                className={`cursor-pointer ${isSelected ? "bg-muted" : ""}`}
+                                onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                              >
+                                <CardContent className="p-3 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    {(item.locationId || item.stockItemId) ? (
+                                      <a
+                                        href={item.locationId
+                                          ? `/locations/${item.locationId}/stock-items/${item.stockItemId}/history`
+                                          : `/stock-items/${item.stockItemId}/history`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-medium text-sm hover:underline text-foreground"
+                                        onClick={(e) => e.stopPropagation()}
+                                        data-testid={`link-bale-mobile-${item.stockItemId}`}
+                                      >
+                                        {item.stockItemName}
+                                      </a>
+                                    ) : (
+                                      <span className="font-medium text-sm">{item.stockItemName}</span>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1 text-xs">
+                                    <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumericValue(item.quantity)}</span></div>
+                                    <div><span className="text-muted-foreground">Sold: </span><span className="font-mono">{formatAmount(item.actualSellingPrice)}</span></div>
+                                    <div><span className="text-muted-foreground">Cost: </span><span className="font-mono">{formatAmount(item.costPrice)}</span></div>
+                                    <div><span className="text-muted-foreground">Total Cost: </span><span className="font-mono">{formatAmount(item.totalCost)}</span></div>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
+                                    <span className={`font-mono font-semibold ${profitColor(parseFloat(item.costProfit))}`}>
+                                      Cost: {formatAmount(Math.abs(parseFloat(item.costProfit)))} ({Math.abs(item.costProfitPercentage).toFixed(1)}%)
+                                    </span>
+                                    <span className={`font-mono font-semibold ${profitColor(item.configuredProfit)}`}>
+                                      Config: {formatAmount(Math.abs(item.configuredProfit))} ({Math.abs(item.configuredProfitPercentage).toFixed(1)}%)
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
                         </div>
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                          <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumericValue(item.quantity)}</span></div>
-                          <div><span className="text-muted-foreground">Sold: </span><span className="font-mono">{formatAmount(item.actualSellingPrice)}</span></div>
-                          <div><span className="text-muted-foreground">Cost: </span><span className="font-mono">{formatAmount(item.costPrice)}</span></div>
-                          <div><span className="text-muted-foreground">Total Cost: </span><span className="font-mono">{formatAmount(item.totalCost)}</span></div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
-                          <span className={`font-mono font-semibold ${profitColor(parseFloat(item.costProfit))}`}>
-                            Cost: {formatAmount(Math.abs(parseFloat(item.costProfit)))} ({Math.abs(item.costProfitPercentage).toFixed(1)}%)
-                          </span>
-                          <span className={`font-mono font-semibold ${profitColor(item.configuredProfit)}`}>
-                            Config: {formatAmount(Math.abs(item.configuredProfit))} ({Math.abs(item.configuredProfitPercentage).toFixed(1)}%)
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
                   );
                 })}
               </div>
