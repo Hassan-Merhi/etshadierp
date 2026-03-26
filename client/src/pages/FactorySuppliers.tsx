@@ -1626,36 +1626,51 @@ export default function FactorySuppliers() {
                       // Goods-only value (server's `value` includes same-currency freight — subtract it for the purchase row)
                       const goodsVal = sameCcFreight ? rawVal - freightAmt : rawVal;
                       const dispGoodsAmt = cc !== "USD" ? `${cc} ${formatNum(String(goodsVal.toFixed(2)))}` : `$${formatNum(String(goodsVal.toFixed(2)))}`;
-                      const commNote = parseFloat((e as any).commissionAmount || "0") > 0 ? `Commission: ${(e as any).commissionCurrencyCode || "USD"} ${formatNum((e as any).commissionAmount)}` : "";
-                      const fxNote = cc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((goodsVal * fxRate).toFixed(2)))}` : "";
+                      const commAmt = parseFloat((e as any).commissionAmount || "0");
+                      const commCc = (e as any).commissionCurrencyCode || cc;
                       const purchaseRow = {
                         key: `c-${e.id}`,
                         date: e.date,
                         type: "purchase" as RowType,
                         ref: e.containerNumber,
-                        detail: [e.origin, fxNote].filter(Boolean).join(" · "),
+                        detail: e.origin || "",
                         amount: dispGoodsAmt,
                         amountIsNeg: false,
                         status: e.status,
-                        notes: [e.notes, commNote].filter(Boolean).join(" · ") || null,
+                        notes: e.notes || null,
                         nativeImpact: toNative(goodsVal, cc, fxRate),
                       };
                       const rows: typeof purchaseRow[] = [purchaseRow];
                       // Same-currency freight → separate Freight row in child's ledger
                       if (sameCcFreight) {
                         const dispFreightAmt = freightCc !== "USD" ? `${freightCc} ${formatNum(String(freightAmt.toFixed(2)))}` : `$${formatNum(String(freightAmt.toFixed(2)))}`;
-                        const fxFreightNote = freightCc !== "USD" ? `@ ${formatNum(e.fxRateToUsd)} = $${formatNum(String((freightAmt * fxRate).toFixed(2)))}` : "";
                         rows.push({
                           key: `f-${e.id}`,
                           date: e.date,
                           type: "freight" as RowType,
                           ref: e.containerNumber,
-                          detail: fxFreightNote,
+                          detail: "",
                           amount: dispFreightAmt,
                           amountIsNeg: false,
                           status: undefined,
                           notes: null,
                           nativeImpact: toNative(freightAmt, freightCc, fxRate),
+                        });
+                      }
+                      // Commission → its own row (attributable to the supplier's balance)
+                      if (commAmt > 0) {
+                        const dispCommAmt = commCc !== "USD" ? `${commCc} ${formatNum(String(commAmt.toFixed(2)))}` : `$${formatNum(String(commAmt.toFixed(2)))}`;
+                        rows.push({
+                          key: `comm-${e.id}`,
+                          date: e.date,
+                          type: "commission" as RowType,
+                          ref: e.containerNumber,
+                          detail: "",
+                          amount: dispCommAmt,
+                          amountIsNeg: false,
+                          status: undefined,
+                          notes: null,
+                          nativeImpact: toNative(commAmt, commCc, fxRate),
                         });
                       }
                       return rows;
@@ -1665,13 +1680,12 @@ export default function FactorySuppliers() {
                       const amt = parseFloat(p.amount || "0");
                       const fxRate = parseFloat(p.fxRateToUsd || "1") || 1;
                       const dispAmt = cc !== "USD" ? `${cc} ${formatNum(String(amt.toFixed(2)))}` : `$${formatNum(String(amt.toFixed(2)))}`;
-                      const fxNote = cc !== "USD" ? ` (@ ${formatNum(p.fxRateToUsd || "1")} = $${formatNum(p.amountUsd)})` : "";
                       return {
                         key: `p-${p.id}`,
                         date: p.date,
                         type: "payment" as RowType,
                         ref: "Payment",
-                        detail: cc !== "USD" ? `${cc} ${formatNum(String(amt))}${fxNote}` : "",
+                        detail: "",
                         amount: dispAmt,
                         amountIsNeg: false,
                         notes: p.notes,
@@ -1771,7 +1785,8 @@ export default function FactorySuppliers() {
                     if (type === "fx") return <Badge className="text-xs font-normal bg-blue-500 dark:bg-blue-600">FX</Badge>;
                     if (type === "other_charge") return <Badge className="text-xs font-normal bg-purple-500 dark:bg-purple-700">Other Charge</Badge>;
                     if (type === "freight") return <Badge className="text-xs font-normal bg-orange-500 dark:bg-orange-600">Freight</Badge>;
-                    return <Badge variant="destructive" className="text-xs font-normal">Commission</Badge>;
+                    if (type === "commission") return <Badge className="text-xs font-normal bg-indigo-500 dark:bg-indigo-600">Commission</Badge>;
+                    return <Badge variant="outline" className="text-xs font-normal">{type}</Badge>;
                   };
 
                   if (allRows.length === 0) return (
@@ -1808,9 +1823,9 @@ export default function FactorySuppliers() {
                                 {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{row.detail || "—"}</TableCell>
-                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
-                                {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.amountIsNeg ? "−" : ""}{row.amount}
-                                {!row.optional && (row.type === "purchase" || row.type === "freight") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" || row.type === "commission" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                                {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.type !== "commission" && row.amountIsNeg ? "−" : ""}{row.amount}
+                                {!row.optional && (row.type === "purchase" || row.type === "freight" || row.type === "commission") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
                                 {!row.optional && row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
                                 {row.optional && <span className="ml-1 text-xs font-normal opacity-70">(Optional)</span>}
                               </TableCell>
