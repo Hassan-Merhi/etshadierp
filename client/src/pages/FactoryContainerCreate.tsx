@@ -36,6 +36,7 @@ export default function FactoryContainerCreate() {
     commissionNotes: "",
     freight: "",
     freightAccountId: "",
+    freightCurrencyCode: "USD",
   });
 
   const [currency, setCurrency] = useState("USD");
@@ -51,7 +52,7 @@ export default function FactoryContainerCreate() {
   };
 
   useEffect(() => {
-    setFormData(f => ({ ...f, commissionCurrencyCode: currency }));
+    setFormData(f => ({ ...f, commissionCurrencyCode: currency, freightCurrencyCode: currency }));
   }, [currency]);
 
   const { data: suppliers } = useQuery<FactorySupplier[]>({
@@ -99,6 +100,7 @@ export default function FactoryContainerCreate() {
         commissionSupplierId: formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null,
         commissionNotes: formData.commissionNotes || null,
         freight: formData.freight || "0",
+        freightCurrencyCode: formData.freightCurrencyCode || currency,
         freightAccountId: formData.freightAccountId ? parseInt(formData.freightAccountId) : null,
         otherCharges: "0",
         otherChargesAccountId: null,
@@ -381,24 +383,43 @@ export default function FactoryContainerCreate() {
               />
             </div>
             <div>
-              <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Label>Freight Currency</Label>
               <Select
-                value={formData.freightAccountId || "__none__"}
-                onValueChange={val => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
+                value={formData.freightCurrencyCode}
+                onValueChange={val => setFormData({ ...formData, freightCurrencyCode: val })}
               >
-                <SelectTrigger data-testid="select-freight-account">
-                  <SelectValue placeholder="Auto (Freight)" />
+                <SelectTrigger data-testid="select-freight-currency">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Auto (Freight)</SelectItem>
-                  {ledgerAccounts.map((acc: any) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>
-                      {acc.name}{acc.code ? ` (${acc.code})` : ""}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                  <SelectItem value="AUD">AUD</SelectItem>
+                  <SelectItem value="GBP">GBP</SelectItem>
+                  <SelectItem value="LBP">LBP</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Select
+              value={formData.freightAccountId || "__none__"}
+              onValueChange={val => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
+            >
+              <SelectTrigger data-testid="select-freight-account">
+                <SelectValue placeholder="Auto (Freight)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Auto (Freight)</SelectItem>
+                {ledgerAccounts.map((acc: any) => (
+                  <SelectItem key={acc.id} value={String(acc.id)}>
+                    {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
