@@ -1285,48 +1285,59 @@ export default function FactorySuppliers() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {statementData.currencyGroups.map((group) => (
-                          <TableRow key={group.currencyCode}>
+                        {statementData.currencyGroups.map((group) => {
+                          const isCommissionOnly = group.containers.length === 0 && parseFloat(group.totalCommission) > 0;
+                          const netPay = parseFloat(group.netPayable);
+                          const commissionOwed = isCommissionOnly && netPay < 0;
+                          const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
+                          return (
+                          <TableRow key={group.currencyCode} className={commissionOwed ? "bg-destructive/5" : ""}>
                             <TableCell className="font-semibold">
                               <Badge variant="outline">{group.currencyCode}</Badge>
+                              {commissionOwed && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
                             </TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{group.containers.length}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{formatKg(group.totalKg)}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCommissionOnly ? "—" : group.containers.length}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCommissionOnly ? "—" : formatKg(group.totalKg)}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-medium">
-                              {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.totalValue)}
+                              {isCommissionOnly ? "—" : `${ccPrefix}${formatNum(group.totalValue)}`}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums text-destructive">
                               {parseFloat(group.totalCommission) > 0 ? (
                                 <span>
-                                  {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.remainingCommission ?? group.totalCommission)}
+                                  {ccPrefix}{formatNum(group.remainingCommission ?? group.totalCommission)}
                                   {group.remainingCommission != null && parseFloat(group.remainingCommission) < parseFloat(group.totalCommission) && (
                                     <span className="text-xs text-muted-foreground ml-1 line-through">
                                       {formatNum(group.totalCommission)}
                                     </span>
                                   )}
                                 </span>
-                              ) : "-"}
+                              ) : "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
-                              {group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$"}{formatNum(group.netPayable)}
-                              {group.currencyCode !== "USD" && (parseFloat(group.netPayable) > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
+                              {commissionOwed ? (
+                                <span className="text-destructive">{ccPrefix}{formatNum(String(Math.abs(netPay)))} DR</span>
+                              ) : (
+                                <>{ccPrefix}{formatNum(group.netPayable)}</>
+                              )}
+                              {group.currencyCode !== "USD" && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
                                   onClick={() => {
-                                    const hasBalance = parseFloat(group.netPayable) > 0;
+                                    const hasBalance = netPay > 0;
                                     setFxSourceType(hasBalance ? "supplier" : "commission");
                                     statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, hasBalance ? group.netPayable : "0", group.totalCommission);
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {parseFloat(group.netPayable) <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
+                                  {netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
