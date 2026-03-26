@@ -1286,8 +1286,12 @@ export default function FactorySuppliers() {
                       </TableHeader>
                       <TableBody>
                         {statementData.currencyGroups.map((group) => {
-                          const isCommissionOnly = group.containers.length === 0 && parseFloat(group.totalCommission) > 0;
-                          const isFreightOnly = group.containers.length === 0 && parseFloat(group.totalCommission) === 0 && parseFloat(group.totalFreight || "0") > 0;
+                          const hasFreight = parseFloat(group.totalFreight || "0") > 0.005;
+                          const hasCommission = parseFloat(group.totalCommission) > 0.005;
+                          const noContainers = group.containers.length === 0;
+                          const isCommissionOnly = noContainers && hasCommission && !hasFreight;
+                          const isFreightOnly = noContainers && hasFreight && !hasCommission;
+                          const isCrossFreightPool = noContainers && hasFreight; // freight ± commission, no containers
                           const netPay = parseFloat(group.netPayable);
                           const isOverpaid = netPay < -0.005;
                           const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
@@ -1297,11 +1301,12 @@ export default function FactorySuppliers() {
                               <Badge variant="outline">{group.currencyCode}</Badge>
                               {isCommissionOnly && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
                               {isFreightOnly && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
+                              {isCrossFreightPool && hasCommission && <span className="ml-2 text-xs text-muted-foreground">Freight + Commission</span>}
                             </TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{(isCommissionOnly || isFreightOnly) ? "—" : group.containers.length}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{(isCommissionOnly || isFreightOnly) ? "—" : formatKg(group.totalKg)}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : group.containers.length}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : formatKg(group.totalKg)}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-medium">
-                              {(isCommissionOnly || isFreightOnly) ? "—" : `${ccPrefix}${formatNum(group.totalValue)}`}
+                              {isCrossFreightPool ? `${ccPrefix}${formatNum(group.totalFreight || "0")}` : `${ccPrefix}${formatNum(group.totalValue)}`}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums text-destructive">
                               {parseFloat(group.totalCommission) > 0 ? (
@@ -1321,33 +1326,53 @@ export default function FactorySuppliers() {
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {(group.currencyCode !== "USD" || isCommissionOnly || isFreightOnly) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
+                              {(group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
                                   onClick={() => {
                                     const hasBalance = netPay > 0;
-                                    const freightAmt = hasBalance ? group.netPayable : "0";
-                                    const form = {
-                                      fromSupplierId: statementSupplierId!,
-                                      toSupplierId: statementData.supplier.parentId!,
-                                      selectedCurrency: group.currencyCode,
-                                      amount: isFreightOnly ? freightAmt : group.totalCommission,
-                                      availableBalance: isFreightOnly ? freightAmt : group.totalCommission,
-                                      supplierBalance: hasBalance ? group.netPayable : "0",
-                                      commissionBalance: isFreightOnly ? "0" : group.totalCommission,
-                                      fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
-                                      date: today,
-                                      notes: isFreightOnly ? "Freight settlement" : "",
-                                    };
+                                    const netPayStr = hasBalance ? group.netPayable : "0";
+                                    let form: Record<string, any>;
+                                    let sourceType: string;
+                                    if (isCrossFreightPool) {
+                                      // Freight (± commission) pool: full netPayable is the available balance
+                                      form = {
+                                        fromSupplierId: statementSupplierId!,
+                                        toSupplierId: statementData.supplier.parentId!,
+                                        selectedCurrency: group.currencyCode,
+                                        amount: netPayStr,
+                                        availableBalance: netPayStr,
+                                        supplierBalance: netPayStr,
+                                        commissionBalance: group.totalCommission,
+                                        fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
+                                        date: today,
+                                        notes: hasCommission ? "Freight + commission settlement" : "Freight settlement",
+                                      };
+                                      sourceType = hasCommission ? "both" : "supplier";
+                                    } else {
+                                      form = {
+                                        fromSupplierId: statementSupplierId!,
+                                        toSupplierId: statementData.supplier.parentId!,
+                                        selectedCurrency: group.currencyCode,
+                                        amount: group.totalCommission,
+                                        availableBalance: group.totalCommission,
+                                        supplierBalance: hasBalance ? group.netPayable : "0",
+                                        commissionBalance: group.totalCommission,
+                                        fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
+                                        date: today,
+                                        notes: "",
+                                      };
+                                      sourceType = "commission";
+                                    }
                                     setFxConversionForm(form);
-                                    setFxSourceType(isFreightOnly ? "supplier" : "commission");
+                                    setFxSourceType(sourceType);
                                     setFxConversionOpen(true);
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : "Settle"}
+                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : isCrossFreightPool ? "Settle" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>

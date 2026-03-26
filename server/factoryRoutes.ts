@@ -2937,9 +2937,18 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         // For commission-only pools (no containers) the commission IS the balance owed to the
         // supplier (they earned it as a broker). Payments out reduce it directly.
         // For normal container pools, commission is deducted from what we owe them.
-        const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0;
+        // Commission-only: no containers, no freight — supplier earns commission as a broker fee
+        const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0 && data.totalFreight <= 0.005;
+        // Freight pool (cross-currency): no containers, has freight, may also have commission earned by supplier
+        const isCrossFreightPool = data.containers.length === 0 && data.totalFreight > 0.005;
+        // netPayable semantics:
+        //  - Commission-only:  commission is EARNED by supplier → effectiveCommission - paid
+        //  - Cross-freight:    totalValue (=freight) is owed, commission is also EARNED → totalValue + commission - paid
+        //  - Normal container: commission is DEDUCTED (goes to broker) → totalValue - commission - paid
         const netPayable = isCommissionOnly
           ? effectiveCommission - paid
+          : isCrossFreightPool
+          ? data.totalValue + effectiveCommission - paid
           : data.totalValue - effectiveCommission - paid;
         // Phase 2: commission remaining = effectiveCommission minus what was settled via FX
         // "both" is treated as commission-first (capped at effectiveCommission), then supplier
