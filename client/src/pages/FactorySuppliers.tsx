@@ -2083,7 +2083,6 @@ export default function FactorySuppliers() {
                   !fxConversionForm.fxRateToUsd ||
                   parseFloat(fxConversionForm.amount) <= 0 ||
                   parseFloat(fxConversionForm.fxRateToUsd) <= 0 ||
-                  (!!fxConversionForm.availableBalance && parseFloat(fxConversionForm.amount) > parseFloat(fxConversionForm.availableBalance) + 0.005) ||
                   fxConversionMutation.isPending
                 }
                 data-testid="button-submit-fx-conversion"
