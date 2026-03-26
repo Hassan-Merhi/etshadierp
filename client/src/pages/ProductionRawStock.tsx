@@ -1336,8 +1336,8 @@ export default function ProductionRawStock() {
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-2">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2 col-span-3">
                 <Label>Container</Label>
                 <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
                   <SelectTrigger data-testid="select-offload-container">
@@ -1359,6 +1359,35 @@ export default function ProductionRawStock() {
                   value={offloadDate}
                   onChange={(e) => setOffloadDate(e.target.value)}
                   data-testid="input-offload-date"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground text-xs">Container Currency</Label>
+                <Select value={currencyCode} onValueChange={setCurrencyCode}>
+                  <SelectTrigger data-testid="select-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground text-xs">
+                  {currencyCode !== "USD" ? `FX Rate (1 ${currencyCode} = ? USD)` : "FX Rate"}
+                </Label>
+                <Input
+                  type="number"
+                  value={fxRateToUsd}
+                  onChange={(e) => setFxRateToUsd(e.target.value)}
+                  placeholder="1.0"
+                  step="0.0001"
+                  disabled={currencyCode === "USD"}
+                  data-testid="input-fx-rate"
                 />
               </div>
             </div>
@@ -1386,46 +1415,12 @@ export default function ProductionRawStock() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
-                  <p className="text-xs text-muted-foreground">Set the exchange rate below — it converts the base material cost from the container currency to USD. All offload charges are entered in USD.</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">Container Currency</Label>
-                      <Select value={currencyCode} onValueChange={setCurrencyCode}>
-                        <SelectTrigger data-testid="select-currency">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="AUD">AUD</SelectItem>
-                          <SelectItem value="LBP">LBP</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">
-                        {currencyCode !== "USD" ? `FX Rate (1 ${currencyCode} = ? USD)` : "FX Rate"}
-                      </Label>
-                      <Input
-                        type="number"
-                        value={fxRateToUsd}
-                        onChange={(e) => setFxRateToUsd(e.target.value)}
-                        placeholder="1.0"
-                        step="0.0001"
-                        disabled={currencyCode === "USD"}
-                        data-testid="input-fx-rate"
-                      />
-                    </div>
-                  </div>
-                  {currencyCode !== "USD" && rate > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      Base rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
-                      {actualKg > 0 && <> · Base payable: <span className="font-mono font-medium">${formatNumber(totalPayableUsd)}</span></>}
-                    </div>
-                  )}
-                </div>
+                {currencyCode !== "USD" && rate > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Base rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
+                    {actualKg > 0 && <> · Base payable: <span className="font-mono font-medium">${formatNumber(totalPayableUsd)}</span></>}
+                  </p>
+                )}
 
                 {hasWeightDiff && (
                   <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${differenceKg > 0 ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : "text-blue-600 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
