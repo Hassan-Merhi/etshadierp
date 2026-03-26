@@ -683,6 +683,25 @@ let migrationsDone = false;
         }
       }
       console.log("✓ Database tables and columns verified/migrated");
+
+      // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
+      const seqFixes: Array<[string, string]> = [
+        ["ledger_accounts", "ledger_accounts_id_seq"],
+        ["factory_suppliers", "factory_suppliers_id_seq"],
+        ["factory_containers", "factory_containers_id_seq"],
+        ["factory_supplier_payments", "factory_supplier_payments_id_seq"],
+        ["factory_supplier_fx_transfers", "factory_supplier_fx_transfers_id_seq"],
+        ["factory_container_other_charges", "factory_container_other_charges_id_seq"],
+        ["vouchers", "vouchers_id_seq"],
+        ["voucher_entries", "voucher_entries_id_seq"],
+      ];
+      for (const [table, seq] of seqFixes) {
+        try {
+          await migrationClient.query(
+            `SELECT setval('${seq}', GREATEST((SELECT COALESCE(MAX(id), 1) FROM ${table}), 1))`
+          );
+        } catch { /* table may not exist yet on first run — skip */ }
+      }
     } catch (err: any) {
       console.error("Migration connection error:", err.message);
     } finally {
