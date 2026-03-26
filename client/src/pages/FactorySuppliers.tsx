@@ -1289,13 +1289,13 @@ export default function FactorySuppliers() {
                           const isCommissionOnly = group.containers.length === 0 && parseFloat(group.totalCommission) > 0;
                           const isFreightOnly = group.containers.length === 0 && parseFloat(group.totalCommission) === 0 && parseFloat(group.totalFreight || "0") > 0;
                           const netPay = parseFloat(group.netPayable);
-                          const commissionOwed = isCommissionOnly && netPay < 0;
+                          const isOverpaid = netPay < -0.005;
                           const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
                           return (
-                          <TableRow key={group.currencyCode} className={commissionOwed ? "bg-destructive/5" : ""}>
+                          <TableRow key={group.currencyCode}>
                             <TableCell className="font-semibold">
                               <Badge variant="outline">{group.currencyCode}</Badge>
-                              {commissionOwed && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
+                              {isCommissionOnly && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
                               {isFreightOnly && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums">{(isCommissionOnly || isFreightOnly) ? "—" : group.containers.length}</TableCell>
@@ -1316,12 +1316,12 @@ export default function FactorySuppliers() {
                               ) : "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-bold">
-                              {commissionOwed ? (
-                                <span className="text-destructive">{ccPrefix}{formatNum(String(Math.abs(netPay)))} DR</span>
+                              {isOverpaid ? (
+                                <span className="text-green-600 dark:text-green-400">{ccPrefix}{formatNum(String(Math.abs(netPay)))} CR</span>
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {(group.currencyCode !== "USD" || commissionOwed || isFreightOnly) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
+                              {(group.currencyCode !== "USD" || isCommissionOnly || isFreightOnly) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1347,7 +1347,7 @@ export default function FactorySuppliers() {
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {commissionOwed ? "Transfer" : isFreightOnly ? "Settle Freight" : netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
+                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>
@@ -1384,9 +1384,12 @@ export default function FactorySuppliers() {
                             <div className="flex gap-4 text-xs text-muted-foreground">
                               <span>Total: {cg.currencyCode} {formatNum(cg.totalValue)}</span>
                               <span>Paid: {cg.currencyCode} {formatNum(cg.totalPaid)}</span>
-                              <span className={parseFloat(cg.netPayable) > 0 ? "font-medium text-foreground" : "text-green-600 dark:text-green-400"}>
-                                Balance: {parseFloat(cg.netPayable) > 0 ? `${cg.currencyCode} ${formatNum(cg.netPayable)}` : "Settled"}
-                              </span>
+                              {(() => {
+                                const nb = parseFloat(cg.netPayable);
+                                if (nb > 0.005) return <span className="font-medium text-foreground">Balance: {cg.currencyCode} {formatNum(cg.netPayable)}</span>;
+                                if (nb < -0.005) return <span className="text-green-600 dark:text-green-400">Balance: {cg.currencyCode} {formatNum(String(Math.abs(nb)))} CR</span>;
+                                return <span className="text-green-600 dark:text-green-400">Settled</span>;
+                              })()}
                             </div>
                           </div>
                           <div className="overflow-x-auto">
@@ -2008,10 +2011,15 @@ export default function FactorySuppliers() {
                   const avail = parseFloat(fxConversionForm.availableBalance || "0");
                   const entered = parseFloat(fxConversionForm.amount || "0");
                   const exceeds = entered > avail + 0.005;
+                  const remaining = avail - entered;
                   return (
-                    <p className={`text-xs mt-1 ${exceeds ? "text-destructive" : "text-muted-foreground"}`}>
-                      Available: {avail.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}
-                      {exceeds && " — exceeds available balance"}
+                    <p className="text-xs mt-1 text-muted-foreground">
+                      Balance: {avail.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}
+                      {exceeds && (
+                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                          — overpayment of {Math.abs(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency} (remaining will show as CR)
+                        </span>
+                      )}
                     </p>
                   );
                 })()}
