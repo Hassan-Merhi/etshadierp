@@ -1319,19 +1319,33 @@ export default function FactorySuppliers() {
                               ) : (
                                 <>{ccPrefix}{formatNum(group.netPayable)}</>
                               )}
-                              {group.currencyCode !== "USD" && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
+                              {(group.currencyCode !== "USD" || commissionOwed) && (netPay > 0 || parseFloat(group.totalCommission) > 0) && statementData.supplier.parentId && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="ml-2 h-6 px-2 text-xs"
                                   onClick={() => {
                                     const hasBalance = netPay > 0;
-                                    setFxSourceType(hasBalance ? "supplier" : "commission");
-                                    statementSupplierId && statementData.supplier.parentId && openFxConversionDialog(statementSupplierId, statementData.supplier.parentId, group.currencyCode, hasBalance ? group.netPayable : "0", group.totalCommission);
+                                    setFxSourceType("commission");
+                                    const form = {
+                                      fromSupplierId: statementSupplierId!,
+                                      toSupplierId: statementData.supplier.parentId!,
+                                      selectedCurrency: group.currencyCode,
+                                      amount: group.totalCommission,
+                                      availableBalance: group.totalCommission,
+                                      supplierBalance: hasBalance ? group.netPayable : "0",
+                                      commissionBalance: group.totalCommission,
+                                      fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
+                                      date: today,
+                                      notes: "",
+                                    };
+                                    setFxConversionForm(form);
+                                    setFxSourceType("commission");
+                                    setFxConversionOpen(true);
                                   }}
                                   data-testid={`button-convert-${group.currencyCode}`}
                                 >
-                                  {netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
+                                  {commissionOwed ? "Transfer" : netPay <= 0 && parseFloat(group.totalCommission) > 0 ? "Settle Commission" : "Settle"}
                                 </Button>
                               )}
                             </TableCell>
@@ -1905,10 +1919,12 @@ export default function FactorySuppliers() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="h-4 w-4" />
-                FX Settlement to Broker (USD)
+                {fxConversionForm.selectedCurrency === "USD" ? "Transfer Commission to Broker" : "FX Settlement to Broker (USD)"}
               </DialogTitle>
               <DialogDescription>
-                Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment.
+                {fxConversionForm.selectedCurrency === "USD"
+                  ? "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment."
+                  : "Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1977,23 +1993,29 @@ export default function FactorySuppliers() {
                 })()}
               </div>
 
-              <div>
-                <Label>Exchange Rate (units of {fxConversionForm.selectedCurrency} per 1 USD)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder="e.g. 0.91 for EUR (EUR per 1 USD)"
-                  value={fxConversionForm.fxRateToUsd}
-                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
-                  data-testid="input-fx-rate"
-                />
-                {fxConversionForm.amount && fxConversionForm.fxRateToUsd && parseFloat(fxConversionForm.fxRateToUsd) > 0 && parseFloat(fxConversionForm.amount) > 0 && (
-                  <p className="text-sm font-medium mt-1.5 text-primary">
-                    = ${(parseFloat(fxConversionForm.amount) / parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                  </p>
-                )}
-              </div>
+              {fxConversionForm.selectedCurrency === "USD" ? (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 text-sm text-muted-foreground">
+                  <span>Rate: <span className="font-medium text-foreground">1 USD = 1 USD</span> (direct transfer, no FX conversion)</span>
+                </div>
+              ) : (
+                <div>
+                  <Label>Exchange Rate (units of {fxConversionForm.selectedCurrency} per 1 USD)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="e.g. 0.91 for EUR (EUR per 1 USD)"
+                    value={fxConversionForm.fxRateToUsd}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
+                    data-testid="input-fx-rate"
+                  />
+                  {fxConversionForm.amount && fxConversionForm.fxRateToUsd && parseFloat(fxConversionForm.fxRateToUsd) > 0 && parseFloat(fxConversionForm.amount) > 0 && (
+                    <p className="text-sm font-medium mt-1.5 text-primary">
+                      = ${(parseFloat(fxConversionForm.amount) / parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <Label>Date</Label>
@@ -2034,7 +2056,7 @@ export default function FactorySuppliers() {
                 }
                 data-testid="button-submit-fx-conversion"
               >
-                {fxConversionMutation.isPending ? "Recording..." : "Record Settlement"}
+                {fxConversionMutation.isPending ? "Recording..." : fxConversionForm.selectedCurrency === "USD" ? "Record Transfer" : "Record Settlement"}
               </Button>
             </DialogFooter>
           </DialogContent>
