@@ -339,9 +339,9 @@ export function ReceiptVoucherTab({
         </Card>
       </div>
 
-      {/* Right column: Account Sidebar (40% on desktop, full-width on mobile) */}
+      {/* Right column: Account Sidebar — hidden on mobile, visible on sm+ */}
       <div
-        className="w-full lg:w-[40%] lg:sticky lg:top-4 h-fit"
+        className="hidden sm:block w-full lg:w-[40%] lg:sticky lg:top-4 h-fit"
         style={{ maxHeight: "calc(100vh - 2rem)" }}
       >
         <AccountSidebar

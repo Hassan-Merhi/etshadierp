@@ -4104,8 +4104,149 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     />
                   </div>
 
-                  {/* Spreadsheet table */}
-                  <div className="border rounded-md overflow-hidden overflow-x-auto">
+                  {/* ── Mobile journal cards (sm:hidden) ── */}
+                  <div className="sm:hidden space-y-2">
+                    {journalFields.map((field, index) => {
+                      const entry = journalEntries[index];
+                      const currentBalance = entry?.accountId > 0 ? getAccountBalance(entry.accountType, entry.accountId) : 0;
+                      const entryAmount = parseFloat(entry?.amount || "0");
+                      const isDebit = entry?.type === "DR";
+                      const projectedBalance = isDebit ? currentBalance + entryAmount : currentBalance - entryAmount;
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-2 bg-card">
+                          <div className="flex items-start gap-2">
+                            <FormField
+                              control={journalForm.control}
+                              name={`entries.${index}.type`}
+                              render={({ field }) => (
+                                <FormItem className="shrink-0">
+                                  <Select value={field.value} onValueChange={(v: "DR" | "CR") => handleJournalTypeChange(index, v)}>
+                                    <FormControl>
+                                      <SelectTrigger className="w-16 text-center font-medium" data-testid={`input-journal-type-${index}`}>
+                                        <SelectValue placeholder="DR" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="DR">DR</SelectItem>
+                                      <SelectItem value="CR">CR</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <Input
+                                value={activeJournalRow === index ? journalAccountSearchTerm : (entry?.accountName || "")}
+                                onChange={(e) => {
+                                  setJournalAccountSearchTerm(e.target.value);
+                                  setJournalAccountHighlightedIndex(0);
+                                }}
+                                onFocus={() => {
+                                  setActiveJournalRow(index);
+                                  setShowAccountSidebar(true);
+                                  setJournalAccountSearchTerm("");
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => {
+                                    if (activeJournalRow === index) {
+                                      setJournalAccountSearchTerm("");
+                                      setActiveJournalRow(null);
+                                    }
+                                  }, 200);
+                                }}
+                                placeholder="Type to search account..."
+                                data-testid={`input-journal-account-${index}`}
+                                className="text-sm"
+                              />
+                              {activeJournalRow === index && filteredJournalAccounts.length > 0 && (
+                                <div className="mt-1 border rounded-md bg-popover shadow-md max-h-44 overflow-y-auto z-20 relative">
+                                  {filteredJournalAccounts.slice(0, 10).map((account: any) => (
+                                    <button
+                                      key={`${account.type}-${account.id}`}
+                                      type="button"
+                                      className="w-full text-left px-3 py-2.5 text-sm hover-elevate border-b last:border-b-0"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleJournalAccountSelect(account);
+                                        setShowAccountSidebar(false);
+                                      }}
+                                    >
+                                      <div className="font-medium truncate">{account.name}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {entry?.accountId > 0 && (
+                                <div className="text-xs text-muted-foreground pl-1 mt-0.5">
+                                  New Bal: <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                    {formatAmount(Math.abs(projectedBalance))} {projectedBalance >= 0 ? "Dr" : "Cr"}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {journalFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeJournal(index)} data-testid={`button-journal-remove-${index}`} className="shrink-0">
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <FormField
+                            control={journalForm.control}
+                            name={`entries.${index}.amount`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground w-14 shrink-0">Amount</span>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0.00"
+                                      className="font-mono text-right"
+                                      data-testid={`input-journal-amount-${index}`}
+                                      onBlur={(e) => {
+                                        const v = Number(e.target.value);
+                                        if (!isNaN(v) && v > 0 && selectedCurrency !== "USD") {
+                                          journalForm.setValue(`entries.${index}.amount`, convertToUSD(v).toFixed(2));
+                                        }
+                                      }}
+                                    />
+                                  </FormControl>
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-1 px-0.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
+                        data-testid="button-journal-add-row"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      <div className="text-right text-xs space-y-0.5">
+                        <div className="text-muted-foreground">DR: {formatAmount(totalDebit)} | CR: {formatAmount(totalCredit)}</div>
+                        <div className="font-bold font-mono">{formatAmount(Math.max(totalDebit, totalCredit))}</div>
+                      </div>
+                    </div>
+                    {Math.abs(totalDebit - totalCredit) > 0.01 && (
+                      <div className="text-center text-sm text-destructive p-2 bg-destructive/10 rounded-md">
+                        DR/CR mismatch: {formatAmount(Math.abs(totalDebit - totalCredit))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Desktop/tablet journal table (hidden on mobile) ── */}
+                  <div className="hidden sm:block border rounded-md overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/50 sticky top-0 z-10">
                         <tr>
@@ -4485,9 +4626,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </CardContent>
               </Card>
 
-              {/* Right Panel - Account Search Sidebar */}
+              {/* Right Panel - Account Search Sidebar (hidden on mobile) */}
               {showAccountSidebar && (
-                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
+                <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <h3 className="text-sm font-semibold">Search Accounts</h3>
@@ -4699,7 +4840,216 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main Spreadsheet Area */}
                 <Card className="flex-1 overflow-hidden min-w-0">
-                  <div className="overflow-x-auto">
+
+                  {/* ── Mobile: card-per-row (sm:hidden) ── */}
+                  <div className="sm:hidden p-3 space-y-2">
+                    {transferFields.map((field, index) => {
+                      const entry = transferEntries[index];
+                      const mobileFilteredItems = activeTransferRow === index && activeFieldType === 'item'
+                        ? transferInventory
+                            .filter((item: any) => {
+                              if (!transferSearchTerm.trim()) return true;
+                              const term = transferSearchTerm.toLowerCase();
+                              return item.stockItemName?.toLowerCase().includes(term) || item.stockItemCode?.toLowerCase().includes(term);
+                            })
+                            .sort((a: any, b: any) => (a.stockItemName || '').localeCompare(b.stockItemName || ''))
+                            .slice(0, 10)
+                        : [];
+                      const mobileFilteredLocs = activeTransferRow === index && activeFieldType === 'source'
+                        ? locations
+                            .filter((loc: any) => {
+                              if (!transferSourceSearchTerm.trim()) return true;
+                              const term = transferSourceSearchTerm.toLowerCase();
+                              return (loc.name || '').toLowerCase().includes(term);
+                            })
+                            .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''))
+                            .slice(0, 8)
+                        : [];
+                      return (
+                        <div key={field.id} className="border rounded-md p-3 space-y-2 bg-card">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground font-medium">#{index + 1}</span>
+                            {transferFields.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeTransfer(index)} className="h-7 w-7" data-testid={`button-remove-transfer-${index}`}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                          {!isPOS && (
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">Source</label>
+                              <input
+                                type="text"
+                                value={activeTransferRow === index && activeFieldType === 'source' ? transferSourceSearchTerm : (entry?.sourceLocationName || "")}
+                                onChange={(e) => { setTransferSourceSearchTerm(e.target.value); setTransferSourceHighlightedIndex(0); }}
+                                onFocus={() => {
+                                  transferFocusIdRef.current += 1;
+                                  setActiveTransferRow(index);
+                                  setActiveFieldType('source');
+                                  setTransferSourceSearchTerm(entry?.sourceLocationName || "");
+                                  setTransferSourceHighlightedIndex(0);
+                                  setShowSourceSidebar(true);
+                                  setShowItemSidebar(false);
+                                }}
+                                onBlur={() => {
+                                  const focusId = transferFocusIdRef.current;
+                                  setTimeout(() => {
+                                    if (transferFocusIdRef.current === focusId) {
+                                      setActiveTransferRow(null);
+                                      setActiveFieldType(null);
+                                      setTransferSourceSearchTerm("");
+                                      setShowSourceSidebar(false);
+                                    }
+                                  }, 250);
+                                }}
+                                placeholder="Type location..."
+                                data-testid={`input-source-${index}`}
+                                className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
+                              />
+                              {mobileFilteredLocs.length > 0 && (
+                                <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto z-20 relative">
+                                  {mobileFilteredLocs.map((loc: any) => (
+                                    <button key={loc.id} type="button" className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, loc.id);
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, loc.name);
+                                        setTransferInventorySource(loc.id);
+                                        setTransferSourceSearchTerm("");
+                                        setShowSourceSidebar(false);
+                                      }}>
+                                      {loc.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="space-y-1">
+                            <label className="text-xs text-muted-foreground">Item</label>
+                            <input
+                              type="text"
+                              value={activeTransferRow === index && activeFieldType === 'item' ? transferSearchTerm : (entry?.stockItemName || "")}
+                              onChange={(e) => {
+                                setTransferSearchTerm(e.target.value);
+                                setTransferHighlightedIndex(0);
+                                if (!e.target.value) {
+                                  stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                  stockTransferForm.setValue(`entries.${index}.stockItemCode`, "");
+                                  stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
+                                }
+                              }}
+                              onFocus={() => {
+                                transferFocusIdRef.current += 1;
+                                setActiveTransferRow(index);
+                                setActiveFieldType('item');
+                                setTransferHighlightedIndex(0);
+                                setTransferSearchTerm(entry?.stockItemName || "");
+                                setShowItemSidebar(true);
+                                setShowSourceSidebar(false);
+                                if (entry?.sourceLocationId > 0) {
+                                  setTransferInventorySource(entry.sourceLocationId);
+                                } else if (isPOS && posLocationId) {
+                                  setTransferInventorySource(posLocationId);
+                                }
+                              }}
+                              onBlur={() => {
+                                const focusId = transferFocusIdRef.current;
+                                setTimeout(() => {
+                                  if (transferFocusIdRef.current === focusId) {
+                                    setActiveTransferRow(null);
+                                    setActiveFieldType(null);
+                                    setTransferSearchTerm("");
+                                    setShowItemSidebar(false);
+                                  }
+                                }, 200);
+                              }}
+                              placeholder="Type to search item..."
+                              data-testid={`input-item-name-${index}`}
+                              className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
+                            />
+                            {mobileFilteredItems.length > 0 && (
+                              <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
+                                {mobileFilteredItems.map((item: any) => (
+                                  <button key={item.stockItemId} type="button" className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      const sourceId = Number(transferInventorySource);
+                                      if (!(sourceId > 0)) return;
+                                      const sourceLocation = locations.find((l: any) => l.id === sourceId);
+                                      stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, { shouldValidate: true });
+                                      stockTransferForm.setValue(`entries.${index}.sourceLocationName`, sourceLocation?.name || "");
+                                      stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, { shouldValidate: true });
+                                      stockTransferForm.setValue(`entries.${index}.stockItemCode`, item.stockItemCode || "");
+                                      stockTransferForm.setValue(`entries.${index}.stockItemName`, item.stockItemName);
+                                      stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
+                                      setTransferSearchTerm("");
+                                      setShowItemSidebar(false);
+                                    }}>
+                                    <div className="font-medium truncate">{item.stockItemName}</div>
+                                    <div className="text-xs text-muted-foreground">Qty: {formatNumber(item.quantity)}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">Qty</label>
+                              <input
+                                type="number"
+                                step="0.001"
+                                value={entry?.quantity || ""}
+                                onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                                placeholder="0"
+                                data-testid={`input-transfer-quantity-${index}`}
+                                className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
+                              />
+                            </div>
+                            {!isPOS && (
+                              <div className="space-y-1">
+                                <label className="text-xs text-muted-foreground">Rate</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={entry?.rate || ""}
+                                  onChange={(e) => stockTransferForm.setValue(`entries.${index}.rate`, e.target.value)}
+                                  placeholder="0.00"
+                                  data-testid={`input-transfer-rate-${index}`}
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {!isPOS && (
+                            <div className="flex items-center justify-between px-1">
+                              <span className="text-xs text-muted-foreground">Amount</span>
+                              <span className="text-sm font-mono font-medium">
+                                {formatAmount(parseFloat(entry?.quantity || "0") * parseFloat(entry?.rate || "0"))}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-1 px-0.5">
+                      <Button type="button" variant="outline" size="sm"
+                        onClick={() => appendTransfer({ sourceLocationId: 0, sourceLocationName: "", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "" })}
+                        data-testid="button-add-transfer-row"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Row
+                      </Button>
+                      {!isPOS && (
+                        <div className="font-bold font-mono text-sm">
+                          Total: {formatAmount(transferTotal)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Desktop/tablet: existing spreadsheet (hidden on mobile) ── */}
+                  <div className="hidden sm:block overflow-x-auto">
                     <div className="min-w-[400px]">
                       {/* Header */}
                       <div className="flex bg-muted/50 border-b sticky top-0 z-10">
@@ -5158,9 +5508,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
                 </Card>
 
-                {/* Right Panel - Item Search */}
+                {/* Right Panel - Item Search (hidden on mobile) */}
                 {showItemSidebar && (
-                <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
+                <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <h3 className="text-sm font-semibold">Search Items</h3>
@@ -5286,9 +5636,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </Card>
                 )}
 
-                {/* Right Panel - Source Location Search */}
+                {/* Right Panel - Source Location Search (hidden on mobile) */}
                 {!isPOS && showSourceSidebar && (
-                  <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
+                  <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                     <div className="p-4 border-b">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <h3 className="text-sm font-semibold">Select Source</h3>
@@ -5510,7 +5860,157 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <div className="flex flex-col lg:flex-row gap-4">
                     {/* Main Spreadsheet Area */}
                     <Card className="flex-1 overflow-hidden min-w-0">
-                      <div className="overflow-x-auto">
+
+                      {/* ── Mobile: card-per-row (sm:hidden) ── */}
+                      <div className="sm:hidden p-3 space-y-2">
+                        {adjustmentFields.map((field, index) => {
+                          const currentEntry = adjustmentEntries[index];
+                          const inventoryItem = adjustmentItemsWithInventory.find(item => item.stockItemId === currentEntry?.stockItemId);
+                          const availableQty = inventoryItem?.quantity || "0";
+                          const rowAmount = parseFloat(currentEntry?.quantity || "0") * parseFloat(currentEntry?.rate || "0");
+                          const mobileAdjItems = activeAdjustmentRow === index
+                            ? filteredAdjustmentItems.slice(0, 10)
+                            : [];
+                          return (
+                            <div key={field.id} className="border rounded-md p-3 space-y-2 bg-card">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground font-medium">#{index + 1}</span>
+                                {adjustmentFields.length > 1 && (
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAdjustment(index)} className="h-7 w-7" data-testid={`button-remove-adjustment-${index}`}>
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-muted-foreground">Type (P/C)</label>
+                                  <input
+                                    type="text"
+                                    value={currentEntry?.type === "PRODUCE" ? "Produce" : currentEntry?.type === "CONSUME" ? "Consume" : ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value.toLowerCase();
+                                      if (val.startsWith('p')) stockAdjustmentForm.setValue(`entries.${index}.type`, "PRODUCE");
+                                      else if (val.startsWith('c')) stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME");
+                                    }}
+                                    placeholder="p / c"
+                                    data-testid={`input-adjustment-type-${index}`}
+                                    className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
+                                  />
+                                </div>
+                                {currentEntry?.stockItemId > 0 && (
+                                  <div className="space-y-1">
+                                    <label className="text-xs text-muted-foreground">Available</label>
+                                    <div className="px-3 py-2 text-sm font-mono text-muted-foreground">{formatNumber(parseFloat(availableQty))}</div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs text-muted-foreground">Item</label>
+                                <input
+                                  type="text"
+                                  value={activeAdjustmentRow === index ? adjustmentSearchTerm : (currentEntry?.stockItemName || "")}
+                                  onChange={(e) => {
+                                    setAdjustmentSearchTerm(e.target.value);
+                                    setAdjustmentHighlightedIndex(0);
+                                    if (!e.target.value) {
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, 0);
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, "");
+                                      stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, "");
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    adjustmentFocusIdRef.current += 1;
+                                    setActiveAdjustmentRow(index);
+                                    setAdjustmentSearchTerm(currentEntry?.stockItemName || "");
+                                    setAdjustmentHighlightedIndex(0);
+                                    setShowAdjustmentSidebar(true);
+                                  }}
+                                  onBlur={() => {
+                                    const focusId = adjustmentFocusIdRef.current;
+                                    setTimeout(() => {
+                                      if (adjustmentFocusIdRef.current === focusId) {
+                                        setActiveAdjustmentRow(null);
+                                        setAdjustmentSearchTerm("");
+                                        setShowAdjustmentSidebar(false);
+                                      }
+                                    }, 200);
+                                  }}
+                                  placeholder="Type to search item..."
+                                  data-testid={`input-adjustment-item-${index}`}
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
+                                />
+                                {mobileAdjItems.length > 0 && (
+                                  <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
+                                    {mobileAdjItems.map((item: any) => (
+                                      <button key={item.stockItemId} type="button" className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, item.stockItemCode || "");
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, item.stockItemName);
+                                          stockAdjustmentForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
+                                          setAdjustmentSearchTerm("");
+                                          setShowAdjustmentSidebar(false);
+                                        }}>
+                                        <div className="font-medium truncate">{item.stockItemName}</div>
+                                        <div className="text-xs text-muted-foreground">Avail: {formatNumber(item.quantity)}</div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-muted-foreground">Qty</label>
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    value={currentEntry?.quantity || ""}
+                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                                    placeholder="0"
+                                    data-testid={`input-adjustment-qty-${index}`}
+                                    className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs text-muted-foreground">Rate</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={currentEntry?.rate || ""}
+                                    onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.rate`, e.target.value)}
+                                    placeholder="0.00"
+                                    data-testid={`input-adjustment-rate-${index}`}
+                                    className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between px-1">
+                                <span className="text-xs text-muted-foreground">Amount</span>
+                                <span className={`text-sm font-mono font-medium ${currentEntry?.type === "CONSUME" ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                  {currentEntry?.type === "CONSUME" ? "-" : "+"}{formatAmount(rowAmount)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center justify-between pt-1 px-0.5">
+                          <Button type="button" variant="outline" size="sm"
+                            onClick={() => appendAdjustment({ type: "CONSUME", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "" })}
+                            data-testid="button-add-adjustment-row"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Row
+                          </Button>
+                          <div className="text-right text-xs space-y-0.5">
+                            <div><span className="text-muted-foreground">Consume: </span><span className="text-destructive font-mono">{formatAmount(consumptionTotal)}</span></div>
+                            <div><span className="text-muted-foreground">Produce: </span><span className="text-emerald-600 font-mono">{formatAmount(productionTotal)}</span></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ── Desktop/tablet: existing spreadsheet (hidden on mobile) ── */}
+                      <div className="hidden sm:block overflow-x-auto">
                         <div className="min-w-[400px]">
                           {/* Header */}
                           <div className="flex bg-muted/50 border-b sticky top-0 z-10">
@@ -5811,9 +6311,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </div>
                     </Card>
 
-                    {/* Right Panel - Item Search Sidebar */}
+                    {/* Right Panel - Item Search Sidebar (hidden on mobile) */}
                     {showAdjustmentSidebar && (
-                      <Card className="w-full lg:w-80 flex flex-col lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
+                      <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                         <div className="p-4 border-b">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <h3 className="text-sm font-semibold">Search Items</h3>
