@@ -1386,33 +1386,6 @@ export default function ProductionRawStock() {
                   </div>
                 </div>
 
-                <Separator />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label>Actual Arrived KG</Label>
-                    <Input
-                      type="number"
-                      value={actualReceivedKg}
-                      onChange={(e) => setActualReceivedKg(e.target.value)}
-                      placeholder="e.g. 19600"
-                      step="0.001"
-                      data-testid="input-actual-kg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Rate per KG ($)</Label>
-                    <Input
-                      type="number"
-                      value={costPerKg}
-                      onChange={(e) => setCostPerKg(e.target.value)}
-                      placeholder="e.g. 1.85"
-                      step="0.0001"
-                      data-testid="input-cost-per-kg"
-                    />
-                  </div>
-                </div>
-
                 <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
                   <p className="text-xs text-muted-foreground">Set the exchange rate below — it converts the base material cost from the container currency to USD. All offload charges are entered in USD.</p>
                   <div className="grid grid-cols-2 gap-4">
