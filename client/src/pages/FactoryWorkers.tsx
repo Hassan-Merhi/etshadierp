@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, Upload, Download, Calculator, X, FileDown,
+  Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,19 @@ export default function FactoryWorkers() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker updated" });
       resetForm(); setEditingWorker(null);
+    },
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${id}/reactivate`, {});
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data: FactoryWorker) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      toast({ title: "Worker reactivated", description: `${data.fullName} is now active again.` });
     },
     onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
@@ -537,9 +550,19 @@ export default function FactoryWorkers() {
                       <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      {worker.active && (
+                      {worker.active ? (
                         <Button size="icon" variant="ghost" onClick={() => openEndContract(worker)} data-testid={`button-end-contract-${worker.id}`}>
                           <UserX className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => reactivateMutation.mutate(worker.id)}
+                          disabled={reactivateMutation.isPending}
+                          data-testid={`button-reactivate-${worker.id}`}
+                        >
+                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
                         </Button>
                       )}
                     </div>

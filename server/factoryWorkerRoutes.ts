@@ -541,6 +541,40 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // POST /api/factory/workers/:id/reactivate - Reactivate an inactive worker
+  app.post("/api/factory/workers/:id/reactivate", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      const today = new Date().toISOString().split("T")[0];
+
+      const [updated] = await db
+        .update(factoryWorkers)
+        .set({ active: true, contractEndDate: null, updatedAt: new Date() })
+        .where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Worker not found" });
+
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: today,
+        txType: "CONTRACT_REACTIVATED",
+        referenceId: updated.id,
+        referenceTable: "factory_workers",
+        description: `Contract reactivated for worker: ${updated.fullName} (${updated.employeeCode || "N/A"})`,
+        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error reactivating worker:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // POST /api/factory/workers/:id/photo - Upload photo
   app.post("/api/factory/workers/:id/photo", requireAuth, workerUpload.single("photo"), async (req: any, res: any) => {
     try {

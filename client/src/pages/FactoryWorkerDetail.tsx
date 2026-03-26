@@ -3,7 +3,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Upload, Pencil, UserX, Package, DollarSign, Calculator,
+  ArrowLeft, Upload, Pencil, UserX, UserCheck, Package, DollarSign, Calculator,
   CheckCircle2, X, CreditCard, Building, Phone, Calendar,
   FileText, FileImage, File, Trash2, Banknote, Plus, Loader2,
   ChevronDown, ChevronRight, RotateCcw,
@@ -423,6 +423,20 @@ export default function FactoryWorkerDetail() {
     onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
 
+  const reactivateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", `/api/factory/workers/${workerId}/reactivate`, {});
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (data: FactoryWorker) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      toast({ title: "Worker reactivated", description: `${data.fullName} is now active again.` });
+    },
+    onError: (err: Error) => { if ((err as any)?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !workerId) return;
@@ -604,9 +618,20 @@ export default function FactoryWorkerDetail() {
                 <Button variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()} data-testid="button-upload-photo">
                   <Upload className="h-3.5 w-3.5 mr-2" />Upload Photo
                 </Button>
-                {worker.active && (
+                {worker.active ? (
                   <Button variant="destructive" className="w-full" onClick={openEndContract} data-testid="button-end-contract">
                     <UserX className="h-3.5 w-3.5 mr-2" />End Contract
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full text-green-600 border-green-600"
+                    onClick={() => reactivateMutation.mutate()}
+                    disabled={reactivateMutation.isPending}
+                    data-testid="button-reactivate-worker"
+                  >
+                    <UserCheck className="h-3.5 w-3.5 mr-2" />
+                    {reactivateMutation.isPending ? "Reactivating..." : "Reactivate Worker"}
                   </Button>
                 )}
               </div>
