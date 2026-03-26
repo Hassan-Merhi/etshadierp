@@ -1859,13 +1859,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         available = supplierAvail; // "supplier" (default)
       }
 
-      const requested = parseFloat(parsed.fromAmount as string);
-      if (requested > available + 0.01) {
-        return res.status(422).json({
-          message: `Amount exceeds available ${sourceType} balance. Available: ${currCode} ${available.toFixed(2)}, Requested: ${currCode} ${requested.toFixed(2)}`,
-        });
-      }
       // ─────────────────────────────────────────────────────────────────────────
+      // Overpayments are allowed — the remaining balance will go negative (CR),
+      // visible on the statement so the company knows the supplier owes money back.
 
       const [created] = await db.insert(factorySupplierFxTransfers).values(parsed).returning();
 
