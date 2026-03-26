@@ -1314,7 +1314,26 @@ export default function FactorySuppliers() {
                             <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : group.containers.length}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : formatKg(group.totalKg)}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums font-medium">
-                              {isCrossFreightPool ? `${ccPrefix}${formatNum(group.totalFreight || "0")}` : `${ccPrefix}${formatNum(group.totalValue)}`}
+                              {isCrossFreightPool ? (() => {
+                                const totalFreight = parseFloat(group.totalFreight || "0");
+                                const remComm = parseFloat(group.remainingCommission || group.totalCommission || "0");
+                                const remainingFreight = Math.max(0, netPay - remComm);
+                                const freightSettled = remainingFreight < totalFreight - 0.005;
+                                return (
+                                  <span className="text-orange-600 dark:text-orange-400">
+                                    {freightSettled ? (
+                                      <>
+                                        {ccPrefix}{formatNum(String(remainingFreight.toFixed(2)))}
+                                        <span className="text-xs text-muted-foreground ml-1 line-through">
+                                          {formatNum(String(totalFreight.toFixed(2)))}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>{ccPrefix}{formatNum(String(totalFreight.toFixed(2)))}</>
+                                    )}
+                                  </span>
+                                );
+                              })() : `${ccPrefix}${formatNum(group.totalValue)}`}
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums text-destructive">
                               {parseFloat(group.totalCommission) > 0 ? (
