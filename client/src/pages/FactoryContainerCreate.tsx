@@ -318,11 +318,11 @@ export default function FactoryContainerCreate() {
             />
           </div>
 
-          {selectedBroker && parseFloat(formData.commissionAmount || "0") > 0 && (
+          {linkedBroker && parseFloat(formData.commissionAmount || "0") > 0 && (
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-start gap-2 text-muted-foreground">
               <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
               <span>
-                A commission account for <strong className="text-foreground">{selectedBroker.name}</strong> will be automatically created or reused in your accounts.
+                A commission account for <strong className="text-foreground">{linkedBroker.name}</strong> will be automatically created or reused in your accounts.
               </span>
             </div>
           )}
