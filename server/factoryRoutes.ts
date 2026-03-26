@@ -2183,17 +2183,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       // Greedy allocation: fill each supplier before moving to the next
       let rem = total;
-      const allocations: Array<{ supplierId: number; name: string; allocated: number; toAmountUsd: number; containers: any[] }> = [];
+      const allocations: Array<{ supplierId: number; name: string; allocated: number; toAmountUsd: number; overpayment: number; containers: any[] }> = [];
       for (const sd of supplierData) {
         if (rem <= 0.001) break;
         const toAllocate = Math.min(rem, sd.available);
         if (toAllocate < 0.001) continue;
-        allocations.push({ supplierId: sd.supplierId, name: sd.name, allocated: toAllocate, toAmountUsd: toAllocate * fxRate, containers: sd.containers });
+        allocations.push({ supplierId: sd.supplierId, name: sd.name, allocated: toAllocate, toAmountUsd: toAllocate * fxRate, overpayment: 0, containers: sd.containers });
         rem -= toAllocate;
       }
 
       if (allocations.length === 0)
         return res.status(400).json({ message: "Could not allocate any amount" });
+
+      // Any remaining after all suppliers are filled goes to the last supplier as an overpayment
+      // (creates a CR balance — the supplier owes the company that amount back)
+      if (rem > 0.001) {
+        const last = allocations[allocations.length - 1];
+        last.overpayment = rem;
+        last.allocated += rem;
+        last.toAmountUsd += rem * fxRate;
+        rem = 0;
+      }
 
       // Dry-run: return preview without saving
       if (dryRun) {
@@ -2210,6 +2220,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             supplierName: a.name,
             allocated: a.allocated.toFixed(4),
             toAmountUsd: a.toAmountUsd.toFixed(4),
+            overpayment: a.overpayment.toFixed(4),
           })),
         });
       }

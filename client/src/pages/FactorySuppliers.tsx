@@ -2940,25 +2940,29 @@ export default function FactorySuppliers() {
                   <span className="text-muted-foreground">≈ USD equivalent</span>
                   <span className="font-semibold tabular-nums text-green-600 dark:text-green-400">${parseFloat(bulkFxPreview.totalUsd || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {parseFloat(bulkFxPreview.remaining) > 0.01 && (
-                  <div className="flex justify-between text-sm text-amber-600 dark:text-amber-400">
-                    <span>Unallocated (exceeds all balances)</span>
-                    <span className="tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                )}
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
                 <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
-                  {bulkFxPreview.transfers.map((t) => (
+                  {bulkFxPreview.transfers.map((t) => {
+                    const overpaid = parseFloat(t.overpayment || "0") > 0.01;
+                    return (
                     <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
-                      <span className="font-medium">{t.supplierName}</span>
+                      <div>
+                        <div className="font-medium">{t.supplierName}</div>
+                        {overpaid && (
+                          <div className="text-xs text-amber-600 dark:text-amber-400">
+                            incl. {bulkFxForm.fromCurrencyCode} {parseFloat(t.overpayment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} overpayment (will show as CR)
+                          </div>
+                        )}
+                      </div>
                       <div className="text-right space-y-0.5">
                         <div className="tabular-nums font-medium">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         <div className="text-xs text-muted-foreground">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <DialogFooter className="gap-2 flex-wrap">
