@@ -150,12 +150,13 @@ export default function FactoryContainers() {
       setOtherChargeLines([]);
       return;
     }
+    const containerCcy = (editingContainer as any).currencyCode || "USD";
     factoryApiRequest("GET", `/api/factory/containers/${editingContainer.id}/other-charges`)
       .then(res => res.ok ? res.json() : [])
       .then((charges: any[]) => {
         setOtherChargeLines(charges.map((c: any) => ({
           amount: c.amount || "",
-          currencyCode: c.currencyCode || currency || "USD",
+          currencyCode: c.currencyCode || containerCcy,
           ledgerAccountId: c.ledgerAccountId ? String(c.ledgerAccountId) : "",
         })));
       })
@@ -571,7 +572,7 @@ export default function FactoryContainers() {
     setFxEffectiveDate("");
   };
 
-  const openEdit = async (c: ContainerWithSupplier) => {
+  const openEdit = (c: ContainerWithSupplier) => {
     setEditingContainer(c);
     setFormData({
       containerNumber: c.containerNumber,
@@ -597,19 +598,6 @@ export default function FactoryContainers() {
     setFxRate((c as any).fxRateToUsd || "1");
     setFxRateSource((c as any).fxRateSource || "auto");
     setFxEffectiveDate((c as any).fxRateDateImport || "");
-    try {
-      const res = await factoryApiRequest("GET", `/api/factory/containers/${c.id}/other-charges`);
-      if (res.ok) {
-        const lines = await res.json();
-        setOtherChargeLines(lines.map((l: any) => ({
-          amount: l.amount || "",
-          currencyCode: l.currencyCode || currency || "USD",
-          ledgerAccountId: l.ledgerAccountId ? String(l.ledgerAccountId) : "",
-        })));
-      }
-    } catch {
-      setOtherChargeLines([]);
-    }
   };
 
   const handleSubmit = () => {
