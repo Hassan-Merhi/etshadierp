@@ -76,6 +76,7 @@ export default function FactoryPOS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [printSale, setPrintSale] = useState<any>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [voidId, setVoidId] = useState<number | null>(null);
   const [tab, setTab] = useState("pos");
 
