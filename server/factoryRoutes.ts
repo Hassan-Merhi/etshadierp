@@ -2972,6 +2972,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Build OB commissions list
       const containerMap: Record<number, any> = {};
       for (const c of containers) containerMap[c.id] = c;
+
+      // Offload charges may reference containers belonging to child suppliers (broker receives a charge
+      // on a child's container). Fetch any missing containers so we can show the real container number.
+      const missingContainerIds = [...new Set(
+        supplierOffloadCharges.map((oc: any) => oc.containerId).filter((id: number) => !containerMap[id])
+      )];
+      if (missingContainerIds.length > 0) {
+        const extraContainers = await db
+          .select({ id: factoryContainers.id, containerNumber: factoryContainers.containerNumber, createdAt: factoryContainers.createdAt })
+          .from(factoryContainers)
+          .where(and(
+            eq(factoryContainers.companyId, companyId),
+            sql`${factoryContainers.id} = ANY(${sql.raw(`ARRAY[${missingContainerIds.join(",")}]`)})`
+          ));
+        for (const c of extraContainers) containerMap[c.id] = c;
+      }
+
       // Fetch commission supplier names for the statement
       const commSupplierIds = (obRawStockWithCommission as any[])
         .map((r: any) => r.commissionSupplierId)
