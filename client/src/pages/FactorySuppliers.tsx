@@ -1481,12 +1481,16 @@ export default function FactorySuppliers() {
                       return (
                         <div key={section.currencyCode} className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-sm px-3 py-1 font-bold">
+                            <Badge variant={section.isBrokerPool ? "default" : "secondary"} className="text-sm px-3 py-1 font-bold">
                               {section.currencyCode}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
-                            </span>
+                            {section.isBrokerPool ? (
+                              <span className="text-xs text-muted-foreground">Broker USD Pool — received from FX settlements &amp; transfers</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
+                              </span>
+                            )}
                           </div>
                           <div className="overflow-x-auto rounded-md border">
                             <Table>
@@ -1496,12 +1500,21 @@ export default function FactorySuppliers() {
                                   <TableHead className="text-xs h-8">Type</TableHead>
                                   <TableHead className="text-xs h-8">Description</TableHead>
                                   <TableHead className="text-xs h-8 text-right">Amount ({section.currencyCode})</TableHead>
-                                  <TableHead className="text-xs h-8 text-right">Commission</TableHead>
-                                  <TableHead className="text-xs h-8 text-right">Balance</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">{section.isBrokerPool ? "Pool Balance" : "Balance"}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {section.rows.map((row: any, idx: number) => (
+                                {section.rows.map((row: any, idx: number) => {
+                                  const balVal = row.runningBalance;
+                                  const balPositive = balVal > 0;
+                                  const balNegative = balVal < 0;
+                                  const balColor = section.isBrokerPool
+                                    ? (balPositive ? "text-green-600 dark:text-green-400" : balNegative ? "text-red-600 dark:text-red-400" : "text-muted-foreground")
+                                    : (balPositive ? "text-red-600 dark:text-red-400" : balNegative ? "text-green-600 dark:text-green-400" : "text-muted-foreground");
+                                  const balLabel = section.isBrokerPool
+                                    ? (balPositive ? "Rcvd" : balNegative ? "Owed" : "")
+                                    : (balPositive ? "CR" : balNegative ? "DR" : "");
+                                  return (
                                   <TableRow key={`${row.ref}-${idx}`} className="text-xs">
                                     <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
                                       {row.date ? formatDate(row.date) : "—"}
@@ -1517,34 +1530,24 @@ export default function FactorySuppliers() {
                                     <TableCell className={`py-1.5 text-right tabular-nums font-medium ${typeColor(row.type)}`}>
                                       {row.amount < 0 ? "−" : ""}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.amount).toFixed(2)))}
                                     </TableCell>
-                                    <TableCell className="py-1.5 text-right tabular-nums text-xs text-muted-foreground">
-                                      {row.commissionAmount != null && row.commissionAmount > 0
-                                        ? `${row.commissionCurrency || section.currencyCode} ${formatNum(String(parseFloat(row.commissionAmount).toFixed(2)))}`
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium text-xs ${row.runningBalance > 0 ? "text-red-600 dark:text-red-400" : row.runningBalance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                      {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.runningBalance).toFixed(2)))}
-                                      <span className="ml-1 opacity-70">{row.runningBalance > 0 ? "CR" : row.runningBalance < 0 ? "DR" : ""}</span>
+                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium text-xs ${balColor}`}>
+                                      {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(balVal).toFixed(2)))}
+                                      <span className="ml-1 opacity-70">{balLabel}</span>
                                     </TableCell>
                                   </TableRow>
-                                ))}
+                                  );
+                                })}
                               </TableBody>
                             </Table>
                           </div>
                           {/* Section totals */}
                           <div className="flex justify-end">
                             <div className="text-xs space-y-0.5 text-right min-w-56 pr-1">
-                              <div className="flex justify-between gap-6 text-muted-foreground">
-                                <span>Gross Value</span>
-                                <span className="tabular-nums font-medium text-foreground">
-                                  {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalValue)}
-                                </span>
-                              </div>
-                              {parseFloat(section.totalCommission) > 0 && (
+                              {!section.isBrokerPool && parseFloat(section.totalValue) > 0 && (
                                 <div className="flex justify-between gap-6 text-muted-foreground">
-                                  <span>Commission</span>
-                                  <span className="tabular-nums text-destructive">
-                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalCommission)}
+                                  <span>Gross Value</span>
+                                  <span className="tabular-nums font-medium text-foreground">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalValue)}
                                   </span>
                                 </div>
                               )}
@@ -1572,20 +1575,35 @@ export default function FactorySuppliers() {
                                   </span>
                                 </div>
                               )}
-                              {(parseFloat(section.totalFxOut) > 0 || parseFloat(section.totalFxIn) > 0) && (
+                              {parseFloat(section.totalFxOut) > 0 && (
                                 <div className="flex justify-between gap-6 text-muted-foreground">
-                                  <span>FX {parseFloat(section.totalFxOut) > 0 ? "Out" : "In"}</span>
+                                  <span>FX Out</span>
                                   <span className="tabular-nums text-amber-600 dark:text-amber-400">
-                                    {parseFloat(section.totalFxOut) > 0 ? "− " : "+ "}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(parseFloat(section.totalFxOut) > 0 ? section.totalFxOut : section.totalFxIn)}
+                                    − {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalFxOut)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalFxIn) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>FX In {section.isBrokerPool ? "(Received)" : ""}</span>
+                                  <span className="tabular-nums text-blue-600 dark:text-blue-400">
+                                    + ${formatNum(String(parseFloat(section.totalFxIn).toFixed(2)))}
                                   </span>
                                 </div>
                               )}
                               <div className="flex justify-between gap-6 border-t pt-1">
-                                <span className="font-semibold">Net Balance</span>
-                                <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-red-600 dark:text-red-400" : parseFloat(section.netBalance) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                                  {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
-                                  <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "CR" : parseFloat(section.netBalance) < 0 ? "DR" : ""}</span>
-                                </span>
+                                <span className="font-semibold">{section.isBrokerPool ? "Pool Balance" : "Net Balance"}</span>
+                                {section.isBrokerPool ? (
+                                  <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-green-600 dark:text-green-400" : parseFloat(section.netBalance) < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                                    ${formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
+                                    <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "Rcvd" : parseFloat(section.netBalance) < 0 ? "Owed" : ""}</span>
+                                  </span>
+                                ) : (
+                                  <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-red-600 dark:text-red-400" : parseFloat(section.netBalance) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
+                                    <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "CR" : parseFloat(section.netBalance) < 0 ? "DR" : ""}</span>
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

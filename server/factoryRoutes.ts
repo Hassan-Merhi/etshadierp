@@ -3348,8 +3348,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         description: `${c.containerNumber} - ${supplierName}`,
         ref: c.containerNumber,
         amount: mainAmt,
-        commissionAmount: commAmt > 0 && commCc === cc ? commAmt : null,
-        commissionCurrency: commAmt > 0 && commCc === cc ? commCc : null,
+        commissionAmount: null,
+        commissionCurrency: null,
       });
 
       // Cross-currency freight: add as an individual ledger row in the freight currency section
@@ -3376,19 +3376,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           commissionCurrency: null,
         });
       }
-
-      // Commission row in different currency section
-      if (commAmt > 0 && commCc !== cc) {
-        addRow(commCc, {
-          date: dateVal,
-          type: "commission",
-          description: `Commission — ${c.containerNumber} - ${supplierName}`,
-          ref: c.containerNumber,
-          amount: commAmt,
-          commissionAmount: null,
-          commissionCurrency: commCc,
-        });
-      }
+      // Commission is intentionally excluded from the broker statement until explicitly transferred.
+      // When transferred, it arrives as an FX In entry and appears naturally in the ledger.
     }
 
     // Payment rows
@@ -3499,37 +3488,38 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
 
     // Build ledgers with running balance
-    const fmtN = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const currencyLedgers = Object.entries(ledgerByCurrency).map(([cc, rows]) => {
       let runBal = 0;
       const rowsWithBal = rows.map((row) => {
+        // Commission is excluded from the broker balance until explicitly transferred.
+        // commissionAmount is always null now, but guard defensively.
         runBal += row.amount;
-        if (row.commissionAmount) runBal += row.commissionAmount;
         return { ...row, runningBalance: runBal };
       });
       const containerRows = rows.filter(r => r.type === "container");
       const totalContainers = containerRows.length;
       const totalValue = containerRows.reduce((s, r) => s + r.amount, 0);
-      const totalCommission = containerRows.reduce((s, r) => s + (r.commissionAmount || 0), 0)
-        + rows.filter(r => r.type === "commission").reduce((s, r) => s + r.amount, 0);
       const totalPaid = Math.abs(rows.filter(r => r.type === "payment").reduce((s, r) => s + r.amount, 0));
       const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
       const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
       const totalOtherCharges = rows.filter(r => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
-      // Freight rows are now real ledger rows, so they're already in runBal
       const totalFreight = rows.filter(r => r.type === "freight").reduce((s, r) => s + r.amount, 0);
+      // A "broker pool" section is the USD section that has no containers —
+      // it represents USD the broker has received from FX settlements and commission transfers.
+      // Its balance is an ASSET (received), not a payable, so CR/DR labels are inverted vs normal sections.
+      const isBrokerPool = cc === "USD" && totalContainers === 0 && totalFxIn > 0;
       return {
         currencyCode: cc,
         rows: rowsWithBal,
         totalContainers,
         totalValue: totalValue.toFixed(2),
-        totalCommission: totalCommission.toFixed(2),
         totalFreight: totalFreight.toFixed(2),
         totalOtherCharges: totalOtherCharges.toFixed(2),
         totalPaid: totalPaid.toFixed(2),
         totalFxOut: totalFxOut.toFixed(2),
         totalFxIn: totalFxIn.toFixed(2),
         netBalance: runBal.toFixed(2),
+        isBrokerPool,
       };
     }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
 
