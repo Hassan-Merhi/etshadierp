@@ -2925,7 +2925,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         // after offload factoryContainerCommissions records exist. Use whichever is greater so
         // the commission always shows in the currency pool even before offloading.
         const effectiveCommission = Math.max(data.totalCommission, data.totalDirectCommission);
-        const netPayable = data.totalValue - effectiveCommission - paid;
+        // For commission-only pools (no containers) the commission IS the balance owed to the
+        // supplier (they earned it as a broker). Payments out reduce it directly.
+        // For normal container pools, commission is deducted from what we owe them.
+        const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0;
+        const netPayable = isCommissionOnly
+          ? effectiveCommission - paid
+          : data.totalValue - effectiveCommission - paid;
         // Phase 2: commission remaining = effectiveCommission minus what was settled via FX
         // "both" is treated as commission-first (capped at effectiveCommission), then supplier
         const commFxReduction = Math.min(effectiveCommission, (fxCommOut[cc] || 0) + (fxBothOut[cc] || 0));
