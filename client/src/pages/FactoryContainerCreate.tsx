@@ -39,9 +39,6 @@ export default function FactoryContainerCreate() {
   });
 
   const [currency, setCurrency] = useState("USD");
-  const [fxRate, setFxRate] = useState("1");
-  const [fxRateSource, setFxRateSource] = useState<"auto" | "manual">("auto");
-  const [fxEffectiveDate, setFxEffectiveDate] = useState("");
   const [totalKg, setTotalKg] = useState("");
   const [ratePerKg, setRatePerKg] = useState("");
   const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
@@ -52,18 +49,6 @@ export default function FactoryContainerCreate() {
   const removeOtherChargeLine = (idx: number) => {
     setOtherChargeLines(prev => prev.filter((_, i) => i !== idx));
   };
-
-  useEffect(() => {
-    if (currency === "USD") {
-      setFxRate("1");
-      setFxEffectiveDate("");
-      return;
-    }
-    fetch(`/api/factory/fx-rates/latest/${currency}`)
-      .then(res => { if (res.ok) return res.json(); throw new Error("No rate"); })
-      .then(data => { if (data?.rate) { setFxRate(String(data.rate)); setFxEffectiveDate(data.effectiveDate || ""); } })
-      .catch(() => {});
-  }, [currency]);
 
   useEffect(() => {
     setFormData(f => ({ ...f, commissionCurrencyCode: currency }));
@@ -105,8 +90,8 @@ export default function FactoryContainerCreate() {
         notes: formData.notes || null,
         status: "PENDING",
         currencyCode: currency,
-        fxRateToUsd: fxRate,
-        fxRateSource,
+        fxRateToUsd: "1",
+        fxRateSource: "manual",
         totalKg: totalKg || null,
         ratePerKg: ratePerKg || null,
         commissionAmount: formData.commissionAmount || "0",
@@ -323,49 +308,7 @@ export default function FactoryContainerCreate() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label>
-                  FX Rate{" "}
-                  {currency !== "USD" ? (
-                    fxRateSource === "auto"
-                      ? `(Auto${fxEffectiveDate ? ` — ${fxEffectiveDate}` : ""})`
-                      : "(Manual)"
-                  ) : ""}
-                </Label>
-                {currency !== "USD" && (
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground underline"
-                    onClick={() => setFxRateSource(fxRateSource === "auto" ? "manual" : "auto")}
-                    data-testid="button-toggle-fx-source"
-                  >
-                    {fxRateSource === "auto" ? "Switch to Manual" : "Switch to Auto"}
-                  </button>
-                )}
-              </div>
-              <Input
-                type="number"
-                value={fxRate}
-                onChange={e => setFxRate(e.target.value)}
-                disabled={currency === "USD" || fxRateSource === "auto"}
-                readOnly={currency !== "USD" && fxRateSource === "auto"}
-                placeholder="1"
-                data-testid="input-container-fx-rate"
-              />
-            </div>
           </div>
-
-          {currency !== "USD" && fxRate && parseFloat(fxRate) > 0 && (
-            <p className="text-sm text-muted-foreground">
-              1 {currency} = {formatNumber(parseFloat(fxRate))} USD
-              &nbsp;&nbsp;·&nbsp;&nbsp;
-              1 USD = {formatNumber(1 / parseFloat(fxRate))} {currency}
-              {ratePerKg && (
-                <span> &nbsp;&nbsp;·&nbsp;&nbsp; Rate/Kg ≈ {formatNumber(parseFloat(ratePerKg) * parseFloat(fxRate))} USD</span>
-              )}
-            </p>
-          )}
 
           <Separator />
 
@@ -531,11 +474,8 @@ export default function FactoryContainerCreate() {
               </div>
             ))}
             {otherChargeLines.length > 0 && (
-              <div className="text-xs text-muted-foreground text-right pt-1 space-y-0.5">
+              <div className="text-xs text-muted-foreground text-right pt-1">
                 <div>Total: {currency} {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0))}</div>
-                {currency !== "USD" && fxRate && parseFloat(fxRate) > 0 && (
-                  <div>= {formatNumber(otherChargeLines.reduce((s, l) => s + parseFloat(l.amount || "0"), 0) * parseFloat(fxRate))} USD</div>
-                )}
               </div>
             )}
           </div>
