@@ -30,6 +30,7 @@ import {
   TableProperties,
   ExternalLink,
   AlertTriangle,
+  Tag,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import {
@@ -115,6 +116,7 @@ const navEntries: NavEntry[] = [
     items: [
       { title: "POS", url: "/pos", icon: ShoppingCart },
       { title: "POS Daybook", url: "/pos-daybook", icon: Book },
+      { title: "Price List", url: "/price-list", icon: Tag },
     ],
   },
   {
@@ -206,6 +208,11 @@ export function AppSidebar({ user }: { user?: any }) {
 
     // Chat is always visible to all non-POS users
     if (item.url === "/chat") {
+      return !isPOSUser;
+    }
+
+    // Price List is visible to all non-POS users
+    if (item.url === "/price-list") {
       return !isPOSUser;
     }
 

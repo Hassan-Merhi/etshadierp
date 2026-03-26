@@ -247,6 +247,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/bale-ledger" component={BaleLedger} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/pos-price-list">{() => <POSPriceList />}</Route>
+      <Route path="/price-list">{() => <POSPriceList />}</Route>
       <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />
       <Route path="/containers/:containerId/verification" component={ContainerVerification} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
