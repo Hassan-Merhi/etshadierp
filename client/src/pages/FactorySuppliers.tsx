@@ -2023,6 +2023,13 @@ export default function FactorySuppliers() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete confirmation for FX transfers (must live inside this early-return block) */}
+        <DeleteConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+          onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        />
       </div>
     );
   }
