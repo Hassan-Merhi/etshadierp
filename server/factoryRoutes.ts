@@ -6268,6 +6268,32 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Double-entry accounting vouchers for Freight
+      // Before posting the offload freight voucher, delete any existing FACTORY-FREIGHT
+      // vouchers and daybook entries created at container-creation time. This prevents
+      // freight from being double-posted (once on creation, once on offload).
+      {
+        const existingFreightVouchers = await db
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY"),
+            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
+          ));
+        if (existingFreightVouchers.length > 0) {
+          const vIds = existingFreightVouchers.map((v: any) => v.id);
+          await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+          await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+        }
+        // Also delete any FREIGHT-type daybook entries linked to this container
+        // that were written at creation time, so they don't duplicate the offload entry.
+        await db.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          eq(factoryDaybookEntries.txType, "FREIGHT"),
+          eq(factoryDaybookEntries.referenceId, containerId)
+        ));
+      }
+
       if (freightVal > 0 && (reqFreightAccountId || reqFreightSupplierId)) {
         const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
         const freightVoucherCcy = reqFreightCurrencyCode || currencyCode;
