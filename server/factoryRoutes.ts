@@ -5016,7 +5016,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             AND foac.company_id = ${factoryContainers.companyId}
           ), 0)`,
           preRegisteredChargesSum: sql<string>`COALESCE((
-            SELECT SUM(fcoc.amount::numeric)
+            SELECT SUM(
+              CASE
+                WHEN COALESCE(fcoc.currency_code, 'USD') = COALESCE(${factoryContainers.currencyCode}, 'USD')
+                  THEN fcoc.amount::numeric
+                WHEN COALESCE(fcoc.currency_code, 'USD') = 'USD'
+                  THEN fcoc.amount::numeric / NULLIF(COALESCE(${factoryContainers.fxRateToUsd}, '1')::numeric, 0)
+                ELSE fcoc.amount::numeric
+              END
+            )
             FROM factory_container_other_charges fcoc
             WHERE fcoc.container_id = ${factoryContainers.id}
             AND fcoc.company_id = ${factoryContainers.companyId}

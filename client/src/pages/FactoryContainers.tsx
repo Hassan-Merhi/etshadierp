@@ -820,7 +820,7 @@ export default function FactoryContainers() {
                                 <div>Freight: {freightCcy} {formatNumber(freightAmt)}</div>
                               )}
                               {(legacyOtherAmt + preRegisteredAmt) > 0 && (
-                                <div>Other: {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
+                                <div>Other: {ccy} {formatNumber(legacyOtherAmt + preRegisteredAmt)}</div>
                               )}
                               {additionalAmt > 0 && (
                                 <div>Additional: {ccy} {formatNumber(additionalAmt)}</div>
