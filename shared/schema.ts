@@ -2829,6 +2829,7 @@ export const customerProformaLines = pgTable("customer_proforma_lines", {
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull().default(0),
   pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
+  priceFixed: boolean("price_fixed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   proformaIdx: index("customer_proforma_lines_proforma_idx").on(t.proformaId),

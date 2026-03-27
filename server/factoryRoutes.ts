@@ -11801,7 +11801,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       let updated = 0;
       let skipped = 0;
+      let fixed = 0;
       for (const line of lines) {
+        if ((line as any).priceFixed) { fixed++; continue; }
         const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
         if (newPrice) {
           await db.update(customerProformaLines)
@@ -11813,9 +11815,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
-      res.json({ updated, skipped });
+      res.json({ updated, skipped, fixed });
     } catch (error: any) {
       console.error("Error applying catalog prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle price_fixed flag on a proforma line
+  app.patch("/api/factory/customer-proforma-lines/:lineId/toggle-fixed", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const lineId = parseInt(req.params.lineId);
+      const [line] = await db.select().from(customerProformaLines).where(eq(customerProformaLines.id, lineId)).limit(1);
+      if (!line) return res.status(404).json({ message: "Line not found" });
+      const [updated] = await db.update(customerProformaLines)
+        .set({ priceFixed: !(line as any).priceFixed })
+        .where(eq(customerProformaLines.id, lineId))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

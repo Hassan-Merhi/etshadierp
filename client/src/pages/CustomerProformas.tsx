@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Lock, LockOpen } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 
@@ -24,6 +24,7 @@ interface ProformaLine {
   productName: string;
   quantity: number;
   pricePerBale: string;
+  priceFixed?: boolean;
   weightPerBaleKg?: string | null;
 }
 
@@ -190,10 +191,26 @@ export default function CustomerProformas() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
-      const msg = result.skipped > 0
-        ? `${result.updated} line(s) updated, ${result.skipped} skipped (no catalog price)`
-        : `${result.updated} line(s) updated with catalog prices`;
-      toast({ title: "Prices Applied", description: msg });
+      const parts: string[] = [];
+      if (result.updated) parts.push(`${result.updated} line(s) updated`);
+      if (result.skipped) parts.push(`${result.skipped} skipped (no catalog price)`);
+      if (result.fixed) parts.push(`${result.fixed} locked (price fixed)`);
+      toast({ title: "Prices Applied", description: parts.join(", ") || "No changes made" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleFixedMutation = useMutation({
+    mutationFn: async (lineId: number) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-proforma-lines/${lineId}/toggle-fixed`, {});
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -432,7 +449,7 @@ export default function CustomerProformas() {
                                 <TableHead className="text-right">Qty</TableHead>
                                 <TableHead className="text-right">Kg/Bale</TableHead>
                                 <TableHead className="text-right">Price/Bale</TableHead>
-                                <TableHead className="w-[80px]"></TableHead>
+                                <TableHead className="w-[100px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -451,10 +468,28 @@ export default function CustomerProformas() {
                                     {(() => { const w = parseFloat(line.weightPerBaleKg || "0"); return w % 1 === 0 ? w.toLocaleString() : w.toFixed(2); })()}
                                   </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
-                                    {formatAmount(parseFloat(line.pricePerBale))}
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {line.priceFixed && (
+                                        <Lock className="h-3 w-3 text-amber-500 shrink-0" />
+                                      )}
+                                      <span>{formatAmount(parseFloat(line.pricePerBale))}</span>
+                                    </div>
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        title={line.priceFixed ? "Price is locked — click to unlock" : "Lock this price (won't change on Apply Catalog Prices)"}
+                                        onClick={() => toggleFixedMutation.mutate(line.id)}
+                                        disabled={toggleFixedMutation.isPending}
+                                        data-testid={`button-toggle-fixed-${line.id}`}
+                                      >
+                                        {line.priceFixed
+                                          ? <Lock className="h-3 w-3 text-amber-500" />
+                                          : <LockOpen className="h-3 w-3 text-muted-foreground" />
+                                        }
+                                      </Button>
                                       <Button
                                         variant="ghost"
                                         size="icon"
