@@ -17096,7 +17096,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       const userId = (req.session as any).userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { locationId, customerName, notes, txDate, currencyCode, cashAccountId, items } = req.body;
+      const { locationId, customerName, notes, txDate, currencyCode, cashAccountId, items, expenses } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
@@ -17108,6 +17108,19 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       }
 
       const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
+
+      // Expense deductions (optional array of {accountId, description, amount})
+      const expenseRows: Array<{ accountId: number; description: string; amount: number }> = [];
+      if (Array.isArray(expenses)) {
+        for (const exp of expenses) {
+          const amt = parseFloat(exp.amount || "0");
+          if (amt > 0 && exp.accountId) {
+            expenseRows.push({ accountId: parseInt(exp.accountId), description: exp.description || "", amount: amt });
+          }
+        }
+      }
+      const totalExpenses = expenseRows.reduce((s, e) => s + e.amount, 0);
+      const netCash = totalAmount - totalExpenses;
 
       // Generate sale number
       const [seqRow] = await db.select({ count: sql<number>`count(*)` }).from(factoryPosSales).where(eq(factoryPosSales.companyId, companyId));
@@ -17128,6 +17141,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           cashAccountId: cashAccountId || null,
           status: "COMPLETED",
           createdBy: userId,
+          expensesJson: expenseRows.length > 0 ? JSON.stringify(expenseRows) : null,
         }).returning();
 
         // 2. Create sale items
@@ -17183,7 +17197,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
           createdBy: userId,
         });
 
-        // 5. Create ERP voucher for cash account (DR Cash / CR Factory Sales Income)
+        // 5. Create ERP voucher for cash account (DR Cash / DR Expenses / CR Factory Sales Income)
         if (cashAccountId) {
           const voucherNum = `FPOS-${sale.id}-${Date.now()}`;
           const [vch] = await tx.insert(vouchers).values({
@@ -17197,15 +17211,25 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
             exchangeRate: "1",
             sourceModule: "FACTORY_POS",
           }).returning();
-          // DR Cash
+          // DR Cash (net after expense deductions)
           await tx.insert(voucherEntries).values({
             voucherId: vch.id,
             ledgerAccountId: cashAccountId,
-            debitAmount: totalAmount.toFixed(2),
+            debitAmount: netCash.toFixed(2),
             creditAmount: "0",
             narration: `Factory POS cash receipt – ${saleNumber}`,
           });
-          // CR Factory Sales Income
+          // DR each expense account
+          for (const exp of expenseRows) {
+            await tx.insert(voucherEntries).values({
+              voucherId: vch.id,
+              ledgerAccountId: exp.accountId,
+              debitAmount: exp.amount.toFixed(2),
+              creditAmount: "0",
+              narration: exp.description || `POS deduction – ${saleNumber}`,
+            });
+          }
+          // CR Factory Sales Income (gross sales amount)
           const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
           await tx.insert(voucherEntries).values({
             voucherId: vch.id,

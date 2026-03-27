@@ -48,6 +48,7 @@ interface CartRow {
   availableQty: number;
   quantity: number;
   unitPrice: number;
+  weightPerBale: number;
 }
 
 interface InventoryItem {
@@ -56,7 +57,15 @@ interface InventoryItem {
   articleCode: string;
   category: string | null;
   quantity: number;
+  totalWeight: number;
   sellingPrice: string;
+}
+
+interface ExpenseRow {
+  id: string;
+  accountId: string;
+  description: string;
+  amount: string;
 }
 
 function emptyRow(id?: string): CartRow {
@@ -68,6 +77,7 @@ function emptyRow(id?: string): CartRow {
     availableQty: 0,
     quantity: 1,
     unitPrice: 0,
+    weightPerBale: 0,
   };
 }
 
@@ -98,6 +108,7 @@ export default function FactoryPOS() {
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [cashAccountId, setCashAccountId] = useState<string>("");
   const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
+  const [expenseRows, setExpenseRows]   = useState<ExpenseRow[]>([]);
   const [search, setSearch]             = useState("");
   const [savedSale, setSavedSale]       = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -165,6 +176,7 @@ export default function FactoryPOS() {
         availableQty: item.quantity,
         quantity: 1,
         unitPrice: parseFloat(item.sellingPrice || "0"),
+        weightPerBale: item.quantity > 0 ? (item.totalWeight || 0) / item.quantity : 0,
       };
       const lastRow = prev[prev.length - 1];
       if (lastRow && !lastRow.productId) {
@@ -189,6 +201,7 @@ export default function FactoryPOS() {
         availableQty: item.quantity,
         quantity: 1,
         unitPrice: parseFloat(item.sellingPrice || "0"),
+        weightPerBale: item.quantity > 0 ? (item.totalWeight || 0) / item.quantity : 0,
       };
       const arr = [...prev];
       arr.splice(targetIdx, 0, newRow);
@@ -228,7 +241,16 @@ export default function FactoryPOS() {
   const validRows = rows.filter(r => r.productId && r.quantity > 0);
   const total = validRows.reduce((s, r) => s + r.quantity * r.unitPrice, 0);
   const totalQty = validRows.reduce((s, r) => s + r.quantity, 0);
+  const totalWeight = validRows.reduce((s, r) => s + r.quantity * r.weightPerBale, 0);
+  const totalExpenseAmount = expenseRows.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const netTotal = total - totalExpenseAmount;
   const ccPrefix = currencyCode !== "USD" ? `${currencyCode} ` : "$";
+
+  // Expense row helpers
+  const addExpenseRow = () => setExpenseRows(prev => [...prev, { id: String(Date.now()), accountId: "", description: "", amount: "" }]);
+  const removeExpenseRow = (idx: number) => setExpenseRows(prev => prev.filter((_, i) => i !== idx));
+  const updateExpenseRow = (idx: number, field: keyof ExpenseRow, value: string) =>
+    setExpenseRows(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
 
   // ---- Print ----
   const fmtPrint = (n: number, prefix = "") => {
@@ -254,8 +276,24 @@ export default function FactoryPOS() {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory", locationId] });
-      setSavedSale({ ...data, cartRows: validRows, customerName, notes, currencyCode, total, txDate, companyName: selectedCompany?.name || "" });
+      const snapshotExpenses = expenseRows
+        .map(e => ({ ...e, accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId }))
+        .filter(e => parseFloat(e.amount) > 0 && e.accountId);
+      setSavedSale({
+        ...data,
+        cartRows: validRows,
+        customerName,
+        notes,
+        currencyCode,
+        total,
+        totalWeight,
+        expenses: snapshotExpenses,
+        netTotal: total - snapshotExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0),
+        txDate,
+        companyName: selectedCompany?.name || "",
+      });
       setRows([emptyRow()]);
+      setExpenseRows([]);
       setCustomerName("");
       setNotes("");
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
@@ -282,6 +320,8 @@ export default function FactoryPOS() {
   const handleSubmit = () => {
     if (!locationId) return toast({ title: "Select a location", variant: "destructive" });
     if (validRows.length === 0) return toast({ title: "No items in sale", variant: "destructive" });
+    const validExpenses = expenseRows.filter(e => parseFloat(e.amount) > 0 && e.accountId);
+    if (totalExpenseAmount > total) return toast({ title: "Deductions exceed sales total", variant: "destructive" });
     saleMutation.mutate({
       locationId: parseInt(locationId),
       customerName: customerName || null,
@@ -295,6 +335,11 @@ export default function FactoryPOS() {
         articleCode: r.articleCode,
         quantity: r.quantity,
         unitPrice: String(r.unitPrice),
+      })),
+      expenses: validExpenses.map(e => ({
+        accountId: e.accountId,
+        description: e.description,
+        amount: e.amount,
       })),
     });
   };
@@ -461,10 +506,18 @@ export default function FactoryPOS() {
         <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2 mt-2">
           <span className="text-xs text-muted-foreground">
             {validRows.length} items · Qty {totalQty}
+            {totalWeight > 0 && ` · ${formatNum(totalWeight)} kg`}
           </span>
-          <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">
-            {ccPrefix}{formatNum(total)}
-          </span>
+          <div className="text-right">
+            {totalExpenseAmount > 0 ? (
+              <>
+                <div className="text-xs text-muted-foreground line-through font-mono">{ccPrefix}{formatNum(total)}</div>
+                <div className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">{ccPrefix}{formatNum(netTotal)}</div>
+              </>
+            ) : (
+              <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">{ccPrefix}{formatNum(total)}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -532,7 +585,7 @@ export default function FactoryPOS() {
                             value={
                               !row.productId ? "" :
                               col.key === "quantity" ? row.quantity :
-                              row.unitPrice === 0 ? "" : row.unitPrice
+                              row.unitPrice
                             }
                             onChange={e => row.productId && updateRow(idx, col.key as "quantity" | "unitPrice", e.target.value)}
                             readOnly={!row.productId}
@@ -549,19 +602,82 @@ export default function FactoryPOS() {
           </div>
 
           {/* Total Section */}
-          <div className="border-t border-muted bg-muted/20 p-4">
+          <div className="border-t border-muted bg-muted/20 p-4 space-y-3">
+            {/* Summary row */}
             <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-lg ml-auto">
-              <div className="flex items-center justify-between sm:justify-start gap-2 text-sm">
+              <div className="flex items-center justify-between sm:justify-start gap-2 text-sm flex-wrap">
                 <span className="text-muted-foreground">Items:</span>
                 <span className="font-mono">{validRows.length}</span>
                 <span className="text-muted-foreground ml-2">Qty:</span>
                 <span className="font-mono" data-testid="text-total-qty">{totalQty}</span>
+                {totalWeight > 0 && (
+                  <>
+                    <span className="text-muted-foreground ml-2">Wt:</span>
+                    <span className="font-mono" data-testid="text-total-weight">{formatNum(totalWeight)} kg</span>
+                  </>
+                )}
               </div>
               <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-lg font-medium">Total:</span>
                 <span className="text-2xl font-semibold font-mono" data-testid="text-grand-total">
                   {ccPrefix}{formatNum(total)}
                 </span>
+              </div>
+            </div>
+
+            {/* Expense deductions */}
+            <div className="sm:max-w-lg ml-auto space-y-2">
+              {expenseRows.map((exp, idx) => (
+                <div key={exp.id} className="flex gap-2 items-center">
+                  <Select value={exp.accountId} onValueChange={v => updateExpenseRow(idx, "accountId", v)}>
+                    <SelectTrigger className="flex-1 min-w-0" data-testid={`select-expense-account-${idx}`}>
+                      <SelectValue placeholder="Expense account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(ledgerAccounts || []).map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Description"
+                    value={exp.description}
+                    onChange={e => updateExpenseRow(idx, "description", e.target.value)}
+                    className="w-28 shrink-0"
+                    data-testid={`input-expense-description-${idx}`}
+                  />
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="Amount"
+                    value={exp.amount}
+                    onChange={e => updateExpenseRow(idx, "amount", e.target.value)}
+                    className="w-24 shrink-0 text-right font-mono"
+                    data-testid={`input-expense-amount-${idx}`}
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => removeExpenseRow(idx)} data-testid={`button-remove-expense-${idx}`}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Button variant="ghost" size="sm" onClick={addExpenseRow} className="text-muted-foreground" data-testid="button-add-deduction">
+                  <Plus className="h-3.5 w-3.5 mr-1" />Add Deduction
+                </Button>
+                {totalExpenseAmount > 0 && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Deductions:</span>
+                      <span className="font-mono text-destructive">-{ccPrefix}{formatNum(totalExpenseAmount)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-medium">Net Cash:</span>
+                      <span className="text-xl font-semibold font-mono" data-testid="text-net-total">
+                        {ccPrefix}{formatNum(netTotal)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -758,7 +874,7 @@ export default function FactoryPOS() {
                   <Input
                     type="number"
                     inputMode="decimal"
-                    value={mobileRow.unitPrice === 0 ? "" : mobileRow.unitPrice}
+                    value={mobileRow.unitPrice}
                     onChange={e => updateRow(mobileRowEditIdx, "unitPrice", e.target.value)}
                     className="text-right font-mono h-12 text-lg"
                     placeholder="0"
@@ -805,9 +921,9 @@ export default function FactoryPOS() {
       {/* ── MOBILE: Sticky save bar ── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-3 py-2 flex items-center gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-xs text-muted-foreground">{validRows.length} items · Qty {totalQty}</div>
+          <div className="text-xs text-muted-foreground">{validRows.length} items · Qty {totalQty}{totalWeight > 0 ? ` · ${formatNum(totalWeight)} kg` : ""}</div>
           <div className="text-base font-semibold font-mono leading-tight" data-testid="text-sticky-total">
-            {ccPrefix}{formatNum(total)}
+            {totalExpenseAmount > 0 ? `${ccPrefix}${formatNum(netTotal)} (net)` : `${ccPrefix}${formatNum(total)}`}
           </div>
         </div>
         <Button
@@ -870,50 +986,93 @@ export default function FactoryPOS() {
               )}
 
               {/* Items table */}
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "0", fontVariantNumeric: "tabular-nums", border: "1px solid #999" }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left",    padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>Description</th>
-                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "8%" }}>Qty</th>
-                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "14%" }}>Rate</th>
-                    <th style={{ textAlign: "center",  padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "16%" }}>Amt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(savedSale?.cartRows ?? []).map((row: CartRow, idx: number) => {
-                    const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
-                    return (
-                      <tr key={idx} style={{ backgroundColor: rowBg }}>
-                        <td style={{ padding: "2px 5px", verticalAlign: "top", fontWeight: "600", lineHeight: "1.2", fontSize: "7pt", border: "1px solid #c8c8c8" }}>
-                          {row.productName}
-                          {row.articleCode ? <span style={{ color: "#666", fontSize: "6.5pt" }}> ({row.articleCode})</span> : null}
-                        </td>
-                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrint(row.quantity)}</td>
-                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.unitPrice)}</td>
-                        <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.quantity * row.unitPrice)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td style={{ padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>TOTAL</td>
-                    <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>
-                      {fmtPrint((savedSale?.cartRows ?? []).reduce((s: number, r: CartRow) => s + r.quantity, 0))}
-                    </td>
-                    <td style={{ padding: "2px 5px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                    <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>
-                      {fmtPrintAmt(savedSale?.total ?? 0)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+              {(() => {
+                const printRows: CartRow[] = savedSale?.cartRows ?? [];
+                const hasPrintWeight = printRows.some((r: CartRow) => r.weightPerBale > 0);
+                const printTotalQty = printRows.reduce((s: number, r: CartRow) => s + r.quantity, 0);
+                const printTotalWeight = printRows.reduce((s: number, r: CartRow) => s + r.quantity * r.weightPerBale, 0);
+                const printExpenses: any[] = savedSale?.expenses ?? [];
+                const printNetTotal: number = savedSale?.netTotal ?? savedSale?.total ?? 0;
+                return (
+                  <>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "0", fontVariantNumeric: "tabular-nums", border: "1px solid #999" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>Description</th>
+                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "8%" }}>Qty</th>
+                          {hasPrintWeight && <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "12%" }}>Wt (kg)</th>}
+                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "14%" }}>Rate</th>
+                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "16%" }}>Amt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {printRows.map((row: CartRow, idx: number) => {
+                          const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
+                          const rowWeight = row.quantity * row.weightPerBale;
+                          return (
+                            <tr key={idx} style={{ backgroundColor: rowBg }}>
+                              <td style={{ padding: "2px 5px", verticalAlign: "top", fontWeight: "600", lineHeight: "1.2", fontSize: "7pt", border: "1px solid #c8c8c8" }}>
+                                {row.productName}
+                                {row.articleCode ? <span style={{ color: "#666", fontSize: "6.5pt" }}> ({row.articleCode})</span> : null}
+                              </td>
+                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrint(row.quantity)}</td>
+                              {hasPrintWeight && <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{rowWeight > 0 ? fmtPrint(rowWeight) : "—"}</td>}
+                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.unitPrice)}</td>
+                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.quantity * row.unitPrice)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td style={{ padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>TOTAL</td>
+                          <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrint(printTotalQty)}</td>
+                          {hasPrintWeight && <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrint(printTotalWeight)}</td>}
+                          <td style={{ padding: "2px 5px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                          <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrintAmt(savedSale?.total ?? 0)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
 
-              {/* Total Paid */}
-              <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "5px", paddingTop: "5px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
-                <span>TOTAL PAID:</span>
-                <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
-              </div>
+                    {/* Expense deductions on receipt */}
+                    {printExpenses.length > 0 && (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginTop: "3px", fontVariantNumeric: "tabular-nums" }}>
+                        <tbody>
+                          {printExpenses.map((exp: any, idx: number) => (
+                            <tr key={idx}>
+                              <td style={{ padding: "2px 5px", fontSize: "7pt", fontWeight: "600", color: "#333" }}>
+                                {exp.description || exp.accountName || "Deduction"}
+                              </td>
+                              <td style={{ textAlign: "right", padding: "2px 5px", fontSize: "7pt", fontWeight: "700", color: "#c00" }}>
+                                -{fmtPrintAmt(parseFloat(exp.amount))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+
+                    {/* Total Paid / Net Cash */}
+                    {printExpenses.length > 0 ? (
+                      <>
+                        <div style={{ fontSize: "9pt", fontWeight: "700", marginTop: "4px", paddingTop: "4px", borderTop: "1px solid #ccc", display: "flex", justifyContent: "space-between", color: "#555" }}>
+                          <span>SALES TOTAL:</span>
+                          <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
+                        </div>
+                        <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "3px", paddingTop: "3px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
+                          <span>NET CASH RECEIVED:</span>
+                          <span>{fmtPrintAmt(printNetTotal)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "5px", paddingTop: "5px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
+                        <span>TOTAL PAID:</span>
+                        <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Notes */}
               {savedSale?.notes && (

@@ -4004,6 +4004,7 @@ export const factoryPosSales = pgTable("factory_pos_sales", {
   status: text("status").notNull().default("COMPLETED"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  expensesJson: text("expenses_json"),
 });
 
 export const insertFactoryPosSaleSchema = createInsertSchema(factoryPosSales).omit({ id: true, createdAt: true }).extend({
