@@ -57,6 +57,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -191,6 +192,23 @@ function getThisMonthRange() {
   return { start, end };
 }
 
+const EMP_AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
+];
+function getEmpAvatarColor(name: string) {
+  let hash = 0;
+  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return EMP_AVATAR_COLORS[Math.abs(hash) % EMP_AVATAR_COLORS.length];
+}
+function getEmpInitials(firstName: string, lastName: string) {
+  return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+}
+
 export default function Payroll() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -201,6 +219,8 @@ export default function Payroll() {
     return text.replace(/\s*-\s*[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{5,}\s*$/i, "").trim();
   };
   const [selectedTab, setSelectedTab] = useState("employees");
+  const [empSearch, setEmpSearch] = useState("");
+  const [empStatusFilter, setEmpStatusFilter] = useState("Active");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
   const [bonusTab, setBonusTab] = useState<"sales" | "bales">("sales");
@@ -606,7 +626,21 @@ export default function Payroll() {
     () => employees?.filter((emp) => emp.employeeType === "Employee") || [],
     [employees]
   );
-  
+
+  const filteredEmployeeStaff = useMemo(() => {
+    return employeeStaff.filter((emp) => {
+      const matchesSearch = !empSearch ||
+        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(empSearch.toLowerCase()) ||
+        (emp.code || "").toLowerCase().includes(empSearch.toLowerCase()) ||
+        (emp.department || "").toLowerCase().includes(empSearch.toLowerCase());
+      const matchesStatus =
+        empStatusFilter === "All" ||
+        (empStatusFilter === "Active" && emp.active) ||
+        (empStatusFilter === "Inactive" && !emp.active);
+      return matchesSearch && matchesStatus;
+    });
+  }, [employeeStaff, empSearch, empStatusFilter]);
+
   const workerStaff = useMemo(
     () => employees?.filter((emp) => emp.employeeType === "Worker") || [],
     [employees]
@@ -1737,24 +1771,39 @@ export default function Payroll() {
 
         <div className="flex-1 min-w-0">
         {selectedTab === "employees" && (
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Warehouse Staff (Employees)</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Employees maintain running balance accounts. Deposit salary to increase balance, withdraw to decrease.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setCreateEmployeeDialogOpen(true)}
-                  data-testid="button-create-employee"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Employee
-                </Button>
+          <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[180px]">
+                <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search employees..."
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-employee-search"
+                />
               </div>
+              <div className="flex gap-1">
+                {["Active", "Inactive", "All"].map((s) => (
+                  <Button
+                    key={s}
+                    size="sm"
+                    variant={empStatusFilter === s ? "default" : "outline"}
+                    onClick={() => setEmpStatusFilter(s)}
+                    data-testid={`button-emp-filter-${s.toLowerCase()}`}
+                  >
+                    {s}
+                  </Button>
+                ))}
+              </div>
+              <Button size="sm" onClick={() => setCreateEmployeeDialogOpen(true)} data-testid="button-create-employee">
+                <Plus className="h-4 w-4 mr-2" />
+                New Employee
+              </Button>
+            </div>
 
+            <div className="space-y-4">
               {/* Payroll Actions */}
               {employeeStaff.length > 0 && (
                 <div className="rounded-md border bg-muted/30 p-4">
@@ -1813,103 +1862,83 @@ export default function Payroll() {
                   <p>No employees found</p>
                   <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
                 </div>
+              ) : filteredEmployeeStaff.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>No employees match your search</p>
+                </div>
               ) : (
-                <>
-                <div className="hidden md:block border rounded-md overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead data-testid="header-name" className="sticky left-0 bg-muted z-10">Name</TableHead>
-                        <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
-                        <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
-                        <TableHead data-testid="header-total-deposits" className="text-right">Deposits</TableHead>
-                        <TableHead data-testid="header-total-withdrawals" className="text-right">Withdrawals</TableHead>
-                        <TableHead data-testid="header-status">Status</TableHead>
-                        <TableHead data-testid="header-actions" className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {employeeStaff.map((employee) => {
-                        // Use the calculated balance from the API
-                        const balance = parseFloat(employee.calculatedBalance || "0");
-                        
-                        return (
-                        <TableRow 
-                          key={employee.id} 
-                          data-testid={`row-employee-${employee.id}`}
-                        >
-                          <TableCell data-testid={`cell-name-${employee.id}`} className="sticky left-0 bg-background z-10">
-                            <button
-                              onClick={() => setStatementEmployee(employee)}
-                              className="flex items-center gap-1 font-medium hover:underline cursor-pointer whitespace-nowrap"
-                              data-testid={`link-employee-statement-${employee.id}`}
-                            >
-                              <Receipt className="h-3 w-3 text-muted-foreground" />
-                              {employee.firstName} {employee.lastName}
-                            </button>
-                          </TableCell>
-                          <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
-                            {formatAmount(parseFloat(employee.monthlySalary))}
-                          </TableCell>
-                          <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono font-semibold">
-                            {formatAmount(balance)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {formatAmount(parseFloat(employee.totalDeposits || "0"))}
-                          </TableCell>
-                          <TableCell data-testid={`cell-withdrawals-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {formatAmount(parseFloat(employee.totalWithdrawals || "0"))}
-                          </TableCell>
-                          <TableCell data-testid={`cell-status-${employee.id}`}>
-                            <Badge variant={employee.active ? "default" : "secondary"}>
-                              {employee.active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell data-testid={`cell-actions-${employee.id}`} className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeposit(employee)}
-                                data-testid={`button-deposit-${employee.id}`}
-                              >
-                                <TrendingUp className="h-4 w-4 mr-1" />
-                                Deposit
+                <div className="space-y-3">
+                  {filteredEmployeeStaff.map((employee) => {
+                    const balance = parseFloat(employee.calculatedBalance || "0");
+                    const initials = getEmpInitials(employee.firstName, employee.lastName);
+                    const avatarColor = getEmpAvatarColor(`${employee.firstName}${employee.lastName}`);
+                    return (
+                      <Card key={employee.id} data-testid={`card-employee-${employee.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <Avatar className="h-11 w-11 shrink-0">
+                              <AvatarFallback className={`text-sm font-semibold ${avatarColor}`}>
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                <button
+                                  onClick={() => setStatementEmployee(employee)}
+                                  className="font-semibold text-sm hover:underline cursor-pointer"
+                                  data-testid={`link-employee-statement-${employee.id}`}
+                                >
+                                  {employee.firstName} {employee.lastName}
+                                </button>
+                                {employee.code && (
+                                  <Badge variant="outline" className="text-xs font-mono">
+                                    {employee.code}
+                                  </Badge>
+                                )}
+                                {!employee.active && (
+                                  <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                                )}
+                              </div>
+                              {employee.department && (
+                                <p className="text-xs text-muted-foreground">{employee.department}</p>
+                              )}
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div>
+                                  <span className="text-xs text-muted-foreground block">Monthly Salary</span>
+                                  <span className="font-mono text-sm">{formatAmount(parseFloat(employee.monthlySalary))}</span>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-muted-foreground block">Balance</span>
+                                  <span className={`font-mono font-semibold text-sm ${balance >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                                    {formatAmount(balance)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-muted-foreground block">Total Deposits</span>
+                                  <span className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</span>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-muted-foreground block">Withdrawals</span>
+                                  <span className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 shrink-0">
+                              <Button size="sm" variant="outline" onClick={() => handleDeposit(employee)} data-testid={`button-deposit-${employee.id}`}>
+                                <TrendingUp className="h-3.5 w-3.5 mr-1" /> Deposit
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleBonus(employee)}
-                                data-testid={`button-bonus-${employee.id}`}
-                              >
-                                <DollarSign className="h-4 w-4 mr-1" />
-                                Bonus
+                              <Button size="sm" variant="outline" onClick={() => handleBonus(employee)} data-testid={`button-bonus-${employee.id}`}>
+                                <DollarSign className="h-3.5 w-3.5 mr-1" /> Bonus
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleWithdrawal(employee)}
-                                data-testid={`button-withdraw-${employee.id}`}
-                              >
-                                <TrendingDown className="h-4 w-4 mr-1" />
-                                Withdraw
+                              <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-${employee.id}`}>
+                                <TrendingDown className="h-3.5 w-3.5 mr-1" /> Withdraw
                               </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => { setEditingEmployee(employee); setEditEmployeeDialogOpen(true); }}
-                                data-testid={`button-edit-employee-${employee.id}`}
-                              >
+                              <Button size="icon" variant="ghost" onClick={() => { setEditingEmployee(employee); setEditEmployeeDialogOpen(true); }} data-testid={`button-edit-${employee.id}`}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <ConfirmationDialog
                                 trigger={
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="text-destructive"
-                                    data-testid={`button-delete-${employee.id}`}
-                                  >
+                                  <Button size="icon" variant="ghost" className="text-destructive" data-testid={`button-delete-${employee.id}`}>
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 }
@@ -1920,87 +1949,15 @@ export default function Payroll() {
                                 onConfirm={() => handleDeleteEmployee(employee)}
                               />
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="md:hidden space-y-3">
-                  {employeeStaff.map((employee) => {
-                    const balance = parseFloat(employee.calculatedBalance || "0");
-                    return (
-                      <Card key={employee.id} data-testid={`card-employee-${employee.id}`}>
-                        <CardContent className="p-4 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <button
-                                onClick={() => setStatementEmployee(employee)}
-                                className="flex items-center gap-1 font-medium hover:underline cursor-pointer"
-                                data-testid={`link-employee-statement-mobile-${employee.id}`}
-                              >
-                                <Receipt className="h-3 w-3 text-muted-foreground" />
-                                {employee.firstName} {employee.lastName}
-                              </button>
-                            </div>
-                            <Badge variant={employee.active ? "default" : "secondary"}>
-                              {employee.active ? "Active" : "Inactive"}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span className="text-muted-foreground block">Monthly Salary</span>
-                              <span className="font-mono">{formatAmount(parseFloat(employee.monthlySalary))}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-muted-foreground block">Balance</span>
-                              <span className="font-mono font-semibold">{formatAmount(balance)}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground block">Deposits</span>
-                              <span className="font-mono text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-muted-foreground block">Withdrawals</span>
-                              <span className="font-mono text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2 pt-1 border-t">
-                            <Button size="sm" variant="outline" onClick={() => handleDeposit(employee)} data-testid={`button-deposit-mobile-${employee.id}`}>
-                              <TrendingUp className="h-4 w-4 mr-1" /> Deposit
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleBonus(employee)} data-testid={`button-bonus-mobile-${employee.id}`}>
-                              <DollarSign className="h-4 w-4 mr-1" /> Bonus
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-mobile-${employee.id}`}>
-                              <TrendingDown className="h-4 w-4 mr-1" /> Withdraw
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => { setEditingEmployee(employee); setEditEmployeeDialogOpen(true); }} data-testid={`button-edit-mobile-${employee.id}`}>
-                              <Pencil className="h-4 w-4 mr-1" /> Edit
-                            </Button>
-                            <ConfirmationDialog
-                              trigger={
-                                <Button size="sm" variant="ghost" className="text-destructive" data-testid={`button-delete-mobile-${employee.id}`}>
-                                  <Trash2 className="h-4 w-4 mr-1" /> Delete
-                                </Button>
-                              }
-                              title="Delete Employee"
-                              description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
-                              confirmText="Delete"
-                              variant="destructive"
-                              onConfirm={() => handleDeleteEmployee(employee)}
-                            />
                           </div>
                         </CardContent>
                       </Card>
                     );
                   })}
                 </div>
-                </>
               )}
             </div>
-          </Card>
+          </div>
         )}
 
         {selectedTab === "workers" && (
