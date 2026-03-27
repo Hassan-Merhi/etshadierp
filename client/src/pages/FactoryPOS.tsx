@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -110,6 +110,9 @@ export default function FactoryPOS() {
   const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
   const [expenseRows, setExpenseRows]   = useState<ExpenseRow[]>([]);
   const [search, setSearch]             = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const searchRef   = useRef<HTMLInputElement>(null);
+  const itemListRef = useRef<HTMLDivElement>(null);
   const [savedSale, setSavedSale]       = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [voidId, setVoidId]             = useState<number | null>(null);
@@ -154,6 +157,38 @@ export default function FactoryPOS() {
     item.productName.toLowerCase().includes(mobileBrowseSearch.toLowerCase()) ||
     (item.articleCode || "").toLowerCase().includes(mobileBrowseSearch.toLowerCase())
   );
+
+  // Scroll the highlighted item into view when navigating with arrow keys
+  useEffect(() => {
+    const list = itemListRef.current;
+    if (!list) return;
+    const child = list.children[highlightedIndex] as HTMLElement | undefined;
+    if (child) child.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightedIndex]);
+
+  // Keyboard handler for the search input
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex(prev => Math.min(prev + 1, filteredInventory.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filteredInventory[highlightedIndex] ?? filteredInventory[0];
+      if (item) {
+        addOrIncrementProduct(item);
+        setSearch("");
+        setHighlightedIndex(0);
+        // Keep focus on the search box for rapid scanning
+        searchRef.current?.focus();
+      }
+    } else if (e.key === "Escape") {
+      setSearch("");
+      setHighlightedIndex(0);
+    }
+  };
 
   // ---- Row helpers ----
   const addOrIncrementProduct = (item: InventoryItem) => {
@@ -686,14 +721,23 @@ export default function FactoryPOS() {
         {/* Right: Product Browser */}
         <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
-            <h3 className="text-sm font-medium mb-3">Products</h3>
+            <h3 className="text-sm font-medium mb-2">Products</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Type or scan a barcode — ↑↓ to navigate, Enter to add
+            </p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search bales..."
+                ref={searchRef}
+                placeholder="Scan barcode or search..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => {
+                  setSearch(e.target.value);
+                  setHighlightedIndex(0);
+                }}
+                onKeyDown={handleSearchKeyDown}
                 className="pl-9"
+                autoFocus
                 data-testid="input-product-search"
               />
             </div>
@@ -709,30 +753,45 @@ export default function FactoryPOS() {
             ) : filteredInventory.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
             ) : (
-              <div className="space-y-1">
-                {filteredInventory.map(item => {
+              <div className="space-y-1" ref={itemListRef}>
+                {filteredInventory.map((item, idx) => {
                   const inCart = rows.find(r => r.productId === item.productId);
                   const price = parseFloat(item.sellingPrice || "0");
+                  const isHighlighted = idx === highlightedIndex;
                   return (
                     <button
                       key={item.productId}
-                      onClick={() => addOrIncrementProduct(item)}
-                      className="w-full text-left rounded-md px-3 py-2.5 border hover-elevate active-elevate-2 flex items-center justify-between gap-2"
+                      onMouseDown={e => {
+                        // Use mouseDown so focus stays on the search input while clicking
+                        e.preventDefault();
+                        addOrIncrementProduct(item);
+                        setSearch("");
+                        setHighlightedIndex(0);
+                        searchRef.current?.focus();
+                      }}
+                      onMouseEnter={() => setHighlightedIndex(idx)}
+                      className={`w-full text-left rounded-md px-3 py-2.5 border flex items-center justify-between gap-2 transition-colors ${
+                        isHighlighted ? "bg-accent border-accent-foreground/20" : "hover-elevate active-elevate-2"
+                      }`}
                       data-testid={`card-product-${item.productId}`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{item.productName}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                          {item.articleCode && <span>{item.articleCode}</span>}
+                          {item.articleCode && <span className="font-mono">{item.articleCode}</span>}
                           <span>Stock: {item.quantity}</span>
-                          {price > 0 && <span className="font-semibold text-primary">{ccPrefix}{formatNum(price)}</span>}
+                          {price > 0 && <span className="font-semibold">{ccPrefix}{formatNum(price)}</span>}
                         </div>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
                         {inCart && (
                           <Badge variant="outline" className="text-xs">×{inCart.quantity}</Badge>
                         )}
-                        <Plus className="h-4 w-4 text-muted-foreground" />
+                        {isHighlighted ? (
+                          <Check className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Plus className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
                     </button>
                   );
@@ -812,10 +871,17 @@ export default function FactoryPOS() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search bales..."
+                placeholder="Scan barcode or search..."
                 value={mobileBrowseSearch}
                 onChange={e => setMobileBrowseSearch(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && mobileFilteredInventory.length > 0) {
+                    e.preventDefault();
+                    addProductFromMobile(mobileFilteredInventory[0]);
+                  }
+                }}
                 className="pl-9"
+                autoFocus
               />
             </div>
           </div>
