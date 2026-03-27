@@ -423,57 +423,69 @@ export default function ProductionRawStock() {
   const costDifference = differenceKg * rate;
   const hasWeightDiff = actualKg > 0 && declaredKg > 0 && actualKg !== declaredKg;
 
-  // Commission is entered and displayed in USD
   const commRateNum = parseFloat(commissionRate || "0");
-  const commissionTotalUsd = commissionType === "PER_KG"
-    ? commRateNum * actualKg
-    : commRateNum;
-
   const fxRate = parseFloat(fxRateToUsd || "1");
   const freightVal = parseFloat(freight || "0");
   const otherChargesVal = parseFloat(otherCharges || "0");
   // Duty is entered in USD
   const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
 
-  // Additional charges — convert to USD using container FX rate for display estimate
+  // Additional charges — convert to USD using each charge's own currency code
   const additionalChargesTotalUsd = additionalCharges.reduce((sum, c) => {
     const amt = parseFloat(c.amount || "0");
     const ccy = c.currencyCode || "USD";
     if (ccy === "USD") return sum + amt;
     if (ccy === currencyCode) return sum + (fxRate > 0 ? amt * fxRate : amt);
-    return sum + amt; // other currencies: treat as-is (best estimate)
+    return sum + amt; // other currencies: best estimate
   }, 0);
 
   // Freight: convert to USD using the freight's own currency code
-  // - If freight currency is USD → use directly
-  // - If freight currency matches container currency → multiply by container fxRate
-  // - Otherwise → use freightFxRate for the conversion
   const freightFxRateVal = parseFloat(freightFxRate || "1");
   const freightUsd = freightCurrencyCode === "USD"
     ? freightVal
     : freightCurrencyCode === currencyCode
       ? freightVal * fxRate
       : freightVal * freightFxRateVal;
-
-  // Freight converted to container currency (for the container-ccy subtotal display)
+  // Freight in container currency for display
   const freightInContainerCcy = freightCurrencyCode === currencyCode
     ? freightVal
     : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
-  // Other charges: entered in USD directly
-  const otherChargesUsd = otherChargesVal;
+  // Other charges carry their own currency (container currency when pre-filled from container).
+  // Convert to USD using the OC currency code and its fx rate — same pattern as freight.
+  const ocFxRateVal = parseFloat(otherChargesFxRate || "1");
+  const otherChargesUsd = otherChargesCurrencyCode === "USD"
+    ? otherChargesVal
+    : otherChargesCurrencyCode === currencyCode
+      ? otherChargesVal * fxRate
+      : otherChargesVal * ocFxRateVal;
+  // Other charges in container currency for display
+  const otherChargesInContainerCcy = otherChargesCurrencyCode === currencyCode
+    ? otherChargesVal
+    : fxRate > 0 ? otherChargesUsd / fxRate : otherChargesVal;
+
+  // Commission: when pre-filled from container the currency is containerCommissionCcy;
+  // when manually entered the user types in USD (the default).
+  const commCurrencyCode = commissionFromContainer ? containerCommissionCcy : "USD";
+  const commTotal = commissionType === "PER_KG" ? commRateNum * actualKg : commRateNum;
+  const commissionTotalUsd = commCurrencyCode === "USD"
+    ? commTotal
+    : commCurrencyCode === currencyCode
+      ? commTotal * fxRate
+      : commTotal * fxRate; // best estimate via container fx rate
+  const commissionInContainerCcy = commCurrencyCode === currencyCode
+    ? commTotal
+    : fxRate > 0 ? commissionTotalUsd / fxRate : commTotal;
 
   // Base material in USD
   const rateUsd = currencyCode === "USD" ? rate : rate * fxRate;
   const totalPayableUsd = actualKg * rateUsd;
 
-  // Grand total in USD = base + freight_usd + other_usd + commission_usd + addl_usd + duty_usd
+  // Grand total in USD
   const grandTotalUsd = totalPayableUsd + freightUsd + otherChargesUsd + commissionTotalUsd + additionalChargesTotalUsd + dutyUsd;
 
-  // Also maintain a container-currency total for display (base + freight converted to container ccy; rest convert from USD)
-  const commissionInContainerCcy = fxRate > 0 ? commissionTotalUsd / fxRate : commissionTotalUsd;
+  // Container-currency totals for display
   const additionalChargesInContainerCcy = fxRate > 0 ? additionalChargesTotalUsd / fxRate : additionalChargesTotalUsd;
-  const otherChargesInContainerCcy = fxRate > 0 ? otherChargesUsd / fxRate : otherChargesUsd;
   const dutyInContainerCcy = fxRate > 0 ? dutyUsd / fxRate : dutyUsd;
   const totalCharges = freightInContainerCcy + otherChargesInContainerCcy + additionalChargesInContainerCcy + commissionInContainerCcy + dutyInContainerCcy;
   const grandTotal = totalPayable + totalCharges;
@@ -596,12 +608,11 @@ export default function ProductionRawStock() {
       ...((() => {
         const p = parseAccountValue(otherChargesAccountId);
         if (p?.type === "supplier") {
-          // Supplier: send raw USD amount with USD currency → backend converts to container ccy
-          return { otherChargesSupplierId: p.id, otherCharges: otherCharges || "0", otherChargesCurrencyCode: "USD", otherChargesFxRate: "1" };
+          // Send the actual amount with its real currency metadata — backend handles conversion
+          return { otherChargesSupplierId: p.id, otherCharges: otherCharges || "0", otherChargesCurrencyCode, otherChargesFxRate };
         } else {
-          // Ledger account: convert USD input to container currency before sending
-          const ocContainerCcy = currencyCode === "USD" ? (otherCharges || "0") : String(otherChargesVal / (fxRate || 1));
-          return { otherChargesAccountId: p?.id ?? null, otherCharges: ocContainerCcy };
+          // Send the actual amount with its real currency metadata — backend handles conversion
+          return { otherChargesAccountId: p?.id ?? null, otherCharges: otherCharges || "0", otherChargesCurrencyCode, otherChargesFxRate };
         }
       })()),
       // Duty entered in USD → convert to container currency for backend (raw USD for pending)
@@ -635,8 +646,10 @@ export default function ProductionRawStock() {
         personName: commissionPersonName.trim(),
         commissionType,
         commissionRate: commissionRate,
-        currencyCode: "USD",
-        fxRateToUsd: "1",
+        // Use the actual commission currency: container currency when pre-filled from container,
+        // USD when entered manually by the user.
+        currencyCode: commCurrencyCode,
+        fxRateToUsd: commCurrencyCode === "USD" ? "1" : fxRateToUsd,
         ledgerAccountId: commissionLedgerAccountId || null,
       };
     }
