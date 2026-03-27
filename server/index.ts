@@ -673,6 +673,13 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_supplier_id integer`,
     `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS expenses_json text`,
+    `CREATE TABLE IF NOT EXISTS factory_worker_categories (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name varchar(200) NOT NULL,
+      worker_ids jsonb NOT NULL DEFAULT '[]',
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

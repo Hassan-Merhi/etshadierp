@@ -71,6 +71,8 @@ import {
   companySettings,
   factorySettings,
   factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
   factoryPayrolls,
   factoryWorkerDocuments,
   factoryAlerts,
@@ -17315,5 +17317,53 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
       console.error("Error voiding factory POS sale:", error);
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // ── Worker Categories ──────────────────────────────────────────────────────
+  app.get("/api/factory/worker-categories", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const cats = await db.select().from(factoryWorkerCategories)
+        .where(eq(factoryWorkerCategories.companyId, companyId))
+        .orderBy(factoryWorkerCategories.name);
+      res.json(cats);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/factory/worker-categories", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const body = insertFactoryWorkerCategorySchema.parse({ ...req.body, companyId });
+      const [cat] = await db.insert(factoryWorkerCategories).values(body).returning();
+      res.json(cat);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      const body = insertFactoryWorkerCategorySchema.partial().parse(req.body);
+      const [cat] = await db.update(factoryWorkerCategories)
+        .set(body)
+        .where(and(eq(factoryWorkerCategories.id, id), eq(factoryWorkerCategories.companyId, companyId)))
+        .returning();
+      if (!cat) return res.status(404).json({ message: "Not found" });
+      res.json(cat);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      await db.delete(factoryWorkerCategories)
+        .where(and(eq(factoryWorkerCategories.id, id), eq(factoryWorkerCategories.companyId, companyId)));
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 }

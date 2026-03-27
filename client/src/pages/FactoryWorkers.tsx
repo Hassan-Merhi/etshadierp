@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown,
+  Plus, Pencil, Search, Users, UserX, UserCheck, Upload, Download, Calculator, X, FileDown, Layers, Trash2,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -11,18 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import type { FactoryWorker } from "@shared/schema";
+import type { FactoryWorker, FactoryWorkerCategory } from "@shared/schema";
 
 interface CashAccount { id: number; name: string; code: string; }
 
@@ -94,6 +96,84 @@ export default function FactoryWorkers() {
       return res.json();
     },
   });
+
+  // ── Categories ─────────────────────────────────────────────────────────────
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<FactoryWorkerCategory | null>(null);
+  const [catName, setCatName] = useState("");
+  const [catWorkerIds, setCatWorkerIds] = useState<number[]>([]);
+
+  const { data: categories = [] } = useQuery<FactoryWorkerCategory[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/worker-categories", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const createCatMutation = useMutation({
+    mutationFn: (data: { name: string; workerIds: number[] }) =>
+      factoryApiRequest("POST", "/api/factory/worker-categories", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+      setCategoryDialogOpen(false);
+      toast({ title: "Category created" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateCatMutation = useMutation({
+    mutationFn: (data: { id: number; name: string; workerIds: number[] }) =>
+      factoryApiRequest("PATCH", `/api/factory/worker-categories/${data.id}`, { name: data.name, workerIds: data.workerIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+      setCategoryDialogOpen(false);
+      toast({ title: "Category updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteCatMutation = useMutation({
+    mutationFn: (id: number) => factoryApiRequest("DELETE", `/api/factory/worker-categories/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+      toast({ title: "Category deleted" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const openNewCategory = () => {
+    setEditingCategory(null);
+    setCatName("");
+    setCatWorkerIds([]);
+    setCategoryDialogOpen(true);
+  };
+
+  const openEditCategory = (cat: FactoryWorkerCategory) => {
+    setEditingCategory(cat);
+    setCatName(cat.name);
+    setCatWorkerIds(Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : []);
+    setCategoryDialogOpen(true);
+  };
+
+  const toggleCatWorker = (id: number) => {
+    setCatWorkerIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+
+  const handleSaveCategory = () => {
+    if (!catName.trim()) {
+      toast({ title: "Name is required", variant: "destructive" }); return;
+    }
+    // Only keep active workers' IDs
+    const activeIds = (workers ?? []).filter((w) => w.active).map((w) => w.id);
+    const filteredIds = catWorkerIds.filter((id) => activeIds.includes(id));
+    if (editingCategory) {
+      updateCatMutation.mutate({ id: editingCategory.id, name: catName.trim(), workerIds: filteredIds });
+    } else {
+      createCatMutation.mutate({ name: catName.trim(), workerIds: filteredIds });
+    }
+  };
+  // ── End Categories ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -452,45 +532,56 @@ export default function FactoryWorkers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-title">Workers</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            <span className="font-medium text-foreground">{activeCount}</span> active
-            {inactiveCount > 0 && <span className="ml-2"><span className="font-medium text-foreground">{inactiveCount}</span> inactive</span>}
-          </p>
+      <Tabs defaultValue="workers">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-title">Workers</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                <span className="font-medium text-foreground">{activeCount}</span> active
+                {inactiveCount > 0 && <span className="ml-2"><span className="font-medium text-foreground">{inactiveCount}</span> inactive</span>}
+              </p>
+            </div>
+            <TabsList>
+              <TabsTrigger value="workers" data-testid="tab-workers">Workers</TabsTrigger>
+              <TabsTrigger value="categories" data-testid="tab-categories">
+                <Layers className="h-3.5 w-3.5 mr-1.5" />Categories
+                {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">{categories.length}</Badge>}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+            <Button variant="outline" onClick={() => window.open("/api/factory/workers/template.xlsx", "_blank")} data-testid="button-download-template">
+              <Download className="h-4 w-4 mr-2" />Template
+            </Button>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importLoading} data-testid="button-import-workers">
+              <Upload className="h-4 w-4 mr-2" />{importLoading ? "Importing..." : "Import Excel"}
+            </Button>
+            <Button variant="outline" onClick={handleExportSalaries} disabled={!filteredWorkers.length} data-testid="button-export-salaries">
+              <FileDown className="h-4 w-4 mr-2" />Export Salaries
+            </Button>
+            <Button onClick={() => { resetForm(); setCreateOpen(true); }} data-testid="button-add-worker">
+              <Plus className="h-4 w-4 mr-2" />Add Worker
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
-          <Button variant="outline" onClick={() => window.open("/api/factory/workers/template.xlsx", "_blank")} data-testid="button-download-template">
-            <Download className="h-4 w-4 mr-2" />Template
-          </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importLoading} data-testid="button-import-workers">
-            <Upload className="h-4 w-4 mr-2" />{importLoading ? "Importing..." : "Import Excel"}
-          </Button>
-          <Button variant="outline" onClick={handleExportSalaries} disabled={!filteredWorkers.length} data-testid="button-export-salaries">
-            <FileDown className="h-4 w-4 mr-2" />Export Salaries
-          </Button>
-          <Button onClick={() => { resetForm(); setCreateOpen(true); }} data-testid="button-add-worker">
-            <Plus className="h-4 w-4 mr-2" />Add Worker
-          </Button>
-        </div>
-      </div>
 
-      <div className="flex gap-3 flex-wrap items-center">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name, code, position..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" data-testid="input-search" />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            <SelectItem value="Active">Active</SelectItem>
-            <SelectItem value="Inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+        <TabsContent value="workers" className="mt-4 space-y-4">
+          <div className="flex gap-3 flex-wrap items-center">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search by name, code, position..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" data-testid="input-search" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
       {filteredWorkers.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
@@ -572,7 +663,144 @@ export default function FactoryWorkers() {
             </div>
           ))}
         </div>
-      )}
+        )}
+        </TabsContent>
+
+        <TabsContent value="categories" className="mt-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Group workers into categories to quickly filter them during stock entry and history.
+              </p>
+              <Button onClick={openNewCategory} data-testid="button-add-category">
+                <Plus className="h-4 w-4 mr-2" />New Category
+              </Button>
+            </div>
+
+            {categories.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground border rounded-md">
+                <Layers className="mx-auto h-8 w-8 mb-3 opacity-40" />
+                <p className="font-medium">No categories yet</p>
+                <p className="text-sm mt-1">Create a category to group workers for quick filtering</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.map((cat) => {
+                  const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
+                  const catWorkers = (workers ?? []).filter((w) => ids.includes(w.id));
+                  const activeMembers = catWorkers.filter((w) => w.active);
+                  return (
+                    <Card key={cat.id} data-testid={`card-category-${cat.id}`}>
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-sm" data-testid={`text-cat-name-${cat.id}`}>{cat.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {activeMembers.length} active worker{activeMembers.length !== 1 ? "s" : ""}
+                              {ids.length > activeMembers.length && (
+                                <span className="ml-1">({ids.length - activeMembers.length} inactive)</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button size="icon" variant="ghost" onClick={() => openEditCategory(cat)} data-testid={`button-edit-cat-${cat.id}`}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteCatMutation.mutate(cat.id)}
+                              disabled={deleteCatMutation.isPending}
+                              data-testid={`button-delete-cat-${cat.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        {activeMembers.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {activeMembers.slice(0, 6).map((w) => (
+                              <Badge key={w.id} variant="secondary" className="text-xs font-normal no-default-active-elevate">
+                                {w.fullName}
+                              </Badge>
+                            ))}
+                            {activeMembers.length > 6 && (
+                              <Badge variant="outline" className="text-xs font-normal no-default-active-elevate">
+                                +{activeMembers.length - 6} more
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Category dialog */}
+      <Dialog open={categoryDialogOpen} onOpenChange={(open) => { if (!open) setCategoryDialogOpen(false); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-category-form">
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit Category" : "New Category"}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? "Update the category name and worker assignments." : "Create a group of workers for easy filtering."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Category Name *</Label>
+              <Input
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                placeholder="e.g. Pressing Team A"
+                data-testid="input-cat-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Workers</Label>
+              <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                {(workers ?? []).filter((w) => w.active || catWorkerIds.includes(w.id)).map((w) => (
+                  <label
+                    key={w.id}
+                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover-elevate ${!w.active ? "opacity-50" : ""}`}
+                    data-testid={`label-cat-worker-${w.id}`}
+                  >
+                    <Checkbox
+                      checked={catWorkerIds.includes(w.id)}
+                      onCheckedChange={() => !w.active ? undefined : toggleCatWorker(w.id)}
+                      disabled={!w.active}
+                      data-testid={`checkbox-cat-worker-${w.id}`}
+                    />
+                    <span className="text-sm flex-1">{w.fullName}</span>
+                    {!w.active && <Badge variant="secondary" className="text-xs no-default-active-elevate">Inactive</Badge>}
+                  </label>
+                ))}
+                {(workers ?? []).filter((w) => w.active || catWorkerIds.includes(w.id)).length === 0 && (
+                  <p className="text-sm text-muted-foreground px-3 py-4 text-center">No workers available</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {catWorkerIds.filter(id => (workers ?? []).find(w => w.id === id && w.active)).length} active workers selected.
+                Inactive workers are automatically excluded.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)} data-testid="button-cancel-cat">Cancel</Button>
+            <Button
+              onClick={handleSaveCategory}
+              disabled={createCatMutation.isPending || updateCatMutation.isPending}
+              data-testid="button-save-cat"
+            >
+              {(createCatMutation.isPending || updateCatMutation.isPending) ? "Saving..." : editingCategory ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen || editingWorker !== null} onOpenChange={(open) => { if (!open) { setCreateOpen(false); setEditingWorker(null); resetForm(); } }}>
         <DialogContent className="max-w-2xl" data-testid="dialog-worker-form">

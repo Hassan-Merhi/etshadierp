@@ -62,6 +62,7 @@ export default function StockEntryHistory() {
 
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [workerIdFilter, setWorkerIdFilter] = useState("all");
   const [productIdFilter, setProductIdFilter] = useState("all");
   const [locationIdFilter, setLocationIdFilter] = useState("all");
@@ -89,9 +90,33 @@ export default function StockEntryHistory() {
   const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
+  const { data: categories = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+  });
 
-  const totalBales = useMemo(() => groups.reduce((s, g) => s + g.baleCount, 0), [groups]);
-  const totalWeight = useMemo(() => groups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0), [groups]);
+  const selectedCategoryWorkerIds: number[] | null = useMemo(() => {
+    if (categoryFilter === "all") return null;
+    const cat = categories.find((c: any) => String(c.id) === categoryFilter);
+    if (!cat) return null;
+    const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
+    return workers.filter((w: any) => w.active && ids.includes(w.id)).map((w: any) => w.id);
+  }, [categoryFilter, categories, workers]);
+
+  const filteredWorkers = useMemo(() => {
+    if (!selectedCategoryWorkerIds) return workers;
+    return workers.filter((w: any) => selectedCategoryWorkerIds.includes(w.id));
+  }, [workers, selectedCategoryWorkerIds]);
+
+  const filteredGroups = useMemo(() => {
+    if (!selectedCategoryWorkerIds || workerIdFilter !== "all") return groups;
+    return groups.filter((g) =>
+      g.workerId !== null && selectedCategoryWorkerIds.includes(g.workerId)
+    );
+  }, [groups, selectedCategoryWorkerIds, workerIdFilter]);
+
+  const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
+  const totalWeight = useMemo(() => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0), [filteredGroups]);
 
   function groupKey(g: GroupRow) {
     return `${g.stockEntryDate}|${g.erpLocationId}|${g.workerId}|${g.productId}`;
@@ -108,6 +133,7 @@ export default function StockEntryHistory() {
   function resetFilters() {
     setFromDate(today);
     setToDate(today);
+    setCategoryFilter("all");
     setWorkerIdFilter("all");
     setProductIdFilter("all");
     setLocationIdFilter("all");
@@ -126,7 +152,7 @@ export default function StockEntryHistory() {
   function exportExcel() {
     const wb = XLSX.utils.book_new();
 
-    const summaryRows = groups.map(g => ({
+    const summaryRows = filteredGroups.map(g => ({
       "Stock Entry Date": g.stockEntryDate,
       "Location": g.locationName,
       "Worker": g.workerName || "Unassigned",
@@ -141,7 +167,7 @@ export default function StockEntryHistory() {
     const ws1 = XLSX.utils.json_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-    const detailRows = groups.flatMap(g =>
+    const detailRows = filteredGroups.flatMap(g =>
       g.bales.map(b => ({
         "Stock Entry Date": b.stockEntryDate,
         "Location": b.locationName,
@@ -176,13 +202,13 @@ export default function StockEntryHistory() {
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
           </Button>
-          <Button variant="outline" size="sm" onClick={exportExcel} disabled={groups.length === 0} data-testid="button-export-excel">
+          <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
             <Download className="w-3 h-3 mr-1" /> Export
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">From Date</Label>
           <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} data-testid="input-from-date" />
@@ -192,12 +218,24 @@ export default function StockEntryHistory() {
           <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} data-testid="input-to-date" />
         </div>
         <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Category</Label>
+          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setWorkerIdFilter("all"); }}>
+            <SelectTrigger data-testid="select-category"><SelectValue placeholder="All categories" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((c: any) => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Worker</Label>
           <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
             <SelectTrigger data-testid="select-worker"><SelectValue placeholder="All workers" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Workers</SelectItem>
-              {workers.map((w: any) => (
+              {filteredWorkers.map((w: any) => (
                 <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
               ))}
             </SelectContent>
@@ -262,7 +300,7 @@ export default function StockEntryHistory() {
       </div>
 
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>{groups.length} group{groups.length !== 1 ? "s" : ""}</span>
+        <span>{filteredGroups.length} group{filteredGroups.length !== 1 ? "s" : ""}</span>
         <span>{totalBales} bales</span>
         <span>{totalWeight.toFixed(2)} kg total</span>
       </div>
@@ -287,10 +325,10 @@ export default function StockEntryHistory() {
             {isLoading && (
               <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
             )}
-            {!isLoading && groups.length === 0 && (
+            {!isLoading && filteredGroups.length === 0 && (
               <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
             )}
-            {groups.map(g => {
+            {filteredGroups.map(g => {
               const key = groupKey(g);
               const expanded = expandedKeys.has(key);
               return [

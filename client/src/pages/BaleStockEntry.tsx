@@ -78,6 +78,21 @@
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
     const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
     const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+    const { data: workerCategoryGroups = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/worker-categories"],
+      queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+    });
+
+    const [workerCategoryFilter, setWorkerCategoryFilter] = useState("all");
+
+    const filteredWorkers = workerCategoryFilter === "all"
+      ? (workers as any[]).filter((w: any) => w.active !== false)
+      : (() => {
+          const cat = workerCategoryGroups.find((c: any) => String(c.id) === workerCategoryFilter);
+          if (!cat) return (workers as any[]).filter((w: any) => w.active !== false);
+          const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
+          return (workers as any[]).filter((w: any) => w.active !== false && ids.includes(w.id));
+        })();
 
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
     const [quickCreateName, setQuickCreateName] = useState("");
@@ -587,7 +602,25 @@
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
+                  {workerCategoryGroups.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Filter workers by:</span>
+                      <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
+                        <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-worker-category-filter">
+                          <SelectValue placeholder="All workers" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Workers</SelectItem>
+                          {workerCategoryGroups.map((c: any) => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {cart.length === 0 ? (
@@ -656,7 +689,7 @@
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                                {workers.map((w: any) => (
+                                {filteredWorkers.map((w: any) => (
                                   <SelectItem key={w.id} value={String(w.id)}>{w.fullName || w.name}</SelectItem>
                                 ))}
                               </SelectContent>

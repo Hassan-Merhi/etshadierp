@@ -4038,3 +4038,21 @@ export const factoryPosSaleItems = pgTable("factory_pos_sale_items", {
 export const insertFactoryPosSaleItemSchema = createInsertSchema(factoryPosSaleItems).omit({ id: true });
 export type InsertFactoryPosSaleItem = z.infer<typeof insertFactoryPosSaleItemSchema>;
 export type FactoryPosSaleItem = typeof factoryPosSaleItems.$inferSelect;
+
+export const factoryWorkerCategories = pgTable("factory_worker_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  workerIds: jsonb("worker_ids").notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFactoryWorkerCategorySchema = createInsertSchema(factoryWorkerCategories).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  name: z.string().min(1),
+  workerIds: z.array(z.number()).default([]),
+});
+export type InsertFactoryWorkerCategory = z.infer<typeof insertFactoryWorkerCategorySchema>;
+export type FactoryWorkerCategory = typeof factoryWorkerCategories.$inferSelect;
