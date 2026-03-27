@@ -516,7 +516,7 @@ export default function BalesHistory() {
                     <TableHead>Article</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
-                    {!hiddenCost.includes("bales_list_cost_per_kg") && <TableHead className="text-right">Prod. Price/kg</TableHead>}
+                    {!hiddenCost.includes("bales_list_cost_per_kg") && <TableHead className="text-right">Sell Price</TableHead>}
                     <TableHead>Status</TableHead>
                     <TableHead>Last Printed</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -570,9 +570,9 @@ export default function BalesHistory() {
                         <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
                         {!hiddenCost.includes("bales_list_cost_per_kg") && (
                           <TableCell className="text-right font-mono text-muted-foreground">
-                            {product?.productionPrice && parseFloat(String(product.productionPrice)) > 0
-                              ? formatLabelNum(String(product.productionPrice))
-                              : formatLabelNum(bale.costPerKg)}
+                            {product?.sellingPrice && parseFloat(String(product.sellingPrice)) > 0
+                              ? formatLabelNum(String(product.sellingPrice))
+                              : "—"}
                           </TableCell>
                         )}
                         <TableCell>

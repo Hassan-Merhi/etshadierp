@@ -453,7 +453,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
       const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
-        return sum + parseFloat(b.costPerKg || "0");
+        const sellPrice = parseFloat((b._product?.sellingPrice) || "0");
+        return sum + sellPrice;
       }, 0);
       const baleMetaJson = JSON.stringify({
         bales: result.bales.map((b: any) => ({
@@ -10538,35 +10539,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
               articleCode: factoryBales.articleCode,
             }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
 
-            // Build product price map: by id (primary) and by articleCode (fallback)
-            const productPriceById = new Map<number, number>();
-            const productPriceByArticleCode = new Map<string, number>();
-            const zeroBales = baleRecords.filter((b: any) => parseFloat(b.costPerKg || "0") === 0);
-            if (zeroBales.length > 0) {
-              // All products for this company so we can match by articleCode too
-              const allProducts = await db.select({
-                id: factoryBaleProducts.id,
-                articleCode: factoryBaleProducts.articleCode,
-                productionPrice: factoryBaleProducts.productionPrice,
-              }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
-              allProducts.forEach((p: any) => {
-                productPriceById.set(p.id, parseFloat(p.productionPrice || "0"));
-                if (p.articleCode) productPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
-              });
-            }
+            // Build product selling price map: by id (primary) and by articleCode (fallback)
+            const productSellingPriceById = new Map<number, number>();
+            const productSellingPriceByArticleCode = new Map<string, number>();
+            // Always fetch products so we can look up sellingPrice per bale
+            const allProducts = await db.select({
+              id: factoryBaleProducts.id,
+              articleCode: factoryBaleProducts.articleCode,
+              sellingPrice: factoryBaleProducts.sellingPrice,
+            }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+            allProducts.forEach((p: any) => {
+              productSellingPriceById.set(p.id, parseFloat(p.sellingPrice || "0"));
+              if (p.articleCode) productSellingPriceByArticleCode.set(p.articleCode, parseFloat(p.sellingPrice || "0"));
+            });
 
-            // Accumulate value per daybook row id — costPerKg is the per-bale production price
+            // Accumulate value per daybook row id using sellingPrice (per bale)
             const rowValueMap = new Map<number, number>();
             for (const baleRec of baleRecords) {
               const entries = baleIdToEntry.get(baleRec.id) || [];
-              const storedCost = parseFloat(baleRec.costPerKg || "0");
-              let val = storedCost;
-              if (val === 0) {
-                // fallback 1: productId → productionPrice
-                if (baleRec.productId) val = productPriceById.get(baleRec.productId) || 0;
-                // fallback 2: articleCode → productionPrice
-                if (val === 0 && baleRec.articleCode) val = productPriceByArticleCode.get(baleRec.articleCode) || 0;
-              }
+              let val = 0;
+              // primary: productId → sellingPrice
+              if (baleRec.productId) val = productSellingPriceById.get(baleRec.productId) || 0;
+              // fallback: articleCode → sellingPrice
+              if (val === 0 && baleRec.articleCode) val = productSellingPriceByArticleCode.get(baleRec.articleCode) || 0;
               for (const { row } of entries) {
                 rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
               }
