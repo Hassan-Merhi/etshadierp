@@ -7361,9 +7361,14 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { ids } = req.body;
-      if (!Array.isArray(ids) || ids.length === 0) {
+      const { ids: rawIds } = req.body;
+      if (!Array.isArray(rawIds) || rawIds.length === 0) {
         return res.status(400).json({ message: "Invalid or empty ids array" });
+      }
+      // Explicitly parse all IDs as integers to prevent "operator does not exist: integer = text"
+      const ids = rawIds.map((id: any) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
+      if (ids.length === 0) {
+        return res.status(400).json({ message: "No valid numeric IDs provided" });
       }
 
       // Get all items that exist and belong to the current company

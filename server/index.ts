@@ -672,6 +672,33 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges decimal(20,2)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_supplier_id integer`,
+    `CREATE TABLE IF NOT EXISTS factory_pos_sales (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      sale_number text NOT NULL,
+      tx_date date NOT NULL,
+      location_id integer,
+      customer_name text,
+      notes text,
+      total_amount decimal(20,2) NOT NULL DEFAULT 0,
+      currency_code varchar(10) NOT NULL DEFAULT 'USD',
+      cash_account_id integer,
+      status text NOT NULL DEFAULT 'COMPLETED',
+      created_by integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS factory_pos_sale_items (
+      id serial PRIMARY KEY,
+      sale_id integer NOT NULL,
+      company_id integer NOT NULL,
+      product_id integer,
+      product_name text NOT NULL,
+      article_code text,
+      quantity integer NOT NULL DEFAULT 1,
+      unit_price decimal(20,2) NOT NULL DEFAULT 0,
+      total_amount decimal(20,2) NOT NULL DEFAULT 0,
+      currency_code varchar(10) NOT NULL DEFAULT 'USD'
+    )`,
     `ALTER TABLE factory_pos_sales ADD COLUMN IF NOT EXISTS expenses_json text`,
     `CREATE TABLE IF NOT EXISTS factory_worker_categories (
       id serial PRIMARY KEY,
