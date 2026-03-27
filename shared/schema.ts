@@ -2369,6 +2369,13 @@ export const factoryContainers = pgTable("factory_containers", {
   dutyAccountId: integer("duty_account_id"),
   dutyStatus: text("duty_status").notNull().default("NONE"),
   dutyNotes: text("duty_notes"),
+  preOffloadFreight: decimal("pre_offload_freight", { precision: 20, scale: 2 }),
+  preOffloadFreightCurrencyCode: varchar("pre_offload_freight_currency_code", { length: 10 }),
+  preOffloadFreightAccountId: integer("pre_offload_freight_account_id"),
+  preOffloadFreightSupplierId: integer("pre_offload_freight_supplier_id"),
+  preOffloadOtherCharges: decimal("pre_offload_other_charges", { precision: 20, scale: 2 }),
+  preOffloadOtherChargesAccountId: integer("pre_offload_other_charges_account_id"),
+  preOffloadOtherChargesSupplierId: integer("pre_offload_other_charges_supplier_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

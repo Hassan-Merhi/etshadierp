@@ -6165,6 +6165,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
           dutyStatus,
           dutyNotes: reqDutyNotes || null,
+          // Snapshot the pre-offload values so they can be restored on reverse
+          preOffloadFreight: container.freight || "0",
+          preOffloadFreightCurrencyCode: (container as any).freightCurrencyCode || container.currencyCode || "USD",
+          preOffloadFreightAccountId: (container as any).freightAccountId || null,
+          preOffloadFreightSupplierId: (container as any).freightSupplierId || null,
+          preOffloadOtherCharges: container.otherCharges || "0",
+          preOffloadOtherChargesAccountId: (container as any).otherChargesAccountId || null,
+          preOffloadOtherChargesSupplierId: (container as any).otherChargesSupplierId || null,
           updatedAt: new Date(),
         })
         .where(eq(factoryContainers.id, containerId));
@@ -6565,26 +6573,72 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(factoryMixBatchSources.containerId, containerId)
         );
 
-        // 6. Reset container to RECEIVED, clearing ALL offload-specific data:
-        //    - Offload measurements (actualReceivedKg, differenceKg, declaredKg)
-        //    - Offload charges entered in the offload dialog (freight, OC)
-        //    - Duty details
-        //    - Computed financials (finalPayable, ratePerKgUsd, fxRateOffload)
-        //    - Commission amount if it was set from offload (not pre-registered)
+        // 6. Restore pre-offload charges and reset container to RECEIVED status.
+        //    If a pre-offload snapshot exists (set during offload), restore those values
+        //    so that charges entered at container-creation time are preserved.
+        //    If no snapshot exists (container was offloaded before this logic was added),
+        //    fall back to zeroing out the charges (legacy behaviour).
+        const preFreight = (container as any).preOffloadFreight;
+        const hasSnapshot = preFreight !== null && preFreight !== undefined;
+        const restoredFreight = hasSnapshot ? String(preFreight || "0") : "0";
+        const restoredFreightAccountId = hasSnapshot ? ((container as any).preOffloadFreightAccountId || null) : null;
+        const restoredFreightSupplierId = hasSnapshot ? ((container as any).preOffloadFreightSupplierId || null) : null;
+        const restoredFreightCurrencyCode = hasSnapshot ? ((container as any).preOffloadFreightCurrencyCode || container.currencyCode || "USD") : (container.currencyCode || "USD");
+        const restoredOtherCharges = hasSnapshot ? String((container as any).preOffloadOtherCharges || "0") : "0";
+        const restoredOtherChargesAccountId = hasSnapshot ? ((container as any).preOffloadOtherChargesAccountId || null) : null;
+        const restoredOtherChargesSupplierId = hasSnapshot ? ((container as any).preOffloadOtherChargesSupplierId || null) : null;
+
+        // Re-post the original creation-time FACTORY-FREIGHT voucher if one existed before offload
+        const restoredFreightAmt = parseFloat(restoredFreight || "0");
+        if (restoredFreightAmt > 0 && restoredFreightAccountId) {
+          const restoredFreightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
+          const [restoredFreightVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: restoredFreightVoucherNum,
+            voucherDate: container.arrivalDate || new Date().toISOString().split("T")[0],
+            description: `Freight on container ${container.containerNumber}`,
+            totalAmount: String(restoredFreightAmt),
+            currency: restoredFreightCurrencyCode,
+            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            sourceModule: "FACTORY",
+          }).returning();
+          // Dr Freight Expense
+          await tx.insert(voucherEntries).values({
+            voucherId: restoredFreightVoucher.id,
+            ledgerAccountId: restoredFreightAccountId,
+            debitAmount: String(restoredFreightAmt),
+            creditAmount: "0",
+            narration: `Freight expense - container ${container.containerNumber}`,
+          });
+          // Cr Supplier Payable (use the pre-offload freight supplier, or fall back to container supplier)
+          const freightCreditorSupplierId = restoredFreightSupplierId || container.supplierId;
+          if (freightCreditorSupplierId) {
+            await tx.insert(voucherEntries).values({
+              voucherId: restoredFreightVoucher.id,
+              factorySupplierId: freightCreditorSupplierId,
+              debitAmount: "0",
+              creditAmount: String(restoredFreightAmt),
+              narration: `Freight payable to supplier - container ${container.containerNumber}`,
+            });
+          }
+        }
+
         await tx.update(factoryContainers).set({
           status: "RECEIVED",
           actualReceivedKg: null,
           differenceKg: null,
           declaredKg: null,
-          // Clear freight set during offload
-          freight: "0",
-          freightAccountId: null,
-          freightSupplierId: null,
-          // Clear other-charges set during offload
-          otherCharges: "0",
-          otherChargesAccountId: null,
-          otherChargesSupplierId: null,
-          // Clear duty
+          // Restore pre-offload freight (or zero if no snapshot)
+          freight: restoredFreight,
+          freightCurrencyCode: restoredFreightCurrencyCode,
+          freightAccountId: restoredFreightAccountId,
+          freightSupplierId: restoredFreightSupplierId,
+          // Restore pre-offload other charges (or zero if no snapshot)
+          otherCharges: restoredOtherCharges,
+          otherChargesAccountId: restoredOtherChargesAccountId,
+          otherChargesSupplierId: restoredOtherChargesSupplierId,
+          // Clear duty (always offload-specific)
           dutyAmount: null,
           dutyAccountId: null,
           dutyStatus: "NONE",
@@ -6595,6 +6649,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           ratePerKgUsd: null,
           fxRateToUsdOffload: null,
           fxRateDateOffload: null,
+          // Clear the pre-offload snapshot columns
+          preOffloadFreight: null,
+          preOffloadFreightCurrencyCode: null,
+          preOffloadFreightAccountId: null,
+          preOffloadFreightSupplierId: null,
+          preOffloadOtherCharges: null,
+          preOffloadOtherChargesAccountId: null,
+          preOffloadOtherChargesSupplierId: null,
           // Reset commission amount if it was created from offload dialog
           ...(hadOffloadCommission ? { commissionAmount: "0" } : {}),
           updatedAt: new Date(),
