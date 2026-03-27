@@ -55,7 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function BalesHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("IN_STOCK");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split("T")[0]);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -274,6 +274,9 @@ export default function BalesHistory() {
     const bale = row.bale;
     const product = row.product;
     const batch = row.mixBatch;
+
+    // Always hide removed/deleted bales
+    if (bale.status === "REMOVED") return false;
 
     if (batchFilter !== "all" && String(bale.mixBatchId) !== batchFilter) return false;
     if (statusFilter !== "all" && bale.status !== statusFilter) return false;

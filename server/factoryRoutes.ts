@@ -9531,6 +9531,27 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  app.delete("/api/factory/bales/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
+
+      const [updated] = await db
+        .update(factoryBales)
+        .set({ status: "REMOVED", updatedAt: new Date() })
+        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
+        .returning({ id: factoryBales.id });
+
+      if (!updated) return res.status(404).json({ message: "Bale not found" });
+      res.json({ message: "Bale removed" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).currentCompanyId;
