@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, DollarSign, CalendarDays, Banknote, Gift } from "lucide-react";
-import FactoryWorkers from "@/pages/FactoryWorkers";
-import FactoryPayrollTab from "@/pages/FactoryPayrollTab";
-import FactoryAttendance from "@/pages/FactoryAttendance";
-import FactoryAdvancesTab from "@/pages/FactoryAdvancesTab";
-import FactoryWorkerBonusesTab from "@/pages/FactoryWorkerBonusesTab";
+import { Users, DollarSign, CalendarDays, Banknote, Gift } from "lucide-react";
+import FactoryEmployees from "@/pages/FactoryEmployees";
+import FactoryEmployeePayrollTab from "@/pages/FactoryEmployeePayrollTab";
+import FactoryEmployeeAttendanceTab from "@/pages/FactoryEmployeeAttendanceTab";
+import FactoryEmployeeAdvancesTab from "@/pages/FactoryEmployeeAdvancesTab";
+import FactoryEmployeeBonusesTab from "@/pages/FactoryEmployeeBonusesTab";
 
-type TabValue = "workers" | "payroll" | "attendance" | "advances" | "bonuses";
+type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses";
 
 function getInitialTab(): TabValue {
   const params = new URLSearchParams(window.location.search);
@@ -16,51 +16,51 @@ function getInitialTab(): TabValue {
   if (tab === "attendance") return "attendance";
   if (tab === "advances") return "advances";
   if (tab === "bonuses") return "bonuses";
-  return "workers";
+  return "employees";
 }
 
-export default function FactoryWorkersHub() {
+export default function FactoryEmployeesHub() {
   const [tab, setTab] = useState<TabValue>(getInitialTab);
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
       <TabsList className="mb-4 flex flex-wrap gap-1">
-        <TabsTrigger value="workers" data-testid="tab-workers">
-          <HardHat className="h-4 w-4 mr-2" />
-          Workers
+        <TabsTrigger value="employees" data-testid="tab-employees">
+          <Users className="h-4 w-4 mr-2" />
+          Employees
         </TabsTrigger>
-        <TabsTrigger value="payroll" data-testid="tab-payroll">
+        <TabsTrigger value="payroll" data-testid="tab-employee-payroll">
           <DollarSign className="h-4 w-4 mr-2" />
           Payroll
         </TabsTrigger>
-        <TabsTrigger value="attendance" data-testid="tab-attendance">
+        <TabsTrigger value="attendance" data-testid="tab-employee-attendance">
           <CalendarDays className="h-4 w-4 mr-2" />
           Attendance
         </TabsTrigger>
-        <TabsTrigger value="advances" data-testid="tab-advances">
+        <TabsTrigger value="advances" data-testid="tab-employee-advances">
           <Banknote className="h-4 w-4 mr-2" />
           Advances
         </TabsTrigger>
-        <TabsTrigger value="bonuses" data-testid="tab-bonuses">
+        <TabsTrigger value="bonuses" data-testid="tab-employee-bonuses">
           <Gift className="h-4 w-4 mr-2" />
           Bonuses
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="workers" className="mt-0">
-        <FactoryWorkers />
+      <TabsContent value="employees" className="mt-0">
+        <FactoryEmployees />
       </TabsContent>
       <TabsContent value="payroll" className="mt-0">
-        <FactoryPayrollTab />
+        <FactoryEmployeePayrollTab />
       </TabsContent>
       <TabsContent value="attendance" className="mt-0">
-        <FactoryAttendance />
+        <FactoryEmployeeAttendanceTab />
       </TabsContent>
       <TabsContent value="advances" className="mt-0">
-        <FactoryAdvancesTab />
+        <FactoryEmployeeAdvancesTab />
       </TabsContent>
       <TabsContent value="bonuses" className="mt-0">
-        <FactoryWorkerBonusesTab />
+        <FactoryEmployeeBonusesTab />
       </TabsContent>
     </Tabs>
   );

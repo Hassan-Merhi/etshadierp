@@ -573,6 +573,74 @@ let migrationsDone = false;
       amount decimal(15,2) NOT NULL,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    // Employee attendance tracking
+    `CREATE TABLE IF NOT EXISTS employee_attendance (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      employee_id integer NOT NULL REFERENCES employees(id),
+      attendance_date date NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'Present',
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT employee_attendance_unique UNIQUE (employee_id, attendance_date)
+    )`,
+    `CREATE INDEX IF NOT EXISTS employee_attendance_company_date_idx ON employee_attendance (company_id, attendance_date)`,
+    // Employee advances
+    `CREATE TABLE IF NOT EXISTS employee_advances (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      employee_id integer NOT NULL REFERENCES employees(id),
+      advance_date date NOT NULL,
+      amount decimal(20,2) NOT NULL,
+      remaining_balance decimal(20,2) NOT NULL DEFAULT 0,
+      cash_account_id integer,
+      notes text,
+      fully_paid boolean NOT NULL DEFAULT false,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS employee_advances_company_idx ON employee_advances (company_id)`,
+    `CREATE INDEX IF NOT EXISTS employee_advances_employee_idx ON employee_advances (employee_id)`,
+    // Employee advance repayments
+    `CREATE TABLE IF NOT EXISTS employee_advance_repayments (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      advance_id integer NOT NULL REFERENCES employee_advances(id),
+      employee_id integer NOT NULL,
+      repayment_date date NOT NULL,
+      amount decimal(20,2) NOT NULL,
+      cash_account_id integer,
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS employee_advance_repayments_advance_idx ON employee_advance_repayments (advance_id)`,
+    // Worker bonuses
+    `CREATE TABLE IF NOT EXISTS worker_bonuses (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      worker_id integer NOT NULL REFERENCES factory_workers(id),
+      bonus_date date NOT NULL,
+      amount decimal(20,2) NOT NULL,
+      notes text,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      cash_account_id integer,
+      paid_date date,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS worker_bonuses_company_idx ON worker_bonuses (company_id)`,
+    `CREATE INDEX IF NOT EXISTS worker_bonuses_worker_idx ON worker_bonuses (worker_id)`,
+    // Employee bonuses
+    `CREATE TABLE IF NOT EXISTS employee_bonuses (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      employee_id integer NOT NULL REFERENCES employees(id),
+      bonus_date date NOT NULL,
+      amount decimal(20,2) NOT NULL,
+      notes text,
+      voucher_id integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS employee_bonuses_company_idx ON employee_bonuses (company_id)`,
+    `CREATE INDEX IF NOT EXISTS employee_bonuses_employee_idx ON employee_bonuses (employee_id)`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

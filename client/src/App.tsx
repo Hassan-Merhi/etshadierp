@@ -122,7 +122,7 @@ const WipersReEntry = lazy(() => import("@/pages/WipersReEntry"));
 const FactoryUsers = lazy(() => import("@/pages/FactoryUsers"));
 const FactoryWorkersHub = lazy(() => import("@/pages/FactoryWorkersHub"));
 const FactoryWorkerDetail = lazy(() => import("@/pages/FactoryWorkerDetail"));
-const FactoryEmployees = lazy(() => import("@/pages/FactoryEmployees"));
+const FactoryEmployeesHub = lazy(() => import("@/pages/FactoryEmployeesHub"));
 const FactoryEmployeeDetail = lazy(() => import("@/pages/FactoryEmployeeDetail"));
 const FactorySupplierReport = lazy(() => import("@/pages/FactorySupplierReport"));
 const FactorySupplierStatement = lazy(() => import("@/pages/FactorySupplierStatement"));
@@ -691,7 +691,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees" component={FactoryEmployees} />
+                    <Route path="/factory/employees" component={FactoryEmployeesHub} />
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers" component={FactoryWorkersHub} />
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
