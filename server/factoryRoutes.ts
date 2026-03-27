@@ -2826,10 +2826,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const totalPayments = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
-      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number; totalFreight: number }> = {};
+      const byCurrency: Record<string, { containers: any[]; totalKg: number; totalValue: number; totalCommission: number; totalDirectCommission: number; totalFreight: number; totalOtherCharges: number }> = {};
       for (const s of statement) {
         const cc = s.currencyCode;
-        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
+        if (!byCurrency[cc]) byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
         byCurrency[cc].containers.push(s);
         byCurrency[cc].totalKg += parseFloat(s.actualReceivedKg || s.totalKg || "0");
         byCurrency[cc].totalValue += parseFloat(s.value);
@@ -2837,12 +2837,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const commCc = s.commissionCurrencyCode || cc;
         const totalCommAmt = parseFloat(s.totalCommission);
         if (totalCommAmt > 0) {
-          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
           byCurrency[commCc].totalCommission += totalCommAmt;
         }
         const directCommAmt = parseFloat(s.commissionAmount || "0");
         if (directCommAmt > 0) {
-          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
+          if (!byCurrency[commCc]) byCurrency[commCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
           byCurrency[commCc].totalDirectCommission += directCommAmt;
         }
         // Freight always shows in its own currency bucket in the balance totals (currencyGroups);
@@ -2850,12 +2850,19 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const freightAmt = parseFloat(s.freight || "0");
         const freightCc = s.freightCurrencyCode || cc;
         if (freightAmt > 0) {
-          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0 };
+          if (!byCurrency[freightCc]) byCurrency[freightCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
           byCurrency[freightCc].totalFreight += freightAmt;
           if (freightCc !== cc) {
             byCurrency[freightCc].totalValue += freightAmt;
           }
         }
+      }
+      // Add offload other charges (supplier-linked) into their currency bucket
+      for (const oc of supplierOffloadCharges as any[]) {
+        const ocCc = oc.currencyCode || "USD";
+        if (!byCurrency[ocCc]) byCurrency[ocCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
+        byCurrency[ocCc].totalOtherCharges += parseFloat(oc.amount || "0");
+        byCurrency[ocCc].totalValue += parseFloat(oc.amount || "0");
       }
 
       // Fetch FX transfers involving this supplier (as source or destination)
@@ -2940,14 +2947,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         // For commission-only pools (no containers) the commission IS the balance owed to the
         // supplier (they earned it as a broker). Payments out reduce it directly.
         // For normal container pools, commission is deducted from what we owe them.
-        // Commission-only: no containers, no freight — supplier earns commission as a broker fee
-        const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0 && data.totalFreight <= 0.005;
+        // Commission-only: no containers, no freight, no other charges — supplier earns commission as a broker fee
+        const isCommissionOnly = data.containers.length === 0 && effectiveCommission > 0 && data.totalFreight <= 0.005 && data.totalOtherCharges <= 0.005;
         // Freight pool (cross-currency): no containers, has freight, may also have commission earned by supplier
         const isCrossFreightPool = data.containers.length === 0 && data.totalFreight > 0.005;
         // netPayable semantics:
         //  - Commission-only:  commission is EARNED by supplier → effectiveCommission - paid
-        //  - Cross-freight:    totalValue (=freight) is owed, commission is also EARNED → totalValue + commission - paid
-        //  - Normal container: commission is DEDUCTED (goes to broker) → totalValue - commission - paid
+        //  - Cross-freight:    totalValue (=freight+otherCharges) is owed, commission also EARNED → totalValue + commission - paid
+        //  - Normal container: commission is DEDUCTED (goes to broker); totalValue includes goods+freight+otherCharges → totalValue - commission - paid
         const netPayable = isCommissionOnly
           ? effectiveCommission - paid
           : isCrossFreightPool
@@ -2969,8 +2976,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           netPayable: netPayable.toFixed(2),
           totalOwed: (data.totalValue + effectiveCommission).toFixed(2),
           totalFreight: data.totalFreight.toFixed(2),
+          totalOtherCharges: data.totalOtherCharges.toFixed(2),
         };
-      }).filter(g => Math.abs(parseFloat(g.netPayable)) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD") || parseFloat(g.totalCommission) > 0.005);
+      }).filter(g => Math.abs(parseFloat(g.netPayable)) > 0.005 || (g.containers.length > 0 && g.currencyCode !== "USD") || parseFloat(g.totalCommission) > 0.005 || parseFloat(g.totalOtherCharges) > 0.005);
 
       // Compute the combined USD-equivalent net payable across all currency groups.
       // Correctly accounts for FX transfers (already deducted in paidByCurrency) and
@@ -6164,13 +6172,13 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const insertedAdditionalCharges: any[] = [];
       if (additionalChargesArr.length > 0) {
         for (const charge of additionalChargesArr) {
-          if (charge.description && parseFloat(charge.amount || "0") > 0) {
+          if (parseFloat(charge.amount || "0") > 0) {
             const [inserted] = await db
               .insert(factoryOffloadAdditionalCharges)
               .values({
                 companyId,
                 containerId,
-                description: charge.description,
+                description: charge.description || "Additional Charge",
                 amount: String(charge.amount),
                 currencyCode: charge.currencyCode || currencyCode,
                 fxRateToUsd: String(charge.fxRateToUsd || (currencyCode === "USD" ? "1" : String(fxRate))),

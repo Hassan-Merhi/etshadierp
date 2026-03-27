@@ -139,6 +139,7 @@ function AccountCombobox({ value, onValueChange, accounts, suppliers, placeholde
 
 interface AdditionalChargeRow {
   id: string;
+  description: string;
   amount: string;
   currencyCode: string;
   ledgerAccountId: string;
@@ -616,6 +617,7 @@ export default function ProductionRawStock() {
       additionalCharges: additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map(c => {
         const p = parseAccountValue(c.ledgerAccountId);
         return {
+          description: c.description || "Additional Charge",
           amount: c.amount,
           currencyCode: c.currencyCode || "USD",
           ledgerAccountId: p?.type === "ledger" ? p.id : null,
@@ -1503,7 +1505,7 @@ export default function ProductionRawStock() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), amount: "", currencyCode: currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])}
+                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", currencyCode: currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])}
                       data-testid="button-add-additional-charge"
                     >
                       <Plus className="h-3 w-3 mr-1" /> Add Row
@@ -1511,13 +1513,22 @@ export default function ProductionRawStock() {
                   </div>
                   {additionalCharges.length > 0 && (
                     <div className="mt-2">
-                      <div className="grid grid-cols-[1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                      <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                        <div className="text-xs text-muted-foreground font-medium">Description</div>
                         <div className="text-xs text-muted-foreground font-medium">Amount</div>
                         <div className="text-xs text-muted-foreground font-medium">CCY</div>
                         <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
                         <div />
                         {additionalCharges.map((charge, idx) => (
                           <>
+                            <Input
+                              key={`desc-${charge.id}`}
+                              type="text"
+                              value={charge.description}
+                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
+                              placeholder="e.g. Port fees"
+                              data-testid={`input-addl-description-${idx}`}
+                            />
                             <Input
                               key={`amt-${charge.id}`}
                               type="number"
