@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { format } from "date-fns";
@@ -143,6 +143,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Create location dialog state
   const [createLocationDialogOpen, setCreateLocationDialogOpen] = useState(false);
 
+  // Rename location dialog state
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -154,6 +159,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setPrintWithCost(withCost);
     setViewAllItems(true);
     setTimeout(() => handlePrint(), 150);
+  };
+
+  // Rename location mutation
+  const renameLocationMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      toast({ title: "Location renamed", description: `Renamed to "${updated.name}".` });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      if (selectedLocationLocal?.id === updated.id) {
+        setSelectedLocationLocal(updated);
+      }
+      setRenameDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    setRenamingLocation(loc);
+    setRenameInput(loc.name);
+    setRenameDialogOpen(true);
   };
 
   // Fetch all locations (only for non-POS users)
@@ -1219,9 +1250,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           data-testid={`row-location-${location.id}`}
                         >
                           <td className="px-3 font-medium" data-testid={`name-${location.id}`}>
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              {location.name}
+                            <div className="flex items-center gap-2 justify-between">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                {location.name}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => openRenameDialog(location, e)}
+                                data-testid={`button-rename-location-${location.id}`}
+                                title="Rename location"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -1460,9 +1502,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {selectedLocationLocal && !selectedGroup && !viewAllItems && (
         <div>
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
-            <h1 className="text-xl md:text-3xl font-bold">
-              {selectedLocationLocal.name} - Stock Groups
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl md:text-3xl font-bold">
+                {selectedLocationLocal.name} - Stock Groups
+              </h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => openRenameDialog(selectedLocationLocal, e)}
+                data-testid="button-rename-selected-location"
+                title="Rename location"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               {/* Export dropdown */}
               <DropdownMenu>
@@ -2415,6 +2468,48 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rename Location Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Location</DialogTitle>
+            <DialogDescription>
+              Enter a new name for <strong>{renamingLocation?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={renameInput}
+              onChange={(e) => setRenameInput(e.target.value)}
+              placeholder="Location name"
+              data-testid="input-rename-location"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
+                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (renameInput.trim() && renamingLocation) {
+                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                }
+              }}
+              disabled={!renameInput.trim() || renameLocationMutation.isPending}
+              data-testid="button-rename-confirm"
+            >
+              {renameLocationMutation.isPending ? "Saving..." : "Rename"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

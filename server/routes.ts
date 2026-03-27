@@ -2275,6 +2275,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Rename (update) location
+  app.patch("/api/locations/:locationId", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "name is required" });
+      }
+
+      const [updated] = await db
+        .update(locations)
+        .set({ name: name.trim() })
+        .where(eq(locations.id, locationId))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Delete location
   app.delete("/api/locations/:locationId", requireAuth, async (req, res) => {
     try {

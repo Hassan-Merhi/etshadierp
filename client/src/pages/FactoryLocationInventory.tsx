@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, MapPin, Layers, Package, Search, Printer, ArrowUpDown,
-  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2
+  FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -135,6 +135,11 @@ export default function FactoryLocationInventory() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [savedProformaId, setSavedProformaId] = useState<number | null>(null);
 
+  // Rename location dialog state
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState<FactoryBaleProduct | null>(null);
@@ -250,6 +255,33 @@ export default function FactoryLocationInventory() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // Rename location mutation
+  const renameLocationMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      toast({ title: "Location renamed", description: `Renamed to "${updated.name}".` });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      if (selectedLocation?.id === updated.id) {
+        setSelectedLocation(updated);
+      }
+      setRenameDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    setRenamingLocation(loc);
+    setRenameInput(loc.name);
+    setRenameDialogOpen(true);
+  };
 
   // On mount: read URL params for edit-mode deep-link
   useEffect(() => {
@@ -865,9 +897,20 @@ export default function FactoryLocationInventory() {
                         data-testid={`row-location-${location.id}`}
                       >
                         <td className="px-3 font-medium">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            {location.name}
+                          <div className="flex items-center gap-2 justify-between">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              {location.name}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => openRenameDialog(location, e)}
+                              data-testid={`button-rename-location-${location.id}`}
+                              title="Rename location"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -903,9 +946,20 @@ export default function FactoryLocationInventory() {
     return (
       <div className="p-4 md:p-6 max-w-5xl mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
-          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
-            {selectedLocation.name} — Categories
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
+              {selectedLocation.name} — Categories
+            </h1>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => openRenameDialog(selectedLocation, e)}
+              data-testid="button-rename-selected-location"
+              title="Rename location"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={handleBackToLocations} data-testid="button-back-locations">
               <ChevronLeft className="h-4 w-4 mr-1" /> Locations
@@ -1942,6 +1996,48 @@ export default function FactoryLocationInventory() {
               data-testid="button-delete-confirm"
             >
               {removeBalesMutation.isPending ? "Removing..." : `Remove ${deleteQty} Bale(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Location Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Location</DialogTitle>
+            <DialogDescription>
+              Enter a new name for <strong>{renamingLocation?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={renameInput}
+              onChange={(e) => setRenameInput(e.target.value)}
+              placeholder="Location name"
+              data-testid="input-rename-location"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
+                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (renameInput.trim() && renamingLocation) {
+                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                }
+              }}
+              disabled={!renameInput.trim() || renameLocationMutation.isPending}
+              data-testid="button-rename-confirm"
+            >
+              {renameLocationMutation.isPending ? "Saving..." : "Rename"}
             </Button>
           </DialogFooter>
         </DialogContent>
