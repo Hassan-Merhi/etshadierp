@@ -285,10 +285,11 @@ export function VoucherEntriesTable({
                     <FormItem>
                       <FormControl>
                         <Input
-                          {...field}
+                          value={field.value}
+                          name={field.name}
                           placeholder="Type to search account..."
                           className="text-sm"
-                          data-testid={`input-account-${index}`}
+                          data-testid={`input-account-mobile-${index}`}
                           onChange={(e) => {
                             field.onChange(e);
                             setSidebarSearchValue(e.target.value);
@@ -333,7 +334,7 @@ export function VoucherEntriesTable({
                   variant="ghost"
                   size="icon"
                   onClick={() => remove(index)}
-                  data-testid={`button-remove-${index}`}
+                  data-testid={`button-remove-mobile-${index}`}
                   className="shrink-0"
                 >
                   <X className="h-4 w-4" />
@@ -351,12 +352,14 @@ export function VoucherEntriesTable({
                     <span className="text-xs text-muted-foreground w-14 shrink-0">Amount</span>
                     <FormControl>
                       <Input
-                        {...field}
+                        value={field.value}
+                        name={field.name}
+                        onChange={field.onChange}
                         type="number"
                         step="0.01"
                         placeholder="0.00"
                         className="font-mono text-right"
-                        data-testid={`input-amount-${index}`}
+                        data-testid={`input-amount-mobile-${index}`}
                         onKeyDown={(e) => handleAmountKeyDown(e, index)}
                         onBlur={(e) => handleAmountBlur(e, index)}
                         onFocus={() => onRowFocus(index, "amount")}
@@ -377,7 +380,7 @@ export function VoucherEntriesTable({
             variant="outline"
             size="sm"
             onClick={handleAddRow}
-            data-testid="button-add-row"
+            data-testid="button-add-row-mobile"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Row

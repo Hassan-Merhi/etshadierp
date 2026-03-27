@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -834,6 +834,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Calculate total
   const entries = form.watch("entries");
+  const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce(
     (sum, entry) => sum + (parseFloat(entry.amount) || 0),
     0
@@ -1565,14 +1566,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Sync active row's accountName to sidebar search (like POS does with itemName)
   useEffect(() => {
     if (activeRowIndex !== null) {
-      const entries = form.watch("entries");
-      const activeEntry = entries[activeRowIndex];
+      const activeEntry = watchedEntries[activeRowIndex];
       if (activeEntry) {
         setSidebarSearchValue(activeEntry.accountName || "");
         setSidebarHighlightedIndex(0);
       }
     }
-  }, [form.watch("entries"), activeRowIndex]);
+  }, [watchedEntries, activeRowIndex]);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -4122,7 +4122,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 <FormItem className="shrink-0">
                                   <Select value={field.value} onValueChange={(v: "DR" | "CR") => handleJournalTypeChange(index, v)}>
                                     <FormControl>
-                                      <SelectTrigger className="w-16 text-center font-medium" data-testid={`input-journal-type-${index}`}>
+                                      <SelectTrigger className="w-16 text-center font-medium" data-testid={`input-journal-type-mobile-${index}`}>
                                         <SelectValue placeholder="DR" />
                                       </SelectTrigger>
                                     </FormControl>
@@ -4155,7 +4155,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }, 200);
                                 }}
                                 placeholder="Type to search account..."
-                                data-testid={`input-journal-account-${index}`}
+                                data-testid={`input-journal-account-mobile-${index}`}
                                 className="text-sm"
                               />
                               {activeJournalRow === index && filteredJournalAccounts.length > 0 && (
@@ -4185,7 +4185,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               )}
                             </div>
                             {journalFields.length > 1 && (
-                              <Button type="button" variant="ghost" size="icon" onClick={() => removeJournal(index)} data-testid={`button-journal-remove-${index}`} className="shrink-0">
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeJournal(index)} data-testid={`button-journal-remove-mobile-${index}`} className="shrink-0">
                                 <X className="h-4 w-4" />
                               </Button>
                             )}
@@ -4205,7 +4205,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       min="0"
                                       placeholder="0.00"
                                       className="font-mono text-right"
-                                      data-testid={`input-journal-amount-${index}`}
+                                      data-testid={`input-journal-amount-mobile-${index}`}
                                       onBlur={(e) => {
                                         const v = Number(e.target.value);
                                         if (!isNaN(v) && v > 0 && selectedCurrency !== "USD") {
@@ -4228,7 +4228,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         variant="outline"
                         size="sm"
                         onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
-                        data-testid="button-journal-add-row"
+                        data-testid="button-journal-add-row-mobile"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Row
@@ -4870,7 +4870,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-muted-foreground font-medium">#{index + 1}</span>
                             {transferFields.length > 1 && (
-                              <Button type="button" variant="ghost" size="icon" onClick={() => removeTransfer(index)} className="h-7 w-7" data-testid={`button-remove-transfer-${index}`}>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeTransfer(index)} className="h-7 w-7" data-testid={`button-remove-transfer-mobile-${index}`}>
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             )}
@@ -4903,7 +4903,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }, 250);
                                 }}
                                 placeholder="Type location..."
-                                data-testid={`input-source-${index}`}
+                                data-testid={`input-source-mobile-${index}`}
                                 className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                               />
                               {mobileFilteredLocs.length > 0 && (
@@ -4965,7 +4965,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 }, 200);
                               }}
                               placeholder="Type to search item..."
-                              data-testid={`input-item-name-${index}`}
+                              data-testid={`input-item-name-mobile-${index}`}
                               className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                             />
                             {mobileFilteredItems.length > 0 && (
@@ -5002,7 +5002,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 value={entry?.quantity || ""}
                                 onChange={(e) => stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value)}
                                 placeholder="0"
-                                data-testid={`input-transfer-quantity-${index}`}
+                                data-testid={`input-transfer-quantity-mobile-${index}`}
                                 className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                               />
                             </div>
@@ -5015,7 +5015,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   value={entry?.rate || ""}
                                   onChange={(e) => stockTransferForm.setValue(`entries.${index}.rate`, e.target.value)}
                                   placeholder="0.00"
-                                  data-testid={`input-transfer-rate-${index}`}
+                                  data-testid={`input-transfer-rate-mobile-${index}`}
                                   className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                                 />
                               </div>
@@ -5035,7 +5035,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <div className="flex items-center justify-between pt-1 px-0.5">
                       <Button type="button" variant="outline" size="sm"
                         onClick={() => appendTransfer({ sourceLocationId: 0, sourceLocationName: "", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "" })}
-                        data-testid="button-add-transfer-row"
+                        data-testid="button-add-transfer-row-mobile"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Row
@@ -5876,7 +5876,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground font-medium">#{index + 1}</span>
                                 {adjustmentFields.length > 1 && (
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAdjustment(index)} className="h-7 w-7" data-testid={`button-remove-adjustment-${index}`}>
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAdjustment(index)} className="h-7 w-7" data-testid={`button-remove-adjustment-mobile-${index}`}>
                                     <X className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
@@ -5893,7 +5893,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       else if (val.startsWith('c')) stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME");
                                     }}
                                     placeholder="p / c"
-                                    data-testid={`input-adjustment-type-${index}`}
+                                    data-testid={`input-adjustment-type-mobile-${index}`}
                                     className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                                   />
                                 </div>
@@ -5936,7 +5936,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }, 200);
                                   }}
                                   placeholder="Type to search item..."
-                                  data-testid={`input-adjustment-item-${index}`}
+                                  data-testid={`input-adjustment-item-mobile-${index}`}
                                   className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                                 />
                                 {mobileAdjItems.length > 0 && (
@@ -5968,7 +5968,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     value={currentEntry?.quantity || ""}
                                     onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
                                     placeholder="0"
-                                    data-testid={`input-adjustment-qty-${index}`}
+                                    data-testid={`input-adjustment-qty-mobile-${index}`}
                                     className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                                   />
                                 </div>
@@ -5980,7 +5980,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     value={currentEntry?.rate || ""}
                                     onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.rate`, e.target.value)}
                                     placeholder="0.00"
-                                    data-testid={`input-adjustment-rate-${index}`}
+                                    data-testid={`input-adjustment-rate-mobile-${index}`}
                                     className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring font-mono text-right"
                                   />
                                 </div>
@@ -5997,7 +5997,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <div className="flex items-center justify-between pt-1 px-0.5">
                           <Button type="button" variant="outline" size="sm"
                             onClick={() => appendAdjustment({ type: "CONSUME", stockItemId: 0, stockItemCode: "", stockItemName: "", quantity: "", rate: "" })}
-                            data-testid="button-add-adjustment-row"
+                            data-testid="button-add-adjustment-row-mobile"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Row
