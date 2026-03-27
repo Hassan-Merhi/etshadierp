@@ -1948,7 +1948,6 @@
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Bale Stock Entry</h1>
-            <p className="text-muted-foreground text-sm mt-1">Scan products and enter bales directly into stock</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <DailyStockSummary />

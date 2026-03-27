@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, CalendarDays, RefreshCw, Pencil, Check, X } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -304,11 +304,12 @@ export default function BalesHistory() {
   const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
   const todayStr = new Date().toISOString().split("T")[0];
+  const summaryDate = dateFilter || todayStr;
   const todayInStock = (balesData || []).filter((row: any) => {
     const bale = row.bale;
     if (bale.status !== "IN_STOCK") return false;
     const baleDate = bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : null;
-    return baleDate === todayStr;
+    return baleDate === summaryDate;
   });
 
   // Robust classification: check category → productName → product.name with includes() matching
@@ -360,38 +361,33 @@ export default function BalesHistory() {
         <Card className="border-dashed">
           <CardContent className="py-2 px-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground font-medium">Today&apos;s In Stock</span>
-              </div>
+              <Input
+                type="date"
+                value={summaryDate}
+                onChange={(e) => setDateFilter(e.target.value || todayStr)}
+                className="h-7 w-36 text-xs px-2 py-1 border-muted-foreground/30"
+                data-testid="input-summary-date"
+              />
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold" data-testid="text-today-qty">{regularQty} qty</span>
                 <span className="text-sm font-semibold" data-testid="text-today-kg">{formatLabelNum(regularKg)} kg</span>
               </div>
-              {garbageQty > 0 && (
-                <>
-                  <div className="w-px h-4 bg-border" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground font-medium">Garbage</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold" data-testid="text-today-garbage-qty">{garbageQty} qty</span>
-                    <span className="text-sm font-semibold" data-testid="text-today-garbage-kg">{formatLabelNum(garbageKg)} kg</span>
-                  </div>
-                </>
-              )}
-              {wipersQty > 0 && (
-                <>
-                  <div className="w-px h-4 bg-border" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground font-medium">Wipers</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold" data-testid="text-today-wipers-qty">{wipersQty} qty</span>
-                    <span className="text-sm font-semibold" data-testid="text-today-wipers-kg">{formatLabelNum(wipersKg)} kg</span>
-                  </div>
-                </>
-              )}
+              <>
+                <div className="w-px h-4 bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">Garbage</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold" data-testid="text-today-garbage-qty">{garbageQty} qty</span>
+                  <span className="text-sm font-semibold" data-testid="text-today-garbage-kg">{formatLabelNum(garbageKg)} kg</span>
+                </div>
+              </>
+              <>
+                <div className="w-px h-4 bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">Wipers</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold" data-testid="text-today-wipers-qty">{wipersQty} qty</span>
+                  <span className="text-sm font-semibold" data-testid="text-today-wipers-kg">{formatLabelNum(wipersKg)} kg</span>
+                </div>
+              </>
             </div>
           </CardContent>
         </Card>
