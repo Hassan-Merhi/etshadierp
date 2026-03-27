@@ -4074,3 +4074,19 @@ export const insertFactoryWorkerCategorySchema = createInsertSchema(factoryWorke
 });
 export type InsertFactoryWorkerCategory = z.infer<typeof insertFactoryWorkerCategorySchema>;
 export type FactoryWorkerCategory = typeof factoryWorkerCategories.$inferSelect;
+
+// Agent Accounts — a curated subset of ledger accounts shown on the Agents page
+export const agentAccounts = pgTable("agent_accounts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  accountId: varchar("account_id", { length: 50 }).notNull(), // e.g. "ledger-123" composite id
+  accountType: varchar("account_type", { length: 50 }).notNull(),
+  accountName: varchar("account_name", { length: 300 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("agent_accounts_company_account_unique").on(t.companyId, t.accountId),
+}));
+
+export const insertAgentAccountSchema = createInsertSchema(agentAccounts).omit({ id: true, createdAt: true });
+export type InsertAgentAccount = z.infer<typeof insertAgentAccountSchema>;
+export type AgentAccount = typeof agentAccounts.$inferSelect;

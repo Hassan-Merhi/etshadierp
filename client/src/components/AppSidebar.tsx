@@ -31,6 +31,7 @@ import {
   ExternalLink,
   AlertTriangle,
   Tag,
+  UserRound,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import {
@@ -102,6 +103,7 @@ const navEntries: NavEntry[] = [
     icon: Calculator,
     items: [
       { title: "Accounts", url: "/accounts", icon: Wallet },
+      { title: "Agents", url: "/agents", icon: UserRound },
       { title: "Suppliers", url: "/suppliers", icon: Users },
       { title: "Customers", url: "/customers", icon: Users },
       { title: "Payroll", url: "/payroll", icon: UserCheck },

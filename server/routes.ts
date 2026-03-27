@@ -145,6 +145,7 @@ import {
   baleLabelPrints,
   factoryDaybookEntries,
   factorySettings,
+  agentAccounts,
   FEATURE_KEYS,
 } from "@shared/schema";
 import { z } from "zod";
@@ -38229,6 +38230,46 @@ if (asOfDate) {
       res.end();
     } catch (error: any) {
       console.error('Net profit Excel export error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Agent Accounts ──────────────────────────────────────────────────────
+  app.get("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db.select().from(agentAccounts).where(eq(agentAccounts.companyId, companyId));
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { accountId, accountType, accountName } = req.body;
+      if (!accountId || !accountType || !accountName) return res.status(400).json({ message: "accountId, accountType, and accountName are required" });
+      const [row] = await db.insert(agentAccounts)
+        .values({ companyId, accountId, accountType, accountName })
+        .onConflictDoUpdate({ target: [agentAccounts.companyId, agentAccounts.accountId], set: { accountName, accountType } })
+        .returning();
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/agent-accounts/:accountId", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accountId = decodeURIComponent(req.params.accountId);
+      await db.delete(agentAccounts).where(and(eq(agentAccounts.companyId, companyId), eq(agentAccounts.accountId, accountId)));
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

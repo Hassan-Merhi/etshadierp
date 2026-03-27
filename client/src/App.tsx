@@ -37,6 +37,7 @@ const POS = lazy(() => import("@/pages/POS"));
 const StockItems = lazy(() => import("@/pages/StockItems"));
 const Containers = lazy(() => import("@/pages/Containers"));
 const Accounts = lazy(() => import("@/pages/Accounts"));
+const Agents = lazy(() => import("@/pages/Agents"));
 const FactoryAccounts = lazy(() => import("@/pages/FactoryAccounts"));
 const FactoryVouchers = lazy(() => import("@/pages/FactoryVouchers"));
 const Suppliers = lazy(() => import("@/pages/Suppliers"));
@@ -223,6 +224,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/pos-import" component={POSImport} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/accounts" component={Accounts} />
+      <Route path="/agents" component={Agents} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/customers" component={Customers} />
       <Route path="/vouchers">{() => <Vouchers />}</Route>

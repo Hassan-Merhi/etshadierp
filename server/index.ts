@@ -694,6 +694,15 @@ let migrationsDone = false;
       notes text,
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS agent_accounts (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      account_id varchar(50) NOT NULL,
+      account_type varchar(50) NOT NULL,
+      account_name varchar(300) NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      UNIQUE(company_id, account_id)
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's
