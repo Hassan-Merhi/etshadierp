@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -57,6 +57,14 @@ interface StatementData {
   openingBalanceSide: string;
 }
 
+function fmtMoney(value: number): string {
+  const abs = Math.abs(value);
+  if (abs % 1 === 0) {
+    return `$${Math.round(abs).toLocaleString()}`;
+  }
+  return `$${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function FactoryCustomerStatement() {
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
@@ -92,6 +100,7 @@ export default function FactoryCustomerStatement() {
   }
 
   const { customer, invoices, balanceHistory, currentBalance, currentBalanceSide, openingBalance, openingBalanceSide } = statement;
+  const hasOpeningBalance = Number(openingBalance || 0) !== 0;
 
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
@@ -142,25 +151,27 @@ export default function FactoryCustomerStatement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className={`grid grid-cols-1 gap-4 mb-6 ${hasOpeningBalance ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
             <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
-              {currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {fmtMoney(currentBalance)}
             </p>
             <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">{currentBalanceSide}</Badge>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
-            <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
-              {Number(openingBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
-          </CardContent>
-        </Card>
+        {hasOpeningBalance && (
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
+              <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
+                {fmtMoney(Number(openingBalance || 0))}
+              </p>
+              <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
@@ -228,13 +239,13 @@ export default function FactoryCustomerStatement() {
                       {inv.totalQtyBales ?? "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-subtotal-${inv.id}`}>
-                      {Number(inv.subtotalBales || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtMoney(Number(inv.subtotalBales || 0))}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-invoice-charges-${inv.id}`}>
-                      {(Number(inv.freightAmount || 0) + Number(inv.otherChargesTotal || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtMoney(Number(inv.freightAmount || 0) + Number(inv.otherChargesTotal || 0))}
                     </TableCell>
                     <TableCell className="text-right font-mono font-bold" data-testid={`text-invoice-total-${inv.id}`}>
-                      {Number(inv.grandTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtMoney(Number(inv.grandTotal || 0))}
                     </TableCell>
                   </TableRow>
                 ))
@@ -279,16 +290,16 @@ export default function FactoryCustomerStatement() {
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
                       {Number(entry.debitAmount || 0) > 0
-                        ? Number(entry.debitAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        ? fmtMoney(Number(entry.debitAmount))
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
                       {Number(entry.creditAmount || 0) > 0
-                        ? Number(entry.creditAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        ? fmtMoney(Number(entry.creditAmount))
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
-                      {Math.abs(entry.runningBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtMoney(Math.abs(entry.runningBalance))}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">{entry.runningBalanceSide}</Badge>

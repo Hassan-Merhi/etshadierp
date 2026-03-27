@@ -10964,17 +10964,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       const customersWithBalances = await Promise.all(
         allCustomers.map(async (customer) => {
-          // Always read balance from customerBalances (factory receivable ledger).
-          // Previously this branched on ledgerAccountId and read from ERP voucherEntries,
-          // but voucherEntries only contains charge-specific journal entries — the bale
-          // subtotal is never posted there — so that path showed balance = charges only.
-          const [balRow] = await db.select({ total: sql<string>`COALESCE(SUM(CAST(debit_amount AS numeric) - CAST(credit_amount AS numeric)), 0)` })
+          // Compute balance from actual FINALIZED invoice grand totals (not stale customerBalances.debitAmount)
+          // plus any non-invoice ledger adjustments (payments, credit notes, etc.)
+          const [salesRow] = await db.select({ total: sql<string>`COALESCE(SUM(CAST(grand_total AS numeric)), 0)` })
+            .from(customerOrders)
+            .where(and(
+              eq(customerOrders.customerId, customer.id),
+              eq(customerOrders.companyId, companyId),
+              eq(customerOrders.status, "FINALIZED"),
+            ));
+          const salesTotal = parseFloat(salesRow?.total || "0");
+
+          // Non-invoice entries: payments received, manual adjustments, opening balance entries
+          const [nonInvRow] = await db.select({ net: sql<string>`COALESCE(SUM(CAST(debit_amount AS numeric) - CAST(credit_amount AS numeric)), 0)` })
             .from(customerBalances)
-            .where(and(eq(customerBalances.customerId, customer.id), eq(customerBalances.companyId, companyId)));
-          const customerBal = parseFloat(balRow?.total || "0");
+            .where(and(
+              eq(customerBalances.customerId, customer.id),
+              eq(customerBalances.companyId, companyId),
+              sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
+            ));
+          const nonInvNet = parseFloat(nonInvRow?.net || "0");
+
           const openingBalance = parseFloat(customer.openingBalance || "0");
           const openingSide = customer.openingBalanceSide || "Dr";
-          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBal;
+          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet;
           return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
         })
       );
@@ -11139,6 +11152,35 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           eq(customerOrders.status, "FINALIZED"),
         ))
         .orderBy(desc(customerOrders.createdAt));
+
+      // Auto-sync: update any INVOICE-type balance rows whose debitAmount differs from
+      // the current invoice grandTotal (happens when the invoice was repriced after finalization)
+      const invoiceBalanceEntries = await db.select({
+        id: customerBalances.id,
+        referenceId: customerBalances.referenceId,
+        debitAmount: customerBalances.debitAmount,
+      }).from(customerBalances)
+        .where(and(
+          eq(customerBalances.companyId, companyId),
+          eq(customerBalances.customerId, customerId),
+          eq(customerBalances.referenceType, "INVOICE"),
+        ));
+
+      for (const entry of invoiceBalanceEntries) {
+        if (!entry.referenceId) continue;
+        const [inv] = await db.select({ grandTotal: customerOrders.grandTotal })
+          .from(customerOrders)
+          .where(eq(customerOrders.id, entry.referenceId));
+        if (inv) {
+          const storedAmt = parseFloat(entry.debitAmount || "0");
+          const actualAmt = parseFloat(inv.grandTotal || "0");
+          if (Math.abs(storedAmt - actualAmt) > 0.001) {
+            await db.update(customerBalances)
+              .set({ debitAmount: String(actualAmt), balance: String(actualAmt) })
+              .where(eq(customerBalances.id, entry.id));
+          }
+        }
+      }
 
       // Get all balance history entries ordered by date
       const balanceRows = await db.select().from(customerBalances)

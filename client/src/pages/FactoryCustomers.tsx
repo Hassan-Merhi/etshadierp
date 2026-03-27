@@ -212,7 +212,9 @@ export default function FactoryCustomers() {
                       <TableCell className="text-right font-mono">
                         {customer.balance !== undefined ? (
                           <span data-testid={`text-customer-balance-${customer.id}`}>
-                            {customer.balance.toFixed(2)}{" "}
+                            {customer.balance % 1 === 0
+                              ? `$${Math.round(customer.balance).toLocaleString()}`
+                              : `$${customer.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}{" "}
                             <span className="text-xs text-muted-foreground">{customer.balanceSide}</span>
                           </span>
                         ) : (
