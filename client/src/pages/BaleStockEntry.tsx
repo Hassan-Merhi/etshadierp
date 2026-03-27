@@ -1890,9 +1890,10 @@
     const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
     const dayGarbage = dayInStock.filter((row: any) => getCategory(row) === "garbage");
     const dayWipers = dayInStock.filter((row: any) => getCategory(row) === "wipers");
+    const dayRegular = dayInStock.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
 
-    const totalQty = dayInStock.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-    const totalKg = dayInStock.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    const totalQty = dayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+    const totalKg = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
     const garbageQty = dayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
     const garbageKg = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
     const wipersQty = dayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
