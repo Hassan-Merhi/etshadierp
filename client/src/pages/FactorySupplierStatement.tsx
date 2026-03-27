@@ -26,6 +26,33 @@ import { formatNumber } from "@/lib/formatNumber";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
 
+/**
+ * Canonical row total helper.
+ *
+ * Priority:
+ *  1. `finalPayableAmount` — set by the backend at offload time. It includes every charge
+ *     (base payable + freight + other charges + commission + duty) converted to container
+ *     currency. This is the ground truth for offloaded containers.
+ *  2. Fallback for pre-offload containers: `value + commissionAmount`.
+ *     `value` = kg × rate + same-currency freight (no commission).
+ *     `commissionAmount` is the pre-offload estimate stored on the container record.
+ *     Note: commissionAmount may be in a different currency; this is a best-estimate only.
+ *
+ * Using this helper everywhere prevents the row from diverging from the backend-posted total
+ * and eliminates the visual double-charge when commission is already inside finalPayableAmount.
+ */
+function getRowTotalOwed(c: any): number {
+  const fp = parseFloat(c.finalPayableAmount ?? "");
+  if (!isNaN(fp) && fp > 0) return fp;
+  return parseFloat(c.value || "0") + parseFloat(c.commissionAmount || "0");
+}
+
+/** True when the row is using the backend canonical total (post-offload). */
+function rowUsesCanonical(c: any): boolean {
+  const fp = parseFloat(c.finalPayableAmount ?? "");
+  return !isNaN(fp) && fp > 0;
+}
+
 export default function FactorySupplierStatement() {
   const { formatDisplayDate } = useDateFormat();
   const [companyId, setCompanyId] = useState<number | null>(null);
@@ -63,6 +90,8 @@ export default function FactorySupplierStatement() {
 
   const getRate = (cc: string) => parseFloat(estimatedRates[cc] || (cc === "USD" ? "1" : "0")) || 0;
 
+  // Group totals come from the backend's canonical totalOwed / netPayable fields.
+  // We do not recompute them on the frontend to avoid divergence.
   const estimatedUsdTotal = statement?.currencyGroups
     ? statement.currencyGroups.reduce((sum: number, g: any) => {
         const rate = getRate(g.currencyCode);
@@ -159,42 +188,55 @@ export default function FactorySupplierStatement() {
                         <TableHead className="text-right">Kg</TableHead>
                         <TableHead className="text-right">Rate</TableHead>
                         <TableHead className="text-right">Value ({group.currencyCode})</TableHead>
-                        <TableHead className="text-right">Commission Owed</TableHead>
-                        <TableHead className="text-right">Total Owed</TableHead>
+                        <TableHead className="text-right">Commission</TableHead>
+                        <TableHead className="text-right">
+                          Total Owed
+                          <span className="block text-xs font-normal text-muted-foreground">(all charges)</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {group.containers.map((c: any) => (
-                        <TableRow key={c.id} data-testid={`row-container-${c.id}`}>
-                          <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {c.date ? formatDisplayDate(c.date) : "—"}
-                          </TableCell>
-                          <TableCell>{c.origin || "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{c.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatNumber(parseFloat(c.actualReceivedKg || c.totalKg || "0"))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatNumber(parseFloat(c.ratePerKg || "0"))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatNumber(parseFloat(c.value))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(c.commissionAmount || "0") > 0 ? (
-                              <span className="text-amber-600 dark:text-amber-400">
-                                {formatNumber(parseFloat(c.commissionAmount))} {c.commissionCurrencyCode}
-                              </span>
-                            ) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatNumber(parseFloat(c.value) + parseFloat(c.commissionAmount || "0"))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {group.containers.map((c: any) => {
+                        const rowTotal = getRowTotalOwed(c);
+                        const isCanonical = rowUsesCanonical(c);
+                        return (
+                          <TableRow key={c.id} data-testid={`row-container-${c.id}`}>
+                            <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {c.date ? formatDisplayDate(c.date) : "—"}
+                            </TableCell>
+                            <TableCell>{c.origin || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{c.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(parseFloat(c.actualReceivedKg || c.totalKg || "0"))}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(parseFloat(c.ratePerKg || "0"))}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium">
+                              {formatNumber(parseFloat(c.value))}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(c.commissionAmount || "0") > 0 ? (
+                                <span className="text-amber-600 dark:text-amber-400">
+                                  {formatNumber(parseFloat(c.commissionAmount))} {c.commissionCurrencyCode}
+                                  {isCanonical && (
+                                    <span className="block text-xs text-muted-foreground font-normal">incl. in total</span>
+                                  )}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium" data-testid={`text-row-total-${c.id}`}>
+                              {formatNumber(rowTotal)}
+                              {!isCanonical && (
+                                <span className="block text-xs text-muted-foreground font-normal">est.</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -211,16 +253,38 @@ export default function FactorySupplierStatement() {
                     </div>
                     {parseFloat(group.totalDirectCommission || "0") > 0 && (
                       <div className="flex justify-between gap-8">
-                        <span className="text-amber-600 dark:text-amber-400">Commission Owed</span>
+                        <span className="text-amber-600 dark:text-amber-400">Commission</span>
                         <span className="font-mono text-amber-600 dark:text-amber-400">+{formatNumber(parseFloat(group.totalDirectCommission))} {group.currencyCode}</span>
                       </div>
                     )}
                     <div className="flex justify-between gap-8 border-t pt-1">
                       <span className="font-medium">Total Owed</span>
-                      <span className="font-mono font-bold">{formatNumber(parseFloat(group.totalOwed || group.totalValue))} {group.currencyCode}</span>
+                      <span className="font-mono font-bold" data-testid={`text-group-total-${group.currencyCode}`}>
+                        {formatNumber(parseFloat(group.totalOwed || group.totalValue))} {group.currencyCode}
+                      </span>
                     </div>
+                    {parseFloat(group.totalPaid || "0") > 0 && (
+                      <div className="flex justify-between gap-8">
+                        <span className="text-muted-foreground">Paid</span>
+                        <span className="font-mono text-green-600 dark:text-green-400">−{formatNumber(parseFloat(group.totalPaid))} {group.currencyCode}</span>
+                      </div>
+                    )}
+                    {parseFloat(group.netPayable || "0") !== parseFloat(group.totalOwed || group.totalValue) && (
+                      <div className="flex justify-between gap-8 border-t pt-1">
+                        <span className="font-medium">Net Payable</span>
+                        <span className="font-mono font-bold" data-testid={`text-group-net-${group.currencyCode}`}>
+                          {formatNumber(parseFloat(group.netPayable))} {group.currencyCode}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                <p className="text-xs text-muted-foreground mt-3">
+                  Row totals marked <span className="italic">est.</span> are pre-offload estimates (goods + commission).
+                  Offloaded rows show the backend-posted total which includes all charges.
+                  Group totals are always computed by the server.
+                </p>
               </CardContent>
             </Card>
           ))}
@@ -260,6 +324,7 @@ export default function FactorySupplierStatement() {
                 <div className="space-y-2 text-sm">
                   {statement.currencyGroups.map((g: any) => {
                     const rate = getRate(g.currencyCode);
+                    // Always use the backend-computed totalOwed for the USD estimate — never recompute.
                     const totalOwed = parseFloat(g.totalOwed || g.netPayable);
                     const usdEq = totalOwed * rate;
                     return (
@@ -302,7 +367,8 @@ export default function FactorySupplierStatement() {
                   Commission Earned (as Broker)
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Containers where this supplier is the commission/broker — commission owed to them.
+                  Containers where this supplier earns commission as broker — a separate obligation
+                  from the supplier's own goods payable shown above.
                 </p>
               </CardHeader>
               <CardContent>
@@ -314,7 +380,7 @@ export default function FactorySupplierStatement() {
                         <TableHead>Purchase Supplier</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Commission</TableHead>
+                        <TableHead className="text-right">Commission Earned</TableHead>
                         <TableHead className="text-right">Currency</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -342,12 +408,16 @@ export default function FactorySupplierStatement() {
                 </div>
                 <div className="mt-3 flex justify-end">
                   <div className="text-sm font-medium">
-                    Total Commission Owed:{" "}
+                    Total Commission Earned:{" "}
                     <span className="font-mono text-green-600 dark:text-green-400" data-testid="text-broker-commission-total">
                       {formatNumber(parseFloat(statement.summary?.totalBrokerCommission || "0"))}
                     </span>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This commission is earned by this supplier acting as broker on another supplier's container.
+                  It is tracked separately and does not overlap with the goods payable above.
+                </p>
               </CardContent>
             </Card>
           )}
