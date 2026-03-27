@@ -8800,6 +8800,31 @@ if (asOfDate) {
     }
   });
 
+  app.delete("/api/fixed-assets/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid asset ID" });
+
+      // Check for linked voucher entries
+      const entryCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM voucher_entries WHERE fixed_asset_id = ${id}`);
+      const entryCount = parseInt((entryCheck.rows[0] as any)?.cnt || "0");
+      if (entryCount > 0) {
+        return res.status(400).json({ message: `Cannot delete: this asset has ${entryCount} voucher entry/entries. Remove related transactions first.` });
+      }
+
+      const [deleted] = await db.delete(fixedAssets)
+        .where(and(eq(fixedAssets.id, id), eq(fixedAssets.companyId, companyId)))
+        .returning({ id: fixedAssets.id });
+
+      if (!deleted) return res.status(404).json({ message: "Fixed asset not found" });
+      res.json({ message: "Fixed asset deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // PO Import - Parse and Preview Excel
   app.post(
     "/api/po-import/parse",

@@ -1035,6 +1035,53 @@ export default function Accounts() {
     },
   });
 
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async () => {
+      if (!employeeToEdit) throw new Error("No employee selected");
+      return await modeApiRequest("DELETE", `/api/factory/employees/${employeeToEdit.accountId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Employee deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
+      setEmployeeToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to delete employee", variant: "destructive" });
+    },
+  });
+
+  const deleteWorkerMutation = useMutation({
+    mutationFn: async (workerId: number) => {
+      return await modeApiRequest("DELETE", `/api/factory/workers/${workerId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Worker deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to delete worker", variant: "destructive" });
+    },
+  });
+
+  const deleteFixedAssetMutation = useMutation({
+    mutationFn: async (assetId: number) => {
+      return await modeApiRequest("DELETE", `/api/fixed-assets/${assetId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Fixed asset deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to delete fixed asset", variant: "destructive" });
+    },
+  });
+
   const deleteFactorySupplierMutation = useMutation({
     mutationFn: async (supplierId: number) => {
       return await modeApiRequest("DELETE", `/api/factory/suppliers/${supplierId}/permanent`);
@@ -1213,6 +1260,10 @@ export default function Accounts() {
     }
     if (customerToEdit) {
       setPendingDelete(() => () => deleteCustomerMutation.mutate());
+      return;
+    }
+    if (employeeToEdit) {
+      setPendingDelete(() => () => deleteEmployeeMutation.mutate());
       return;
     }
     if (!accountToEdit) return;
@@ -2592,6 +2643,8 @@ export default function Accounts() {
                         const isSelected = isLedgerSelected || isBankSelected || isSupplierSelected || isCustomerSelected || isEmployeeSelected;
 
                         const isFactorySupplier = account.type === "factorySupplier";
+                        const isFactoryWorker = account.type === "factoryWorker";
+                        const isFixedAsset = account.type === "fixedAsset";
 
                         return (
                           <button
@@ -2689,22 +2742,23 @@ export default function Accounts() {
                                 {account.type}
                               </Badge>
                               <span className="text-sm flex-1 text-left">{account.name}</span>
-                              {isFactorySupplier && (
+                              {(isFactorySupplier || isFactoryWorker || isFixedAsset) && (
                                 <span
                                   role="button"
                                   className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setPendingDelete(() => () => deleteFactorySupplierMutation.mutate(account.accountId as number));
+                                    if (isFactorySupplier) {
+                                      setPendingDelete(() => () => deleteFactorySupplierMutation.mutate(account.accountId as number));
+                                    } else if (isFactoryWorker) {
+                                      setPendingDelete(() => () => deleteWorkerMutation.mutate(account.accountId as number));
+                                    } else if (isFixedAsset) {
+                                      setPendingDelete(() => () => deleteFixedAssetMutation.mutate(account.accountId as number));
+                                    }
                                   }}
-                                  data-testid={`button-delete-factory-supplier-${account.accountId}`}
+                                  data-testid={`button-delete-account-inline-${account.accountId}`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
-                                </span>
-                              )}
-                              {!isEditable && !isFactorySupplier && (
-                                <span className="ml-auto text-xs text-muted-foreground italic shrink-0">
-                                  (View only)
                                 </span>
                               )}
                             </div>
@@ -2869,20 +2923,18 @@ export default function Accounts() {
                           )}
                         </div>
                         <div className="flex gap-2 justify-between">
-                          {!employeeToEdit && (
                           <Button
                             type="button"
                             variant="destructive"
                             onClick={handleDeleteAccount}
-                            disabled={deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending}
+                            disabled={deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending}
                             data-testid="button-delete-account"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            {(deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending)
+                            {(deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending)
                               ? "Deleting..."
                               : "Delete"}
                           </Button>
-                          )}
                           <div className="flex gap-2">
                             <Button
                               type="button"

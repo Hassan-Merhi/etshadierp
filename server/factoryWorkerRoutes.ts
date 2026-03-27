@@ -2764,4 +2764,38 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
+
+  // DELETE /api/factory/workers/:id - Permanently delete a factory worker
+  app.delete("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid worker ID" });
+
+      // Check if the worker has any bale entries
+      const baleCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status != 'REMOVED'`);
+      const baleCount = parseInt((baleCheck.rows[0] as any)?.cnt || "0");
+      if (baleCount > 0) {
+        return res.status(400).json({ message: `Cannot delete: this worker has ${baleCount} bale entries. Remove all bale entries first.` });
+      }
+
+      // Check for payroll entries
+      const payrollCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM worker_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`);
+      const payrollCount = parseInt((payrollCheck.rows[0] as any)?.cnt || "0");
+      if (payrollCount > 0) {
+        return res.status(400).json({ message: `Cannot delete: this worker has ${payrollCount} payroll record(s).` });
+      }
+
+      const [deleted] = await db.delete(factoryWorkers)
+        .where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)))
+        .returning({ id: factoryWorkers.id });
+
+      if (!deleted) return res.status(404).json({ message: "Worker not found" });
+      res.json({ message: "Worker deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting factory worker:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
