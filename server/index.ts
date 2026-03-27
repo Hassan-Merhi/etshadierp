@@ -680,6 +680,19 @@ let migrationsDone = false;
       worker_ids jsonb NOT NULL DEFAULT '[]',
       created_at timestamp NOT NULL DEFAULT now()
     )`,
+    `CREATE TABLE IF NOT EXISTS factory_raw_material_adjustments (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      date varchar(20) NOT NULL,
+      type varchar(10) NOT NULL,
+      kg decimal(15,3) NOT NULL,
+      cost_per_kg decimal(20,4) DEFAULT '0',
+      currency_code varchar(10) DEFAULT 'USD',
+      supplier_id integer,
+      material_label varchar(200),
+      notes text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   // Health check registered BEFORE registerRoutes so it takes precedence over the
   // one in routes.ts. Returns 503 while migrations are running — this tells Render's

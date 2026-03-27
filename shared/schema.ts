@@ -2497,6 +2497,23 @@ export const insertFactoryRawStockSchema = createInsertSchema(factoryRawStock).o
 export type InsertFactoryRawStock = z.infer<typeof insertFactoryRawStockSchema>;
 export type FactoryRawStock = typeof factoryRawStock.$inferSelect;
 
+// Manual raw material adjustments (add/remove stock without affecting supplier balances)
+export const factoryRawMaterialAdjustments = pgTable("factory_raw_material_adjustments", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  date: varchar("date", { length: 20 }).notNull(),
+  type: varchar("type", { length: 10 }).notNull(), // "ADD" or "REMOVE"
+  kg: decimal("kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).default("0"),
+  currencyCode: varchar("currency_code", { length: 10 }).default("USD"),
+  supplierId: integer("supplier_id"), // optional: link to a factory supplier row
+  materialLabel: varchar("material_label", { length: 200 }), // for standalone manual materials
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type FactoryRawMaterialAdjustment = typeof factoryRawMaterialAdjustments.$inferSelect;
+
 export const factorySupplierPayments = pgTable("factory_supplier_payments", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

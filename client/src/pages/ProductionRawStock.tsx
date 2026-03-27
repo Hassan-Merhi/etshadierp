@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { Button } from "@/components/ui/button";
@@ -198,6 +198,98 @@ interface ContainerOption {
   commissionSupplierId?: number | null;
 }
 
+function AdjustmentsHistoryCard({ deleteAdjustmentMutation }: {
+  deleteAdjustmentMutation: any;
+}) {
+  const { formatDisplayDate } = useDateFormat();
+  const [open, setOpen] = useState(false);
+  const { data: adjustments, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/raw-stock/adjustments"],
+    enabled: open,
+  });
+
+  if (!open) {
+    return (
+      <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => setOpen(true)} data-testid="button-show-adjustments-history">
+        <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
+        Show Manual Stock Adjustments History
+      </Button>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <SlidersHorizontal className="h-4 w-4" />
+          Manual Stock Adjustments
+        </CardTitle>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)} data-testid="button-hide-adjustments-history">
+          <X className="h-3.5 w-3.5 mr-1" />
+          Hide
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : adjustments && adjustments.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Material / Supplier</TableHead>
+                <TableHead className="text-right">Qty (kg)</TableHead>
+                <TableHead className="text-right">Cost/kg</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {adjustments.map((adj: any) => (
+                <TableRow key={adj.id} data-testid={`row-adjustment-${adj.id}`}>
+                  <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(adj.date)}</TableCell>
+                  <TableCell>
+                    <Badge variant={adj.type === "ADD" ? "default" : "secondary"} data-testid={`badge-adj-type-${adj.id}`}>
+                      {adj.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {adj.materialLabel || adj.supplierName || `Supplier #${adj.supplierId}`}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{parseFloat(adj.kg).toFixed(3)}</TableCell>
+                  <TableCell className="text-right font-mono text-muted-foreground">
+                    {adj.type === "ADD" && parseFloat(adj.costPerKg) > 0
+                      ? `${adj.currencyCode} ${parseFloat(adj.costPerKg).toFixed(4)}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{adj.notes || "—"}</TableCell>
+                  <TableCell>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteAdjustmentMutation.mutate(adj.id)}
+                      disabled={deleteAdjustmentMutation.isPending}
+                      data-testid={`button-delete-adjustment-${adj.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-center text-muted-foreground py-6 text-sm">No manual adjustments recorded yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProductionRawStock() {
   const { formatDisplayDate } = useDateFormat();
   const [offloadDialogOpen, setOffloadDialogOpen] = useState(false);
@@ -254,6 +346,17 @@ export default function ProductionRawStock() {
   // OB delete
   const [deleteObDialogOpen, setDeleteObDialogOpen] = useState(false);
   const [deletingObRecord, setDeletingObRecord] = useState<{ rawStockId: number; supplierName: string; containerNumber: string } | null>(null);
+  // Raw stock adjustment dialog
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [adjustingRow, setAdjustingRow] = useState<{ supplierId: number | null; supplierName: string } | null>(null);
+  const [adjType, setAdjType] = useState<"ADD" | "REMOVE">("ADD");
+  const [adjKg, setAdjKg] = useState("");
+  const [adjCostPerKg, setAdjCostPerKg] = useState("");
+  const [adjCurrency, setAdjCurrency] = useState("USD");
+  const [adjNotes, setAdjNotes] = useState("");
+  const [adjDate, setAdjDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [adjMaterialLabel, setAdjMaterialLabel] = useState("");
+  const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
   // Mix batch section state
   const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
   const [mixBatchStatusFilter, setMixBatchStatusFilter] = useState<string>("OPEN");
@@ -407,6 +510,60 @@ export default function ProductionRawStock() {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDeleteObDialogOpen(false);
+    },
+  });
+
+  const createAdjustmentMutation = useMutation({
+    mutationFn: async (payload: {
+      type: "ADD" | "REMOVE";
+      kg: string;
+      costPerKg: string;
+      currencyCode: string;
+      supplierId?: number | null;
+      materialLabel?: string;
+      notes?: string;
+      date: string;
+    }) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/adjustment", payload);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to save adjustment");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/adjustments"] });
+      setAdjustDialogOpen(false);
+      setAdjKg("");
+      setAdjCostPerKg("");
+      setAdjNotes("");
+      setAdjMaterialLabel("");
+      toast({ title: "Saved", description: "Stock adjustment recorded successfully." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAdjustmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/raw-stock/adjustments/${id}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/adjustments"] });
+      toast({ title: "Deleted", description: "Adjustment removed." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -912,16 +1069,38 @@ export default function ProductionRawStock() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
           <CardTitle>Raw Stock by Supplier</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => recalculateMutation.mutate()}
-            disabled={recalculateMutation.isPending}
-            data-testid="button-recalculate-used-kg"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
-            Recalculate Used kg
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAdjIsNewMaterial(true);
+                setAdjustingRow(null);
+                setAdjType("ADD");
+                setAdjKg("");
+                setAdjCostPerKg("");
+                setAdjCurrency("USD");
+                setAdjNotes("");
+                setAdjMaterialLabel("");
+                setAdjDate(new Date().toISOString().split("T")[0]);
+                setAdjustDialogOpen(true);
+              }}
+              data-testid="button-add-manual-material"
+            >
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+              New Manual Material
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => recalculateMutation.mutate()}
+              disabled={recalculateMutation.isPending}
+              data-testid="button-recalculate-used-kg"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
+              Recalculate Used kg
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -958,8 +1137,11 @@ export default function ProductionRawStock() {
                         {row.supplierName}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={isOB ? "secondary" : "outline"} data-testid={`badge-source-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}>
-                          {isOB ? "Opening" : "Container"}
+                        <Badge
+                          variant={isOB ? "secondary" : row.sourceType === "MANUAL" ? "secondary" : "outline"}
+                          data-testid={`badge-source-${row.supplierId || idx}${isOB ? "-ob" : "-ct"}`}
+                        >
+                          {isOB ? "Opening" : row.sourceType === "MANUAL" ? "Manual" : "Container"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
@@ -990,6 +1172,26 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid={`button-adjust-stock-${row.supplierId || idx}`}
+                          onClick={() => {
+                            setAdjIsNewMaterial(false);
+                            setAdjustingRow({ supplierId: row.supplierId ?? null, supplierName: row.supplierName });
+                            setAdjType("ADD");
+                            setAdjKg("");
+                            setAdjCostPerKg(row.costPerKgUsd || row.costPerKg || "");
+                            setAdjCurrency(row.currencyCode || "USD");
+                            setAdjNotes("");
+                            setAdjMaterialLabel("");
+                            setAdjDate(new Date().toISOString().split("T")[0]);
+                            setAdjustDialogOpen(true);
+                          }}
+                        >
+                          <SlidersHorizontal className="h-3 w-3 mr-1" />
+                          Adjust
+                        </Button>
                         {isOB && remaining > 0 && (
                           <Button
                             size="sm"
@@ -1099,6 +1301,9 @@ export default function ProductionRawStock() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Manual Stock Adjustments History ── */}
+      <AdjustmentsHistoryCard deleteAdjustmentMutation={deleteAdjustmentMutation} />
 
       {/* ── Mix Batches Section ── */}
       <Card>
@@ -2430,6 +2635,158 @@ export default function ProductionRawStock() {
               {deleteObMutation.isPending ? "Deleting..." : "Yes, Delete"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Raw Stock Adjustment Dialog ── */}
+      <Dialog open={adjustDialogOpen} onOpenChange={(open) => {
+        setAdjustDialogOpen(open);
+        if (!open) { setAdjustingRow(null); setAdjIsNewMaterial(false); }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {adjIsNewMaterial
+                ? "Add New Manual Material"
+                : `Adjust Stock — ${adjustingRow?.supplierName ?? ""}`}
+            </DialogTitle>
+            <DialogDescription>
+              {adjIsNewMaterial
+                ? "Create a standalone raw material entry not linked to any container or supplier. This will not affect any supplier or broker balance."
+                : "Add or remove kg from this supplier's stock total. This will not affect any supplier or broker balance."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {adjIsNewMaterial && (
+              <div className="space-y-1">
+                <Label>Material Name</Label>
+                <Input
+                  value={adjMaterialLabel}
+                  onChange={(e) => setAdjMaterialLabel(e.target.value)}
+                  placeholder="e.g. Waste Regrind, Local Purchase..."
+                  data-testid="input-adj-material-label"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label>Adjustment Type</Label>
+              <Select value={adjType} onValueChange={(v) => setAdjType(v as "ADD" | "REMOVE")}>
+                <SelectTrigger data-testid="select-adj-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADD">Add Stock (increase received kg)</SelectItem>
+                  <SelectItem value="REMOVE">Remove Stock (increase used kg)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Quantity (kg)</Label>
+                <Input
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  value={adjKg}
+                  onChange={(e) => setAdjKg(e.target.value)}
+                  placeholder="0.000"
+                  data-testid="input-adj-kg"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={adjDate}
+                  onChange={(e) => setAdjDate(e.target.value)}
+                  data-testid="input-adj-date"
+                />
+              </div>
+            </div>
+
+            {adjType === "ADD" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Cost / kg (optional)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={adjCostPerKg}
+                    onChange={(e) => setAdjCostPerKg(e.target.value)}
+                    placeholder="0.0000"
+                    data-testid="input-adj-cost-per-kg"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Select value={adjCurrency} onValueChange={setAdjCurrency}>
+                    <SelectTrigger data-testid="select-adj-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="PKR">PKR</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="AED">AED</SelectItem>
+                      <SelectItem value="CNY">CNY</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={adjNotes}
+                onChange={(e) => setAdjNotes(e.target.value)}
+                placeholder="Reason for adjustment..."
+                rows={2}
+                data-testid="input-adj-notes"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setAdjustDialogOpen(false)} data-testid="button-adj-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!adjKg || parseFloat(adjKg) <= 0) {
+                  toast({ title: "Error", description: "Please enter a valid kg amount.", variant: "destructive" });
+                  return;
+                }
+                if (adjIsNewMaterial && !adjMaterialLabel.trim()) {
+                  toast({ title: "Error", description: "Please enter a material name.", variant: "destructive" });
+                  return;
+                }
+                if (!adjDate) {
+                  toast({ title: "Error", description: "Please select a date.", variant: "destructive" });
+                  return;
+                }
+                createAdjustmentMutation.mutate({
+                  type: adjType,
+                  kg: adjKg,
+                  costPerKg: adjCostPerKg || "0",
+                  currencyCode: adjCurrency,
+                  supplierId: adjIsNewMaterial ? null : (adjustingRow?.supplierId ?? null),
+                  materialLabel: adjIsNewMaterial ? adjMaterialLabel.trim() : undefined,
+                  notes: adjNotes || undefined,
+                  date: adjDate,
+                });
+              }}
+              disabled={createAdjustmentMutation.isPending}
+              data-testid="button-adj-confirm"
+            >
+              {createAdjustmentMutation.isPending ? "Saving..." : "Save Adjustment"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

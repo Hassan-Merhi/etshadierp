@@ -73,6 +73,7 @@ import {
   factoryWorkers,
   factoryWorkerCategories,
   insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
   factoryPayrolls,
   factoryWorkerDocuments,
   factoryAlerts,
@@ -5840,6 +5841,67 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
       }
 
+      // Fetch manual adjustments and merge into supplierMap
+      const adjustments = await db.select().from(factoryRawMaterialAdjustments)
+        .where(eq(factoryRawMaterialAdjustments.companyId, companyId));
+
+      for (const adj of adjustments) {
+        const kg = parseFloat(adj.kg as string) || 0;
+        const costPerKgAdj = parseFloat(adj.costPerKg as string) || 0;
+        const isAdd = adj.type === "ADD";
+        let key: string;
+        let supplierName: string;
+        let supplierId: number | null = null;
+        if (adj.supplierId) {
+          // Find supplier name from existing map entries or fetch inline
+          const existingEntry = Array.from(supplierMap.entries()).find(([, v]) => v.supplierId === adj.supplierId);
+          if (existingEntry) {
+            key = existingEntry[0];
+            supplierName = existingEntry[1].supplierName;
+            supplierId = adj.supplierId;
+          } else {
+            // Supplier exists in adjustments but no container raw stock yet - create new row
+            const [sup] = await db.select({ name: factorySuppliers.name })
+              .from(factorySuppliers)
+              .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
+              .limit(1);
+            supplierName = sup?.name || `Supplier #${adj.supplierId}`;
+            key = `${supplierName}__ADJ_${adj.supplierId}`;
+            supplierId = adj.supplierId;
+          }
+        } else {
+          // Standalone manual material (no supplier)
+          supplierName = adj.materialLabel || "Manual Stock";
+          key = `MANUAL__${supplierName}`;
+        }
+
+        if (supplierMap.has(key)) {
+          const existing = supplierMap.get(key)!;
+          if (isAdd) {
+            const prevCost = existing._totalReceived * existing._avgCostPerKg;
+            const newCost = kg * costPerKgAdj;
+            existing._totalReceived += kg;
+            existing._avgCostPerKg = existing._totalReceived > 0
+              ? (prevCost + newCost) / existing._totalReceived : 0;
+            existing._avgCostPerKgUsd = existing._avgCostPerKg; // use same for manual
+          } else {
+            existing._totalUsed += kg;
+          }
+        } else {
+          supplierMap.set(key, {
+            supplierName,
+            supplierId,
+            sourceType: "MANUAL",
+            currencyCode: adj.currencyCode || "USD",
+            _totalReceived: isAdd ? kg : 0,
+            _totalUsed: isAdd ? 0 : kg,
+            _avgCostPerKg: costPerKgAdj,
+            _avgCostPerKgUsd: costPerKgAdj,
+            lastOffloaded: adj.createdAt,
+          });
+        }
+      }
+
       const reservedRows = await db
         .select({
           supplierId: factoryMixBatchSources.supplierId,
@@ -5886,6 +5948,79 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       res.json(aggregated);
     } catch (error: any) {
       console.error("Error fetching factory raw stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET all adjustments for display/audit
+  app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db.select({
+        id: factoryRawMaterialAdjustments.id,
+        companyId: factoryRawMaterialAdjustments.companyId,
+        date: factoryRawMaterialAdjustments.date,
+        type: factoryRawMaterialAdjustments.type,
+        kg: factoryRawMaterialAdjustments.kg,
+        costPerKg: factoryRawMaterialAdjustments.costPerKg,
+        currencyCode: factoryRawMaterialAdjustments.currencyCode,
+        supplierId: factoryRawMaterialAdjustments.supplierId,
+        supplierName: factorySuppliers.name,
+        materialLabel: factoryRawMaterialAdjustments.materialLabel,
+        notes: factoryRawMaterialAdjustments.notes,
+        createdAt: factoryRawMaterialAdjustments.createdAt,
+      })
+        .from(factoryRawMaterialAdjustments)
+        .leftJoin(factorySuppliers, and(
+          eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id),
+          eq(factorySuppliers.companyId, companyId)
+        ))
+        .where(eq(factoryRawMaterialAdjustments.companyId, companyId))
+        .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST create a new adjustment (ADD or REMOVE), or create a new standalone manual material
+  app.post("/api/factory/raw-stock/adjustment", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, date } = req.body;
+      if (!type || !["ADD", "REMOVE"].includes(type)) return res.status(400).json({ message: "type must be ADD or REMOVE" });
+      if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
+      if (!date) return res.status(400).json({ message: "date is required" });
+      const [inserted] = await db.insert(factoryRawMaterialAdjustments).values({
+        companyId,
+        date,
+        type,
+        kg: String(parseFloat(kg)),
+        costPerKg: costPerKg ? String(parseFloat(costPerKg)) : "0",
+        currencyCode: currencyCode || "USD",
+        supplierId: supplierId ? Number(supplierId) : null,
+        materialLabel: materialLabel || null,
+        notes: notes || null,
+      }).returning();
+      res.json(inserted);
+    } catch (error: any) {
+      console.error("Error creating raw stock adjustment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE a specific adjustment
+  app.delete("/api/factory/raw-stock/adjustments/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      await db.delete(factoryRawMaterialAdjustments)
+        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
