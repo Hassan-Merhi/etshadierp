@@ -5554,19 +5554,30 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
         if (container) {
           const today = new Date().toISOString().split("T")[0];
+          const voucherDate = container.arrivalDate || today;
           for (const charge of newCharges) {
             const chargeAmt = parseFloat(charge.amount || "0");
             if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
+            // Use the charge's own currency, not the container's currency
+            const chargeCcy = charge.currencyCode || container.currencyCode || "USD";
+            let chargeFxRate: string;
+            if (chargeCcy === "USD") {
+              chargeFxRate = "1";
+            } else if (chargeCcy === (container.currencyCode || "USD")) {
+              chargeFxRate = String(parseFloat(container.fxRateToUsd || "1"));
+            } else {
+              chargeFxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
+            }
             const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
             const [ocVoucher] = await db.insert(vouchers).values({
               companyId,
               voucherType: "Journal",
               voucherNumber: ocVoucherNum,
-              voucherDate: container.arrivalDate || today,
+              voucherDate,
               description: `${charge.description} - container ${container.containerNumber}`,
               totalAmount: String(chargeAmt),
-              currency: container.currencyCode || "USD",
-              exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+              currency: chargeCcy,
+              exchangeRate: chargeFxRate,
               sourceModule: "FACTORY",
             }).returning();
             // Dr Factory Charges Payable
@@ -6232,15 +6243,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       for (const charge of additionalChargesArr) {
         const chargeAmount = parseFloat(charge.amount || "0");
         if (charge.description && chargeAmount > 0) {
+          const chargeDaybookCcy = charge.currencyCode || currencyCode;
+          const chargeDaybookFx = parseFloat(charge.fxRateToUsd || String(fxRate));
           await writeDaybookEntry(db, {
             companyId,
             txDate: offloadDate,
             txType: "OTHER_CHARGE",
             referenceId: containerId,
             description: `${charge.description} on container ${container.containerNumber}`,
-            currencyCode,
+            currencyCode: chargeDaybookCcy,
             amountCurrency: chargeAmount,
-            fxRateToUsd: fxRate,
+            fxRateToUsd: chargeDaybookFx,
           });
         }
       }
@@ -6362,6 +6375,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (chargeAmount <= 0) continue;
         // Must have either a ledger account or a supplier selected
         if (!inserted.ledgerAccountId && !inserted.supplierId) continue;
+        // Use the charge's own currency/FX rate, not the container's
+        const addlChargeCcy = inserted.currencyCode || currencyCode;
+        const addlChargeFx = String(parseFloat(inserted.fxRateToUsd || String(fxRate)));
         const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
         const [ocVoucher] = await db.insert(vouchers).values({
           companyId,
@@ -6370,8 +6386,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           voucherDate: offloadDate,
           description: `${inserted.description} - container ${container.containerNumber}`,
           totalAmount: String(chargeAmount),
-          currency: currencyCode,
-          exchangeRate: String(fxRate),
+          currency: addlChargeCcy,
+          exchangeRate: addlChargeFx,
           sourceModule: "FACTORY",
         }).returning();
         // Dr Factory Charges Payable
