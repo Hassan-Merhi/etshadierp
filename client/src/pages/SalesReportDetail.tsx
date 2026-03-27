@@ -72,6 +72,17 @@ const formatNumericValue = (value: string | number): string => {
 const profitColor = (v: number) =>
   v > 0 ? "text-green-600 dark:text-green-400" : v < 0 ? "text-red-600 dark:text-red-400" : "";
 
+const LOCATION_PALETTE = [
+  { dot: "bg-blue-500", text: "text-blue-700 dark:text-blue-300", badge: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700" },
+  { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300", badge: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700" },
+  { dot: "bg-violet-500", text: "text-violet-700 dark:text-violet-300", badge: "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-700" },
+  { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300", badge: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700" },
+  { dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-300", badge: "bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700" },
+  { dot: "bg-cyan-500", text: "text-cyan-700 dark:text-cyan-300", badge: "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700" },
+  { dot: "bg-orange-500", text: "text-orange-700 dark:text-orange-300", badge: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-700" },
+  { dot: "bg-pink-500", text: "text-pink-700 dark:text-pink-300", badge: "bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-700" },
+];
+
 export default function SalesReportDetail() {
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
@@ -180,6 +191,15 @@ export default function SalesReportDetail() {
   itemGroups.forEach((g) => {
     g.locationBreakdown.sort((a, b) => a.locationName.localeCompare(b.locationName));
   });
+
+  // Build a stable color map for all unique locations (all companies view or multiple locations)
+  const allLocKeys = Array.from(new Set(filteredItems.map((i) => String(i.locationId ?? "no-location"))));
+  const locationColorMap = new Map<string, typeof LOCATION_PALETTE[0]>();
+  allLocKeys.forEach((key, idx) => {
+    locationColorMap.set(key, LOCATION_PALETTE[idx % LOCATION_PALETTE.length]);
+  });
+  // Apply colors when multiple distinct locations exist (all-companies view or item sold in many locations)
+  const multipleLocations = allLocKeys.length > 1;
 
   const toggleItem = (key: string) => {
     setExpandedItems((prev) => {
@@ -379,14 +399,26 @@ export default function SalesReportDetail() {
                               }
                             </TableCell>
                             <TableCell className="py-2">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span>{group.stockItemName}</span>
                                 {group.stockItemCode && (
                                   <span className="text-xs text-muted-foreground font-normal">{group.stockItemCode}</span>
                                 )}
-                                <Badge variant="secondary" className="text-xs font-normal">
-                                  {group.locationBreakdown.length} loc{group.locationBreakdown.length !== 1 ? "s" : ""}
-                                </Badge>
+                                {multipleLocations && group.locationBreakdown.length > 1 ? (
+                                  <div className="flex items-center gap-1">
+                                    {group.locationBreakdown.map((loc) => {
+                                      const color = locationColorMap.get(loc.locationKey);
+                                      return color ? (
+                                        <span key={loc.locationKey} title={loc.locationName} className={`inline-block h-2 w-2 rounded-full ${color.dot}`} />
+                                      ) : null;
+                                    })}
+                                    <span className="text-xs text-muted-foreground">{group.locationBreakdown.length} locs</span>
+                                  </div>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs font-normal">
+                                    {group.locationBreakdown.length} loc{group.locationBreakdown.length !== 1 ? "s" : ""}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono py-2">{formatNumber(group.totalQty)}</TableCell>
@@ -427,12 +459,26 @@ export default function SalesReportDetail() {
                                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                                     }
                                   </TableCell>
-                                  <TableCell className="py-1.5 pl-4 text-muted-foreground">
+                                  <TableCell className="py-1.5 pl-4">
                                     <div className="flex items-center gap-2">
-                                      <span>{loc.locationName}</span>
-                                      <Badge variant="outline" className="text-xs font-normal">
-                                        {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
-                                      </Badge>
+                                      {multipleLocations && (() => {
+                                        const color = locationColorMap.get(loc.locationKey);
+                                        return color ? (
+                                          <span className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${color.dot}`} />
+                                        ) : null;
+                                      })()}
+                                      <span className={multipleLocations ? (locationColorMap.get(loc.locationKey)?.text ?? "text-muted-foreground") : "text-muted-foreground"}>
+                                        {loc.locationName}
+                                      </span>
+                                      {multipleLocations ? (
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-normal ${locationColorMap.get(loc.locationKey)?.badge ?? ""}`}>
+                                          {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
+                                        </span>
+                                      ) : (
+                                        <Badge variant="outline" className="text-xs font-normal">
+                                          {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
+                                        </Badge>
+                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatNumber(loc.totalQty)}</TableCell>
@@ -461,10 +507,7 @@ export default function SalesReportDetail() {
                                   >
                                     <TableCell className="py-1 w-6"></TableCell>
                                     <TableCell className="py-1 pl-10 text-muted-foreground">
-                                      <div className="flex items-center gap-2">
-                                        <span>{item.voucherNumber}</span>
-                                        <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
-                                      </div>
+                                      <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
                                     </TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
@@ -527,15 +570,27 @@ export default function SalesReportDetail() {
                       >
                         <CardContent className="p-3 space-y-2">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {isExpanded
                                 ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                 : <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               }
                               <span className="font-medium text-sm">{group.stockItemName}</span>
-                              <Badge variant="secondary" className="text-xs font-normal">
-                                {group.locationBreakdown.length} loc{group.locationBreakdown.length !== 1 ? "s" : ""}
-                              </Badge>
+                              {multipleLocations && group.locationBreakdown.length > 1 ? (
+                                <div className="flex items-center gap-1">
+                                  {group.locationBreakdown.map((loc) => {
+                                    const color = locationColorMap.get(loc.locationKey);
+                                    return color ? (
+                                      <span key={loc.locationKey} title={loc.locationName} className={`inline-block h-2 w-2 rounded-full ${color.dot}`} />
+                                    ) : null;
+                                  })}
+                                  <span className="text-xs text-muted-foreground">{group.locationBreakdown.length} locs</span>
+                                </div>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs font-normal">
+                                  {group.locationBreakdown.length} loc{group.locationBreakdown.length !== 1 ? "s" : ""}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-1 text-xs">
@@ -572,10 +627,22 @@ export default function SalesReportDetail() {
                                         ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                                         : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                                       }
-                                      <span className="text-sm font-medium">{loc.locationName}</span>
-                                      <Badge variant="outline" className="text-xs font-normal">
-                                        {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
-                                      </Badge>
+                                      {multipleLocations && (() => {
+                                        const color = locationColorMap.get(loc.locationKey);
+                                        return color ? <span className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${color.dot}`} /> : null;
+                                      })()}
+                                      <span className={`text-sm font-medium ${multipleLocations ? (locationColorMap.get(loc.locationKey)?.text ?? "") : ""}`}>
+                                        {loc.locationName}
+                                      </span>
+                                      {multipleLocations ? (
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-normal ${locationColorMap.get(loc.locationKey)?.badge ?? ""}`}>
+                                          {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
+                                        </span>
+                                      ) : (
+                                        <Badge variant="outline" className="text-xs font-normal">
+                                          {loc.items.length} sale{loc.items.length !== 1 ? "s" : ""}
+                                        </Badge>
+                                      )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-1 text-xs pl-5">
                                       <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumber(loc.totalQty)}</span></div>
@@ -597,7 +664,6 @@ export default function SalesReportDetail() {
                                     {loc.items.map((item) => (
                                       <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
                                         <div className="flex items-center justify-between gap-2">
-                                          <span className="text-muted-foreground">{item.voucherNumber}</span>
                                           <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-1 mt-1">
