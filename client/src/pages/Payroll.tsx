@@ -2551,6 +2551,7 @@ export default function Payroll() {
 
           return (
             <div className="space-y-4">
+              {/* Header */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <h2 className="text-lg font-semibold">Worker Profiles</h2>
@@ -2586,7 +2587,6 @@ export default function Payroll() {
                       </button>
                     );
                   })}
-                  {/* Ungrouped workers button */}
                   {(() => {
                     const ungroupedCount = workerStaff.filter(w => !workerGroups.some(g => (g.members || []).some(m => m.id === w.id))).length;
                     if (ungroupedCount === 0) return null;
@@ -2603,17 +2603,21 @@ export default function Payroll() {
                 </div>
               )}
 
-              <input
-                type="text"
+              {/* Search */}
+              <Input
                 placeholder="Search by name, code, or department..."
                 value={workerProfileSearch}
                 onChange={(e) => setWorkerProfileSearch(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
                 data-testid="input-search-worker-profiles"
               />
 
+              {/* Card grid */}
               {employeesLoading ? (
-                <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-md bg-muted animate-pulse" />)}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-36 rounded-md bg-muted animate-pulse" />
+                  ))}
+                </div>
               ) : filteredWorkers.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center text-muted-foreground">
@@ -2622,64 +2626,62 @@ export default function Payroll() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Group</TableHead>
-                            <TableHead className="text-right">Base Salary</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredWorkers.map((worker) => (
-                            <TableRow
-                              key={worker.id}
-                              className="cursor-pointer hover-elevate"
-                              onClick={() => setSelectedWorkerProfileId(worker.id)}
-                              data-testid={`row-worker-profile-${worker.id}`}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {filteredWorkers.map((worker) => {
+                    const initials = getEmpInitials(worker.firstName, worker.lastName);
+                    const avatarColor = getEmpAvatarColor(`${worker.firstName}${worker.lastName}`);
+                    const isActive = worker.active !== false;
+                    return (
+                      <Card
+                        key={worker.id}
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => setSelectedWorkerProfileId(worker.id)}
+                        data-testid={`card-worker-profile-${worker.id}`}
+                      >
+                        <CardContent className="p-4 flex flex-col items-center text-center relative">
+                          <div className="absolute top-3 right-3">
+                            <Badge
+                              variant={isActive ? "default" : "secondary"}
+                              className="text-xs"
+                              data-testid={`badge-worker-status-${worker.id}`}
                             >
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                                    {(worker.firstName?.[0] ?? "").toUpperCase()}{(worker.lastName?.[0] ?? "").toUpperCase()}
-                                  </div>
-                                  <span className="font-medium text-sm" data-testid={`text-worker-name-${worker.id}`}>{worker.firstName} {worker.lastName}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {workerGroupMap[worker.id]
-                                  ? <Badge variant="secondary" className="text-xs">{workerGroupMap[worker.id]}</Badge>
-                                  : <span className="text-xs text-muted-foreground">—</span>}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm" data-testid={`text-worker-salary-${worker.id}`}>{formatAmount(parseFloat(worker.monthlySalary || "0"))}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={`text-xs ${worker.active === false ? "text-muted-foreground" : "text-green-700 dark:text-green-400"}`} data-testid={`badge-worker-status-${worker.id}`}>
-                                  {worker.active === false ? "Inactive" : "Active"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-xs"
-                                  onClick={(e) => { e.stopPropagation(); setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
-                                  data-testid={`button-edit-profile-worker-${worker.id}`}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
+                              {isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <Avatar className="h-14 w-14 mt-1 mb-3">
+                            <AvatarFallback className={`text-base font-semibold ${avatarColor}`}>
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <p className="font-semibold text-sm leading-tight uppercase" data-testid={`text-worker-name-${worker.id}`}>
+                            {worker.firstName} {worker.lastName}
+                          </p>
+                          {worker.code && (
+                            <p className="text-xs text-muted-foreground mt-0.5 font-mono" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</p>
+                          )}
+                          {workerGroupMap[worker.id] && (
+                            <Badge variant="secondary" className="mt-2 text-xs">
+                              {workerGroupMap[worker.id]}
+                            </Badge>
+                          )}
+                          <p className="font-mono text-sm font-medium mt-2" data-testid={`text-worker-salary-${worker.id}`}>
+                            {formatAmount(parseFloat(worker.monthlySalary || "0"))}
+                          </p>
+                          <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
+                              data-testid={`button-edit-profile-worker-${worker.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );
