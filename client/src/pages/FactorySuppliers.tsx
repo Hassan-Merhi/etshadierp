@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers, AlertTriangle
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers, AlertTriangle, Info, Eye, TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -208,6 +208,10 @@ export default function FactorySuppliers() {
     enabled: !!statementSupplierId,
     retry: 1,
   });
+
+  // Broker statement view toggle: "broker-only" shows only the broker's own balance;
+  // "combined" adds linked supplier exposure to each KPI card.
+  const [brokerView, setBrokerView] = useState<"broker-only" | "combined">("broker-only");
 
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
@@ -1142,7 +1146,7 @@ export default function FactorySuppliers() {
               const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
               const currencyGroups: any[] = statementData.currencyGroups || [];
 
-              // For broker statements: aggregate linked supplier balances by currency for KPIs
+              // Broker: aggregate linked supplier net balances by currency
               const linkedGroups: any[] = statementData.linkedSupplierGroups || [];
               const linkedBalMap: Record<string, number> = {};
               if (isBrokerStatement) {
@@ -1155,28 +1159,35 @@ export default function FactorySuppliers() {
                   }
                 }
               }
-              // Merge own currencyGroups + linked balances into one map
-              const kpiMap: Record<string, { own: number; linked: number; totalFreight: number }> = {};
+
+              // Own currency net balances
+              const ownMap: Record<string, { own: number; totalFreight: number }> = {};
               for (const g of currencyGroups) {
                 const cc = g.currencyCode;
-                if (!kpiMap[cc]) kpiMap[cc] = { own: 0, linked: 0, totalFreight: 0 };
-                kpiMap[cc].own += parseFloat(g.netPayable || "0");
-                kpiMap[cc].totalFreight += parseFloat(g.totalFreight || "0");
+                if (!ownMap[cc]) ownMap[cc] = { own: 0, totalFreight: 0 };
+                ownMap[cc].own += parseFloat(g.netPayable || "0");
+                ownMap[cc].totalFreight += parseFloat(g.totalFreight || "0");
               }
-              for (const [cc, val] of Object.entries(linkedBalMap)) {
-                if (!kpiMap[cc]) kpiMap[cc] = { own: 0, linked: 0, totalFreight: 0 };
-                kpiMap[cc].linked += val;
-              }
-              const kpiEntries = Object.entries(kpiMap).filter(([, v]) => Math.abs(v.own + v.linked) > 0.005);
 
-              // Detect issues
+              // KPI entries for the "Broker Net Balance" primary section
+              const ownKpiEntries = Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005);
+              // KPI entries for "Linked Exposure" secondary section
+              const linkedKpiEntries = Object.entries(linkedBalMap).filter(([, v]) => Math.abs(v) > 0.005);
+              // Combined total map
+              const combinedMap: Record<string, number> = {};
+              for (const [cc, v] of Object.entries(ownMap)) combinedMap[cc] = (combinedMap[cc] || 0) + v.own;
+              for (const [cc, v] of Object.entries(linkedBalMap)) combinedMap[cc] = (combinedMap[cc] || 0) + v;
+              const combinedKpiEntries = Object.entries(combinedMap).filter(([, v]) => Math.abs(v) > 0.005);
+
+              // Issues
               const issues: Array<{ kind: "warn" | "info"; msg: string }> = [];
               if (isBrokerStatement) {
                 for (const lg of linkedGroups) {
                   for (const cg of (lg.currencyGroups || [])) {
                     const bal = parseFloat(cg.netPayable || "0");
                     if (bal > 0.005) {
-                      issues.push({ kind: "warn", msg: `${lg.supplierName}: ${cg.currencyCode} ${cg.currencyCode !== "USD" ? cg.currencyCode + " " : "$"}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                      const pfx = cg.currencyCode !== "USD" ? `${cg.currencyCode} ` : "$";
+                      issues.push({ kind: "warn", msg: `${lg.supplierName}: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
                     }
                   }
                 }
@@ -1186,32 +1197,134 @@ export default function FactorySuppliers() {
                 if (bal > 0.005) {
                   const cc = g.currencyCode;
                   const pfx = cc !== "USD" ? `${cc} ` : "$";
-                  issues.push({ kind: "warn", msg: `Own ${cc} pool: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                  issues.push({ kind: "warn", msg: `Broker ${cc} pool: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
                 }
               }
 
+              const renderBalCard = (cc: string, bal: number, label: string, testId: string, freight?: number) => {
+                const isOverpaid = bal < -0.005;
+                const isSettled = Math.abs(bal) <= 0.005;
+                const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
+                return (
+                  <Card key={`${testId}-${cc}`}>
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground font-medium">{cc} {label}</div>
+                      <div
+                        className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : ""}`}
+                        data-testid={`${testId}-${cc}`}
+                      >
+                        {isSettled ? (
+                          <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
+                        ) : isOverpaid ? (
+                          <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
+                        ) : (
+                          <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
+                        )}
+                      </div>
+                      {freight && freight > 0.005 && (
+                        <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                          incl. {ccPrefix}{formatNum(String(freight.toFixed(2)))} freight
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              };
+
               return (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="text-xs text-muted-foreground">
-                          {isBrokerStatement ? "Linked Containers" : "Active Containers"}
+                  {/* ── View toggle (broker only) ──────────────────────────── */}
+                  {isBrokerStatement && (
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Eye className="h-4 w-4" />
+                        <span>Viewing:</span>
+                        <div className="flex rounded-md border overflow-hidden">
+                          <button
+                            className={`px-3 py-1.5 text-xs font-medium transition-colors ${brokerView === "broker-only" ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
+                            onClick={() => setBrokerView("broker-only")}
+                            data-testid="button-broker-view-own"
+                          >
+                            Broker Only
+                          </button>
+                          <button
+                            className={`px-3 py-1.5 text-xs font-medium border-l transition-colors ${brokerView === "combined" ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
+                            onClick={() => setBrokerView("combined")}
+                            data-testid="button-broker-view-combined"
+                          >
+                            Combined Exposure
+                          </button>
                         </div>
-                        <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
-                          {isBrokerStatement
-                            ? linkedGroups.reduce((s, lg) => s + lg.containerCount, 0)
-                            : activeContainerCount}
-                          {!isBrokerStatement && statementData.summary.totalContainers > activeContainerCount && (
-                            <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
-                          )}
-                        </div>
-                        {isBrokerStatement && (
-                          <div className="text-xs text-muted-foreground mt-1">{linkedGroups.length} linked supplier{linkedGroups.length !== 1 ? "s" : ""}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Plain-English explanation (broker only) ───────────── */}
+                  {isBrokerStatement && (
+                    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                      <div className="flex items-center gap-2 font-medium text-foreground">
+                        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        How to read this statement
+                      </div>
+                      <ul className="pl-6 space-y-0.5 text-muted-foreground list-disc text-xs">
+                        <li><span className="font-medium text-foreground">Broker Net Balance</span> — amounts the broker itself owes or is owed (direct containers, commissions received, settlements made).</li>
+                        <li><span className="font-medium text-foreground">Linked Supplier Exposure</span> — balances of suppliers managed under this broker. Informational only — these are NOT broker-owned debts.</li>
+                        <li><span className="font-medium text-foreground">Combined Exposure</span> — broker balance + all linked supplier balances (toggle above to see this view).</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* ── PRIMARY: Broker Net Balance ───────────────────────── */}
+                  {isBrokerStatement ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold">Broker Net Balance</h2>
+                        <span className="text-xs text-muted-foreground">— broker-owned amounts only</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {/* Container count card */}
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="text-xs text-muted-foreground">Broker Containers</div>
+                            <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
+                              {activeContainerCount}
+                              {statementData.summary.totalContainers > activeContainerCount && (
+                                <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        {ownKpiEntries.length === 0 ? (
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="text-xs text-muted-foreground">Broker Balance</div>
+                              <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
+                                $— <span className="text-sm font-normal">Settled</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          ownKpiEntries.map(([cc, v]) =>
+                            renderBalCard(cc, v.own, "Broker Balance", "text-statement-balance", v.totalFreight)
+                          )
                         )}
-                      </CardContent>
-                    </Card>
-                    {!isBrokerStatement && (
+                      </div>
+                    </div>
+                  ) : (
+                    /* Non-broker: simple combined KPI grid */
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="text-xs text-muted-foreground">Active Containers</div>
+                          <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
+                            {activeContainerCount}
+                            {statementData.summary.totalContainers > activeContainerCount && (
+                              <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
                       <Card>
                         <CardContent className="p-4">
                           <div className="text-xs text-muted-foreground">Active Weight</div>
@@ -1220,61 +1333,57 @@ export default function FactorySuppliers() {
                           </div>
                         </CardContent>
                       </Card>
-                    )}
-                    {kpiEntries.length === 0 && (
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="text-xs text-muted-foreground">Net Balance</div>
-                          <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
-                            $— <span className="text-sm font-normal">Settled</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {kpiEntries.map(([cc, v]) => {
-                      const bal = v.own + v.linked;
-                      const isOverpaid = bal < -0.005;
-                      const isSettled = Math.abs(bal) <= 0.005;
-                      const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
-                      return (
-                        <Card key={cc}>
+                      {Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).length === 0 ? (
+                        <Card>
                           <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <span className="font-medium">{cc}</span>
-                              <span>Balance</span>
-                              {isBrokerStatement && v.linked !== 0 && v.own !== 0 && (
-                                <span className="text-xs opacity-60">(combined)</span>
-                              )}
+                            <div className="text-xs text-muted-foreground">Net Balance</div>
+                            <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
+                              $— <span className="text-sm font-normal">Settled</span>
                             </div>
-                            <div
-                              className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                              data-testid={`text-statement-balance-${cc}`}
-                            >
-                              {isSettled ? (
-                                <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
-                              ) : isOverpaid ? (
-                                <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
-                              ) : (
-                                <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
-                              )}
-                            </div>
-                            {v.totalFreight > 0.005 && (
-                              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                incl. {ccPrefix}{formatNum(String(v.totalFreight.toFixed(2)))} freight
-                              </div>
-                            )}
-                            {isBrokerStatement && v.linked !== 0 && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {ccPrefix}{formatNum(String(Math.abs(v.linked).toFixed(2)))} from linked suppliers
-                              </div>
-                            )}
                           </CardContent>
                         </Card>
-                      );
-                    })}
-                  </div>
+                      ) : (
+                        Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).map(([cc, v]) =>
+                          renderBalCard(cc, v.own, "Net Balance", "text-statement-balance", v.totalFreight)
+                        )
+                      )}
+                    </div>
+                  )}
 
-                  {/* Issues panel */}
+                  {/* ── SECONDARY: Linked Supplier Exposure ───────────────── */}
+                  {isBrokerStatement && linkedKpiEntries.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold">Linked Supplier Exposure</h2>
+                        <span className="text-xs text-muted-foreground">— informational, not broker-owned</span>
+                        <Badge variant="outline" className="text-xs">{linkedGroups.length} supplier{linkedGroups.length !== 1 ? "s" : ""}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {linkedKpiEntries.map(([cc, bal]) =>
+                          renderBalCard(cc, bal, "Exposure", "text-linked-exposure")
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── TERTIARY: Combined Exposure (only in combined view) ── */}
+                  {isBrokerStatement && brokerView === "combined" && combinedKpiEntries.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-muted-foreground" />
+                        <h2 className="text-sm font-semibold">Combined Exposure</h2>
+                        <span className="text-xs text-muted-foreground">— broker + all linked suppliers</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {combinedKpiEntries.map(([cc, bal]) =>
+                          renderBalCard(cc, bal, "Combined", "text-combined-exposure")
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Issues panel ──────────────────────────────────────── */}
                   {issues.length > 0 && (
                     <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1.5">
                       <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">
@@ -1497,14 +1606,18 @@ export default function FactorySuppliers() {
               </Card>
             )}
 
-            {/* Phase 2: Broker linked supplier container groups */}
+            {/* Linked Supplier Exposure detail — informational, not broker-owned */}
             {statementData.linkedSupplierGroups && statementData.linkedSupplierGroups.length > 0 && (
               <Card>
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Link2 className="h-4 w-4" />
-                    Linked Supplier Containers
+                    Linked Supplier Exposure
                   </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Informational only — these are balances owed to linked suppliers, not amounts owed by or to the broker.
+                    They do not add to Broker Net Balance.
+                  </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {statementData.linkedSupplierGroups.map(group => (
@@ -1566,14 +1679,14 @@ export default function FactorySuppliers() {
               </Card>
             )}
 
-            {/* ── Broker Consolidated Statement ── */}
+            {/* ── Broker Activity Ledger (consolidated) ── */}
             {isBrokerStatement && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
                     <span className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" />
-                      Consolidated Broker Statement
+                      <BookOpen className="h-4 w-4" />
+                      Broker Activity Ledger
                     </span>
                     <Button
                       variant="outline"
@@ -1589,7 +1702,8 @@ export default function FactorySuppliers() {
                     </Button>
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    All containers from this broker and its linked suppliers, grouped by currency.
+                    All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
+                    Grouped by currency. Does not include linked supplier activity.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-0">
