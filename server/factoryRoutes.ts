@@ -6487,6 +6487,32 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         return res.status(400).json({ message: "Only OFFLOADED or PARTIALLY_RECEIVED containers can be reversed" });
       }
 
+      // Safety guard: block reversal if this container's raw stock has already been
+      // consumed in a mix batch that has production usage (daily usage or pressing batches recorded).
+      const mixSourceLinks = await db
+        .select({ mixBatchId: factoryMixBatchSources.mixBatchId })
+        .from(factoryMixBatchSources)
+        .where(eq(factoryMixBatchSources.containerId, containerId));
+
+      if (mixSourceLinks.length > 0) {
+        const linkedBatchIds = [...new Set(mixSourceLinks.map((s: any) => s.mixBatchId))];
+        const usedBatches = await db
+          .select({ id: factoryMixBatches.id, batchCode: factoryMixBatches.batchCode, usedKg: factoryMixBatches.usedKg })
+          .from(factoryMixBatches)
+          .where(and(
+            eq(factoryMixBatches.companyId, companyId),
+            inArray(factoryMixBatches.id, linkedBatchIds),
+            sql`${factoryMixBatches.usedKg}::numeric > 0`
+          ));
+
+        if (usedBatches.length > 0) {
+          const codes = usedBatches.map((b: any) => b.batchCode).join(", ");
+          return res.status(400).json({
+            message: `Cannot reverse offload: stock from this container has already been consumed in mix batch(es) ${codes}. Remove it from those batches first before reversing.`,
+          });
+        }
+      }
+
       await db.transaction(async (tx) => {
         // 1. Find the raw stock entry for this container
         const [rawStockRow] = await tx
@@ -6752,6 +6778,46 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             costPerKgUsd: String(costPerKgUsd),
           })
           .where(eq(factoryRawStock.id, rawStock.id));
+      }
+
+      // Propagate the updated cost to any mix batch sources that drew from this container,
+      // then recalculate the weighted-average costPerKg on the parent mix batches.
+      const containerMixSources = await db
+        .select()
+        .from(factoryMixBatchSources)
+        .where(eq(factoryMixBatchSources.containerId, containerId));
+
+      if (containerMixSources.length > 0) {
+        for (const src of containerMixSources) {
+          const newSourceTotalCost = parseFloat(src.weightKg) * newInclusiveCostPerKg;
+          await db
+            .update(factoryMixBatchSources)
+            .set({
+              costPerKg: String(newInclusiveCostPerKg),
+              totalCost: String(newSourceTotalCost.toFixed(2)),
+            })
+            .where(eq(factoryMixBatchSources.id, src.id));
+        }
+
+        // Recalculate the weighted cost for every affected mix batch
+        const affectedBatchIds = [...new Set(containerMixSources.map((s: any) => s.mixBatchId))];
+        for (const batchId of affectedBatchIds) {
+          const allSources = await db
+            .select()
+            .from(factoryMixBatchSources)
+            .where(eq(factoryMixBatchSources.mixBatchId, batchId));
+          const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
+          const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
+          const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
+          await db
+            .update(factoryMixBatches)
+            .set({
+              costPerKg: String(batchCostPerKg.toFixed(4)),
+              totalCost: String(batchTotalCost.toFixed(2)),
+              updatedAt: new Date(),
+            })
+            .where(eq(factoryMixBatches.id, batchId));
+        }
       }
 
       const today = new Date().toISOString().split("T")[0];
