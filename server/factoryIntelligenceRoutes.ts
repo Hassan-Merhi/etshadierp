@@ -64,7 +64,20 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!settings) {
         [settings] = await db
           .insert(factorySettings)
-          .values({ companyId })
+          .values({
+            companyId,
+            dashboardEnabled: true,
+            kpisEnabled: true,
+            profitabilityEnabled: true,
+            alertsEnabled: true,
+            supplierScoringEnabled: true,
+            mixOptimizerEnabled: true,
+            traceabilityEnabled: true,
+            balePhotosEnabled: true,
+            wasteTrackingEnabled: true,
+            cashflowEnabled: true,
+            rolesEnabled: true,
+          })
           .returning();
       }
 

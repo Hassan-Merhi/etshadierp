@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 
@@ -251,6 +251,25 @@ export default function FactorySettings() {
     mutation.mutate(settings);
   };
 
+  const handleEnableAll = () => {
+    const allEnabled: FactorySettingsData = {
+      ...settings,
+      dashboardEnabled: true,
+      kpisEnabled: true,
+      profitabilityEnabled: true,
+      alertsEnabled: true,
+      supplierScoringEnabled: true,
+      mixOptimizerEnabled: true,
+      traceabilityEnabled: true,
+      balePhotosEnabled: true,
+      wasteTrackingEnabled: true,
+      cashflowEnabled: true,
+      rolesEnabled: true,
+    };
+    setSettings(allEnabled);
+    mutation.mutate(allEnabled);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
@@ -279,10 +298,16 @@ export default function FactorySettings() {
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-title">Factory Settings</h1>
           <p className="text-muted-foreground mt-1">Toggle factory intelligence features on or off</p>
         </div>
-        <Button onClick={handleSave} disabled={mutation.isPending} data-testid="button-save-settings">
-          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          Save Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleEnableAll} disabled={mutation.isPending} data-testid="button-enable-all">
+            <ToggleRight className="h-4 w-4 mr-2" />
+            Enable All
+          </Button>
+          <Button onClick={handleSave} disabled={mutation.isPending} data-testid="button-save-settings">
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Settings
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
