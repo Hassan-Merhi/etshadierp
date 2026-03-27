@@ -675,6 +675,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
                     <Route path="/factory/accounts" component={FactoryAccounts} />
+                    <Route path="/factory/agents" component={Agents} />
                     <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
                     <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
                     <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />

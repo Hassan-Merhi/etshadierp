@@ -38242,7 +38242,7 @@ if (asOfDate) {
   // ─── Agent Accounts ──────────────────────────────────────────────────────
   app.get("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db.select().from(agentAccounts).where(eq(agentAccounts.companyId, companyId));
       res.json(rows);
@@ -38253,7 +38253,7 @@ if (asOfDate) {
 
   app.post("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { accountId, accountType, accountName } = req.body;
       if (!accountId || !accountType || !accountName) return res.status(400).json({ message: "accountId, accountType, and accountName are required" });
@@ -38269,7 +38269,7 @@ if (asOfDate) {
 
   app.delete("/api/agent-accounts/:accountId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const accountId = decodeURIComponent(req.params.accountId);
       await db.delete(agentAccounts).where(and(eq(agentAccounts.companyId, companyId), eq(agentAccounts.accountId, accountId)));

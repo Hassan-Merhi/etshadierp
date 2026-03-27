@@ -26,6 +26,7 @@ import {
   ShoppingCart,
   ClipboardList,
   HardHat,
+  UserRound,
   ClipboardCheck,
   Activity,
   RefreshCw,
@@ -130,6 +131,7 @@ const allMenuGroups: MenuGroup[] = [
     items: [
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+      { title: "Agents", url: "/factory/agents", icon: UserRound },
     ],
   },
   {
