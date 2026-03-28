@@ -3602,6 +3602,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
 
     // FX transfer rows — deduplicate by id to avoid counting same transfer twice
+    // Key logic: Only affect the broker's USD pool for transfers TO/FROM the broker.
+    // For internal pool transfers (linked supplier → linked supplier), only show the
+    // source-currency leg so each supplier's sub-balance is visible without distorting the pool total.
+    // For USD→USD transfers FROM a linked supplier TO the broker, adding both fx_out and fx_in
+    // to the USD section used to cancel them to zero — now we only add the correct directional row.
     const seenFxIds = new Set<number>();
     for (const t of allFx as any[]) {
       if (seenFxIds.has(t.id)) continue;
@@ -3611,28 +3616,49 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const toUsd = parseFloat(t.toAmountUsd || "0");
       const rate = fromAmt > 0 ? (toUsd / fromAmt).toFixed(4) : "1";
       const dateVal = t.date ? String(t.date) : null;
+      const isFromBroker = t.fromSupplierId === brokerId;
+      const isToBroker = t.toSupplierId === brokerId;
 
-      // Source currency: FX Out (negative — reduces balance in that currency)
-      addRow(fromCc, {
-        date: dateVal,
-        type: "fx_out",
-        description: `FX ${fromCc}→USD @ ${rate}`,
-        ref: `FX-${t.id}`,
-        amount: -fromAmt,
-        commissionAmount: null,
-        commissionCurrency: null,
-      });
+      // Non-USD source currency leg: always show fx_out in the foreign currency section
+      // so the linked supplier's foreign-currency contribution is visible.
+      if (fromCc !== "USD") {
+        addRow(fromCc, {
+          date: dateVal,
+          type: "fx_out",
+          description: `FX ${fromCc}→USD @ ${rate}`,
+          ref: `FX-${t.id}`,
+          amount: -fromAmt,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
 
-      // USD: FX In (positive — adds to USD balance)
-      addRow("USD", {
-        date: dateVal,
-        type: "fx_in",
-        description: `FX In from ${fromCc} @ ${rate}`,
-        ref: `FX-${t.id}`,
-        amount: toUsd,
-        commissionAmount: null,
-        commissionCurrency: null,
-      });
+      // USD pool: FX In — only when the broker is the recipient.
+      // (Linked-supplier-to-linked-supplier USD transfers don't change the broker's pool.)
+      if (isToBroker) {
+        addRow("USD", {
+          date: dateVal,
+          type: "fx_in",
+          description: `FX In from ${fromCc} @ ${rate}`,
+          ref: `FX-${t.id}`,
+          amount: toUsd,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
+
+      // USD pool: FX Out — only when the broker is the sender (broker redistributes USD out).
+      if (isFromBroker && fromCc === "USD") {
+        addRow("USD", {
+          date: dateVal,
+          type: "fx_out",
+          description: `FX USD out @ ${rate}`,
+          ref: `FX-${t.id}`,
+          amount: -fromAmt,
+          commissionAmount: null,
+          commissionCurrency: null,
+        });
+      }
     }
 
     // Offload additional charge rows
