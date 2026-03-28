@@ -440,12 +440,7 @@ export default function FactoryProformas() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setAddLineProformaId(proforma.id);
-                              setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
-                              setCatalogSelectedItem(null);
-                              setCatalogSearch("");
-                              setAddLineMode("catalog");
-                              setIsAddLineOpen(true);
+                              navigate(`/factory/sales/proformas/${proforma.id}/add-line?customerId=${proforma.customerId}&proformaName=${encodeURIComponent(proforma.name)}`);
                             }}
                             data-testid={`button-add-line-${proforma.id}`}
                           >
