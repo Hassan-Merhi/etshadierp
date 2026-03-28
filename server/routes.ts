@@ -16575,17 +16575,21 @@ if (asOfDate) {
                 const sourceLocId = item.sourceLocationId ?? transfer.sourceLocationId;
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
-                const totalAmount = quantity * rate;
 
-                if (willBeOptional) {
+                // Guard on inventoryApplied: only reverse if inventory was actually applied,
+                // only apply if inventory was not already applied. This prevents stock
+                // corruption for legacy transfers (inventoryApplied=false on non-optional)
+                // and for any edge case where the flag is out of sync with the optional flag.
+                if (willBeOptional && transfer.inventoryApplied) {
+                  // Reverse: inventory was applied, now marking optional → undo it
                   await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, -quantity, existingVoucher.companyId);
-                } else {
+                } else if (!willBeOptional && !transfer.inventoryApplied) {
+                  // Apply: inventory was not applied, now marking non-optional → apply it
                   await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
-
-                  // Add to destination
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 }
+                // else: inventory state already matches target state — no-op (prevents double moves)
               }
 
               // CRITICAL: sync inventoryApplied so that a subsequent PUT /api/stock-transfers/:id
@@ -16792,13 +16796,19 @@ if (asOfDate) {
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
 
-                if (willBeOptional) {
+                // Guard on inventoryApplied: only reverse if inventory was actually applied,
+                // only apply if inventory was not already applied. Prevents stock corruption
+                // from double-toggling or legacy transfers with mismatched flag states.
+                if (willBeOptional && transfer.inventoryApplied) {
+                  // Reverse: inventory was applied, now marking optional → undo it
                   await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, -quantity, existingVoucher.companyId);
-                } else {
+                } else if (!willBeOptional && !transfer.inventoryApplied) {
+                  // Apply: inventory was not applied, now marking non-optional → apply it
                   await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
                   await adjustInventory(tx, transfer.destinationLocationId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 }
+                // else: already in the correct applied/unapplied state — no-op
               }
 
               // CRITICAL: sync inventoryApplied on the transfer record so that
