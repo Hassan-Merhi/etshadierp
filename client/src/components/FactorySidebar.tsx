@@ -166,6 +166,7 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Supplier Statement", url: "/factory/supplier-statement", icon: ClipboardCheck },
       { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
+      { title: "Net Profit Analytics", url: "/factory/net-profit-analytics", icon: BarChart3 },
     ],
   },
 ];

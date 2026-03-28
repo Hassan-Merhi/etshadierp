@@ -111,6 +111,7 @@ const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics
 const InventoryRepair = lazy(() => import("@/pages/InventoryRepair"));
 const NetProfitDetails = lazy(() => import("@/pages/NetProfitDetails"));
 const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
+const FactoryNetProfitAnalytics = lazy(() => import("@/pages/FactoryNetProfitAnalytics"));
 const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
 const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
 const OptionalVouchers = lazy(() => import("@/pages/OptionalVouchers"));
@@ -730,6 +731,7 @@ function AuthenticatedApp() {
                     {user?.role === "Admin" && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
                     {user?.role === "Admin" && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
                     <Route path="/factory/net-profit-details" component={NetProfitDetails} />
+                    <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route><Redirect to={factoryDefaultPage} /></Route>
                   </Switch>
                   </Suspense>
