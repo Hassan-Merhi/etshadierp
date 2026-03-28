@@ -84,6 +84,7 @@ export default function ContainerLoadingScan() {
   const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
   const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
   const [pendingBypassBaleRef, setPendingBypassBaleRef] = useState<string | null>(null);
+  const [pendingBypassOverloadRef, setPendingBypassOverloadRef] = useState<string | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const scannerRef = useRef<HTMLInputElement>(null);
 
@@ -162,12 +163,13 @@ export default function ContainerLoadingScan() {
   });
 
   const addBaleMutation = useMutation({
-    mutationFn: async (data: { scanCode: string; locationId: number; allowBypassProforma?: boolean }) => {
+    mutationFn: async (data: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean }) => {
+    onSuccess: (data: any, variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
       setPendingBypassBaleRef(null);
+      setPendingBypassOverloadRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
       const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
@@ -202,8 +204,28 @@ export default function ContainerLoadingScan() {
       scannerRef.current?.focus();
     },
     onError: (error: Error, variables: any) => {
+      if ((error as any).overloaded) {
+        setPendingBypassOverloadRef(variables.scanCode);
+        setPendingBypassBaleRef(null);
+        setScanFlash("error");
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          osc.connect(ctx.destination);
+          osc.frequency.value = 550;
+          ctx.resume().then(() => {
+            osc.start();
+            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+          });
+        } catch { /* no audio support */ }
+        setTimeout(() => setScanFlash(null), 600);
+        setScanCode("");
+        scannerRef.current?.focus();
+        return;
+      }
       if ((error as any).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
+        setPendingBypassOverloadRef(null);
         setScanFlash("error");
         try {
           const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -286,12 +308,12 @@ export default function ContainerLoadingScan() {
     if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
     e.preventDefault();
     const trimmed = scanCode.trim();
-    const isBypass = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
-    if (pendingBypassBaleRef !== null && !isBypass) {
-      setPendingBypassBaleRef(null);
-    }
-    addBaleMutation.mutate({ scanCode: trimmed, locationId: parseInt(selectedLocationId), allowBypassProforma: isBypass || undefined });
-  }, [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, addBaleMutation]);
+    const isBypassProforma = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
+    const isBypassOverload = pendingBypassOverloadRef !== null && pendingBypassOverloadRef === trimmed;
+    if (pendingBypassBaleRef !== null && !isBypassProforma) setPendingBypassBaleRef(null);
+    if (pendingBypassOverloadRef !== null && !isBypassOverload) setPendingBypassOverloadRef(null);
+    addBaleMutation.mutate({ scanCode: trimmed, locationId: parseInt(selectedLocationId), allowBypassProforma: isBypassProforma || undefined, allowBypassOverload: isBypassOverload || undefined });
+  }, [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]);
 
   const toggleGroup = useCallback((articleCode: string) => {
     setExpandedGroups((prev) => {
@@ -373,6 +395,14 @@ export default function ContainerLoadingScan() {
           <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
             <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
             <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
+          </div>
+        </div>
+      )}
+      {pendingBypassOverloadRef !== null && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+          <div className="bg-orange-500 text-white rounded-xl px-12 py-6 shadow-2xl border-4 border-orange-700 text-center">
+            <div className="text-3xl font-black tracking-wide">QUANTITY EXCEEDED</div>
+            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
           </div>
         </div>
       )}

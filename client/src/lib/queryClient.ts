@@ -19,6 +19,7 @@ async function throwIfResNotOk(res: Response) {
     error.employeeBalance = errorData.employeeBalance;
     error.ledgerBalance = errorData.ledgerBalance;
     error.notInProforma = errorData.notInProforma;
+    error.overloaded = errorData.overloaded;
     throw error;
   }
 }

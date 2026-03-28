@@ -12457,6 +12457,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         proformaLine = pl || null;
         if (proformaLine) {
           priceUsed = proformaLine.pricePerBale;
+          // Overload check: count existing bales of this article in the order
+          if (!req.body.allowBypassOverload) {
+            const [countResult] = await db
+              .select({ count: sql<number>`COUNT(*)::int` })
+              .from(customerOrderBales)
+              .where(and(
+                eq(customerOrderBales.orderId, orderId),
+                eq(customerOrderBales.articleCode, bale.articleCode || "")
+              ));
+            const currentCount = countResult?.count || 0;
+            if (currentCount >= proformaLine.quantity) {
+              return res.status(400).json({
+                overloaded: true,
+                message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
+              });
+            }
+          }
         } else if (!req.body.allowBypassProforma) {
           return res.status(400).json({
             notInProforma: true,
