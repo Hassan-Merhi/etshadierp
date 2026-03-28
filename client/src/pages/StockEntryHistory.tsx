@@ -187,103 +187,9 @@ export default function StockEntryHistory() {
     XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
-  function handlePrint() {
-    const printWindow = window.open("", "_blank", "width=1100,height=800");
-    if (!printWindow) return;
-
-    const totalBalesCount = filteredGroups.reduce((s, g) => s + g.baleCount, 0);
-    const totalWeightKg = filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0);
-
-    const rowsHtml = filteredGroups.map(g => {
-      const baleRowsHtml = g.bales.map(b => `
-        <tr class="bale-row">
-          <td></td>
-          <td class="mono">${b.referenceNumber}</td>
-          <td>${b.productName || "—"} ${b.articleCode ? `<span class="code">${b.articleCode}</span>` : ""}</td>
-          <td>${b.workerName || "<em>Unassigned</em>"}</td>
-          <td class="num">${parseFloat(b.weightKg || "0").toFixed(2)}</td>
-          <td>${b.status}</td>
-          <td>${b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—"}</td>
-        </tr>
-      `).join("");
-
-      return `
-        <tr class="group-row">
-          <td class="date">${g.stockEntryDate}</td>
-          <td class="mono">—</td>
-          <td>${g.productName || "—"} ${g.articleCode ? `<span class="code">${g.articleCode}</span>` : ""}</td>
-          <td>${g.workerName || "<em>Unassigned</em>"}</td>
-          <td class="num bold">${parseFloat(g.totalWeight || "0").toFixed(2)}</td>
-          <td><span class="badge">${g.baleCount} bales</span></td>
-          <td class="num">${parseFloat(g.avgWeight || "0").toFixed(2)} avg</td>
-        </tr>
-        ${baleRowsHtml}
-      `;
-    }).join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Stock Entry History — ${fromDate} to ${toDate}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 20px; }
-    h1 { font-size: 16px; margin-bottom: 4px; }
-    .meta { font-size: 10px; color: #555; margin-bottom: 14px; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th { background: #222; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-    thead th.num { text-align: right; }
-    tbody tr { border-bottom: 1px solid #e5e7eb; }
-    tbody tr:last-child { border-bottom: none; }
-    .group-row td { background: #f3f4f6; font-weight: 600; padding: 7px 8px; }
-    .bale-row td { padding: 4px 8px; font-size: 10px; color: #333; }
-    .bale-row td:first-child { border-left: 3px solid #d1d5db; }
-    .num { text-align: right; }
-    .bold { font-weight: 700; }
-    .date { white-space: nowrap; }
-    .mono { font-family: monospace; font-size: 10px; }
-    .code { font-size: 9px; color: #6b7280; margin-left: 4px; }
-    .badge { background: #dbeafe; color: #1e40af; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 600; }
-    tfoot td { background: #111; color: #fff; font-weight: 700; padding: 8px; font-size: 12px; }
-    tfoot .num { text-align: right; }
-    @media print {
-      body { padding: 10px; }
-      .no-print { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <h1>Stock Entry History</h1>
-  <div class="meta">Period: ${fromDate} &rarr; ${toDate} &nbsp;&bull;&nbsp; ${filteredGroups.length} groups &nbsp;&bull;&nbsp; ${totalBalesCount} bales &nbsp;&bull;&nbsp; ${totalWeightKg.toFixed(2)} kg total</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Entry Date</th>
-        <th>Reference</th>
-        <th>Product</th>
-        <th>Worker</th>
-        <th class="num">Weight (kg)</th>
-        <th>Bales / Status</th>
-        <th>Avg / Finalized</th>
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="4">TOTAL</td>
-        <td class="num">${totalWeightKg.toFixed(2)} kg</td>
-        <td>${totalBalesCount} bales</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-  <script>window.onload = function(){ window.print(); };<\/script>
-</body>
-</html>`;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
+  function handleExportPdf() {
+    const pdfParams = new URLSearchParams(params);
+    window.open(`/api/factory/bales/stock-entry-history/export-pdf?${pdfParams.toString()}`, "_blank");
   }
 
   return (
@@ -302,8 +208,8 @@ export default function StockEntryHistory() {
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredGroups.length === 0} data-testid="button-print">
-            <Printer className="w-3 h-3 mr-1" /> Print / PDF
+          <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={filteredGroups.length === 0} data-testid="button-export-pdf">
+            <Printer className="w-3 h-3 mr-1" /> Export PDF
           </Button>
           <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
             <Download className="w-3 h-3 mr-1" /> Export
