@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Lock, Printer, UserCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Lock, Printer, Grid3X3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,68 @@ interface BaleDetail {
   workerName: string | null;
   productName: string | null;
   articleCode: string | null;
+}
+
+interface MatrixRow {
+  productLabel: string;
+  counts: Record<string, number>;
+  total: number;
+}
+
+interface WorkerMatrix {
+  workers: string[];
+  rows: MatrixRow[];
+  workerTotals: Record<string, number>;
+  grandTotal: number;
+}
+
+function buildWorkerMatrix(filteredGroups: GroupRow[]): WorkerMatrix {
+  const workerSet = new Set<string>();
+  const productMap = new Map<string, Record<string, number>>();
+
+  for (const g of filteredGroups) {
+    for (const b of g.bales) {
+      const productLabel = b.productName
+        ? (b.articleCode ? `${b.productName} (${b.articleCode})` : b.productName)
+        : "—";
+      const workerKey = b.workerName || "Unassigned";
+
+      workerSet.add(workerKey);
+
+      if (!productMap.has(productLabel)) productMap.set(productLabel, {});
+      const row = productMap.get(productLabel)!;
+      row[workerKey] = (row[workerKey] || 0) + 1;
+    }
+  }
+
+  const named: string[] = [];
+  let hasUnassigned = false;
+  for (const w of workerSet) {
+    if (w === "Unassigned") hasUnassigned = true;
+    else named.push(w);
+  }
+  named.sort((a, b) => a.localeCompare(b));
+  const workers = hasUnassigned ? [...named, "Unassigned"] : named;
+
+  const rows: MatrixRow[] = Array.from(productMap.entries())
+    .map(([productLabel, counts]) => ({
+      productLabel,
+      counts,
+      total: Object.values(counts).reduce((s, v) => s + v, 0),
+    }))
+    .sort((a, b) => a.productLabel.localeCompare(b.productLabel));
+
+  const workerTotals: Record<string, number> = {};
+  for (const w of workers) workerTotals[w] = 0;
+  for (const row of rows) {
+    for (const w of workers) {
+      workerTotals[w] = (workerTotals[w] || 0) + (row.counts[w] || 0);
+    }
+  }
+
+  const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+
+  return { workers, rows, workerTotals, grandTotal };
 }
 
 export default function StockEntryHistory() {
@@ -202,12 +264,132 @@ export default function StockEntryHistory() {
     const ws2 = XLSX.utils.json_to_sheet(detailRows);
     XLSX.utils.book_append_sheet(wb, ws2, "Bale Details");
 
+    const matrix = buildWorkerMatrix(filteredGroups);
+    const ws3 = XLSX.utils.aoa_to_sheet([]);
+
+    XLSX.utils.sheet_add_aoa(ws3, [["Stock Entry History — Worker Matrix"]], { origin: "A1" });
+    XLSX.utils.sheet_add_aoa(ws3, [[`Period: ${fromDate}  →  ${toDate}`]], { origin: "A2" });
+
+    const matrixHeader = ["Bale / Product", ...matrix.workers, "Total"];
+    XLSX.utils.sheet_add_aoa(ws3, [matrixHeader], { origin: "A4" });
+
+    const matrixData = matrix.rows.map(row => [
+      row.productLabel,
+      ...matrix.workers.map(w => row.counts[w] || 0),
+      row.total,
+    ]);
+    if (matrixData.length > 0) {
+      XLSX.utils.sheet_add_aoa(ws3, matrixData, { origin: "A5" });
+    }
+
+    const totalsRow = ["TOTAL", ...matrix.workers.map(w => matrix.workerTotals[w] || 0), matrix.grandTotal];
+    XLSX.utils.sheet_add_aoa(ws3, [totalsRow], { origin: { r: 4 + matrix.rows.length, c: 0 } });
+
+    const colWidths = [{ wch: 36 }, ...matrix.workers.map(() => ({ wch: 14 })), { wch: 10 }];
+    ws3["!cols"] = colWidths;
+    ws3["!freeze"] = { xSplit: 0, ySplit: 4 };
+
+    XLSX.utils.book_append_sheet(wb, ws3, "Worker Matrix");
+
     XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
   function handleExportPdf() {
     const pdfParams = new URLSearchParams(params);
     window.open(`/api/factory/bales/stock-entry-history/export-pdf?${pdfParams.toString()}`, "_blank");
+  }
+
+  function handlePrintMatrix() {
+    if (filteredGroups.length === 0) return;
+    const matrix = buildWorkerMatrix(filteredGroups);
+    const { workers: cols, rows, workerTotals, grandTotal } = matrix;
+
+    const numCols = cols.length + 2;
+    const fontSize = numCols > 12 ? 7 : numCols > 8 ? 8.5 : 10;
+
+    const headerCells = cols.map(w =>
+      `<th class="wc">${w}</th>`
+    ).join("");
+
+    const dataRows = rows.map((row, idx) => {
+      const cells = cols.map(w => {
+        const v = row.counts[w] || 0;
+        return `<td class="num">${v > 0 ? v : ""}</td>`;
+      }).join("");
+      return `<tr class="${idx % 2 === 1 ? "alt" : ""}">
+        <td class="prod">${row.productLabel}</td>
+        ${cells}
+        <td class="num total-col">${row.total}</td>
+      </tr>`;
+    }).join("");
+
+    const totalCells = cols.map(w =>
+      `<td class="num">${workerTotals[w] || 0}</td>`
+    ).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Worker Matrix — ${fromDate} to ${toDate}</title>
+  <style>
+    @page { size: landscape; margin: 12mm 10mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: ${fontSize}px; color: #111; }
+
+    .header { margin-bottom: 8px; }
+    .header h1 { font-size: ${fontSize + 4}px; font-weight: 700; }
+    .header .sub { font-size: ${fontSize}px; color: #444; margin-top: 2px; }
+    .header .meta { font-size: ${fontSize - 1}px; color: #666; margin-top: 4px; font-weight: 600; }
+
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead { display: table-header-group; }
+    th, td { border: 1px solid #ccc; padding: 3px 4px; overflow: hidden; }
+    th { background: #1F3864; color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize - 0.5}px; }
+    th.prod-h { text-align: left; width: 22%; }
+    th.wc { width: ${Math.floor(72 / Math.max(cols.length, 1))}%; }
+
+    td.prod { text-align: left; font-weight: 500; word-break: break-word; }
+    td.num { text-align: center; }
+    td.total-col { font-weight: 700; background: #f0f4ff; }
+    tr.alt td { background: #f8f8f8; }
+    tr.alt td.total-col { background: #e8eeff; }
+
+    tr.totals-row td { background: #1F3864 !important; color: #fff; font-weight: 700; border-color: #1a3060; }
+    tr.totals-row td.num { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Stock Entry History — Worker Matrix</h1>
+    <div class="sub">Period: ${fromDate} &rarr; ${toDate}</div>
+    <div class="meta">${cols.length} worker column${cols.length !== 1 ? "s" : ""}  &bull;  ${rows.length} product row${rows.length !== 1 ? "s" : ""}  &bull;  ${grandTotal} bales total</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="prod-h">Bale / Product</th>
+        ${headerCells}
+        <th class="wc">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${dataRows}
+      <tr class="totals-row">
+        <td class="prod">TOTAL</td>
+        ${totalCells}
+        <td class="num">${grandTotal}</td>
+      </tr>
+    </tbody>
+  </table>
+  <script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank", "width=1200,height=800");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
   }
 
   return (
@@ -219,18 +401,21 @@ export default function StockEntryHistory() {
             <TooltipTrigger asChild>
               <Lock className="w-4 h-4 text-muted-foreground cursor-default" />
             </TooltipTrigger>
-            <TooltipContent>Worker assignment is locked for all stock-entry bales.</TooltipContent>
+            <TooltipContent>Worker assignment is locked once a worker has been set on a bale.</TooltipContent>
           </Tooltip>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
           </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintMatrix} disabled={filteredGroups.length === 0} data-testid="button-print-matrix">
+            <Grid3X3 className="w-3 h-3 mr-1" /> Print Matrix
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={filteredGroups.length === 0} data-testid="button-export-pdf">
             <Printer className="w-3 h-3 mr-1" /> Export PDF
           </Button>
           <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
-            <Download className="w-3 h-3 mr-1" /> Export
+            <Download className="w-3 h-3 mr-1" /> Export Excel
           </Button>
         </div>
       </div>
