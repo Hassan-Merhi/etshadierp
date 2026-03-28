@@ -2347,6 +2347,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usdAmt;
       }
 
+      // Fetch FX transfers for this supplier (both as sender and receiver)
+      const allFxTransfers = await db
+        .select()
+        .from(factorySupplierFxTransfers)
+        .where(and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          sql`(${factorySupplierFxTransfers.fromSupplierId} = ${supplierId} OR ${factorySupplierFxTransfers.toSupplierId} = ${supplierId})`
+        ));
+
       // computeBalance: TRUE BROKER BALANCE MODEL.
       // Commission from a supplier's own containers is included in the supplier's balance.
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
@@ -2357,7 +2366,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
-          return sum + (kg * rate + freight) * fx;
+          const containerCc = c.currencyCode || "USD";
+          const freightCc = c.freightCurrencyCode || containerCc;
+          // Freight in the same currency as the container → multiply by fx; otherwise treat separately
+          const freightInContainerCurr = freightCc === containerCc ? freight : 0;
+          const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
+          return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // Commission from supplier's OWN containers (not broker-earned from other suppliers' containers)
         const ownCommission = supplierContainers.reduce((sum: number, c: any) => {
@@ -2367,10 +2381,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           const commFx = parseFloat(c.fxRateToUsd || "1");
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
+        // Other charges from other suppliers' containers where this supplier is the charge recipient
+        const otherChargesValue = allContainers.reduce((sum: number, c: any) => {
+          if (c.otherChargesSupplierId !== sid) return sum;
+          const oc = parseFloat(c.otherCharges || "0");
+          if (oc <= 0) return sum;
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          return sum + oc * fx;
+        }, 0);
+        // FX net: FX-in transfers received minus FX-out transfers sent (in USD)
+        // Use toAmountUsd for both directions — it's the actual USD value settled.
+        let fxNetUsd = 0;
+        for (const t of allFxTransfers as any[]) {
+          if (t.toSupplierId === sid) {
+            fxNetUsd += parseFloat(t.toAmountUsd || "0");
+          }
+          if (t.fromSupplierId === sid) {
+            fxNetUsd -= parseFloat(t.toAmountUsd || "0");
+          }
+        }
         const supplierPayments = allPayments.filter((p: any) => p.supplierId === sid);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
-        return openingBal + containerValue + ownCommission - totalPaid - voucherPaid;
+        return openingBal + containerValue + ownCommission + otherChargesValue + fxNetUsd - totalPaid - voucherPaid;
       };
 
       // True broker balance: only the broker's own balance (NOT children aggregated in)
@@ -2450,12 +2483,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
         // Sum container value including freight (agreed supplier charge) in USD.
+        // Cross-currency freight (e.g. USD freight on AUD containers) is added directly in USD.
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const fx = parseFloat(c.fxRateToUsd || "1");
-          return sum + ((kg * rate + freight) * fx);
+          const containerCc = c.currencyCode || "USD";
+          const freightCc = c.freightCurrencyCode || containerCc;
+          const freightInContainerCurr = freightCc === containerCc ? freight : 0;
+          const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
+          return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // TRUE BROKER BALANCE MODEL:
         // Commission from this supplier's OWN containers accumulates under the SUPPLIER (not the broker).
@@ -2480,7 +2518,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         // Include voucher-based payments (payment vouchers) in the balance
         const voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
-        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue - totalPaid - voucherPaidUsd;
+        // FX net (USD): FX-in transfers received minus FX-out transfers sent (in USD equivalent)
+        // This is critical for brokers that accumulate balance via explicit FX settlements from linked suppliers.
+        // Always use toAmountUsd as the USD amount — it reflects the actual settled USD value.
+        let fxNetUsd = 0;
+        for (const t of allFxTransfers) {
+          if (t.toSupplierId === s.id) {
+            fxNetUsd += parseFloat((t as any).toAmountUsd || "0");
+          }
+          if (t.fromSupplierId === s.id) {
+            fxNetUsd -= parseFloat((t as any).toAmountUsd || "0");
+          }
+        }
+        // Other charges from containers where this supplier is the charge recipient
+        // (other_charges_supplier_id points to the supplier owed these charges)
+        const otherChargesValue = containers.reduce((sum: number, c: any) => {
+          if (c.otherChargesSupplierId !== s.id) return sum;
+          const oc = parseFloat(c.otherCharges || "0");
+          if (oc <= 0) return sum;
+          const fx = parseFloat(c.fxRateToUsd || "1");
+          return sum + oc * fx;
+        }, 0);
+        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue + otherChargesValue + fxNetUsd - totalPaid - voucherPaidUsd;
 
         // Per-currency balances (original currency, not converted).
         // Use kg * ratePerKg + freight + commission from own containers.
@@ -2522,6 +2581,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (t.toSupplierId === s.id) {
             byCurrency["USD"] = (byCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
           }
+        }
+        // Other charges from other suppliers' containers attributed to this supplier
+        // (e.g. broker-linked charges where other_charges_supplier_id = s.id)
+        for (const c of containers) {
+          if ((c as any).otherChargesSupplierId !== s.id) continue;
+          const oc = parseFloat((c as any).otherCharges || "0");
+          if (oc <= 0) continue;
+          const cc = (c as any).currencyCode || "USD";
+          byCurrency[cc] = (byCurrency[cc] || 0) + oc;
         }
         const currencyBalances = Object.entries(byCurrency)
           .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
@@ -2735,6 +2803,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .orderBy(factoryOffloadAdditionalCharges.createdAt);
 
+      // Also fetch container-level other_charges attributed to this supplier via other_charges_supplier_id
+      // (these are stored directly on factory_containers, distinct from the factoryOffloadAdditionalCharges table)
+      const containerColCharges = await db
+        .select({
+          id: factoryContainers.id,
+          containerId: factoryContainers.id,
+          description: sql<string>`'Other Charges'`,
+          amount: factoryContainers.otherCharges,
+          currencyCode: factoryContainers.currencyCode,
+          fxRateToUsd: factoryContainers.fxRateToUsd,
+          createdAt: factoryContainers.createdAt,
+        })
+        .from(factoryContainers)
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          eq(factoryContainers.otherChargesSupplierId, supplierId),
+          sql`${factoryContainers.otherCharges}::numeric > 0`
+        ));
+      // Merge into supplierOffloadCharges list for unified processing below
+      const allSupplierCharges = [...supplierOffloadCharges as any[], ...(containerColCharges as any[]).map((c: any) => ({
+        ...c,
+        amount: c.amount,
+        currencyCode: c.currencyCode || "USD",
+      }))];
+
       const statement = containers.map((c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
@@ -2860,8 +2953,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           }
         }
       }
-      // Add offload other charges (supplier-linked) into their currency bucket
-      for (const oc of supplierOffloadCharges as any[]) {
+      // Add offload other charges (supplier-linked + container col other_charges) into their currency bucket
+      for (const oc of allSupplierCharges as any[]) {
         const ocCc = oc.currencyCode || "USD";
         if (!byCurrency[ocCc]) byCurrency[ocCc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
         byCurrency[ocCc].totalOtherCharges += parseFloat(oc.amount || "0");
@@ -3006,7 +3099,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       // Offload charges may reference containers belonging to child suppliers (broker receives a charge
       // on a child's container). Fetch any missing containers so we can show the real container number.
       const missingContainerIds = [...new Set(
-        supplierOffloadCharges.map((oc: any) => oc.containerId).filter((id: number) => !containerMap[id])
+        allSupplierCharges.map((oc: any) => oc.containerId).filter((id: number) => !containerMap[id])
       )];
       if (missingContainerIds.length > 0) {
         const extraContainers = await db
@@ -3246,7 +3339,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amountIsNeg: true,
           notes: null,
         })),
-        ...supplierOffloadCharges.map((oc: any) => {
+        ...allSupplierCharges.map((oc: any) => {
           const cc = oc.currencyCode || "USD";
           return {
             key: `oac-${oc.id}`,
@@ -3271,7 +3364,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         statement: enrichedStatement,
         currencyGroups,
         obCommissions,
-        offloadCharges: supplierOffloadCharges,
+        offloadCharges: allSupplierCharges,
         payments,
         fxTransfers: enrichedFxTransfers,
         linkedSupplierGroups,
@@ -3563,6 +3656,45 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         type: "other_charge",
         description: `${oc.description || "Other Charge"} — ${oc.containerNumber || `Container ${oc.containerId}`}`,
         ref: oc.containerNumber || `Container ${oc.containerId}`,
+        amount: amt,
+        commissionAmount: null,
+        commissionCurrency: null,
+      });
+    }
+
+    // factory_containers.other_charges column where other_charges_supplier_id is in the broker group
+    // (distinct from the factoryContainerOtherCharges table which is a separate multi-row charges table)
+    const containerColOtherCharges = allSupplierIds.length > 0
+      ? await db
+          .select({
+            id: factoryContainers.id,
+            containerNumber: factoryContainers.containerNumber,
+            otherCharges: factoryContainers.otherCharges,
+            otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
+            currencyCode: factoryContainers.currencyCode,
+            arrivalDate: factoryContainers.arrivalDate,
+            createdAt: factoryContainers.createdAt,
+            supplierId: factoryContainers.supplierId,
+          })
+          .from(factoryContainers)
+          .where(and(
+            eq(factoryContainers.companyId, companyId),
+            sql`${factoryContainers.otherChargesSupplierId} = ANY(${sql.raw(`ARRAY[${allSupplierIds.join(",")}]`)})`,
+            sql`${factoryContainers.otherCharges}::numeric > 0`
+          ))
+      : [];
+
+    for (const c of containerColOtherCharges as any[]) {
+      const cc = c.currencyCode || "USD";
+      const amt = parseFloat(c.otherCharges || "0");
+      const chargeSupplierName = supplierNameMap[c.otherChargesSupplierId] || "Unknown";
+      const containerSupplierName = supplierNameMap[c.supplierId] || "Unknown";
+      const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
+      addRow(cc, {
+        date: dateVal,
+        type: "other_charge",
+        description: `Other Charges — ${c.containerNumber} (${containerSupplierName} → ${chargeSupplierName})`,
+        ref: c.containerNumber,
         amount: amt,
         commissionAmount: null,
         commissionCurrency: null,
