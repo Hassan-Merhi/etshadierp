@@ -3225,8 +3225,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }
         for (const t of (linkedFxTransfers as any[])) {
           if (t.fromSupplierId === linked.id) {
+            // Linked supplier sent funds out (FX Out) — counts as settled against their balance
             const cc = t.fromCurrencyCode || "USD";
             linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
+          }
+          if (t.toSupplierId === linked.id) {
+            // Linked supplier received USD back (e.g. round-trip return from broker) —
+            // reduces net-settled so the exposure is correctly restored.
+            linkedPaidByCurrency["USD"] = (linkedPaidByCurrency["USD"] || 0) - parseFloat(t.toAmountUsd || "0");
           }
         }
 
