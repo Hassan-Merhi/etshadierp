@@ -28,6 +28,7 @@ interface PendingLoad {
   orderDate: string;
   totalQtyBales: number;
   proformaIdUsed: number | null;
+  proformaName: string | null;
   locationId: number | null;
   loadingStartedAt: string | null;
   status: string;
@@ -116,7 +117,7 @@ export default function FactoryPendingLoadings() {
                     </Badge>
                     {load.proformaIdUsed && (
                       <Badge variant="outline" data-testid={`badge-proforma-${load.id}`}>
-                        Proforma #{load.proformaIdUsed}
+                        {load.proformaName ? load.proformaName : `Proforma #${load.proformaIdUsed}`}
                       </Badge>
                     )}
                   </div>

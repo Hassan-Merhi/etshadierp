@@ -12812,6 +12812,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           invoiceNumber: customerOrders.invoiceNumber,
           orderDate: customerOrders.orderDate,
           proformaIdUsed: customerOrders.proformaIdUsed,
+          proformaName: customerProformas.name,
           status: customerOrders.status,
           subtotalBales: customerOrders.subtotalBales,
           freightAmount: customerOrders.freightAmount,
@@ -12831,6 +12832,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         })
         .from(customerOrders)
         .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .leftJoin(customerProformas, eq(customerOrders.proformaIdUsed, customerProformas.id))
         .where(and(...conditions))
         .orderBy(desc(customerOrders.createdAt));
 
