@@ -1285,7 +1285,7 @@ export const insertDashboardCashAccountSchema = createInsertSchema(dashboardCash
   createdAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  accountType: z.enum(["ledger", "bank"]),
+  accountType: z.string().min(1),
   accountId: z.number().min(1, "Account is required"),
   displayOrder: z.number().optional(),
 });
