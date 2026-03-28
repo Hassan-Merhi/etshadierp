@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3, List, AlignJustify } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,6 +136,7 @@ export default function StockEntryHistory() {
   const [search, setSearch] = useState("");
   const [includeUnassigned, setIncludeUnassigned] = useState(true);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
 
   const params = new URLSearchParams();
   params.set("startDate", fromDate);
@@ -183,6 +184,33 @@ export default function StockEntryHistory() {
 
   const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
   const totalWeight = useMemo(() => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0), [filteredGroups]);
+
+  // Condensed view: group by worker
+  interface WorkerCondensed {
+    workerKey: string;
+    workerId: number | null;
+    workerName: string | null;
+    totalBales: number;
+    totalWeight: number;
+    groups: GroupRow[];
+  }
+  const workerGroups = useMemo<WorkerCondensed[]>(() => {
+    const map = new Map<string, WorkerCondensed>();
+    for (const g of filteredGroups) {
+      const key = g.workerId != null ? String(g.workerId) : "unassigned";
+      if (!map.has(key)) {
+        map.set(key, { workerKey: key, workerId: g.workerId, workerName: g.workerName, totalBales: 0, totalWeight: 0, groups: [] });
+      }
+      const wg = map.get(key)!;
+      wg.totalBales += g.baleCount;
+      wg.totalWeight += parseFloat(g.totalWeight || "0");
+      wg.groups.push(g);
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalBales - a.totalBales);
+  }, [filteredGroups]);
+
+  // Detailed view: flat list of all bales
+  const allBales = useMemo(() => filteredGroups.flatMap(g => g.bales), [filteredGroups]);
 
   const bulkAssignMutation = useMutation({
     mutationFn: async ({ baleIds, workerId }: { baleIds: number[]; workerId: number }) => {
@@ -413,6 +441,27 @@ export default function StockEntryHistory() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-base font-semibold">Stock Entry History</h2>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-md border overflow-hidden">
+            <Button
+              variant={viewMode === "condensed" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setViewMode("condensed")}
+              data-testid="button-view-condensed"
+            >
+              <AlignJustify className="w-3 h-3 mr-1" /> Condensed
+            </Button>
+            <Button
+              variant={viewMode === "detailed" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0 border-l"
+              onClick={() => setViewMode("detailed")}
+              data-testid="button-view-detailed"
+            >
+              <List className="w-3 h-3 mr-1" /> Detailed
+            </Button>
+          </div>
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
           </Button>
@@ -522,120 +571,208 @@ export default function StockEntryHistory() {
         <span>{totalWeight.toFixed(2)} kg total</span>
       </div>
 
-      <div className="rounded-md border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/50">
-            <tr className="bg-muted/50 text-left">
-              <th className="px-3 py-2 w-6"></th>
-              <th className="px-3 py-2">Entry Date</th>
-              <th className="px-3 py-2">Location</th>
-              <th className="px-3 py-2">Worker</th>
-              <th className="px-3 py-2">Product</th>
-              <th className="px-3 py-2 text-right">Bales</th>
-              <th className="px-3 py-2 text-right">Total kg</th>
-              <th className="px-3 py-2 text-right">Avg kg</th>
-              <th className="px-3 py-2">First Bale</th>
-              <th className="px-3 py-2">Last Bale</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            )}
-            {!isLoading && filteredGroups.length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
-            )}
-            {filteredGroups.map(g => {
-              const key = groupKey(g);
-              const expanded = expandedKeys.has(key);
-              return [
-                <tr
-                  key={key}
-                  className="border-t hover-elevate cursor-pointer"
-                  onClick={() => toggleExpand(key)}
-                  data-testid={`row-group-${key}`}
-                >
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </td>
-                  <td className="px-3 py-2 font-medium">{formatDisplayDate(g.stockEntryDate)}</td>
-                  <td className="px-3 py-2">{g.locationName}</td>
-                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                    <Select
-                      value={g.workerId ? String(g.workerId) : ""}
-                      onValueChange={(v) => {
-                        const baleIds = g.bales.map(b => b.id);
-                        bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
-                      }}
-                    >
-                      <SelectTrigger
-                        className={`h-7 w-40 text-xs ${!g.workerId ? "text-muted-foreground italic" : ""}`}
-                        data-testid={`select-assign-worker-${groupKey(g)}`}
-                      >
-                        <SelectValue placeholder="Assign worker…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workers.filter((w: any) => w.active).map((w: any) => (
-                          <SelectItem key={w.id} value={String(w.id)}>
-                            {w.fullName || w.full_name || w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span>{g.productName || "—"}</span>
-                    {g.articleCode && <span className="ml-1 text-xs text-muted-foreground">{g.articleCode}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right font-medium">{g.baleCount}</td>
-                  <td className="px-3 py-2 text-right">{parseFloat(g.totalWeight || "0").toFixed(2)}</td>
-                  <td className="px-3 py-2 text-right">{parseFloat(g.avgWeight || "0").toFixed(2)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{fmtTime(g.firstFinalizedAt)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{fmtTime(g.lastFinalizedAt)}</td>
-                </tr>,
-                expanded && (
-                  <tr key={key + "-detail"} className="bg-muted/20">
-                    <td colSpan={10} className="px-6 py-3">
-                      <table className="w-full text-xs">
-                        <thead className="sticky top-0 z-10 bg-muted/50">
-                          <tr className="text-muted-foreground">
-                            <th className="text-left pb-1 pr-4">Reference</th>
-                            <th className="text-left pb-1 pr-4">Product</th>
-                            <th className="text-left pb-1 pr-4">Worker</th>
-                            <th className="text-right pb-1 pr-4">Weight (kg)</th>
-                            <th className="text-left pb-1 pr-4">Status</th>
-                            <th className="text-left pb-1 pr-4">Entry Date</th>
-                            <th className="text-left pb-1 pr-4">Finalized At</th>
-                            <th className="text-left pb-1">Location</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {g.bales.map(b => (
-                            <tr key={b.id} className="border-t border-border/40" data-testid={`row-bale-${b.id}`}>
-                              <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
-                              <td className="py-1 pr-4">{b.productName || "—"}</td>
-                              <td className="py-1 pr-4">{b.workerName || <span className="italic text-muted-foreground">Unassigned</span>}</td>
-                              <td className="py-1 pr-4 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
-                              <td className="py-1 pr-4">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
-                                  {b.status}
-                                </span>
-                              </td>
-                              <td className="py-1 pr-4">{b.stockEntryDate ? formatDisplayDate(b.stockEntryDate) : "—"}</td>
-                              <td className="py-1 pr-4">{b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—"}</td>
-                              <td className="py-1">{b.locationName}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+      {/* ── CONDENSED VIEW: grouped by worker ── */}
+      {viewMode === "condensed" && (
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/50">
+              <tr className="text-left">
+                <th className="px-3 py-2 w-6"></th>
+                <th className="px-3 py-2">Worker</th>
+                <th className="px-3 py-2 text-right">Bales</th>
+                <th className="px-3 py-2 text-right">Total kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              )}
+              {!isLoading && workerGroups.length === 0 && (
+                <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
+              )}
+              {workerGroups.map(wg => {
+                const wExpanded = expandedKeys.has(wg.workerKey);
+                return [
+                  /* Worker header row */
+                  <tr
+                    key={wg.workerKey}
+                    className="border-t hover-elevate cursor-pointer bg-muted/30"
+                    onClick={() => toggleExpand(wg.workerKey)}
+                    data-testid={`row-worker-${wg.workerKey}`}
+                  >
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {wExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </td>
-                  </tr>
-                ),
-              ];
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <td className="px-3 py-2 font-semibold">
+                      {wg.workerName || <span className="italic text-muted-foreground">Unassigned</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
+                  </tr>,
+
+                  /* Expanded: sub-group rows per date+location+product */
+                  wExpanded && (
+                    <tr key={wg.workerKey + "-sub"} className="bg-muted/10">
+                      <td colSpan={4} className="px-0 py-0">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-muted-foreground border-b bg-muted/20">
+                              <th className="px-8 py-1.5 text-left w-6"></th>
+                              <th className="px-3 py-1.5 text-left">Date</th>
+                              <th className="px-3 py-1.5 text-left">Location</th>
+                              <th className="px-3 py-1.5 text-left">Product</th>
+                              <th className="px-3 py-1.5 text-right">Bales</th>
+                              <th className="px-3 py-1.5 text-right">Total kg</th>
+                              <th className="px-3 py-1.5 text-right">Avg kg</th>
+                              <th className="px-3 py-1.5">First</th>
+                              <th className="px-3 py-1.5">Last</th>
+                              <th className="px-3 py-1.5">Reassign</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {wg.groups.map(g => {
+                              const gKey = groupKey(g);
+                              const gExpanded = expandedKeys.has(gKey + "-bales");
+                              return [
+                                <tr
+                                  key={gKey}
+                                  className="border-t border-border/40 hover-elevate cursor-pointer"
+                                  onClick={() => toggleExpand(gKey + "-bales")}
+                                  data-testid={`row-group-${gKey}`}
+                                >
+                                  <td className="px-8 py-1.5 text-muted-foreground">
+                                    {gExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                  </td>
+                                  <td className="px-3 py-1.5">{formatDisplayDate(g.stockEntryDate)}</td>
+                                  <td className="px-3 py-1.5">{g.locationName}</td>
+                                  <td className="px-3 py-1.5">
+                                    {g.productName || "—"}
+                                    {g.articleCode && <span className="ml-1 text-muted-foreground">({g.articleCode})</span>}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right font-medium">{g.baleCount}</td>
+                                  <td className="px-3 py-1.5 text-right">{parseFloat(g.totalWeight || "0").toFixed(2)}</td>
+                                  <td className="px-3 py-1.5 text-right">{parseFloat(g.avgWeight || "0").toFixed(2)}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{fmtTime(g.firstFinalizedAt)}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{fmtTime(g.lastFinalizedAt)}</td>
+                                  <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
+                                    <Select
+                                      value={g.workerId ? String(g.workerId) : ""}
+                                      onValueChange={(v) => {
+                                        const baleIds = g.bales.map(b => b.id);
+                                        bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-6 w-36 text-xs" data-testid={`select-assign-worker-${gKey}`}>
+                                        <SelectValue placeholder="Reassign…" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {workers.filter((w: any) => w.active).map((w: any) => (
+                                          <SelectItem key={w.id} value={String(w.id)}>
+                                            {w.fullName || w.full_name || w.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </td>
+                                </tr>,
+                                /* Bale-level detail inside sub-group */
+                                gExpanded && (
+                                  <tr key={gKey + "-bales-detail"} className="bg-muted/20">
+                                    <td colSpan={10} className="px-12 py-2">
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="text-muted-foreground">
+                                            <th className="text-left pb-1 pr-4">Reference</th>
+                                            <th className="text-right pb-1 pr-4">Weight (kg)</th>
+                                            <th className="text-left pb-1 pr-4">Status</th>
+                                            <th className="text-left pb-1">Finalized At</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {g.bales.map(b => (
+                                            <tr key={b.id} className="border-t border-border/30" data-testid={`row-bale-${b.id}`}>
+                                              <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
+                                              <td className="py-1 pr-4 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
+                                              <td className="py-1 pr-4">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                                                  {b.status}
+                                                </span>
+                                              </td>
+                                              <td className="py-1">{b.finalizedAt ? new Date(b.finalizedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </td>
+                                  </tr>
+                                ),
+                              ];
+                            })}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  ),
+                ];
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── DETAILED VIEW: flat per-bale list ── */}
+      {viewMode === "detailed" && (
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/50">
+              <tr className="text-left">
+                <th className="px-3 py-2">Reference</th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Location</th>
+                <th className="px-3 py-2">Worker</th>
+                <th className="px-3 py-2">Product</th>
+                <th className="px-3 py-2">Article</th>
+                <th className="px-3 py-2 text-right">Weight (kg)</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Finalized At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              )}
+              {!isLoading && allBales.length === 0 && (
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No bales found for the selected filters.</td></tr>
+              )}
+              {allBales.map((b, idx) => (
+                <tr
+                  key={b.id}
+                  className={`border-t ${idx % 2 === 1 ? "bg-muted/20" : ""}`}
+                  data-testid={`row-bale-${b.id}`}
+                >
+                  <td className="px-3 py-1.5 font-mono text-xs">{b.referenceNumber}</td>
+                  <td className="px-3 py-1.5">{b.stockEntryDate ? formatDisplayDate(b.stockEntryDate) : "—"}</td>
+                  <td className="px-3 py-1.5">{b.locationName}</td>
+                  <td className="px-3 py-1.5">
+                    {b.workerName || <span className="italic text-muted-foreground text-xs">Unassigned</span>}
+                  </td>
+                  <td className="px-3 py-1.5">{b.productName || "—"}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{b.articleCode || "—"}</td>
+                  <td className="px-3 py-1.5 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
+                  <td className="px-3 py-1.5">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                      {b.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-muted-foreground text-xs">
+                    {b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
