@@ -6,9 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -33,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
+import { EditMixBatchDialog } from "../components/EditMixBatchDialog";
 import { formatNumber } from "@/lib/formatNumber";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -55,8 +53,6 @@ export default function MixBatches() {
 
   // Edit state
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editNotes, setEditNotes] = useState("");
 
   // Delete state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -110,29 +106,6 @@ export default function MixBatches() {
       setSourceBatchId("");
       setSelectedBaleIds(new Set());
       toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to batch` });
-    },
-    onError: (err: any) => {
-      if (err?._handledGlobally) return;
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const editMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("PATCH", `/api/factory/mix-batches/${editBatch!.id}`, {
-        name: editName,
-        notes: editNotes,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Update failed");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-      setEditBatch(null);
-      toast({ title: "Saved", description: "Batch updated successfully" });
     },
     onError: (err: any) => {
       if (err?._handledGlobally) return;
@@ -316,11 +289,7 @@ export default function MixBatches() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => {
-                              setEditBatch(batch);
-                              setEditName(batch.name || "");
-                              setEditNotes((batch as any).notes || "");
-                            }}
+                            onClick={() => setEditBatch(batch)}
                             data-testid={`button-edit-batch-${batch.id}`}
                           >
                             <Pencil className="h-4 w-4" />
@@ -365,51 +334,11 @@ export default function MixBatches() {
         onOpenChange={setCreateDialogOpen}
       />
 
-      {/* Edit Batch Dialog */}
-      <Dialog open={!!editBatch} onOpenChange={(open) => { if (!open) setEditBatch(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Batch</DialogTitle>
-            <DialogDescription>
-              Update the name or notes for this batch. Sources and weights cannot be changed after creation.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Batch Name</Label>
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder={editBatch?.batchCode || ""}
-                data-testid="input-edit-batch-name"
-              />
-              <p className="text-xs text-muted-foreground">Leave blank to use the auto-generated batch code.</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Optional notes..."
-                rows={3}
-                data-testid="input-edit-batch-notes"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditBatch(null)} data-testid="button-cancel-edit">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => editMutation.mutate()}
-                disabled={editMutation.isPending}
-                data-testid="button-save-edit"
-              >
-                {editMutation.isPending ? "Saving..." : "Save"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EditMixBatchDialog
+        batch={editBatch}
+        open={!!editBatch}
+        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>

@@ -7778,25 +7778,221 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
-      const [batch] = await db
-        .select()
-        .from(factoryMixBatches)
-        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+      const { name, notes, batchDate, supplierSources, batchSources } = req.body;
 
-      if (!batch) return res.status(404).json({ message: "Mix batch not found" });
+      // If no source data provided → simple name/notes update only
+      const hasSourceUpdate = supplierSources !== undefined || batchSources !== undefined;
 
-      const { name, notes } = req.body;
-      const updates: any = {};
-      if (name !== undefined) updates.name = name?.trim() || null;
-      if (notes !== undefined) updates.notes = notes?.trim() || null;
+      if (!hasSourceUpdate) {
+        const [batch] = await db.select().from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+        if (!batch) return res.status(404).json({ message: "Mix batch not found" });
+        const updates: any = {};
+        if (name !== undefined) updates.name = name?.trim() || null;
+        if (notes !== undefined) updates.notes = notes?.trim() || null;
+        if (batchDate !== undefined) updates.batchDate = batchDate || null;
+        const [updated] = await db.update(factoryMixBatches).set(updates)
+          .where(eq(factoryMixBatches.id, id)).returning();
+        return res.json(updated);
+      }
 
-      const [updated] = await db
-        .update(factoryMixBatches)
-        .set(updates)
-        .where(eq(factoryMixBatches.id, id))
-        .returning();
+      // Full source edit: reverse old consumption, apply new
+      const result = await db.transaction(async (tx: any) => {
+        const [batch] = await tx.select().from(factoryMixBatches)
+          .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)))
+          .for("update");
+        if (!batch) throw new Error("Mix batch not found");
 
-      res.json(updated);
+        const usedKg = parseFloat(batch.usedKg || "0");
+
+        // ── 1. Reverse all existing sources ──
+        const oldSources = await tx.select().from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, id));
+
+        for (const src of oldSources) {
+          if (src.containerId) {
+            const [rsRow] = await tx.select().from(factoryRawStock)
+              .where(eq(factoryRawStock.containerId, src.containerId));
+            if (rsRow) {
+              const newUsed = Math.max(0, parseFloat(rsRow.usedKg) - parseFloat(src.weightKg));
+              await tx.update(factoryRawStock).set({ usedKg: newUsed.toFixed(3) })
+                .where(eq(factoryRawStock.id, rsRow.id));
+            }
+          } else if (src.supplierId && !src.sourceBatchId) {
+            // Legacy supplier-only source: FIFO reverse
+            const supplierRawStocks = await tx.select({
+              id: factoryRawStock.id, usedKg: factoryRawStock.usedKg,
+            })
+              .from(factoryRawStock)
+              .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+              .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, src.supplierId)))
+              .orderBy(desc(factoryRawStock.offloadedAt), desc(factoryRawStock.id));
+            let toRestore = parseFloat(src.weightKg);
+            for (const rs of supplierRawStocks) {
+              if (toRestore <= 0.001) break;
+              const usedNow = parseFloat(rs.usedKg);
+              if (usedNow <= 0) continue;
+              const restore = Math.min(toRestore, usedNow);
+              await tx.update(factoryRawStock)
+                .set({ usedKg: Math.max(0, usedNow - restore).toFixed(3) })
+                .where(eq(factoryRawStock.id, rs.id));
+              toRestore -= restore;
+            }
+          } else if (src.sourceBatchId) {
+            const [srcBatch] = await tx.select().from(factoryMixBatches)
+              .where(eq(factoryMixBatches.id, src.sourceBatchId));
+            if (srcBatch) {
+              const newUsed = Math.max(0, parseFloat(srcBatch.usedKg) - parseFloat(src.weightKg));
+              await tx.update(factoryMixBatches)
+                .set({ usedKg: newUsed.toFixed(3), status: "ACTIVE" })
+                .where(eq(factoryMixBatches.id, src.sourceBatchId));
+            }
+          }
+        }
+
+        // ── 2. Delete old source records ──
+        await tx.delete(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, id));
+
+        // ── 3. Apply new sources ──
+        let totalWeightKg = 0;
+        let totalCost = 0;
+        const sourceRecords: any[] = [];
+
+        for (const source of (supplierSources || [])) {
+          const { supplierId, weightKg } = source;
+          const weight = parseFloat(weightKg);
+
+          const supplierRawStocks = await tx.select({
+            id: factoryRawStock.id,
+            receivedKg: factoryRawStock.receivedKg,
+            usedKg: factoryRawStock.usedKg,
+            costPerKg: factoryRawStock.costPerKg,
+            costPerKgUsd: factoryRawStock.costPerKgUsd,
+            containerId: factoryRawStock.containerId,
+            offloadedAt: factoryRawStock.offloadedAt,
+          })
+            .from(factoryRawStock)
+            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, supplierId)))
+            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
+            .for("update");
+
+          let weightedCostSum = 0, weightedCostWeight = 0;
+          for (const rs of supplierRawStocks) {
+            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+            const rsCost = parseFloat(rs.costPerKgUsd || rs.costPerKg);
+            weightedCostSum += avail * rsCost;
+            weightedCostWeight += avail;
+          }
+          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
+
+          const perRsDeductions: Array<{ containerId: number; deduct: number }> = [];
+          let remaining = weight;
+          for (const rs of supplierRawStocks) {
+            if (remaining <= 0.001) break;
+            const avail = parseFloat(rs.receivedKg) - parseFloat(rs.usedKg);
+            if (avail <= 0) continue;
+            const deduct = Math.min(remaining, avail);
+            await tx.update(factoryRawStock)
+              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${deduct}` })
+              .where(eq(factoryRawStock.id, rs.id));
+            perRsDeductions.push({ containerId: rs.containerId, deduct });
+            remaining -= deduct;
+          }
+          if (remaining > 0.001 && supplierRawStocks.length > 0) {
+            const lastRs = supplierRawStocks[supplierRawStocks.length - 1];
+            await tx.update(factoryRawStock)
+              .set({ usedKg: sql`${factoryRawStock.usedKg} + ${remaining}` })
+              .where(eq(factoryRawStock.id, lastRs.id));
+            const ex = perRsDeductions.find(d => d.containerId === lastRs.containerId);
+            if (ex) ex.deduct += remaining; else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
+            remaining = 0;
+          }
+
+          totalWeightKg += weight;
+          totalCost += weight * costPerKg;
+          for (const d of perRsDeductions) {
+            sourceRecords.push({ supplierId, containerId: d.containerId, weightKg: String(d.deduct), costPerKg: String(costPerKg), totalCost: String(d.deduct * costPerKg) });
+          }
+        }
+
+        for (const bSource of (batchSources || [])) {
+          const { sourceBatchId, weightKg } = bSource;
+          const [srcBatch] = await tx.select().from(factoryMixBatches)
+            .where(and(eq(factoryMixBatches.id, sourceBatchId), eq(factoryMixBatches.companyId, companyId)))
+            .for("update");
+          if (!srcBatch) throw new Error(`Source batch ${sourceBatchId} not found`);
+          const batchRemaining = parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg);
+          const weight = parseFloat(weightKg);
+          if (weight > batchRemaining + 0.001) throw new Error(`Not enough in batch ${srcBatch.batchCode}. Available: ${batchRemaining.toFixed(3)} kg`);
+          const cost = parseFloat(srcBatch.costPerKg);
+          await tx.update(factoryMixBatches)
+            .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
+            .where(eq(factoryMixBatches.id, srcBatch.id));
+          totalWeightKg += weight;
+          totalCost += weight * cost;
+          sourceRecords.push({ sourceBatchId, weightKg: String(weight), costPerKg: String(cost), totalCost: String(weight * cost) });
+        }
+
+        // ── 4. Validate new total >= already used in production ──
+        if (totalWeightKg < usedKg - 0.001) {
+          throw new Error(`New total (${totalWeightKg.toFixed(3)} kg) is less than already used in production (${usedKg.toFixed(3)} kg). Increase sources or reduce cannot proceed.`);
+        }
+
+        const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
+
+        // ── 5. Update batch totals ──
+        const batchUpdates: any = {
+          totalWeightKg: String(totalWeightKg),
+          costPerKg: String(blendedCostPerKg),
+          totalCost: String(totalCost),
+          updatedAt: new Date(),
+        };
+        if (name !== undefined) batchUpdates.name = name?.trim() || null;
+        if (notes !== undefined) batchUpdates.notes = notes?.trim() || null;
+        if (batchDate !== undefined) batchUpdates.batchDate = batchDate || null;
+
+        const [updated] = await tx.update(factoryMixBatches).set(batchUpdates)
+          .where(eq(factoryMixBatches.id, id)).returning();
+
+        // ── 6. Insert new source records ──
+        for (const sr of sourceRecords) {
+          await tx.insert(factoryMixBatchSources).values({
+            mixBatchId: id,
+            containerId: sr.containerId || null,
+            supplierId: sr.supplierId || null,
+            sourceBatchId: sr.sourceBatchId || null,
+            sourceType: sr.sourceBatchId ? "BATCH" : sr.containerId ? "CONTAINER" : "SUPPLIER",
+            sourceId: sr.supplierId || sr.containerId || sr.sourceBatchId || null,
+            weightKg: sr.weightKg,
+            quantityKg: sr.weightKg,
+            costPerKg: sr.costPerKg,
+            totalCost: sr.totalCost,
+          });
+        }
+
+        return updated;
+      });
+
+      // Update daybook entry
+      await db.delete(factoryDaybookEntries).where(and(
+        eq(factoryDaybookEntries.companyId, companyId),
+        eq(factoryDaybookEntries.txType, "MIX_BATCH_CREATED"),
+        eq(factoryDaybookEntries.referenceId, id)
+      ));
+      const mbTxDate = batchDate || result.batchDate || new Date().toISOString().split('T')[0];
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: mbTxDate,
+        txType: "MIX_BATCH_CREATED",
+        referenceId: result.id,
+        description: `Mix batch edited: ${result.batchCode}${result.name ? ` – ${result.name}` : ""} (${parseFloat(result.totalWeightKg || "0").toFixed(1)} kg)`,
+        amountCurrency: parseFloat(result.totalCost || "0"),
+        amountUsd: parseFloat(result.totalCost || "0"),
+      });
+
+      res.json(result);
     } catch (error: any) {
       console.error("Error updating mix batch:", error);
       res.status(500).json({ message: error.message });
