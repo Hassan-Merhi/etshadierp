@@ -1637,6 +1637,7 @@
     barcode: string;
     quantity: number;
     productionDate: string;
+    refNumber?: string;
   }
 
   function ImportBalesTab() {
