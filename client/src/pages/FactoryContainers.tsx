@@ -202,6 +202,8 @@ export default function FactoryContainers() {
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       const hasCommission = parseFloat(vars.commissionAmount || "0") > 0;
       toast({
         title: "Container saved",
@@ -270,6 +272,8 @@ export default function FactoryContainers() {
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       const hasCommission = parseFloat(vars.data.commissionAmount || "0") > 0;
       toast({
         title: "Container saved",
