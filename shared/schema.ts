@@ -2358,6 +2358,7 @@ export const factoryContainers = pgTable("factory_containers", {
   freightAccountId: integer("freight_account_id"),
   freightSupplierId: integer("freight_supplier_id"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
+  otherChargesCurrencyCode: varchar("other_charges_currency_code", { length: 10 }),
   otherChargesAccountId: integer("other_charges_account_id"),
   otherChargesSupplierId: integer("other_charges_supplier_id"),
   commissionAmount: decimal("commission_amount", { precision: 20, scale: 2 }).default("0"),
