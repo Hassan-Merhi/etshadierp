@@ -71,7 +71,6 @@ const StockOTW = lazy(() => import("@/pages/StockOTW"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const SoldContainers = lazy(() => import("@/pages/SoldContainers"));
 const Bales = lazy(() => import("@/pages/Bales"));
-const MixBatches = lazy(() => import("@/pages/MixBatches"));
 const ProductionBales = lazy(() => import("@/pages/ProductionBales"));
 const BaleProducts = lazy(() => import("@/pages/BaleProducts"));
 const OrphanedRecords = lazy(() => import("@/pages/OrphanedRecords"));
@@ -269,7 +268,6 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/live-sheets" component={LiveSheets} />
       <Route path="/chat" component={Chat} />
       <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
-      <Route path="/mix-batches"><Redirect to="/factory/mix-batches" /></Route>
       <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
       <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
       <Route path="/sold-containers"><Redirect to="/containers" /></Route>
@@ -662,7 +660,6 @@ function AuthenticatedApp() {
                     <Route path="/factory/bale-products" component={BaleProducts} />
                     <Route path="/factory/raw-stock/opening-balance/:id/edit" component={FactoryOpeningBalanceEdit} />
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />
-                    <Route path="/factory/mix-batches" component={MixBatches} />
                     <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
                     <Route path="/factory/pressing"><Redirect to="/factory/stock-entry" /></Route>
                     <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>

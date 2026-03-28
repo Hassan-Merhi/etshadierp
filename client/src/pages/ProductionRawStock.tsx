@@ -1325,7 +1325,7 @@ export default function ProductionRawStock() {
               </Button>
               <Button variant="outline" size="sm" onClick={() => { setUseTodayUsages([]); setUseTodayOpen(true); }} disabled={openBatchesForUsage.length === 0} data-testid="button-use-today">
                 <CheckCircle className="h-4 w-4 mr-1" />
-                Use Today
+                Record Consumption
               </Button>
               <Button size="sm" onClick={() => setCreateMixBatchOpen(true)} data-testid="button-create-mix-batch">
                 <Plus className="h-4 w-4 mr-1" />
@@ -2796,7 +2796,7 @@ export default function ProductionRawStock() {
           <DialogHeader>
             <DialogTitle>Record Daily Consumption</DialogTitle>
             <DialogDescription>
-              Enter how many kg were consumed from each open batch today. Partial consumption will create a carry-forward batch automatically.
+              Select a date and enter how many kg were consumed from each open batch. Partial consumption will create a carry-forward batch automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
