@@ -79,6 +79,10 @@ app.use("/uploads", express.static("uploads"));
 // as both run behind reverse proxies
 app.set("trust proxy", 1);
 
+// Disable ETag generation globally so Express never sends ETags for API responses.
+// ETags cause 304 "Not Modified" responses which prevent balance/data from refreshing.
+app.set("etag", false);
+
 // Session middleware
 const PgSession = connectPgSimple(session);
 
@@ -137,6 +141,19 @@ app.use(session(sessionConfig));
 // Add build version header to all responses for cache tracking
 app.use((_req, res, next) => {
   res.setHeader('X-Build-Version', BUILD_VERSION);
+  next();
+});
+
+// Disable HTTP-level caching for all API routes.
+// Without this, Express generates ETags and the browser returns 304 "Not Modified"
+// for every subsequent request — causing TanStack Query's invalidateQueries to have
+// no effect (the browser hands back its cached response instead of hitting the server).
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
   next();
 });
 
