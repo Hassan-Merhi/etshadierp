@@ -367,6 +367,8 @@ export default function ProductionRawStock() {
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
+  const [batchDetailOpen, setBatchDetailOpen] = useState(false);
+  const [selectedBatchDetail, setSelectedBatchDetail] = useState<MixBatchRow | null>(null);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -413,6 +415,16 @@ export default function ProductionRawStock() {
 
   const { data: mixBatches, isLoading: mixBatchesLoading } = useQuery<MixBatchRow[]>({
     queryKey: ["/api/factory/mix-batches"],
+  });
+
+  const { data: batchDetailSources, isLoading: batchDetailSourcesLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/mix-batches", selectedBatchDetail?.id, "sources"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/mix-batches/${selectedBatchDetail!.id}/sources`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sources");
+      return res.json();
+    },
+    enabled: !!selectedBatchDetail && batchDetailOpen,
   });
 
   const { data: dailyReport, isLoading: dailyReportLoading } = useQuery<any>({
@@ -1441,6 +1453,7 @@ export default function ProductionRawStock() {
                   <TableHead className="text-right">Total (kg)</TableHead>
                   <TableHead className="text-right">Used (kg)</TableHead>
                   <TableHead className="text-right">Remaining (kg)</TableHead>
+                  <TableHead className="text-right">Blended Cost</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -1461,13 +1474,27 @@ export default function ProductionRawStock() {
                   };
                   return (
                     <TableRow key={batch.id} data-testid={`row-mix-batch-${batch.id}`}>
-                      <TableCell className="font-mono font-medium text-sm">{batch.batchCode}</TableCell>
-                      <TableCell className="text-sm">{batch.name || "—"}</TableCell>
+                      <TableCell
+                        className="font-mono font-medium text-sm cursor-pointer hover:underline text-primary"
+                        onClick={() => { setSelectedBatchDetail(batch); setBatchDetailOpen(true); }}
+                        data-testid={`link-mix-batch-detail-${batch.id}`}
+                      >
+                        {batch.batchCode}
+                      </TableCell>
+                      <TableCell
+                        className="text-sm cursor-pointer hover:underline"
+                        onClick={() => { setSelectedBatchDetail(batch); setBatchDetailOpen(true); }}
+                      >
+                        {batch.name || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{batch.operatorUser || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(used)}</TableCell>
                       <TableCell className="text-right font-mono font-medium text-sm">{formatNumber(remaining)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
+                      </TableCell>
                       <TableCell className="w-28">
                         <div className="space-y-1">
                           <Progress value={pct} className="h-2" />
@@ -1540,6 +1567,76 @@ export default function ProductionRawStock() {
               {deleteBatchMutation.isPending ? "Deleting..." : "Delete Batch"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Batch Detail / Origin Summary Dialog ── */}
+      <Dialog open={batchDetailOpen} onOpenChange={(open) => { setBatchDetailOpen(open); if (!open) setSelectedBatchDetail(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedBatchDetail?.batchCode}{selectedBatchDetail?.name ? ` — ${selectedBatchDetail.name}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Origin breakdown — raw materials and batches that were blended into this batch
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBatchDetail && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-muted-foreground text-xs">Total Weight</p>
+                  <p className="font-mono font-semibold">{formatNumber(parseFloat(selectedBatchDetail.totalWeightKg))} kg</p>
+                </div>
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-muted-foreground text-xs">Blended Cost</p>
+                  <p className="font-mono font-semibold">${parseFloat(selectedBatchDetail.costPerKg || "0").toFixed(4)}/kg</p>
+                </div>
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <p className="text-muted-foreground text-xs">Total Cost</p>
+                  <p className="font-mono font-semibold">${formatNumber(parseFloat(selectedBatchDetail.totalCost || "0"))}</p>
+                </div>
+              </div>
+
+              {batchDetailSourcesLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : batchDetailSources && batchDetailSources.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Origin</TableHead>
+                      <TableHead>Container / Reference</TableHead>
+                      <TableHead className="text-right">Weight (kg)</TableHead>
+                      <TableHead className="text-right">Cost/kg</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batchDetailSources.map((src: any) => {
+                      const originLabel = src.supplierName || (src.sourceBatchCode ? "Batch" : "Unknown");
+                      const refLabel = src.sourceBatchCode
+                        ? src.sourceBatchCode
+                        : src.containerNumber || "—";
+                      return (
+                        <TableRow key={src.id}>
+                          <TableCell className="font-medium text-sm">{originLabel}</TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">{refLabel}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatNumber(parseFloat(src.weightKg))}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${parseFloat(src.costPerKg || "0").toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${formatNumber(parseFloat(src.totalCost || "0"))}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No source data available for this batch.</p>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

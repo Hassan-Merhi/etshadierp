@@ -8250,15 +8250,20 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           id: factoryMixBatchSources.id,
           mixBatchId: factoryMixBatchSources.mixBatchId,
           containerId: factoryMixBatchSources.containerId,
+          supplierId: factoryMixBatchSources.supplierId,
           sourceBatchId: factoryMixBatchSources.sourceBatchId,
+          sourceType: factoryMixBatchSources.sourceType,
           weightKg: factoryMixBatchSources.weightKg,
           costPerKg: factoryMixBatchSources.costPerKg,
           totalCost: factoryMixBatchSources.totalCost,
           createdAt: factoryMixBatchSources.createdAt,
           containerNumber: factoryContainers.containerNumber,
+          supplierName: factorySuppliers.name,
+          sourceBatchCode: sql<string>`(SELECT batch_code FROM factory_mix_batches WHERE id = ${factoryMixBatchSources.sourceBatchId})`,
         })
         .from(factoryMixBatchSources)
         .leftJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
+        .leftJoin(factorySuppliers, eq(factoryMixBatchSources.supplierId, factorySuppliers.id))
         .where(eq(factoryMixBatchSources.mixBatchId, id));
 
       res.json(results);
