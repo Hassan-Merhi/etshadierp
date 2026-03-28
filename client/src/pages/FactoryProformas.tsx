@@ -62,6 +62,8 @@ export default function FactoryProformas() {
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
   const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "" });
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
+  const [inlineQtyLineId, setInlineQtyLineId] = useState<number | null>(null);
+  const [inlineQtyValue, setInlineQtyValue] = useState<string>("");
   const [renamingProforma, setRenamingProforma] = useState<Proforma | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [addLineMode, setAddLineMode] = useState<"manual" | "catalog">("catalog");
@@ -195,6 +197,31 @@ export default function FactoryProformas() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const inlineQtyMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: number; quantity: number }) => {
+      const res = await modeApiRequest("PUT", `/api/factory/customer-proforma-lines/${id}`, { quantity });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      setInlineQtyLineId(null);
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setInlineQtyLineId(null);
+    },
+  });
+
+  const commitInlineQty = (lineId: number) => {
+    const qty = parseInt(inlineQtyValue);
+    if (!isNaN(qty) && qty >= 1) {
+      inlineQtyMutation.mutate({ id: lineId, quantity: qty });
+    } else {
+      setInlineQtyLineId(null);
+    }
+  };
 
   const applyCatalogPricesMutation = useMutation({
     mutationFn: async (proformaId: number) => {
@@ -447,12 +474,17 @@ export default function FactoryProformas() {
                                 <TableHead>Product Name</TableHead>
                                 <TableHead className="text-right">Qty</TableHead>
                                 <TableHead className="text-right">Kg/Bale</TableHead>
+                                <TableHead className="text-right">Total Kg</TableHead>
                                 <TableHead className="text-right">Price/Bale</TableHead>
                                 <TableHead className="w-[80px]"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {proforma.lines.map((line) => (
+                              {proforma.lines.map((line) => {
+                                const lineWt = parseFloat(line.weightPerBaleKg || "0");
+                                const lineTotal = line.quantity * lineWt;
+                                const isEditingQty = inlineQtyLineId === line.id;
+                                return (
                                 <TableRow key={line.id} data-testid={`row-line-${line.id}`}>
                                   <TableCell className="font-mono text-sm" data-testid={`text-article-code-${line.id}`}>
                                     {line.articleCode}
@@ -461,10 +493,37 @@ export default function FactoryProformas() {
                                     {line.productName}
                                   </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
-                                    {line.quantity}
+                                    {isEditingQty ? (
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        className="w-20 h-7 text-right font-mono text-sm ml-auto"
+                                        value={inlineQtyValue}
+                                        onChange={(e) => setInlineQtyValue(e.target.value)}
+                                        onBlur={() => commitInlineQty(line.id)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") commitInlineQty(line.id);
+                                          if (e.key === "Escape") setInlineQtyLineId(null);
+                                        }}
+                                        autoFocus
+                                        data-testid={`input-inline-qty-${line.id}`}
+                                      />
+                                    ) : (
+                                      <button
+                                        className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
+                                        title="Click to edit quantity"
+                                        onClick={() => { setInlineQtyLineId(line.id); setInlineQtyValue(String(line.quantity)); }}
+                                        data-testid={`button-inline-qty-${line.id}`}
+                                      >
+                                        {line.quantity}
+                                      </button>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-right font-mono text-sm" data-testid={`text-kg-bale-${line.id}`}>
-                                    {(() => { const w = parseFloat(line.weightPerBaleKg || "0"); return w % 1 === 0 ? w.toLocaleString() : w.toFixed(2); })()}
+                                    {lineWt % 1 === 0 ? lineWt.toLocaleString() : lineWt.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm text-muted-foreground" data-testid={`text-total-kg-${line.id}`}>
+                                    {lineTotal > 0 ? (lineTotal % 1 === 0 ? lineTotal.toLocaleString() : lineTotal.toFixed(1)) : "—"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
                                     {formatAmount(parseFloat(line.pricePerBale))}
@@ -500,7 +559,8 @@ export default function FactoryProformas() {
                                     </div>
                                   </TableCell>
                                 </TableRow>
-                              ))}
+                              );
+                              })}
                             </TableBody>
                           </Table>
                           {(() => {
