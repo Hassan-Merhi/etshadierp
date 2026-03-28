@@ -7761,7 +7761,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           .delete(factoryMixBatchSources)
           .where(eq(factoryMixBatchSources.mixBatchId, id));
 
-        // 4. Delete the batch
+        // 4. Delete daybook entries for this mix batch
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "MIX_BATCH_CREATED"),
+            eq(factoryDaybookEntries.referenceId, id)
+          ));
+
+        // 5. Delete the batch
         await tx
           .delete(factoryMixBatches)
           .where(eq(factoryMixBatches.id, id));

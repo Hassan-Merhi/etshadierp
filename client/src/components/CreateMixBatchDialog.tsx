@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -142,9 +143,32 @@ export function CreateMixBatchDialog({
     onSuccess: (result: FactoryMixBatch) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      toast({ title: "Success", description: "Daily usage batch created successfully" });
       onCreated?.(result);
       handleClose();
+      const batchId = result.id;
+      const batchCode = (result as any).batchCode || `#${batchId}`;
+      toast({
+        title: "Batch created",
+        description: `${batchCode} created successfully`,
+        action: (
+          <ToastAction
+            altText="Undo"
+            onClick={async () => {
+              try {
+                const res = await fetch(`/api/factory/mix-batches/${batchId}`, { method: "DELETE" });
+                if (!res.ok) throw new Error((await res.json()).message);
+                queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+                toast({ title: "Undone", description: `${batchCode} has been reversed` });
+              } catch (e: any) {
+                toast({ title: "Undo failed", description: e.message, variant: "destructive" });
+              }
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
