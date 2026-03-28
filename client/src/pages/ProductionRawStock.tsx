@@ -5,6 +5,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Container, Package, Plus, ArrowDown, AlertTriangle, CheckCircle, Upload, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, CalendarDays, FlaskConical, FileSpreadsheet, FileText, RefreshCw, SlidersHorizontal, PlusCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
+import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
+import type { FactoryMixBatch } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -367,6 +369,7 @@ export default function ProductionRawStock() {
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [dailyReportDate, setDailyReportDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
+  const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
   const [batchDetailOpen, setBatchDetailOpen] = useState(false);
   const [selectedBatchDetail, setSelectedBatchDetail] = useState<MixBatchRow | null>(null);
   const { toast } = useToast();
@@ -1507,14 +1510,24 @@ export default function ProductionRawStock() {
                         </span>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleteBatchId(batch.id)}
-                          data-testid={`button-delete-mix-batch-${batch.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditBatch(batch as unknown as FactoryMixBatch)}
+                            data-testid={`button-edit-mix-batch-${batch.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleteBatchId(batch.id)}
+                            data-testid={`button-delete-mix-batch-${batch.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -1538,6 +1551,12 @@ export default function ProductionRawStock() {
           )}
         </CardContent>
       </Card>
+
+      <EditMixBatchDialog
+        batch={editBatch}
+        open={!!editBatch}
+        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+      />
 
       <Dialog open={deleteBatchId !== null} onOpenChange={(open) => { if (!open) setDeleteBatchId(null); }}>
         <DialogContent className="max-w-sm">
