@@ -569,11 +569,15 @@ function DataToolsTab() {
   const [silentSrcId, setSilentSrcId] = useState("");
   const [silentDstId, setSilentDstId] = useState("");
   const [silentFile, setSilentFile] = useState<File | null>(null);
-  const [silentItems, setSilentItems] = useState<any[]>([]);
-  const [silentErrors, setSilentErrors] = useState<string[]>([]);
-  const [silentStep, setSilentStep] = useState<"setup" | "preview" | "done">("setup");
+  const [silentValidItems, setSilentValidItems] = useState<any[]>([]);
+  const [silentWarnItems, setSilentWarnItems] = useState<any[]>([]);
+  const [silentErrorLines, setSilentErrorLines] = useState<any[]>([]);
+  const [silentIncludeWarnings, setSilentIncludeWarnings] = useState(false);
+  const [silentParseError, setSilentParseError] = useState("");
+  const [silentStep, setSilentStep] = useState<"setup" | "validation" | "done">("setup");
   const [isSilentParsing, setIsSilentParsing] = useState(false);
   const [isSilentApplying, setIsSilentApplying] = useState(false);
+  const [silentAppliedCount, setSilentAppliedCount] = useState(0);
 
   // Fetch locations (filtered by company context - locations are already company-scoped by the API)
   const { data: locations = [] } = useQuery<any[]>({
@@ -1048,7 +1052,7 @@ function DataToolsTab() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => { setSilentStep("setup"); setSilentItems([]); setSilentErrors([]); setSilentFile(null); setSilentTransferOpen(true); }}
+              onClick={() => { setSilentStep("setup"); setSilentValidItems([]); setSilentWarnItems([]); setSilentErrorLines([]); setSilentParseError(""); setSilentFile(null); setSilentAppliedCount(0); setSilentTransferOpen(true); }}
               data-testid="button-open-silent-transfer"
             >
               <ArrowLeftRight className="h-4 w-4 mr-2" />
@@ -1064,10 +1068,11 @@ function DataToolsTab() {
           <DialogHeader>
             <DialogTitle>Silent Stock Transfer</DialogTitle>
             <DialogDescription>
-              Upload an Excel file to move stock between locations. No daybook entry will be created.
+              Upload an Excel file to move stock between locations without creating a daybook entry.
             </DialogDescription>
           </DialogHeader>
 
+          {/* STEP 1 — Setup */}
           {silentStep === "setup" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -1123,8 +1128,15 @@ function DataToolsTab() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong>
+                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong> — duplicate barcodes are detected automatically.
               </p>
+
+              {silentParseError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{silentParseError}</AlertDescription>
+                </Alert>
+              )}
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSilentTransferOpen(false)}>Cancel</Button>
@@ -1132,7 +1144,7 @@ function DataToolsTab() {
                   onClick={async () => {
                     if (!silentSrcId || !silentDstId || !silentFile) return;
                     setIsSilentParsing(true);
-                    setSilentErrors([]);
+                    setSilentParseError("");
                     try {
                       const formData = new FormData();
                       formData.append("file", silentFile);
@@ -1145,11 +1157,13 @@ function DataToolsTab() {
                       });
                       const data = await res.json();
                       if (!res.ok) throw new Error(data.message);
-                      setSilentItems(data.items || []);
-                      setSilentErrors(data.errors || []);
-                      setSilentStep("preview");
+                      setSilentValidItems(data.validItems || []);
+                      setSilentWarnItems(data.warnItems || []);
+                      setSilentErrorLines(data.errorLines || []);
+                      setSilentIncludeWarnings(false);
+                      setSilentStep("validation");
                     } catch (err: any) {
-                      setSilentErrors([err.message]);
+                      setSilentParseError(err.message);
                     } finally {
                       setIsSilentParsing(false);
                     }
@@ -1157,102 +1171,225 @@ function DataToolsTab() {
                   disabled={!silentSrcId || !silentDstId || !silentFile || isSilentParsing}
                   data-testid="button-silent-transfer-parse"
                 >
-                  {isSilentParsing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parsing...</> : "Preview Transfer"}
+                  {isSilentParsing
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Validating...</>
+                    : "Validate File"}
                 </Button>
               </DialogFooter>
             </div>
           )}
 
-          {silentStep === "preview" && (
-            <div className="space-y-4">
-              {silentErrors.length > 0 && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    <ul className="list-disc pl-4 space-y-1 text-sm">
-                      {silentErrors.map((e, i) => <li key={i}>{e}</li>)}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {silentItems.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">No valid items found in the file.</p>
-              ) : (
-                <div className="rounded-md border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Current Stock</TableHead>
-                        <TableHead className="text-right">After Transfer</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {silentItems.map((item, i) => (
-                        <TableRow key={i} data-testid={`row-silent-item-${i}`}>
-                          <TableCell className="font-medium text-sm">{item.stockItemName}</TableCell>
-                          <TableCell className="text-right text-sm">{formatNumber(item.quantity)}</TableCell>
-                          <TableCell className="text-right text-sm">{formatNumber(item.currentStock)}</TableCell>
-                          <TableCell className={`text-right text-sm font-medium ${item.afterTransfer < 0 ? "text-destructive" : ""}`}>
-                            {formatNumber(item.afterTransfer)}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{formatNumber(item.averageRate, 2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+          {/* STEP 2 — Validation results */}
+          {silentStep === "validation" && (() => {
+            const applyItems = silentIncludeWarnings
+              ? [...silentValidItems, ...silentWarnItems]
+              : silentValidItems;
+            return (
+              <div className="space-y-4">
+                {/* Summary row */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium px-2 py-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {silentValidItems.length} valid
+                  </span>
+                  {silentWarnItems.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-medium px-2 py-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {silentWarnItems.length} insufficient stock
+                    </span>
+                  )}
+                  {silentErrorLines.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs font-medium px-2 py-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {silentErrorLines.length} error{silentErrorLines.length !== 1 ? "s" : ""} (excluded)
+                    </span>
+                  )}
                 </div>
-              )}
 
-              <p className="text-sm text-muted-foreground">
-                {silentItems.length} item(s) ready to transfer. Items with negative "After Transfer" will go below zero — this is allowed but flagged.
-              </p>
+                <div className="max-h-[380px] overflow-y-auto space-y-3 pr-1">
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>Back</Button>
-                <Button
-                  onClick={async () => {
-                    if (silentItems.length === 0) return;
-                    setIsSilentApplying(true);
-                    try {
-                      const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
-                        sourceLocationId: parseInt(silentSrcId),
-                        destinationLocationId: parseInt(silentDstId),
-                        items: silentItems,
-                      });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.message);
-                      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-                      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
-                      setSilentStep("done");
-                    } catch (err: any) {
-                      setSilentErrors([err.message]);
-                    } finally {
-                      setIsSilentApplying(false);
-                    }
-                  }}
-                  disabled={silentItems.length === 0 || isSilentApplying}
-                  data-testid="button-silent-transfer-apply"
-                >
-                  {isSilentApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply Transfer (${silentItems.length} items)`}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
+                  {/* Error rows */}
+                  {silentErrorLines.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-destructive mb-1">Errors — excluded from transfer</p>
+                      <div className="rounded-md border border-destructive/30 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2 w-14">Row</TableHead>
+                              <TableHead className="text-xs py-2">Barcode</TableHead>
+                              <TableHead className="text-xs py-2">Reason</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentErrorLines.map((e: any, i: number) => (
+                              <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
+                                <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
+                                <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
+                                <TableCell className="text-xs py-1.5 text-destructive">{e.reason}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
 
+                  {/* Warning rows — insufficient stock */}
+                  {silentWarnItems.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                          Insufficient Stock — will go negative
+                        </p>
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={silentIncludeWarnings}
+                            onChange={(e) => setSilentIncludeWarnings(e.target.checked)}
+                            data-testid="checkbox-include-warnings"
+                            className="h-3.5 w-3.5 rounded"
+                          />
+                          <span className="text-xs text-muted-foreground">Include anyway</span>
+                        </label>
+                      </div>
+                      <div className={`rounded-md border overflow-hidden transition-opacity ${silentIncludeWarnings ? "border-yellow-300 dark:border-yellow-700/50 opacity-100" : "border-muted opacity-60"}`}>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2">Item</TableHead>
+                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                              <TableHead className="text-right text-xs py-2">Available</TableHead>
+                              <TableHead className="text-xs py-2">Issue</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentWarnItems.map((item: any, i: number) => (
+                              <TableRow key={i} className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}>
+                                <TableCell className="py-1.5">
+                                  <div className="text-xs font-medium">{item.stockItemName}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-destructive font-medium">{formatNumber(item.currentStock)}</TableCell>
+                                <TableCell className="text-xs py-1.5 text-yellow-700 dark:text-yellow-400">{item.warnReason}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Valid items */}
+                  {silentValidItems.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+                        Valid — ready to transfer
+                      </p>
+                      <div className="rounded-md border border-green-200 dark:border-green-800/40 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-2">Item</TableHead>
+                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                              <TableHead className="text-right text-xs py-2">Stock</TableHead>
+                              <TableHead className="text-right text-xs py-2">After</TableHead>
+                              <TableHead className="text-right text-xs py-2">Rate</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {silentValidItems.map((item: any, i: number) => (
+                              <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
+                                <TableCell className="py-1.5">
+                                  <div className="text-xs font-medium">{item.stockItemName}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.currentStock)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-green-700 dark:text-green-400 font-medium">
+                                  {formatNumber(item.afterTransfer)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5 text-muted-foreground">{formatNumber(item.averageRate, 2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {silentValidItems.length === 0 && silentWarnItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No transferable items found in the file.
+                    </p>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>Back</Button>
+                  <Button
+                    onClick={async () => {
+                      if (applyItems.length === 0) return;
+                      setIsSilentApplying(true);
+                      try {
+                        const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
+                          sourceLocationId: parseInt(silentSrcId),
+                          destinationLocationId: parseInt(silentDstId),
+                          items: applyItems,
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message);
+                        queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+                        setSilentAppliedCount(applyItems.length);
+                        setSilentStep("done");
+                      } catch (err: any) {
+                        setSilentParseError(err.message);
+                        setSilentStep("setup");
+                      } finally {
+                        setIsSilentApplying(false);
+                      }
+                    }}
+                    disabled={applyItems.length === 0 || isSilentApplying}
+                    data-testid="button-silent-transfer-apply"
+                  >
+                    {isSilentApplying
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</>
+                      : applyItems.length === 0
+                        ? "No items to transfer"
+                        : `Apply Transfer (${applyItems.length} item${applyItems.length !== 1 ? "s" : ""})`}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+
+          {/* STEP 3 — Done */}
           {silentStep === "done" && (
             <div className="flex flex-col items-center gap-4 py-6">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               <div className="text-center">
-                <p className="font-semibold">Transfer Complete</p>
+                <p className="font-semibold text-lg">Transfer Complete</p>
                 <p className="text-sm text-muted-foreground">
-                  {silentItems.length} item(s) moved. Stock is updated — no daybook entry was created.
+                  {silentAppliedCount} item{silentAppliedCount !== 1 ? "s" : ""} moved silently. No daybook entry was created.
                 </p>
               </div>
-              <Button onClick={() => setSilentTransferOpen(false)} data-testid="button-silent-transfer-close">Close</Button>
+              <Button
+                onClick={() => {
+                  setSilentTransferOpen(false);
+                  setSilentStep("setup");
+                  setSilentSrcId("");
+                  setSilentDstId("");
+                  setSilentFile(null);
+                  setSilentValidItems([]);
+                  setSilentWarnItems([]);
+                  setSilentErrorLines([]);
+                  setSilentParseError("");
+                  setSilentAppliedCount(0);
+                }}
+                data-testid="button-silent-transfer-close"
+              >Close</Button>
             </div>
           )}
         </DialogContent>

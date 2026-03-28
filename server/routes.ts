@@ -11429,7 +11429,7 @@ if (asOfDate) {
     }
   });
 
-  // Parse + validate uploaded Excel
+  // Parse + validate uploaded Excel — returns structured validation results
   app.post(
     "/api/inventory/silent-transfer/parse",
     requireAuth,
@@ -11461,47 +11461,82 @@ if (asOfDate) {
 
         if (rawData.length === 0) return res.status(400).json({ message: "Excel file is empty" });
 
-        const errors: string[] = [];
-        const items: any[] = [];
+        // Three output buckets
+        const errorLines: Array<{ rowNum: number; barcode: string; reason: string }> = [];
+        const validItems: any[] = [];
+        const warnItems: any[] = [];   // insufficient stock but can still be applied
+
+        // Track barcodes already seen to detect duplicates in the file
+        const seenBarcodes = new Map<string, number>(); // barcode → first rowNum
 
         for (let i = 0; i < rawData.length; i++) {
           const row = rawData[i];
           const rowNum = i + 2;
           const barcode = (row.Barcode || row.barcode || row.Code || row.code || "").toString().trim();
-          const quantity = parseFloat(row.Quantity || row.quantity || row.Qty || row.qty || "0");
+          const quantityRaw = row.Quantity ?? row.quantity ?? row.Qty ?? row.qty;
+          const quantity = parseFloat(quantityRaw ?? "0");
 
-          if (!barcode) continue;
+          if (!barcode) continue; // blank row — silently skip
+
+          // Duplicate barcode in same file
+          if (seenBarcodes.has(barcode)) {
+            errorLines.push({ rowNum, barcode, reason: `Duplicate — already listed at row ${seenBarcodes.get(barcode)}` });
+            continue;
+          }
+          seenBarcodes.set(barcode, rowNum);
+
+          // Invalid quantity
           if (isNaN(quantity) || quantity <= 0) {
-            errors.push(`Row ${rowNum}: Invalid quantity for barcode '${barcode}'`);
+            errorLines.push({ rowNum, barcode, reason: "Quantity must be a positive number" });
             continue;
           }
 
+          // Look up stock item
           const stockItem = await storage.getStockItemByCodeOrAlias(barcode, companyId);
           if (!stockItem) {
-            errors.push(`Row ${rowNum}: Barcode '${barcode}' not found`);
+            errorLines.push({ rowNum, barcode, reason: "Barcode / code not found in stock items" });
             continue;
           }
 
+          // Check inventory at source
           const [srcInv] = await db.select().from(inventory)
             .where(and(eq(inventory.stockItemId, stockItem.id), eq(inventory.locationId, srcId))).limit(1);
 
           const currentStock = srcInv ? parseFloat(srcInv.quantity || "0") : 0;
-          const averageRate = srcInv ? parseFloat(srcInv.averageRate || "0") : 0;
+          const averageRate  = srcInv ? parseFloat(srcInv.averageRate  || "0") : 0;
           const afterTransfer = currentStock - quantity;
 
-          items.push({
+          const item = {
+            rowNum,
             barcode,
             stockItemId: stockItem.id,
             stockItemName: stockItem.name,
+            uom: stockItem.uom || "",
             quantity,
             currentStock,
             averageRate,
             afterTransfer,
-            warning: afterTransfer < 0 ? `Will go negative (available: ${currentStock})` : null,
-          });
+          };
+
+          if (currentStock <= 0 && quantity > 0) {
+            // No stock at all at this source
+            warnItems.push({ ...item, warnReason: `No stock at source (available: 0)` });
+          } else if (afterTransfer < 0) {
+            // Partial stock — will go negative
+            warnItems.push({ ...item, warnReason: `Insufficient stock (available: ${currentStock.toFixed(2)}, short by: ${Math.abs(afterTransfer).toFixed(2)})` });
+          } else {
+            validItems.push(item);
+          }
         }
 
-        res.json({ items, errors, sourceLocation: sourceLocation.name, destLocation: destLocation.name });
+        res.json({
+          validItems,
+          warnItems,
+          errorLines,
+          sourceLocation: sourceLocation.name,
+          destLocation: destLocation.name,
+          totalRows: rawData.filter((r: any) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim()).length,
+        });
       } catch (err: any) {
         console.error("Silent transfer parse error:", err);
         res.status(500).json({ message: err.message });
