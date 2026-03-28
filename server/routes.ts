@@ -1087,12 +1087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Fetching user from database...");
-      const user = (await Promise.race([
-        storage.getUserByUsername(username),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Database query timeout")), 5000),
-        ),
-      ])) as any;
+      const user = await storage.getUserByUsername(username);
       console.log("User fetch complete:", user ? "Found" : "Not found");
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });

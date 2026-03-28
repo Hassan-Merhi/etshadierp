@@ -8,7 +8,7 @@ import { registerRoutes } from "./routes";
 import { setupWS } from "./wsServer";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { Client } from "pg";
 
 // Global error handlers — prevent unhandled rejections from crashing the process in production
@@ -868,16 +868,34 @@ let migrationsDone = false;
     }
   };
 
+  // Pre-warm the DB connection pool so the first user request
+  // (e.g. login) doesn't bear the cost of the initial TCP handshake + SSL
+  // negotiation to the database. Retries up to 3 times with a short delay
+  // so Render's database has time to wake from cold-start sleep.
+  const warmupDb = async () => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await pool.query("SELECT 1");
+        console.log(`✓ DB connection pool warmed up (attempt ${attempt})`);
+        return;
+      } catch (err: any) {
+        console.warn(`⚠️  DB warmup attempt ${attempt} failed: ${err.message}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+    console.error("✗ DB warmup failed after 3 attempts — queries will connect lazily");
+  };
+
   const doListen = () => {
     server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
-      // Run migrations in background AFTER port is open.
-      // Render's health check (/api/health/db) returns 503 until done,
-      // so the old instance continues serving traffic during this window.
-      runMigrations().catch((err) => {
-        console.error("Migration error:", err);
-        migrationsDone = true; // unblock health check even on error
-      });
+      // Warm up the pool first, then run schema migrations.
+      warmupDb().then(() =>
+        runMigrations().catch((err) => {
+          console.error("Migration error:", err);
+          migrationsDone = true;
+        })
+      );
     });
   };
 
