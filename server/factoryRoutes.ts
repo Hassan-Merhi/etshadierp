@@ -9743,11 +9743,31 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
       if (!bale) return res.status(404).json({ message: "Bale not found" });
-      if (bale.stockEntryDate) return res.status(403).json({ message: "Worker assignment is locked for stock-entry bales and cannot be changed." });
+      if (bale.stockEntryDate && bale.finalizedBy) return res.status(403).json({ message: "Worker assignment is locked for stock-entry bales once a worker has been set." });
       const [updated] = await db.update(factoryBales).set({ finalizedBy: parseInt(workerId), updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
       res.json(updated);
     } catch (error: any) {
       console.error("Error assigning worker to bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Bulk assign worker to multiple bales (for stock entry history groups) ──
+  app.patch("/api/factory/bales/bulk-assign-worker", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { baleIds, workerId } = req.body;
+      if (!Array.isArray(baleIds) || baleIds.length === 0) return res.status(400).json({ message: "baleIds array is required" });
+      if (!workerId) return res.status(400).json({ message: "workerId is required" });
+      const numericIds = baleIds.map(Number).filter(n => !isNaN(n));
+      const numericWorkerId = parseInt(workerId);
+      await db.update(factoryBales)
+        .set({ finalizedBy: numericWorkerId, updatedAt: new Date() })
+        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)));
+      res.json({ updated: numericIds.length, workerId: numericWorkerId });
+    } catch (error: any) {
+      console.error("Error bulk-assigning worker:", error);
       res.status(500).json({ message: error.message });
     }
   });

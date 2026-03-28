@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Lock, Printer } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Lock, Printer, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Location } from "@shared/schema";
 
 const STATUS_OPTIONS = [
@@ -58,6 +60,8 @@ interface BaleDetail {
 
 export default function StockEntryHistory() {
   const { formatDisplayDate } = useDateFormat();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const today = new Date().toISOString().split("T")[0];
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
@@ -118,6 +122,20 @@ export default function StockEntryHistory() {
 
   const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
   const totalWeight = useMemo(() => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0), [filteredGroups]);
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async ({ baleIds, workerId }: { baleIds: number[]; workerId: number }) => {
+      const res = await apiRequest("PATCH", "/api/factory/bales/bulk-assign-worker", { baleIds, workerId });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Worker assigned", description: `Worker updated for ${vars.baleIds.length} bale(s).` });
+      qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   function groupKey(g: GroupRow) {
     return `${g.stockEntryDate}|${g.erpLocationId}|${g.workerId}|${g.productId}`;
@@ -352,10 +370,29 @@ export default function StockEntryHistory() {
                   </td>
                   <td className="px-3 py-2 font-medium">{formatDisplayDate(g.stockEntryDate)}</td>
                   <td className="px-3 py-2">{g.locationName}</td>
-                  <td className="px-3 py-2">
-                    {g.workerName
-                      ? g.workerName
-                      : <span className="text-muted-foreground italic">Unassigned</span>}
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                    {g.workerName ? (
+                      <span>{g.workerName}</span>
+                    ) : (
+                      <Select
+                        value=""
+                        onValueChange={(v) => {
+                          const baleIds = g.bales.map(b => b.id);
+                          bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-36 text-xs text-muted-foreground italic" data-testid={`select-assign-worker-${groupKey(g)}`}>
+                          <SelectValue placeholder="Assign worker…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workers.filter((w: any) => w.active).map((w: any) => (
+                            <SelectItem key={w.id} value={String(w.id)}>
+                              {w.fullName || w.full_name || w.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <span>{g.productName || "—"}</span>
