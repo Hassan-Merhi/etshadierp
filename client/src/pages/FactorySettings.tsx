@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight } from "lucide-react";
+import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 
@@ -80,6 +80,40 @@ export default function FactorySettings() {
     totalWeight: number;
     totalProducts: number;
   } | null>(null);
+
+  type OcContainer = { containerId: number; containerNumber: string; charges: { id: number; description: string; amount: string; currencyCode: string }[] };
+  const [ocPreview, setOcPreview] = useState<OcContainer[] | null>(null);
+  const [ocFixResult, setOcFixResult] = useState<{ fixed: number } | null>(null);
+
+  const ocPreviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("GET", "/api/factory/admin/other-charges-currency-preview");
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      return res.json() as Promise<{ containers: OcContainer[] }>;
+    },
+    onSuccess: (data) => {
+      setOcPreview(data.containers);
+      setOcFixResult(null);
+      if (data.containers.length === 0) {
+        toast({ title: "All clear", description: "No other charges found with non-USD currency." });
+      }
+    },
+    onError: (err: Error) => { if (err?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
+
+  const ocFixMutation = useMutation({
+    mutationFn: async (containerIds: number[]) => {
+      const res = await factoryApiRequest("POST", "/api/factory/admin/fix-other-charges-currency", { containerIds });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      return res.json() as Promise<{ fixed: number }>;
+    },
+    onSuccess: (data) => {
+      setOcFixResult(data);
+      setOcPreview(null);
+      toast({ title: "Fixed", description: `${data.fixed} container(s) re-posted in USD.` });
+    },
+    onError: (err: Error) => { if (err?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+  });
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -700,6 +734,106 @@ export default function FactorySettings() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Fix Other Charges Currency ───────────────────────── */}
+      <Card data-testid="card-fix-oc-currency">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-muted-foreground" />
+            Fix Other Charges Currency
+          </CardTitle>
+          <CardDescription>
+            If other charges were accidentally entered in EUR instead of USD, this tool
+            re-posts their accounting entries in USD without reversing the offload.
+            Click "Preview" first to see which containers are affected, then "Apply Fix".
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => ocPreviewMutation.mutate()}
+              disabled={ocPreviewMutation.isPending || ocFixMutation.isPending}
+              data-testid="button-oc-currency-preview"
+            >
+              {ocPreviewMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+              Preview
+            </Button>
+            {ocPreview && ocPreview.length > 0 && (
+              <Button
+                onClick={() => ocFixMutation.mutate(ocPreview.map(c => c.containerId))}
+                disabled={ocFixMutation.isPending}
+                data-testid="button-oc-currency-apply"
+              >
+                {ocFixMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <DollarSign className="h-4 w-4 mr-2" />}
+                Apply Fix — Re-post as USD ({ocPreview.length} container{ocPreview.length !== 1 ? "s" : ""})
+              </Button>
+            )}
+          </div>
+
+          {ocPreview && ocPreview.length > 0 && (
+            <div className="space-y-2" data-testid="section-oc-preview">
+              <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  Found <strong>{ocPreview.length}</strong> container{ocPreview.length !== 1 ? "s" : ""} with non-USD other charges.
+                  The existing EUR vouchers will be deleted and replaced with USD ones. The offload data is not affected.
+                </span>
+              </div>
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-center">Current Currency</TableHead>
+                      <TableHead className="text-center">Will Become</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ocPreview.flatMap(container =>
+                      container.charges.map((charge, chargeIdx) => (
+                        <TableRow key={`${container.containerId}-${chargeIdx}`} data-testid={`row-oc-preview-${container.containerId}-${chargeIdx}`}>
+                          {chargeIdx === 0 && (
+                            <TableCell rowSpan={container.charges.length} className="font-medium align-top">
+                              {container.containerNumber}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-muted-foreground">{charge.description}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(charge.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                              {charge.currencyCode}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                              USD
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {ocFixResult && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-oc-fix-result">
+              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+              <span>
+                Done — {ocFixResult.fixed} container{ocFixResult.fixed !== 1 ? "s" : ""} re-posted in USD.
+                The accounting ledger now shows USD for those other charges.
+              </span>
             </div>
           )}
         </CardContent>
