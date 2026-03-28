@@ -8017,9 +8017,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       });
 
       const mbToday = new Date().toISOString().split('T')[0];
+      const mbTxDate = batchDate || mbToday;
       await writeDaybookEntry(db, {
         companyId,
-        txDate: mbToday,
+        txDate: mbTxDate,
         txType: "MIX_BATCH_CREATED",
         referenceId: result.id,
         description: `Mix batch created: ${result.batchCode}${result.name ? ` – ${result.name}` : ""} (${parseFloat(result.totalWeightKg || "0").toFixed(1)} kg)`,

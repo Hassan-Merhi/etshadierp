@@ -309,7 +309,7 @@ export default function MixBatches() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {formatDisplayDate(batch.createdAt)}
+                        {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">

@@ -74,6 +74,7 @@ export function CreateMixBatchDialog({
   const [weightInput, setWeightInput] = useState<string>("");
   const [batchName, setBatchName] = useState("");
   const [notes, setNotes] = useState("");
+  const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   const { data: supplierStock } = useQuery<SupplierRawStock[]>({
     queryKey: ["/api/factory/raw-stock"],
@@ -125,6 +126,7 @@ export function CreateMixBatchDialog({
         body: JSON.stringify({
           name: batchName || undefined,
           notes: notes || undefined,
+          batchDate: batchDate || undefined,
           supplierSources: supplierSources.length > 0 ? supplierSources : undefined,
           batchSources: batchSources.length > 0 ? batchSources : undefined,
         }),
@@ -241,6 +243,7 @@ export function CreateMixBatchDialog({
     setWeightInput("");
     setBatchName("");
     setNotes("");
+    setBatchDate(new Date().toISOString().split("T")[0]);
     setAddSourceType("supplier");
   };
 
@@ -261,14 +264,25 @@ export function CreateMixBatchDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label>Batch Name (optional)</Label>
-            <Input
-              value={batchName}
-              onChange={(e) => setBatchName(e.target.value)}
-              placeholder="e.g. Cyprus + Spain Mix"
-              data-testid="input-batch-name"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Batch Name (optional)</Label>
+              <Input
+                value={batchName}
+                onChange={(e) => setBatchName(e.target.value)}
+                placeholder="e.g. Cyprus + Spain Mix"
+                data-testid="input-batch-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Batch Date</Label>
+              <Input
+                type="date"
+                value={batchDate}
+                onChange={(e) => setBatchDate(e.target.value)}
+                data-testid="input-batch-date"
+              />
+            </div>
           </div>
 
           <div className="space-y-4">
