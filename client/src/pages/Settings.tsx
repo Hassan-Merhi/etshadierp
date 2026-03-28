@@ -564,6 +564,17 @@ function DataToolsTab() {
   const [isImportingStock, setIsImportingStock] = useState(false);
   const [stockImportComplete, setStockImportComplete] = useState(false);
 
+  // Silent inventory transfer state
+  const [silentTransferOpen, setSilentTransferOpen] = useState(false);
+  const [silentSrcId, setSilentSrcId] = useState("");
+  const [silentDstId, setSilentDstId] = useState("");
+  const [silentFile, setSilentFile] = useState<File | null>(null);
+  const [silentItems, setSilentItems] = useState<any[]>([]);
+  const [silentErrors, setSilentErrors] = useState<string[]>([]);
+  const [silentStep, setSilentStep] = useState<"setup" | "preview" | "done">("setup");
+  const [isSilentParsing, setIsSilentParsing] = useState(false);
+  const [isSilentApplying, setIsSilentApplying] = useState(false);
+
   // Fetch locations (filtered by company context - locations are already company-scoped by the API)
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -1021,7 +1032,231 @@ function DataToolsTab() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Silent Stock Transfer Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-4 w-4" />
+              Silent Stock Transfer
+            </CardTitle>
+            <CardDescription>
+              Move stock between locations via Excel upload — no daybook entry created
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { setSilentStep("setup"); setSilentItems([]); setSilentErrors([]); setSilentFile(null); setSilentTransferOpen(true); }}
+              data-testid="button-open-silent-transfer"
+            >
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              Open Silent Transfer
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Silent Transfer Dialog */}
+      <Dialog open={silentTransferOpen} onOpenChange={(o) => { if (!isSilentParsing && !isSilentApplying) setSilentTransferOpen(o); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Silent Stock Transfer</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file to move stock between locations. No daybook entry will be created.
+            </DialogDescription>
+          </DialogHeader>
+
+          {silentStep === "setup" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Source Location</Label>
+                  <Select value={silentSrcId} onValueChange={setSilentSrcId}>
+                    <SelectTrigger data-testid="select-silent-source">
+                      <SelectValue placeholder="From location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Destination Location</Label>
+                  <Select value={silentDstId} onValueChange={setSilentDstId}>
+                    <SelectTrigger data-testid="select-silent-destination">
+                      <SelectValue placeholder="To location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(locations as any[]).filter((l: any) => String(l.id) !== silentSrcId).map((loc: any) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="silent-transfer-file">Excel File</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open("/api/inventory/silent-transfer/template", "_blank")}
+                    data-testid="button-silent-transfer-template"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download Template
+                  </Button>
+                </div>
+                <Input
+                  id="silent-transfer-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setSilentFile(e.target.files?.[0] ?? null)}
+                  data-testid="input-silent-transfer-file"
+                />
+                {silentFile && <p className="text-sm text-muted-foreground">Selected: {silentFile.name}</p>}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong>
+              </p>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSilentTransferOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={async () => {
+                    if (!silentSrcId || !silentDstId || !silentFile) return;
+                    setIsSilentParsing(true);
+                    setSilentErrors([]);
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", silentFile);
+                      formData.append("sourceLocationId", silentSrcId);
+                      formData.append("destinationLocationId", silentDstId);
+                      const res = await fetch("/api/inventory/silent-transfer/parse", {
+                        method: "POST",
+                        body: formData,
+                        credentials: "include",
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.message);
+                      setSilentItems(data.items || []);
+                      setSilentErrors(data.errors || []);
+                      setSilentStep("preview");
+                    } catch (err: any) {
+                      setSilentErrors([err.message]);
+                    } finally {
+                      setIsSilentParsing(false);
+                    }
+                  }}
+                  disabled={!silentSrcId || !silentDstId || !silentFile || isSilentParsing}
+                  data-testid="button-silent-transfer-parse"
+                >
+                  {isSilentParsing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parsing...</> : "Preview Transfer"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {silentStep === "preview" && (
+            <div className="space-y-4">
+              {silentErrors.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <ul className="list-disc pl-4 space-y-1 text-sm">
+                      {silentErrors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {silentItems.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-4">No valid items found in the file.</p>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Current Stock</TableHead>
+                        <TableHead className="text-right">After Transfer</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {silentItems.map((item, i) => (
+                        <TableRow key={i} data-testid={`row-silent-item-${i}`}>
+                          <TableCell className="font-medium text-sm">{item.stockItemName}</TableCell>
+                          <TableCell className="text-right text-sm">{formatNumber(item.quantity)}</TableCell>
+                          <TableCell className="text-right text-sm">{formatNumber(item.currentStock)}</TableCell>
+                          <TableCell className={`text-right text-sm font-medium ${item.afterTransfer < 0 ? "text-destructive" : ""}`}>
+                            {formatNumber(item.afterTransfer)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{formatNumber(item.averageRate, 2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <p className="text-sm text-muted-foreground">
+                {silentItems.length} item(s) ready to transfer. Items with negative "After Transfer" will go below zero — this is allowed but flagged.
+              </p>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>Back</Button>
+                <Button
+                  onClick={async () => {
+                    if (silentItems.length === 0) return;
+                    setIsSilentApplying(true);
+                    try {
+                      const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
+                        sourceLocationId: parseInt(silentSrcId),
+                        destinationLocationId: parseInt(silentDstId),
+                        items: silentItems,
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.message);
+                      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+                      setSilentStep("done");
+                    } catch (err: any) {
+                      setSilentErrors([err.message]);
+                    } finally {
+                      setIsSilentApplying(false);
+                    }
+                  }}
+                  disabled={silentItems.length === 0 || isSilentApplying}
+                  data-testid="button-silent-transfer-apply"
+                >
+                  {isSilentApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply Transfer (${silentItems.length} items)`}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {silentStep === "done" && (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+              <div className="text-center">
+                <p className="font-semibold">Transfer Complete</p>
+                <p className="text-sm text-muted-foreground">
+                  {silentItems.length} item(s) moved. Stock is updated — no daybook entry was created.
+                </p>
+              </div>
+              <Button onClick={() => setSilentTransferOpen(false)} data-testid="button-silent-transfer-close">Close</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Cost Price Import Dialog */}
       <Dialog open={costPriceImportOpen} onOpenChange={handleCostPriceDialogClose}>
