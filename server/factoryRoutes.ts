@@ -512,16 +512,16 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const allIntendedRefs: string[] = [];
       const payloadDupes = new Set<string>();
       for (const b of bales) {
-        const barcode = b.barcode.trim();
+        const base = (b.refNumber && b.refNumber.trim()) ? b.refNumber.trim() : b.barcode.trim();
         const qty = parseInt(b.quantity) || 1;
-        const refs = qty === 1 ? [barcode] : Array.from({ length: qty }, (_, i) => `${barcode}-${i + 1}`);
+        const refs = qty === 1 ? [base] : Array.from({ length: qty }, (_, i) => `${base}-${i + 1}`);
         for (const ref of refs) {
           if (allIntendedRefs.includes(ref)) payloadDupes.add(ref);
           allIntendedRefs.push(ref);
         }
       }
       if (payloadDupes.size > 0) {
-        return res.status(400).json({ message: `Duplicate barcodes within import file: ${Array.from(payloadDupes).join(", ")}` });
+        return res.status(400).json({ message: `Duplicate ref numbers within import file: ${Array.from(payloadDupes).join(", ")}` });
       }
 
       const result = await db.transaction(async (tx: any) => {
@@ -589,7 +589,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
           for (let i = 0; i < qty; i++) {
             const pressedAt = b.productionDate ? new Date(b.productionDate) : null;
-            const refNum = qty === 1 ? barcode : `${barcode}-${i + 1}`;
+            const refBase = (b.refNumber && b.refNumber.trim()) ? b.refNumber.trim() : barcode;
+            const refNum = qty === 1 ? refBase : `${refBase}-${i + 1}`;
 
             const [bale] = await tx
               .insert(factoryBales)

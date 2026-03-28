@@ -1704,6 +1704,7 @@
           const barcodeIdx = headers.findIndex((h) => h.includes("BARCODE"));
           const qtyIdx = headers.findIndex((h) => h.includes("QUANTITY"));
           const dateIdx = headers.findIndex((h) => h.includes("PRODUCTION DATE"));
+          const refIdx = headers.findIndex((h) => h.includes("REF NUMBER") || h === "REF" || h === "REF CODE" || h === "REFERENCE");
 
           // Convert Excel serial date number (e.g. 46096) to YYYY-MM-DD string
           const parseExcelDate = (val: any): string => {
@@ -1742,6 +1743,7 @@
               barcode: String(row[barcodeIdx] || "").trim(),
               quantity: parseInt(String(row[qtyIdx] || "1")) || 1,
               productionDate: dateIdx >= 0 ? parseExcelDate(row[dateIdx]) : "",
+              refNumber: refIdx >= 0 ? String(row[refIdx] || "").trim() : undefined,
             });
           }
 
@@ -1864,6 +1866,7 @@
                       <TableHead>Item Name</TableHead>
                       <TableHead className="text-right">Weight</TableHead>
                       <TableHead>Barcode</TableHead>
+                      <TableHead>Ref Number</TableHead>
                       <TableHead className="text-center">Qty</TableHead>
                       <TableHead>Production Date</TableHead>
                     </TableRow>
@@ -1875,6 +1878,7 @@
                         <TableCell className="font-medium" data-testid={`text-import-name-${idx}`}>{row.itemName}</TableCell>
                         <TableCell className="text-right" data-testid={`text-import-weight-${idx}`}>{row.weight}</TableCell>
                         <TableCell className="font-mono text-sm" data-testid={`text-import-barcode-${idx}`}>{row.barcode}</TableCell>
+                        <TableCell className="font-mono text-sm" data-testid={`text-import-ref-${idx}`}>{row.refNumber || <span className="text-muted-foreground text-xs">auto</span>}</TableCell>
                         <TableCell className="text-center" data-testid={`text-import-qty-${idx}`}>{row.quantity}</TableCell>
                         <TableCell data-testid={`text-import-date-${idx}`}>{row.productionDate}</TableCell>
                       </TableRow>
@@ -1892,7 +1896,7 @@
               <div className="text-center text-muted-foreground">
                 <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 opacity-50" />
                 <p className="font-medium" data-testid="text-import-empty">Upload an Excel file to preview bales for import</p>
-                <p className="text-sm mt-1">Expected columns: ITEM NAME, WEIGHT, ITEM BARCODE, QUANTITY, PRODUCTION DATE</p>
+                <p className="text-sm mt-1">Expected columns: ITEM NAME, WEIGHT, ITEM BARCODE, QUANTITY, PRODUCTION DATE, REF NUMBER (optional)</p>
               </div>
             </CardContent>
           </Card>
