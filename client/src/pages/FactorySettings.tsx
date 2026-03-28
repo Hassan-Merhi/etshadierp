@@ -111,6 +111,10 @@ export default function FactorySettings() {
       setOcFixResult(data);
       setOcPreview(null);
       toast({ title: "Fixed", description: `${data.fixed} container(s) re-posted in USD.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/net-profit-statement"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
     onError: (err: Error) => { if (err?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
