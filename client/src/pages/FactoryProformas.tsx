@@ -13,7 +13,9 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck } from "lucide-react";
+import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 
@@ -69,6 +71,8 @@ export default function FactoryProformas() {
   const [addLineMode, setAddLineMode] = useState<"manual" | "catalog">("catalog");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogSelectedItem, setCatalogSelectedItem] = useState<any | null>(null);
+  const [createLoadingProforma, setCreateLoadingProforma] = useState<Proforma | null>(null);
+  const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
@@ -84,6 +88,34 @@ export default function FactoryProformas() {
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
     enabled: isAddLineOpen && addLineMode === "catalog",
+  });
+
+  const { data: locations = [] } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/locations"],
+    enabled: !!createLoadingProforma,
+  });
+
+  const createLoadingMutation = useMutation({
+    mutationFn: async ({ proformaId, locationId }: { proformaId: number; locationId: string }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/create-loading`, { locationId: parseInt(locationId) });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const balesAdded = data.balesAdded ?? 0;
+      toast({
+        title: "Pending Loading Created",
+        description: `Loading #${data.order.id} created — ${balesAdded} bale${balesAdded !== 1 ? "s" : ""} added from stock`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", "LOADING"] });
+      setCreateLoadingProforma(null);
+      setCreateLoadingLocationId("");
+      navigate("/factory/sales/loadings");
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const createProformaMutation = useMutation({
@@ -360,6 +392,16 @@ export default function FactoryProformas() {
                       </Badge>
                     </button>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setCreateLoadingProforma(proforma); setCreateLoadingLocationId(""); }}
+                        data-testid={`button-create-loading-${proforma.id}`}
+                        title="Create pending loading from this proforma"
+                      >
+                        <Truck className="h-4 w-4 mr-1" />
+                        Create Loading
+                      </Button>
                       {!proforma.isActive && (
                         <Button
                           variant="ghost"
@@ -903,6 +945,49 @@ export default function FactoryProformas() {
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!createLoadingProforma} onOpenChange={(open) => { if (!open) { setCreateLoadingProforma(null); setCreateLoadingLocationId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Pending Loading</DialogTitle>
+            <DialogDescription>
+              A new loading will be created from <strong>{createLoadingProforma?.name}</strong>. Bales matching each proforma line will be automatically reserved from the selected location.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium mb-1 block">Warehouse Location</Label>
+              <Select value={createLoadingLocationId} onValueChange={setCreateLoadingLocationId}>
+                <SelectTrigger data-testid="select-loading-location">
+                  <SelectValue placeholder="Select a location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`select-location-option-${loc.id}`}>
+                      {loc.name} {loc.code ? `(${loc.code})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCreateLoadingProforma(null); setCreateLoadingLocationId(""); }} data-testid="button-cancel-create-loading">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!createLoadingProforma || !createLoadingLocationId) return;
+                createLoadingMutation.mutate({ proformaId: createLoadingProforma.id, locationId: createLoadingLocationId });
+              }}
+              disabled={!createLoadingLocationId || createLoadingMutation.isPending}
+              data-testid="button-confirm-create-loading"
+            >
+              {createLoadingMutation.isPending ? "Creating..." : "Create Loading"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <DeleteConfirmDialog
         open={!!pendingDelete}
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}

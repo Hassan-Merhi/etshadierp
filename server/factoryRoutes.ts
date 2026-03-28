@@ -12049,6 +12049,91 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Create a pending loading from a proforma — auto-adds matching bales from stock
+  app.post("/api/factory/customer-proformas/:id/create-loading", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const proformaId = parseInt(req.params.id);
+      const { locationId, orderDate } = req.body;
+      if (!locationId) return res.status(400).json({ message: "locationId is required" });
+
+      // Fetch the proforma (validate ownership via customerId join)
+      const [proforma] = await db.select().from(customerProformas)
+        .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
+      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+
+      // Fetch proforma lines
+      const lines = await db.select().from(customerProformaLines)
+        .where(eq(customerProformaLines.proformaId, proformaId));
+
+      // Create the LOADING order
+      const [order] = await db.insert(customerOrders).values({
+        companyId,
+        customerId: proforma.customerId,
+        proformaIdUsed: proformaId,
+        locationId: parseInt(locationId),
+        orderDate: orderDate || new Date().toISOString().split('T')[0],
+        status: "LOADING",
+        loadingStartedAt: new Date(),
+      }).returning();
+
+      // For each proforma line, grab available bales from stock at the location
+      let totalBalesAdded = 0;
+      for (const line of lines) {
+        if (!line.articleCode) continue;
+        const qty = line.quantity || 0;
+        if (qty <= 0) continue;
+
+        // Find available bales at this location with matching articleCode
+        const available = await db.select().from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK")),
+            eq(factoryBales.erpLocationId, parseInt(locationId)),
+            eq(factoryBales.articleCode, line.articleCode),
+          ))
+          .orderBy(factoryBales.id)
+          .limit(qty);
+
+        for (const bale of available) {
+          await db.insert(customerOrderBales).values({
+            orderId: order.id,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            locationId: parseInt(locationId),
+            weight: bale.weightKg,
+            articleCode: bale.articleCode,
+            baleName: bale.productName || bale.articleCode || bale.baleCode,
+            priceUsed: line.pricePerBale,
+          });
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(eq(factoryBales.id, bale.id));
+          totalBalesAdded++;
+        }
+      }
+
+      await recalculateOrderTotals(db, order.id);
+
+      const [loadingCustomer] = await db.select({ legalName: customers.legalName })
+        .from(customers).where(eq(customers.id, proforma.customerId));
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: orderDate || new Date().toISOString().split('T')[0],
+        txType: "LOADING_CREATED",
+        referenceId: order.id,
+        description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added`,
+      });
+
+      res.json({ order, balesAdded: totalBalesAdded });
+    } catch (error: any) {
+      console.error("Error creating loading from proforma:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/customer-proforma-lines", requireAuth, async (req: any, res: any) => {
     try {
       const parsed = insertCustomerProformaLineSchema.parse(req.body);
