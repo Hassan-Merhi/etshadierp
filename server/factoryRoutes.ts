@@ -13184,19 +13184,29 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const notFound: Array<{ articleCode: string; requestedQty: number; foundQty: number }> = [];
       const notFoundRefs: string[] = [];
 
-      // ── REF-NUMBER MODE ─────────────────────────────────────────────────────
+      // ── REF-NUMBER / REF-CODE MODE ──────────────────────────────────────────
       if (hasRefNumbers) {
         const refNumbers = refNumbersRaw as string[];
         for (const rawRef of refNumbers) {
           const refNum = String(rawRef).trim();
           if (!refNum) continue;
 
-          const [bale] = await db.select().from(factoryBales)
+          // Try referenceNumber first, then fall back to baleCode
+          let [bale] = await db.select().from(factoryBales)
             .where(and(
               eq(factoryBales.companyId, companyId),
               eq(factoryBales.referenceNumber, refNum),
               or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK"))
             ));
+
+          if (!bale) {
+            [bale] = await db.select().from(factoryBales)
+              .where(and(
+                eq(factoryBales.companyId, companyId),
+                eq(factoryBales.baleCode, refNum),
+                or(eq(factoryBales.status, "FINALIZED"), eq(factoryBales.status, "IN_STOCK"))
+              ));
+          }
 
           if (!bale) { notFoundRefs.push(refNum); continue; }
           if (alreadyAddedBaleIds.has(bale.id)) continue;

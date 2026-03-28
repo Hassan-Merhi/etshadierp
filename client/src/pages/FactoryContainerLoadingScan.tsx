@@ -484,19 +484,19 @@ export default function FactoryContainerLoadingScan() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-        // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" column, use ref mode
+        // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" / "Ref Code" column, use ref mode
         const firstRow = rows[0] || {};
         const refKey = Object.keys(firstRow).find((k) =>
-          /^ref(erence)?([\s_-]?number)?$/i.test(k.trim())
+          /^ref(erence)?([\s_-]?(number|code|no|num))?$/i.test(k.trim())
         );
 
         if (refKey) {
-          // REF NUMBER MODE
+          // REF NUMBER / REF CODE MODE
           const refs = rows
             .map((r) => String(r[refKey] ?? "").trim())
             .filter(Boolean);
           if (refs.length === 0) {
-            toast({ title: "No valid rows found", description: "Ensure the Ref Number column has values", variant: "destructive" });
+            toast({ title: "No valid rows found", description: "Ensure the Ref / Ref Code column has values", variant: "destructive" });
             return;
           }
           setImportMode("refNumber");
@@ -1187,14 +1187,14 @@ export default function FactoryContainerLoadingScan() {
             {importMode === "refNumber" ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Each bale will be looked up and added by its exact ref number.
+                  Each bale will be looked up by its ref number or bale code and added individually.
                 </p>
                 <div className="border rounded-md overflow-auto max-h-[320px]">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
                         <TableHead>#</TableHead>
-                        <TableHead>Ref Number</TableHead>
+                        <TableHead>Ref / Code</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1208,7 +1208,7 @@ export default function FactoryContainerLoadingScan() {
                   </Table>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {importRefNumbers.length} bale{importRefNumbers.length !== 1 ? "s" : ""} by ref number
+                  {importRefNumbers.length} bale{importRefNumbers.length !== 1 ? "s" : ""} by ref / bale code
                 </p>
               </>
             ) : (
