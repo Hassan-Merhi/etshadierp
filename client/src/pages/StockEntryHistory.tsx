@@ -1,14 +1,13 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Lock, Printer, Grid3X3 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, Grid3X3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -294,38 +293,48 @@ export default function StockEntryHistory() {
     XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
-  function handleExportPdf() {
-    const pdfParams = new URLSearchParams(params);
-    window.open(`/api/factory/bales/stock-entry-history/export-pdf?${pdfParams.toString()}`, "_blank");
-  }
-
   function handlePrintMatrix() {
     if (filteredGroups.length === 0) return;
     const matrix = buildWorkerMatrix(filteredGroups);
     const { workers: cols, rows, workerTotals, grandTotal } = matrix;
 
     const numCols = cols.length + 2;
-    const fontSize = numCols > 12 ? 7 : numCols > 8 ? 8.5 : 10;
+    const fontSize = numCols > 14 ? 6.5 : numCols > 10 ? 7.5 : numCols > 7 ? 8.5 : 9.5;
 
-    const headerCells = cols.map(w =>
-      `<th class="wc">${w}</th>`
-    ).join("");
+    // Palette of vivid accent colors for worker columns (cycles if more workers than colors)
+    const palette = [
+      "#2563eb","#16a34a","#dc2626","#9333ea","#ea580c","#0891b2","#be185d","#65a30d","#7c3aed","#b45309",
+      "#0284c7","#15803d","#e11d48","#7e22ce","#c2410c","#0e7490","#9d174d","#4d7c0f","#6d28d9","#92400e",
+    ];
+    const colColor = (i: number) => palette[i % palette.length];
+
+    // Create subtle background per column header
+    const headerCells = cols.map((w, i) => {
+      const c = colColor(i);
+      return `<th class="wc" style="background:${c};">${w.replace(" ", "<br/>")}</th>`;
+    }).join("");
 
     const dataRows = rows.map((row, idx) => {
-      const cells = cols.map(w => {
+      const rowBg = idx % 2 === 0 ? "#ffffff" : "#f1f5f9";
+      const cells = cols.map((w, i) => {
         const v = row.counts[w] || 0;
-        return `<td class="num">${v > 0 ? v : ""}</td>`;
+        const accent = colColor(i);
+        const style = v > 0
+          ? `style="color:${accent};font-weight:700;background:${rowBg};"`
+          : `style="background:${rowBg};color:#cbd5e1;"`;
+        return `<td class="num" ${style}>${v > 0 ? v : "·"}</td>`;
       }).join("");
-      return `<tr class="${idx % 2 === 1 ? "alt" : ""}">
-        <td class="prod">${row.productLabel}</td>
+      return `<tr>
+        <td class="prod" style="background:${rowBg};">${row.productLabel}</td>
         ${cells}
-        <td class="num total-col">${row.total}</td>
+        <td class="num total-col" style="background:${idx % 2 === 0 ? "#e0f2fe" : "#bae6fd"};">${row.total}</td>
       </tr>`;
     }).join("");
 
-    const totalCells = cols.map(w =>
-      `<td class="num">${workerTotals[w] || 0}</td>`
-    ).join("");
+    const totalCells = cols.map((w, i) => {
+      const c = colColor(i);
+      return `<td class="num" style="background:${c};color:#fff;">${workerTotals[w] || 0}</td>`;
+    }).join("");
 
     const html = `<!DOCTYPE html>
 <html>
@@ -333,52 +342,59 @@ export default function StockEntryHistory() {
   <meta charset="utf-8"/>
   <title>Worker Matrix — ${fromDate} to ${toDate}</title>
   <style>
-    @page { size: landscape; margin: 12mm 10mm; }
+    @page { size: landscape; margin: 10mm 8mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: ${fontSize}px; color: #111; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: ${fontSize}px; color: #1e293b; background: #fff; }
 
-    .header { margin-bottom: 8px; }
-    .header h1 { font-size: ${fontSize + 4}px; font-weight: 700; }
-    .header .sub { font-size: ${fontSize}px; color: #444; margin-top: 2px; }
-    .header .meta { font-size: ${fontSize - 1}px; color: #666; margin-top: 4px; font-weight: 600; }
+    .header { margin-bottom: 6px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 4px; }
+    .header-left h1 { font-size: ${fontSize + 3}px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; }
+    .header-left .sub { font-size: ${fontSize - 0.5}px; color: #475569; margin-top: 1px; }
+    .header-right { text-align: right; font-size: ${fontSize - 1}px; color: #64748b; line-height: 1.5; }
+    .header-right strong { color: #1e3a8a; }
 
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead { display: table-header-group; }
-    th, td { border: 1px solid #ccc; padding: 3px 4px; overflow: hidden; }
-    th { background: #1F3864; color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize - 0.5}px; }
-    th.prod-h { text-align: left; width: 22%; }
-    th.wc { width: ${Math.floor(72 / Math.max(cols.length, 1))}%; }
+    th, td { border: 1px solid #e2e8f0; padding: 2px 3px; overflow: hidden; }
+    th { color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize - 0.5}px; line-height: 1.2; }
+    th.prod-h { background: #1e3a8a; text-align: left; width: 22%; font-size: ${fontSize - 0.5}px; }
+    th.wc { width: ${Math.floor(68 / Math.max(cols.length, 1))}%; }
+    th.total-h { background: #0369a1; width: 6%; }
 
-    td.prod { text-align: left; font-weight: 500; word-break: break-word; }
-    td.num { text-align: center; }
-    td.total-col { font-weight: 700; background: #f0f4ff; }
-    tr.alt td { background: #f8f8f8; }
-    tr.alt td.total-col { background: #e8eeff; }
+    td.prod { text-align: left; font-weight: 500; word-break: break-word; color: #1e293b; font-size: ${fontSize - 0.5}px; }
+    td.num { text-align: center; font-size: ${fontSize}px; }
+    td.total-col { font-weight: 800; text-align: center; }
 
-    tr.totals-row td { background: #1F3864 !important; color: #fff; font-weight: 700; border-color: #1a3060; }
-    tr.totals-row td.num { text-align: center; }
+    tr.totals-row td { font-weight: 800; border-color: #1e3a8a; }
+    tr.totals-row td.prod-total { background: #1e3a8a; color: #fff; text-align: left; font-size: ${fontSize - 0.5}px; }
+    tr.totals-row td.grand { background: #0369a1; color: #fff; text-align: center; font-weight: 800; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Stock Entry History — Worker Matrix</h1>
-    <div class="sub">Period: ${fromDate} &rarr; ${toDate}</div>
-    <div class="meta">${cols.length} worker column${cols.length !== 1 ? "s" : ""}  &bull;  ${rows.length} product row${rows.length !== 1 ? "s" : ""}  &bull;  ${grandTotal} bales total</div>
+    <div class="header-left">
+      <h1>Worker Bale Matrix</h1>
+      <div class="sub">Stock Entry History &nbsp;·&nbsp; ${fromDate} &rarr; ${toDate}</div>
+    </div>
+    <div class="header-right">
+      <strong>${cols.length}</strong> worker${cols.length !== 1 ? "s" : ""} &nbsp;|&nbsp;
+      <strong>${rows.length}</strong> product${rows.length !== 1 ? "s" : ""} &nbsp;|&nbsp;
+      <strong>${grandTotal}</strong> bales total
+    </div>
   </div>
   <table>
     <thead>
       <tr>
-        <th class="prod-h">Bale / Product</th>
+        <th class="prod-h">Product / Article</th>
         ${headerCells}
-        <th class="wc">Total</th>
+        <th class="total-h">Total</th>
       </tr>
     </thead>
     <tbody>
       ${dataRows}
       <tr class="totals-row">
-        <td class="prod">TOTAL</td>
+        <td class="prod-total">TOTAL</td>
         ${totalCells}
-        <td class="num">${grandTotal}</td>
+        <td class="grand">${grandTotal}</td>
       </tr>
     </tbody>
   </table>
@@ -395,24 +411,13 @@ export default function StockEntryHistory() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold">Stock Entry History</h2>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Lock className="w-4 h-4 text-muted-foreground cursor-default" />
-            </TooltipTrigger>
-            <TooltipContent>Worker assignment is locked once a worker has been set on a bale.</TooltipContent>
-          </Tooltip>
-        </div>
+        <h2 className="text-base font-semibold">Stock Entry History</h2>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
             <RotateCcw className="w-3 h-3 mr-1" /> Reset
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrintMatrix} disabled={filteredGroups.length === 0} data-testid="button-print-matrix">
             <Grid3X3 className="w-3 h-3 mr-1" /> Print Matrix
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={filteredGroups.length === 0} data-testid="button-export-pdf">
-            <Printer className="w-3 h-3 mr-1" /> Export PDF
           </Button>
           <Button variant="outline" size="sm" onClick={exportExcel} disabled={filteredGroups.length === 0} data-testid="button-export-excel">
             <Download className="w-3 h-3 mr-1" /> Export Excel
@@ -556,28 +561,27 @@ export default function StockEntryHistory() {
                   <td className="px-3 py-2 font-medium">{formatDisplayDate(g.stockEntryDate)}</td>
                   <td className="px-3 py-2">{g.locationName}</td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
-                    {g.workerName ? (
-                      <span>{g.workerName}</span>
-                    ) : (
-                      <Select
-                        value=""
-                        onValueChange={(v) => {
-                          const baleIds = g.bales.map(b => b.id);
-                          bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
-                        }}
+                    <Select
+                      value={g.workerId ? String(g.workerId) : ""}
+                      onValueChange={(v) => {
+                        const baleIds = g.bales.map(b => b.id);
+                        bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
+                      }}
+                    >
+                      <SelectTrigger
+                        className={`h-7 w-40 text-xs ${!g.workerId ? "text-muted-foreground italic" : ""}`}
+                        data-testid={`select-assign-worker-${groupKey(g)}`}
                       >
-                        <SelectTrigger className="h-7 w-36 text-xs text-muted-foreground italic" data-testid={`select-assign-worker-${groupKey(g)}`}>
-                          <SelectValue placeholder="Assign worker…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {workers.filter((w: any) => w.active).map((w: any) => (
-                            <SelectItem key={w.id} value={String(w.id)}>
-                              {w.fullName || w.full_name || w.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                        <SelectValue placeholder="Assign worker…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workers.filter((w: any) => w.active).map((w: any) => (
+                          <SelectItem key={w.id} value={String(w.id)}>
+                            {w.fullName || w.full_name || w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="px-3 py-2">
                     <span>{g.productName || "—"}</span>
