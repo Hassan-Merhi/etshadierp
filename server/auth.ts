@@ -1,76 +1,42 @@
 import { Request, Response, NextFunction } from "express";
-import { storage } from "./storage";
 import { db } from "./db";
-import { userLocations, userCompanyRoles } from "@shared/schema";
+import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
-// Authentication middleware - checks if user is logged in
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  try {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const user = await storage.getUser(req.session.userId);
-    if (!user) {
-      req.session.userId = undefined;
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    // Check if a company is selected
-    if (!req.session.currentCompanyId) {
-      return res.status(401).json({ message: "No company selected" });
-    }
-
-    // Load the user's role for the current company
-    let userCompanyRole = await storage.getUserCompanyRole(req.session.userId, req.session.currentCompanyId);
-
-    // Developer bypass: if no role for this specific company, check if this user
-    // is a Developer in ANY company — if so, synthesize a full-access role
-    if (!userCompanyRole) {
-      const allRoles = await db
-        .select()
-        .from(userCompanyRoles)
-        .where(eq(userCompanyRoles.userId, req.session.userId));
-      const isDeveloper = allRoles.some((r) => r.role === "Developer");
-      if (isDeveloper) {
-        userCompanyRole = {
-          id: -1,
-          userId: req.session.userId,
-          companyId: req.session.currentCompanyId,
-          role: "Developer",
-          assignedLocationId: null,
-          posStation: null,
-          cashAccountId: null,
-          canSellNegativeStock: true,
-          daybookEditDays: 9999,
-          canAccessCustomers: true,
-          createdAt: new Date(),
-        };
-      } else {
-        return res.status(403).json({ message: "You do not have access to this company" });
-      }
-    }
-
-    // Attach user with company-specific role and location info
-    req.user = {
-      ...user,
-      role: userCompanyRole.role,
-      assignedLocationId: userCompanyRole.assignedLocationId,
-      posStation: userCompanyRole.posStation,
-      cashAccountId: userCompanyRole.cashAccountId,
-      canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(userCompanyRole.role) ? true : userCompanyRole.canSellNegativeStock,
-      daybookEditDays: userCompanyRole.daybookEditDays,
-      canAccessCustomers: userCompanyRole.canAccessCustomers,
-    };
-
-    next();
-  } catch (err: any) {
-    // Any unhandled DB or logic error must return JSON, never let Express
-    // fall through to its default HTML error page for API routes.
-    console.error("[requireAuth] Unexpected error:", err?.message ?? err);
-    return res.status(500).json({ message: "Authentication error" });
+// Authentication middleware - checks if user is logged in.
+// Uses ONLY session data — zero database calls — to avoid pool exhaustion
+// under burst traffic. Role, location, and permission flags are written to
+// the session at login and on every company-switch, so they are always fresh.
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
+
+  if (!req.session.currentCompanyId) {
+    return res.status(401).json({ message: "No company selected" });
+  }
+
+  const role = req.session.currentRole;
+  if (!role) {
+    // Session is missing role — force re-login so it gets repopulated
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Build req.user from session cache — no DB round-trip needed
+  req.user = {
+    id: req.session.userId,
+    role,
+    assignedLocationId: req.session.currentLocationId ?? null,
+    posStation: req.session.currentPOSStation ?? null,
+    cashAccountId: req.session.cashAccountId ?? null,
+    canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
+      ? true
+      : (req.session.canSellNegativeStock ?? false),
+    daybookEditDays: req.session.daybookEditDays ?? 0,
+    canAccessCustomers: req.session.canAccessCustomers ?? false,
+  } as any;
+
+  next();
 }
 
 // Role-based authorization middleware
