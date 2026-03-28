@@ -9892,7 +9892,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
       `);
 
-      res.json(rows);
+      res.json(rows.rows);
     } catch (error: any) {
       console.error("Error fetching stock entry history:", error);
       res.status(500).json({ message: error.message });
