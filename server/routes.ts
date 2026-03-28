@@ -7291,14 +7291,13 @@ if (asOfDate) {
   );
 
   // Stock Items
-  app.get("/api/stock-items", requireAuth, async (req, res) => {
+  app.get("/api/stock-items", requireAuth, async (req: any, res: any) => {
     try {
-      if (!req.session.currentCompanyId) {
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const items = await storage.getAllStockItems(
-        req.session.currentCompanyId,
-      );
+      const items = await storage.getAllStockItems(companyId);
       res.json(items);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
