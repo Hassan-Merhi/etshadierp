@@ -38077,7 +38077,6 @@ if (asOfDate) {
           ['Gross Margin %', grossMarginPct.toFixed(1) + '%', false],
           ['Net Margin %', netMarginPct.toFixed(1) + '%', false],
         ];
-        if (showNetPosition) kpiRows.push(['Net Position (Balance Sheet)', fmt(npValue), true]);
 
         for (const [label, value, isBold] of kpiRows) {
           const row = ws.addRow(['', label, '', '', value]);
@@ -38209,17 +38208,6 @@ if (asOfDate) {
         nmRow.getCell(2).font = { bold: false }; nmRow.getCell(5).font = { bold: true };
         ws.mergeCells(`B${nmRow.number}:D${nmRow.number}`);
 
-        if (showNetPosition) {
-          ws.addRow([]);
-          const bsRow = ws.addRow(['NET POSITION (Balance Sheet)', '', '', '', fmt(npValue)]);
-          bsRow.eachCell((cell: any) => { cell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: npValue >= 0 ? 'FF16A34A' : 'FFDC2626' } }; cell.alignment = { horizontal: 'center' }; });
-          bsRow.getCell(5).numFmt = '$#,##0.##';
-          ws.mergeCells(`A${bsRow.number}:D${bsRow.number}`);
-          ws.getRow(bsRow.number).height = 30;
-          const bsNote = ws.addRow(['', 'Assets − Liabilities, all-time cumulative (not period-filtered)', '', '', '']);
-          bsNote.getCell(2).font = { italic: true, size: 9, color: { argb: 'FF888888' } };
-          ws.mergeCells(`B${bsNote.number}:E${bsNote.number}`);
-        }
 
         ws.getColumn(1).width = 28;
         ws.getColumn(2).width = 38;
@@ -38341,17 +38329,6 @@ if (asOfDate) {
         writeRow('Net Margin %', monthStatsList.map(s => s.netMarginPct), totalStats.netMarginPct, { pct: true });
         blankRow();
 
-        // Net Position (balance sheet - only total column meaningful)
-        {
-          const rowData: any[] = ['Net Position (Balance Sheet — All-Time)'];
-          for (let i = 0; i < numMonths; i++) rowData.push('—');
-          rowData.push(fmt(npValue));
-          const row = ws.addRow(rowData);
-          row.getCell(1).font = { bold: true };
-          row.eachCell((cell: any) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: npValue >= 0 ? 'FFD1FAE5' : 'FFFEE2E2' } }; });
-          row.getCell(totalCol).numFmt = numFmt;
-          row.getCell(totalCol).font = { bold: true, color: { argb: npValue >= 0 ? 'FF16A34A' : 'FFDC2626' } };
-        }
 
         // Column widths
         ws.getColumn(1).width = 36;
@@ -38396,7 +38373,7 @@ if (asOfDate) {
         const allBalances = computeBalancesFromEntries(allPeriodEntries);
         const stats = computeStats(allBalances, totalSalesAll, openingStockValue, closingStockValue, false);
         const ws = workbook.addWorksheet('Net Profit Report');
-        writeSheet(ws, stats, periodLabel, true, netPositionValue);
+        writeSheet(ws, stats, periodLabel, false, 0);
       }
 
       const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, '_');
