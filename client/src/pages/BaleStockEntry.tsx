@@ -1659,10 +1659,10 @@
     }, [activeLocations, selectedLocationId]);
 
     const downloadTemplate = () => {
-      const headers = ["ITEM NAME", "WEIGHT", "ITEM BARCODE", "QUANTITY", "PRODUCTION DATE"];
+      const headers = ["ITEM NAME", "WEIGHT", "ITEM BARCODE", "QUANTITY", "PRODUCTION DATE", "REF NUMBER"];
       const sampleRows = [
-        ["Cotton Bale A1", 25, "ART001", 10, "2026-03-14"],
-        ["Cotton Bale B2", 30, "ART002", 5, "2026-03-14"],
+        ["Cotton Bale A1", 25, "ART001", 1, "2026-03-14", "MYREF-001"],
+        ["Cotton Bale B2", 30, "ART002", 1, "2026-03-14", "MYREF-002"],
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
       ws["!cols"] = headers.map(() => ({ wch: 20 }));
