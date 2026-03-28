@@ -3474,7 +3474,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         .orderBy(factoryOffloadAdditionalCharges.createdAt)
       : [];
 
-    // Container-level other charges (entered per-container, currency inherited from container)
+    // Container-level other charges (entered per-container, use charge's own currency first)
     const allContainerOtherCharges = allSupplierIds.length > 0
       ? await db.select({
           id: factoryContainerOtherCharges.id,
@@ -3483,7 +3483,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           amount: factoryContainerOtherCharges.amount,
           createdAt: factoryContainerOtherCharges.createdAt,
           supplierId: factoryContainers.supplierId,
-          currencyCode: factoryContainers.currencyCode,
+          chargeCurrencyCode: factoryContainerOtherCharges.currencyCode,
+          containerCurrencyCode: factoryContainers.currencyCode,
           containerNumber: factoryContainers.containerNumber,
         })
         .from(factoryContainerOtherCharges)
@@ -3649,7 +3650,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
     // Container-level other charge rows (linked via container → supplier)
     for (const oc of allContainerOtherCharges as any[]) {
-      const cc = oc.currencyCode || "USD";
+      const cc = oc.chargeCurrencyCode || oc.containerCurrencyCode || "USD";
       const amt = parseFloat(oc.amount || "0");
       const dateVal = oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null;
       addRow(cc, {
