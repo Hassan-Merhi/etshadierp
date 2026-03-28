@@ -225,6 +225,7 @@ export default function MixBatches() {
               <Skeleton className="h-12 w-full" />
             </div>
           ) : filteredBatches && filteredBatches.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
@@ -309,6 +310,7 @@ export default function MixBatches() {
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-12">
               <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
