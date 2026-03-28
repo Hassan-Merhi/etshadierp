@@ -15,7 +15,7 @@ import {
   BarChart3,
   Building2,
   Loader2,
-  Scale,
+  TrendingUp,
 } from "lucide-react";
 
 type Period = "today" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month";
@@ -76,18 +76,28 @@ function formatAmount(n: number) {
   return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
 }
 
-function AmountCell({ value }: { value: number }) {
+function AmountCell({ value, alwaysGreen }: { value: number; alwaysGreen?: boolean }) {
   const isNeg = value < 0;
+  const color = alwaysGreen
+    ? "text-green-700 dark:text-green-400"
+    : isNeg
+    ? "text-red-600 dark:text-red-400"
+    : "text-green-700 dark:text-green-400";
   return (
-    <span className={isNeg ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400"}>
+    <span className={color}>
       {isNeg ? "-" : ""}
       {formatAmount(Math.abs(value))}
     </span>
   );
 }
 
-function KpiCard({ title, subtitle, value, icon: Icon, color }: { title: string; subtitle?: string; value: number; icon: any; color: string }) {
+function KpiCard({ title, value, icon: Icon, color, isProfit }: { title: string; value: number; icon: any; color: string; isProfit?: boolean }) {
   const isNeg = value < 0;
+  const textColor = isProfit
+    ? isNeg
+      ? "text-red-600 dark:text-red-400"
+      : "text-green-700 dark:text-green-400"
+    : "";
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-4">
@@ -96,8 +106,7 @@ function KpiCard({ title, subtitle, value, icon: Icon, color }: { title: string;
         </div>
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{title}</p>
-          {subtitle && <p className="text-xs text-muted-foreground/70 italic">{subtitle}</p>}
-          <p className={`text-lg font-bold ${isNeg ? "text-red-600 dark:text-red-400" : ""}`}>
+          <p className={`text-lg font-bold ${textColor}`}>
             {isNeg ? "-" : ""}
             {formatAmount(Math.abs(value))}
           </p>
@@ -132,7 +141,11 @@ function AccountSection({
             <Badge className={badgeColor}>{title}</Badge>
             <span className="text-xs text-muted-foreground">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? "s" : ""}</span>
           </div>
-          <span className={`font-semibold text-sm ${type === "income" ? (total >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400") : (total > 0 ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400")}`}>
+          <span className={`font-semibold text-sm ${
+            type === "income"
+              ? "text-green-700 dark:text-green-400"
+              : "text-red-600 dark:text-red-400"
+          }`}>
             {formatAmount(Math.abs(total))}
           </span>
         </div>
@@ -158,7 +171,7 @@ function AccountSection({
                     <td className="px-3 py-2 text-right text-muted-foreground">{formatAmount(acc.debit)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{formatAmount(acc.credit)}</td>
                     <td className="px-3 py-2 text-right font-medium">
-                      <AmountCell value={acc.balance} />
+                      <AmountCell value={acc.balance} alwaysGreen={type === "income"} />
                     </td>
                   </tr>
                 ))}
@@ -170,7 +183,6 @@ function AccountSection({
     </Collapsible>
   );
 }
-
 
 export default function NetProfitReport() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -219,7 +231,6 @@ export default function NetProfitReport() {
     },
   });
 
-
   const handleExport = () => {
     const p = new URLSearchParams();
     if (startDate) p.set("startDate", startDate);
@@ -242,23 +253,23 @@ export default function NetProfitReport() {
   const directIncTotal = rp?.directIncomes?.total ?? 0;
   const indirectExpTotal = lp?.indirectExpenses?.total ?? 0;
   const indirectIncTotal = rp?.indirectIncomes?.total ?? 0;
-  // Net Position from the net-profit-statement (period-aware, matches dashboard logic)
-  const balanceSheetPosition = data?.netPosition ?? 0;
-  const totalExpenses = purchasesTotal + directExpTotal + indirectExpTotal;
 
-  // Year options for month picker (5 years back)
+  const totalIncome = salesTotal + directIncTotal + indirectIncTotal + closingStock;
+  const totalExpenses = openingStock + purchasesTotal + directExpTotal + indirectExpTotal;
+  const netProfit = totalIncome - totalExpenses;
+
   const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b flex-wrap">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
             Net Profit Report
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Income, expenses, and profitability breakdown</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Income, expenses, and net profit — {periodLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isAdminOrDev && companies.length > 0 && (
@@ -319,7 +330,7 @@ export default function NetProfitReport() {
           )}
           <Button onClick={handleExport} data-testid="button-export-excel" disabled={isLoading}>
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            Export
           </Button>
         </div>
       </div>
@@ -344,64 +355,82 @@ export default function NetProfitReport() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <KpiCard title="Total Sales" value={salesTotal} icon={ShoppingCart} color="bg-blue-600" />
-              <KpiCard title="Total Expenses" value={totalExpenses} icon={Receipt} color="bg-red-600" />
+              <KpiCard title="Total Revenue" value={salesTotal + directIncTotal + indirectIncTotal} icon={ShoppingCart} color="bg-blue-600" />
+              <KpiCard title="Total Expenses" value={purchasesTotal + directExpTotal + indirectExpTotal} icon={Receipt} color="bg-red-600" />
               <KpiCard
-                title="Net Position"
-                subtitle="Balance Sheet (All-Time)"
-                value={balanceSheetPosition}
-                icon={Scale}
-                color={balanceSheetPosition >= 0 ? "bg-teal-600" : "bg-orange-600"}
+                title="Net Profit"
+                value={netProfit}
+                icon={TrendingUp}
+                color={netProfit >= 0 ? "bg-green-600" : "bg-orange-600"}
+                isProfit
               />
             </div>
 
-            {/* Profit Summary Card */}
+            {/* Profit & Loss Summary */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Profit Summary — {periodLabel}</CardTitle>
+                <CardTitle className="text-base">Profit & Loss — {periodLabel}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Income side */}
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Income</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Income</p>
                     {[
                       { label: "Sales (Revenue)", value: salesTotal },
+                      { label: "Closing Stock", value: closingStock },
                       { label: "Direct Incomes", value: directIncTotal },
                       { label: "Indirect Incomes", value: indirectIncTotal },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{label}</span>
-                        <AmountCell value={value} />
+                        <span className="text-green-700 dark:text-green-400 font-mono">{formatAmount(value)}</span>
                       </div>
                     ))}
+                    <Separator className="my-2" />
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Total Income</span>
+                      <span className="text-green-700 dark:text-green-400 font-mono">{formatAmount(totalIncome)}</span>
+                    </div>
                   </div>
 
                   {/* Expense side */}
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Expenses</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Expenses</p>
                     {[
+                      { label: "Opening Stock", value: openingStock },
                       { label: "Purchases", value: purchasesTotal },
                       { label: "Direct Expenses", value: directExpTotal },
                       { label: "Indirect Expenses", value: indirectExpTotal },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{label}</span>
-                        <span className="text-red-600 dark:text-red-400">{formatAmount(value)}</span>
+                        <span className="text-red-600 dark:text-red-400 font-mono">{formatAmount(value)}</span>
                       </div>
                     ))}
+                    <Separator className="my-2" />
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Total Expenses</span>
+                      <span className="text-red-600 dark:text-red-400 font-mono">{formatAmount(totalExpenses)}</span>
+                    </div>
                   </div>
                 </div>
 
-                <Separator className="my-3" />
+                <Separator className="my-4" />
 
-                <div className={`flex justify-between items-start font-bold text-sm rounded-md px-3 py-2 ${balanceSheetPosition >= 0 ? "bg-teal-50 dark:bg-teal-950/30" : "bg-orange-50 dark:bg-orange-950/30"}`}>
-                  <div>
-                    <span>Net Position</span>
-                    <p className="text-xs font-normal text-muted-foreground mt-0.5">Assets − Liabilities, all-time cumulative</p>
-                  </div>
-                  <span className={`ml-4 shrink-0 ${balanceSheetPosition >= 0 ? "text-teal-700 dark:text-teal-400" : "text-orange-600 dark:text-orange-400"}`}>
-                    {balanceSheetPosition < 0 ? "-" : ""}{formatAmount(Math.abs(balanceSheetPosition))}
+                {/* Net Profit bottom line */}
+                <div className={`flex justify-between items-center font-bold text-base rounded-md px-4 py-3 ${
+                  netProfit >= 0
+                    ? "bg-green-50 dark:bg-green-950/30"
+                    : "bg-red-50 dark:bg-red-950/30"
+                }`}>
+                  <span>{netProfit >= 0 ? "Net Profit" : "Net Loss"}</span>
+                  <span className={`font-mono ${
+                    netProfit >= 0
+                      ? "text-green-700 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}>
+                    {netProfit < 0 ? "-" : ""}{formatAmount(Math.abs(netProfit))}
                   </span>
                 </div>
               </CardContent>
@@ -413,6 +442,13 @@ export default function NetProfitReport() {
                 <CardTitle className="text-base">Account Breakdown</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1">
+                <AccountSection
+                  title="Sales"
+                  accounts={rp?.salesAccounts?.accounts || []}
+                  total={salesTotal}
+                  type="income"
+                  badgeColor="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                />
                 <AccountSection
                   title="Purchases"
                   accounts={lp?.purchaseAccounts?.accounts || []}
