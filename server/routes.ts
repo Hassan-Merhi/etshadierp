@@ -27117,8 +27117,11 @@ if (asOfDate) {
         // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
         leftPane: {
           // Trading Account - Debit Side
+          // For period-filtered views (monthly, weekly, etc.), opening/closing stock are excluded
+          // so monthly P&Ls reflect true trading performance (no all-time stock distortion).
+          // Only "All Time" (no startDate) includes the stock adjustment.
           openingStock: {
-            value: openingStockValue,
+            value: startDate ? 0 : openingStockValue,
           },
           purchaseAccounts: {
             total: purchaseAccountsTotal,
@@ -27151,7 +27154,7 @@ if (asOfDate) {
             count: directIncomeAccounts.length,
           },
           closingStock: {
-            value: closingStockValue,
+            value: startDate ? 0 : closingStockValue,
           },
           tradingTotal: rightTradingTotal, // Sum of credit side
           grossProfitBf: grossProfitBf,
