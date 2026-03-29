@@ -898,7 +898,7 @@ export default function Analytics() {
     const total = calculatePLTotal(accountList);
 
     return (
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -931,8 +931,33 @@ export default function Analytics() {
 
 
   return (
-    <div className="flex h-full">
-      <nav className="w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-analytics">
+    <div className="flex flex-col h-full md:flex-row">
+
+      {/* ── Mobile section selector (shown only on small screens) ── */}
+      <div className="md:hidden border-b bg-muted/30 px-3 py-2 shrink-0">
+        <Select value={activeSection} onValueChange={setActiveSection}>
+          <SelectTrigger className="w-full" data-testid="select-analytics-section">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {sidebarGroups.map(group => (
+              <Fragment key={group.label}>
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {group.label}
+                </div>
+                {group.items.map(item => (
+                  <SelectItem key={item.key} value={item.key}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </Fragment>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* ── Desktop left nav (hidden on mobile) ── */}
+      <nav className="hidden md:block w-56 shrink-0 border-r bg-muted/30 p-3 space-y-4 overflow-y-auto" data-testid="tabs-analytics">
         {sidebarGroups.map((group) => (
           <div key={group.label}>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
@@ -957,7 +982,7 @@ export default function Analytics() {
         ))}
       </nav>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Analytics</h1>
@@ -999,17 +1024,19 @@ export default function Analytics() {
                   No asset accounts found
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renderHierarchicalAccounts(assetAccounts)}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(assetAccounts)}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1041,17 +1068,19 @@ export default function Analytics() {
                   No liability accounts found
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renderHierarchicalAccounts(liabilityAccounts)}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(liabilityAccounts)}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1083,18 +1112,20 @@ export default function Analytics() {
                   No cash accounts found
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-right">Side</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renderHierarchicalAccounts(cashAccounts, true)}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Side</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(cashAccounts, true)}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1126,18 +1157,20 @@ export default function Analytics() {
                   No loan or bank accounts found
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                      <TableHead className="text-right">Side</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {renderHierarchicalAccounts(loansBanksAccounts, true)}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Side</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(loansBanksAccounts, true)}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1168,17 +1201,19 @@ export default function Analytics() {
                     No expense accounts found
                   </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(expenseAccounts)}
-                    </TableBody>
-                  </Table>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(expenseAccounts)}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </Card>
         )}
@@ -1208,17 +1243,19 @@ export default function Analytics() {
                     No direct expense accounts found
                   </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(directExpenseAccounts)}
-                    </TableBody>
-                  </Table>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(directExpenseAccounts)}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </Card>
         )}
@@ -1248,17 +1285,19 @@ export default function Analytics() {
                     No indirect expense accounts found
                   </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(indirectExpenseAccounts)}
-                    </TableBody>
-                  </Table>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(indirectExpenseAccounts)}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </Card>
         )}
