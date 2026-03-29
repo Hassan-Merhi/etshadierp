@@ -16,9 +16,6 @@ import {
   Search,
   PieChart,
   Ship,
-  Boxes,
-  Calculator,
-  Store,
   TrendingUp,
   MessageCircle,
   TableProperties,
@@ -26,7 +23,7 @@ import {
   AlertTriangle,
   Tag,
   UserRound,
-  Eye,
+  ChevronDown,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
@@ -34,7 +31,7 @@ import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE } from "@shared/schema";
-import { useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -51,12 +48,11 @@ interface NavSection {
   items: NavItem[];
 }
 
-// Pinned top-level items (always visible outside sections)
 const pinnedItems: NavItem[] = [
-  { title: "Tracking",  url: "/",                  icon: Ship          },
+  { title: "Tracking",  url: "/",                  icon: Ship            },
   { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
-  { title: "Daybook",   url: "/daybook",            icon: Book          },
-  { title: "Vouchers",  url: "/vouchers",           icon: Receipt       },
+  { title: "Daybook",   url: "/daybook",            icon: Book            },
+  { title: "Vouchers",  url: "/vouchers",           icon: Receipt         },
 ];
 
 const navSections: NavSection[] = [
@@ -64,21 +60,21 @@ const navSections: NavSection[] = [
     label: "Inventory",
     color: "#a855f7",
     items: [
-      { title: "Location Inventory",  url: "/location-inventory",  icon: MapPin   },
-      { title: "Stock OTW",           url: "/stock-otw",           icon: Ship     },
-      { title: "Containers",          url: "/containers",          icon: Container},
-      { title: "Stock Items",         url: "/stock-items",         icon: Package  },
-      { title: "Stock Query",         url: "/stock-query",         icon: Search   },
-      { title: "Optional Vouchers",   url: "/optional-vouchers",   icon: FileText },
+      { title: "Location Inventory", url: "/location-inventory", icon: MapPin    },
+      { title: "Stock OTW",          url: "/stock-otw",          icon: Ship      },
+      { title: "Containers",         url: "/containers",         icon: Container },
+      { title: "Stock Items",        url: "/stock-items",        icon: Package   },
+      { title: "Stock Query",        url: "/stock-query",        icon: Search    },
+      { title: "Optional Vouchers",  url: "/optional-vouchers",  icon: FileText  },
     ],
   },
   {
     label: "Sales & POS",
     color: "#22c55e",
     items: [
-      { title: "POS",        url: "/pos",          icon: ShoppingCart },
-      { title: "POS Daybook",url: "/pos-daybook",  icon: Book         },
-      { title: "Price List", url: "/price-list",   icon: Tag          },
+      { title: "POS",         url: "/pos",          icon: ShoppingCart },
+      { title: "POS Daybook", url: "/pos-daybook",  icon: Book         },
+      { title: "Price List",  url: "/price-list",   icon: Tag          },
     ],
   },
   {
@@ -96,14 +92,13 @@ const navSections: NavSection[] = [
     label: "Analytics",
     color: "#06b6d4",
     items: [
-      { title: "Sales Report",      url: "/sales-report",      icon: PieChart    },
-      { title: "Analytics",         url: "/analytics",         icon: BarChart3   },
-      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp  },
+      { title: "Sales Report",      url: "/sales-report",      icon: PieChart   },
+      { title: "Analytics",         url: "/analytics",         icon: BarChart3  },
+      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
     ],
   },
 ];
 
-// Utility items rendered in the bottom section
 const utilityItems: NavItem[] = [
   { title: "Create",      url: "/create",      icon: FolderPlus      },
   { title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
@@ -126,9 +121,8 @@ export function AppSidebar({ user }: { user?: any }) {
   useEffect(() => {
     const count = chatUnread?.count || 0;
     if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
-    if (count > prevUnreadRef.current) {
+    if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
-    }
     prevUnreadRef.current = count;
   }, [chatUnread?.count]);
 
@@ -149,14 +143,12 @@ export function AppSidebar({ user }: { user?: any }) {
   const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
 
   const isItemVisible = (item: NavItem): boolean => {
-    const isPOSUser     = user?.role?.startsWith("POS");
-    const isAdmin       = user?.role === "Admin";
-    const isDeveloper   = user?.role === "Developer";
-    const featureKey    = ROUTE_TO_FEATURE[item.url];
+    const isPOSUser   = user?.role?.startsWith("POS");
+    const isAdmin     = user?.role === "Admin";
+    const isDeveloper = user?.role === "Developer";
+    const featureKey  = ROUTE_TO_FEATURE[item.url];
 
-    if (item.url === "/factory/raw-stock") {
-      if (selectedCompany?.companyType !== "factory") return false;
-    }
+    if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory") return false;
     if (item.url === "/net-profit-report") return isDeveloper;
     if (item.url === "/chat")       return !isPOSUser;
     if (item.url === "/price-list") return !isPOSUser;
@@ -171,15 +163,44 @@ export function AppSidebar({ user }: { user?: any }) {
 
     if (featureKey && allowedPages.size > 0) return allowedPages.has(featureKey);
     if (allowedPages.size === 0 && myErpPages)  return false;
-    if (item.url === "/settings")   return false;
-    if (item.url === "/pos-daybook")return isPOSUser;
+    if (item.url === "/settings")    return false;
+    if (item.url === "/pos-daybook") return isPOSUser;
 
     return true;
   };
 
+  const visibleSections = navSections.map(s => ({
+    ...s,
+    items: s.items.filter(isItemVisible),
+  })).filter(s => s.items.length > 0);
+
+  // Auto-open the section containing the active route
+  const activeSection = visibleSections.find(s => s.items.some(i => location === i.url));
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(activeSection ? [activeSection.label] : [])
+  );
+
+  useEffect(() => {
+    if (activeSection) {
+      setOpenSections(prev => {
+        if (prev.has(activeSection.label)) return prev;
+        const next = new Set(prev);
+        next.add(activeSection.label);
+        return next;
+      });
+    }
+  }, [location]);
+
+  const toggleSection = (label: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  };
+
   const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
 
-  // Reusable nav link
   const NavLink = ({ item, color }: { item: NavItem; color: string }) => {
     const isActive = location === item.url;
     const unread   = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
@@ -187,24 +208,41 @@ export function AppSidebar({ user }: { user?: any }) {
       <a
         href={item.url}
         data-testid={`link-${item.url}`}
-        className={`
-          flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors
-          ${isActive
+        className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+          isActive
             ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"}
-        `}
-        style={{
-          borderLeft: `2px solid ${isActive ? color : "transparent"}`,
-          paddingLeft: "8px",
-          paddingRight: "10px",
-        }}
+            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+        }`}
+        style={{ borderLeft: `2px solid ${isActive ? color : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
       >
         <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
         <span className="flex-1 leading-tight">{item.title}</span>
         {unread > 0 && (
-          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
-            {unread}
-          </Badge>
+          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">{unread}</Badge>
+        )}
+      </a>
+    );
+  };
+
+  const FlatLink = ({ href, icon: Icon, label, color = "#6b7280", badge, testId }: {
+    href: string; icon: any; label: string; color?: string; badge?: number; testId: string;
+  }) => {
+    const isActive = location === href;
+    return (
+      <a
+        href={href}
+        data-testid={testId}
+        className={`flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors ${
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+        }`}
+        style={{ borderLeft: `2px solid ${isActive ? color : "transparent"}`, paddingLeft: "8px", paddingRight: "10px" }}
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
+        <span className="flex-1 leading-tight">{label}</span>
+        {badge != null && badge > 0 && (
+          <Badge variant="default" className="text-xs min-w-5 justify-center">{badge}</Badge>
         )}
       </a>
     );
@@ -212,7 +250,6 @@ export function AppSidebar({ user }: { user?: any }) {
 
   return (
     <Sidebar>
-      {/* ── Header ─────────────────────────────── */}
       <SidebarHeader className="px-4 py-3 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -225,38 +262,50 @@ export function AppSidebar({ user }: { user?: any }) {
         </div>
       </SidebarHeader>
 
-      {/* ── Scrollable nav ──────────────────────── */}
       <SidebarContent className="px-3 py-2 overflow-y-auto">
-
-        {/* Pinned top-level items */}
-        <div className="space-y-0.5 mb-1">
+        {/* Pinned top items */}
+        <div className="space-y-0.5 mb-2">
           {pinnedItems.filter(isItemVisible).map(item => (
-            <NavLink key={item.url} item={item} color="#3b82f6" />
+            <FlatLink key={item.url} href={item.url} icon={item.icon} label={item.title} color="#3b82f6" testId={`link-${item.url}`} />
           ))}
         </div>
 
-        {/* Sectioned nav */}
-        {navSections.map((section, idx) => {
-          const visible = section.items.filter(isItemVisible);
-          if (visible.length === 0) return null;
-          return (
-            <div key={section.label} className={idx === 0 ? "mt-3" : "mt-4"}>
-              <p
-                className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: section.color, opacity: 0.7 }}
-              >
-                {section.label}
-              </p>
-              <div className="space-y-0.5">
-                {visible.map(item => (
-                  <NavLink key={item.url} item={item} color={section.color} />
-                ))}
+        {/* Collapsible sections */}
+        <div className="space-y-1">
+          {visibleSections.map(section => {
+            const isOpen   = openSections.has(section.label);
+            const hasActive = section.items.some(i => location === i.url);
+            return (
+              <div key={section.label}>
+                <button
+                  onClick={() => toggleSection(section.label)}
+                  data-testid={`button-section-${section.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-left transition-colors hover:bg-sidebar-accent/30"
+                >
+                  <span
+                    className="flex-1 text-[10px] font-semibold uppercase tracking-widest"
+                    style={{ color: section.color, opacity: hasActive ? 1 : 0.65 }}
+                  >
+                    {section.label}
+                  </span>
+                  <ChevronDown
+                    className="h-3 w-3 shrink-0 transition-transform duration-200"
+                    style={{ color: section.color, opacity: 0.65, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {section.items.map(item => (
+                      <NavLink key={item.url} item={item} color={section.color} />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
 
-        {/* Utility links */}
+        {/* Tools section */}
         {utilityItems.filter(isItemVisible).length > 0 && (
           <div className="mt-4">
             <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
@@ -264,16 +313,16 @@ export function AppSidebar({ user }: { user?: any }) {
             </p>
             <div className="space-y-0.5">
               {utilityItems.filter(isItemVisible).map(item => (
-                <NavLink key={item.url} item={item} color="#6b7280" />
+                <FlatLink key={item.url} href={item.url} icon={item.icon} label={item.title} color="#6b7280" testId={`link-${item.url}`} />
               ))}
             </div>
           </div>
         )}
 
-        {/* Bottom utility strip */}
+        {/* Bottom strip */}
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
           {isItemVisible({ title: "Chat", url: "/chat", icon: MessageCircle }) && (
-            <NavLink item={{ title: "Chat", url: "/chat", icon: MessageCircle }} color="#3b82f6" />
+            <FlatLink href="/chat" icon={MessageCircle} label="Chat" color="#3b82f6" badge={chatUnread?.count} testId="link-chat" />
           )}
           {conflictCount > 0 && (
             <a
@@ -284,29 +333,21 @@ export function AppSidebar({ user }: { user?: any }) {
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
               <span className="flex-1 leading-tight">Conflicts</span>
-              <Badge
-                variant="outline"
-                className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
-                data-testid="badge-conflict-count"
-              >
+              <Badge variant="outline" className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400" data-testid="badge-conflict-count">
                 {conflictCount}
               </Badge>
             </a>
           )}
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
-            <NavLink item={{ title: "Settings", url: "/settings", icon: Settings }} color="#6b7280" />
+            <FlatLink href="/settings" icon={Settings} label="Settings" color="#6b7280" testId="link-settings" />
           )}
         </div>
-
       </SidebarContent>
 
-      {/* ── Footer ─────────────────────────────── */}
       <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-sm font-medium leading-tight truncate">{user?.username || "User"}</span>
