@@ -219,6 +219,7 @@ interface NetProfitAccount {
 
 interface NetProfitStatementData {
   netPosition: number;
+  openingBalancesNet?: number | null;
   leftPane: {
     openingStock: {
       value: number;
@@ -252,9 +253,6 @@ interface NetProfitStatementData {
       count: number;
     };
     closingStock: {
-      value: number;
-    };
-    openingStock?: {
       value: number;
     };
     tradingTotal: number;
@@ -1985,6 +1983,18 @@ export default function Analytics() {
               </div>
             ) : netProfitData ? (
               <div className="space-y-6">
+
+              {/* Opening Balances — shown only for All Time view (no date filter) */}
+              {!plStartDate && !plEndDate && netProfitData.openingBalancesNet != null && netProfitData.openingBalancesNet !== 0 && (
+                <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-muted/30" data-testid="row-opening-balances">
+                  <span className="flex items-center gap-2 font-medium text-sm">
+                    <ChevronRight className="h-4 w-4" />
+                    Opening Balances (Balance B/F)
+                  </span>
+                  <span className="font-mono text-sm">{formatAmount(netProfitData.openingBalancesNet)}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Pane */}
                 <div className="border rounded-lg overflow-hidden">
@@ -2215,24 +2225,6 @@ export default function Analytics() {
                           : formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}
                       </span>
                     </div>
-
-                    {/* Opening Stock (ERP + period-filtered only: moved from expense to income side) */}
-                    {(plStartDate || plEndDate) && appMode !== "factory" && (
-                      <div
-                        className="flex justify-between items-center p-3"
-                        data-testid="row-right-opening-stock"
-                      >
-                        <span className="flex items-center gap-2">
-                          <ChevronRight className="h-4 w-4" />
-                          Opening Stock
-                        </span>
-                        <span className="font-mono">
-                          {appMode === "factory"
-                            ? formatAmount(factoryStockSummary?.openingStock ?? 0)
-                            : formatAmount(netProfitData.rightPane?.openingStock?.value || 0)}
-                        </span>
-                      </div>
-                    )}
 
                     {/* Empty spacer rows to match left pane */}
                     <div className="h-10 bg-muted/10"></div>

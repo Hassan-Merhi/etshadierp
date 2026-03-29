@@ -26978,12 +26978,11 @@ if (asOfDate) {
       // - Gross Profit = Credit side - Debit side
       const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
       const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
-      // For period-filtered views (day/week/month): both opening AND closing stock appear on the
-      // income/credit side. Opening stock is moved OUT of expenses and treated as value-on-hand
-      // alongside closing stock. Debit side only has purchases + direct expenses.
       // For "All Time" (no startDate): traditional Tally format — opening on debit, closing on credit.
+      // For period-filtered (day/week/month): pure voucher-based P&L so periods are properly additive.
+      // Opening/closing stock are excluded from period P&L to avoid all-time snapshot distortion.
       const grossProfit = startDate
-        ? salesAccountsTotal + closingStockValue + openingStockValue + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
+        ? salesAccountsTotal + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
         : tradingCreditSide - tradingDebitSide;
 
       // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
@@ -27159,15 +27158,25 @@ if (asOfDate) {
 
       const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
 
+      // Opening Balances Net — the net worth of the business before any voucher transactions.
+      // Computed as sum of all non-income/non-expense account opening balances (Dr positive, Cr negative).
+      // Shown in the All Time P&L so that: Opening Balances + Sum(monthly P&Ls) ≈ Net Position.
+      const skipTypesForOB = ['Income', 'Expense', 'Direct Expense', 'Indirect Expense', 'Profit'];
+      let openingBalancesNet = 0;
+      for (const acc of companyAccounts) {
+        if (skipTypesForOB.includes(acc.accountType || '')) continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        if (opening === 0) continue;
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        openingBalancesNet += openingSigned;
+      }
+
       // Calculate totals for panes (Tally Trading Account format)
-      // All Time → Left: Opening + Purchases + Direct Expenses | Right: Sales + Closing + Direct Incomes
-      // Period   → Left: Purchases + Direct Expenses           | Right: Sales + Closing + Opening + Direct Incomes
-      const leftPaneTotal = startDate
-        ? purchaseAccountsTotal + directExpensesTotal
-        : tradingDebitSide;
-      const rightTradingTotal = startDate
-        ? salesAccountsTotal + closingStockValue + openingStockValue + directIncomesTotal
-        : tradingCreditSide;
+      // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
+      // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
+      const leftPaneTotal = tradingDebitSide; // Opening Stock + Purchases + Direct Expenses
+      const rightTradingTotal = tradingCreditSide; // Sales + Closing Stock + Direct Incomes
 
       // === RIGHT PANE DATA ===
       // Note: salesAccountsTotal, closingStockValue, directIncomesTotal already calculated above for Gross Profit
@@ -27184,6 +27193,7 @@ if (asOfDate) {
           endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
         netPosition: netPositionValue,
+        openingBalancesNet: startDate ? null : openingBalancesNet,
         // TALLY PRIME TRADING ACCOUNT STRUCTURE
         // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
         // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
@@ -27226,10 +27236,7 @@ if (asOfDate) {
             count: directIncomeAccounts.length,
           },
           closingStock: {
-            value: closingStockValue,
-          },
-          openingStock: {
-            value: startDate ? openingStockValue : 0,
+            value: startDate ? 0 : closingStockValue,
           },
           tradingTotal: rightTradingTotal, // Sum of credit side
           grossProfitBf: grossProfitBf,
