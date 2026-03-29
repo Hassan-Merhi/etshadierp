@@ -1727,8 +1727,24 @@ export default function Payroll() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Payroll</h1>
 
-      <div className="flex gap-6">
-        <nav className="w-56 shrink-0 space-y-4">
+      {/* ── Mobile tab selector ── */}
+      <div className="md:hidden">
+        <Select value={selectedTab} onValueChange={setSelectedTab}>
+          <SelectTrigger className="w-full" data-testid="select-payroll-tab">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="employees"><span className="flex items-center gap-2"><Users className="h-4 w-4" />Employees</span></SelectItem>
+            <SelectItem value="worker-profiles"><span className="flex items-center gap-2"><User className="h-4 w-4" />Worker Profiles</span></SelectItem>
+            <SelectItem value="run-payroll"><span className="flex items-center gap-2"><PlayCircle className="h-4 w-4" />Run Payroll</span></SelectItem>
+            <SelectItem value="advances"><span className="flex items-center gap-2"><Banknote className="h-4 w-4" />Advances</span></SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-4 md:gap-6">
+        {/* ── Desktop left nav ── */}
+        <nav className="hidden md:block w-56 shrink-0 space-y-4">
           {[
             {
               label: "Payroll",
@@ -2121,7 +2137,7 @@ export default function Payroll() {
                             </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
-                            <div className="border-t">
+                            <div className="border-t overflow-x-auto">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
@@ -2254,7 +2270,7 @@ export default function Payroll() {
                           {ungroupedWorkers.length} workers not assigned to any group
                         </p>
                       </div>
-                      <div className="border-t">
+                      <div className="border-t overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>

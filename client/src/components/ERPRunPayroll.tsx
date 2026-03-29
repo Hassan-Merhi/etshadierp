@@ -659,7 +659,7 @@ export default function ERPRunPayroll() {
               </div>
 
               {/* Preview table */}
-              <div className="border rounded-md overflow-hidden">
+              <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -735,7 +735,7 @@ export default function ERPRunPayroll() {
               <p className="text-sm mt-1">Select workers and run a payroll to get started.</p>
             </div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
