@@ -3913,7 +3913,7 @@ function OfflineSyncPanel() {
     ];
 
     return (
-      <div className="flex flex-col sm:flex-row h-full">
+      <div className="flex flex-col sm:flex-row sm:h-full">
         {/* Mobile section selector — visible only on small screens */}
         <div className="sm:hidden border-b p-3">
           <Select value={activeSection} onValueChange={setActiveSection}>
@@ -3958,11 +3958,11 @@ function OfflineSyncPanel() {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 sm:overflow-y-auto p-4 sm:p-6">
 
           {activeSection === "companies" && (
             <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               <h2 className="text-2xl font-semibold">Company Management</h2>
@@ -4350,7 +4350,7 @@ function OfflineSyncPanel() {
                     <CardTitle className="text-lg">Users ({factoryUsersData.length})</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-x-auto">
                   {isLoadingFactoryUsers ? (
                     <p className="text-center text-muted-foreground py-8">Loading users...</p>
                   ) : factoryUsersData.length > 0 ? (
