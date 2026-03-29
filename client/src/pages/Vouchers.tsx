@@ -42,7 +42,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -3858,28 +3860,32 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      {/* Mobile horizontal tab bar — visible on small screens only */}
+      {/* Mobile tab selector — visible on small screens only */}
       {!isPOS && (
-        <div className="sm:hidden flex overflow-x-auto gap-1 pb-1 -mx-1 px-1">
-          {sidebarGroups.flatMap((g) => g.items).map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key as typeof activeTab)}
-                data-testid={`tab-mobile-${item.key}`}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md whitespace-nowrap flex-shrink-0 transition-colors ${
-                  isActive
-                    ? "bg-background shadow-sm font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="sm:hidden">
+          <Select value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+            <SelectTrigger className="w-full" data-testid="select-voucher-tab-mobile">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sidebarGroups.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <SelectItem key={item.key} value={item.key}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
