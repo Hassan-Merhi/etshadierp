@@ -41,6 +41,7 @@ import {
   Gauge,
   MessageCircle,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,7 +64,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
-import { AlertTriangle } from "lucide-react";
 import { useState, useEffect, useRef, Fragment } from "react";
 
 interface MenuItem {
@@ -78,6 +78,7 @@ interface MenuItem {
 interface MenuGroup {
   title: string;
   icon: any;
+  color: string;
   items: MenuItem[];
 }
 
@@ -85,6 +86,7 @@ const allMenuGroups: MenuGroup[] = [
   {
     title: "Overview",
     icon: LayoutDashboard,
+    color: "text-blue-500",
     items: [
       { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard, requiresExplicitAccess: true },
     ],
@@ -92,6 +94,7 @@ const allMenuGroups: MenuGroup[] = [
   {
     title: "Operations",
     icon: Factory,
+    color: "text-orange-500",
     items: [
       { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
       { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
@@ -103,6 +106,7 @@ const allMenuGroups: MenuGroup[] = [
   {
     title: "Sales",
     icon: ShoppingCart,
+    color: "text-green-500",
     items: [
       { title: "Factory POS", url: "/factory/pos", icon: ShoppingCart },
       { title: "Customers", url: "/factory/customers", icon: Users },
@@ -116,6 +120,7 @@ const allMenuGroups: MenuGroup[] = [
   {
     title: "Inventory",
     icon: MapPin,
+    color: "text-purple-500",
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
       { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
@@ -125,8 +130,20 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
+    title: "Finance",
+    icon: Wallet,
+    color: "text-emerald-500",
+    items: [
+      { title: "Workers", url: "/factory/workers", icon: HardHat },
+      { title: "Employees", url: "/factory/employees", icon: Users },
+      { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
+      { title: "Containers", url: "/factory/containers", icon: Container },
+    ],
+  },
+  {
     title: "Accounting",
     icon: Landmark,
+    color: "text-amber-500",
     items: [
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark },
@@ -134,18 +151,21 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "Finance",
-    icon: Wallet,
+    title: "Reports",
+    icon: ClipboardCheck,
+    color: "text-cyan-500",
     items: [
-      { title: "Workers", url: "/factory/workers", icon: HardHat },
-      { title: "Employees", url: "/factory/employees", icon: Users },
-      { title: "Suppliers", url: "/factory/suppliers", icon: Users },
-      { title: "Containers", url: "/factory/containers", icon: Container },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
+      { title: "Net Profit Analytics", url: "/factory/net-profit-analytics", icon: BarChart3 },
+      { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
+      { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
+      { title: "Supplier Statement", url: "/factory/supplier-statement", icon: ClipboardCheck },
     ],
   },
   {
     title: "Intelligence",
     icon: Gauge,
+    color: "text-rose-500",
     items: [
       { title: "Factory Dashboard", url: "/factory/intelligence/dashboard", icon: Activity, featureFlag: "dashboardEnabled" },
       { title: "KPIs", url: "/factory/intelligence/kpis", icon: Gauge, featureFlag: "kpisEnabled" },
@@ -158,21 +178,8 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Intelligence Settings", url: "/factory/intelligence/settings", icon: Settings, adminOnly: true },
     ],
   },
-  {
-    title: "Reports",
-    icon: ClipboardCheck,
-    items: [
-      { title: "Supplier Report", url: "/factory/supplier-report", icon: ClipboardCheck },
-      { title: "Supplier Statement", url: "/factory/supplier-statement", icon: ClipboardCheck },
-      { title: "Production Summary", url: "/factory/production-summary", icon: BarChart3 },
-      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp },
-      { title: "Net Profit Analytics", url: "/factory/net-profit-analytics", icon: BarChart3 },
-    ],
-  },
 ];
 
-// Central source of truth for Factory page access — derived from sidebar nav
-// Any page added to allMenuGroups or the extra items below automatically appears in settings.
 export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] = [
   ...allMenuGroups.flatMap(group =>
     group.items.map(item => ({
@@ -240,9 +247,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         if (!myAccess.pageKeys.includes(pageKey)) return false;
       }
       if (item.requiresExplicitAccess && !isAdmin && myAccess) {
-        if (myAccess.fullAccess) {
-          return false;
-        }
+        if (myAccess.fullAccess) return false;
         const pageKey = item.url.replace(/^\//, "");
         if (!myAccess.pageKeys.includes(pageKey)) return false;
       }
@@ -255,7 +260,9 @@ export function FactorySidebar({ user }: { user?: any }) {
       group.items.some(item => location === item.url)
     );
     if (activeGroup) {
-      setOpenGroups([activeGroup.title]);
+      setOpenGroups(prev =>
+        prev.includes(activeGroup.title) ? prev : [...prev, activeGroup.title]
+      );
     }
   }, [location]);
 
@@ -267,9 +274,8 @@ export function FactorySidebar({ user }: { user?: any }) {
     );
   };
 
-  const isGroupActive = (group: MenuGroup) => {
-    return group.items.some((item) => location === item.url);
-  };
+  const isGroupActive = (group: MenuGroup) =>
+    group.items.some((item) => location === item.url);
 
   const initials = user?.username
     ? user.username.substring(0, 2).toUpperCase()
@@ -277,90 +283,131 @@ export function FactorySidebar({ user }: { user?: any }) {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white">
+      {/* Header */}
+      <SidebarHeader className="px-4 py-3 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-orange-600 text-white shadow-sm">
             <Factory className="h-5 w-5" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-base font-semibold">Factory</span>
-            <span className="text-xs text-muted-foreground">
-              Production System
-            </span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold leading-tight">Factory</span>
+            <span className="text-xs text-muted-foreground leading-tight">Production System</span>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
+
+      <SidebarContent className="px-2 py-2">
+        <SidebarGroup className="p-0">
           <SidebarGroupContent>
-            <SidebarMenu>
-              {menuGroups.map((group) => {
+            <SidebarMenu className="gap-0.5">
+
+              {menuGroups.map((group, groupIdx) => {
                 const isOpen = openGroups.includes(group.title);
                 const hasActiveItem = isGroupActive(group);
+                const isExpanded = isOpen || hasActiveItem;
 
                 return (
                   <Fragment key={group.title}>
-                  <Collapsible
-                    open={isOpen || hasActiveItem}
-                    onOpenChange={() => toggleGroup(group.title)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          className="w-full justify-between"
-                          isActive={hasActiveItem && !isOpen}
-                        >
-                          <div className="flex items-center gap-2">
-                            <group.icon className="h-4 w-4" />
-                            <span>{group.title}</span>
-                          </div>
-                          <ChevronRight
-                            className={`h-4 w-4 transition-transform duration-200 ${
-                              isOpen || hasActiveItem ? "rotate-90" : ""
+                    {/* Subtle separator between major sections */}
+                    {groupIdx > 0 && ["Operations", "Finance", "Reports"].includes(group.title) && (
+                      <div className="my-1 mx-2 border-t border-sidebar-border/60" />
+                    )}
+
+                    <Collapsible
+                      open={isExpanded}
+                      onOpenChange={() => toggleGroup(group.title)}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton
+                            className={`w-full justify-between rounded-md transition-colors ${
+                              hasActiveItem
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                : ""
                             }`}
-                          />
+                            data-testid={`button-group-${group.title.toLowerCase()}`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <group.icon className={`h-4 w-4 shrink-0 ${hasActiveItem ? group.color : "text-muted-foreground"}`} />
+                              <span className="text-sm">{group.title}</span>
+                            </div>
+                            <ChevronRight
+                              className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                                isExpanded ? "rotate-90" : ""
+                              }`}
+                            />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+
+                        <CollapsibleContent>
+                          <SidebarMenuSub className="ml-3 border-l border-sidebar-border/70 pl-2 my-0.5">
+                            {group.items.map((item) => {
+                              const isActive = location === item.url;
+                              return (
+                                <SidebarMenuSubItem key={item.title}>
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isActive}
+                                    className={`rounded-md text-sm transition-colors ${
+                                      isActive
+                                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    }`}
+                                  >
+                                    <a href={item.url} data-testid={`link-factory-${item.url.split('/').pop()}`}>
+                                      <item.icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? group.color : ""}`} />
+                                      <span className="flex-1">{item.title}</span>
+                                    </a>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+
+                    {/* Daybook sits right after Overview as a flat item */}
+                    {group.title === "Overview" && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location === "/factory/daybook"}
+                          className={`rounded-md transition-colors ${
+                            location === "/factory/daybook"
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                              : ""
+                          }`}
+                        >
+                          <a href="/factory/daybook" data-testid="link-factory-daybook" className="flex items-center gap-2.5">
+                            <BookOpen className={`h-4 w-4 shrink-0 ${location === "/factory/daybook" ? "text-blue-500" : "text-muted-foreground"}`} />
+                            <span className="text-sm">Daybook</span>
+                          </a>
                         </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {group.items.map((item) => {
-                            const isActive = location === item.url;
-                            return (
-                              <SidebarMenuSubItem key={item.title}>
-                                <SidebarMenuSubButton asChild isActive={isActive}>
-                                  <a href={item.url} data-testid={`link-factory-${item.url.split('/').pop()}`}>
-                                    <item.icon className="h-4 w-4" />
-                                    <span className="flex-1">{item.title}</span>
-                                  </a>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                  {group.title === "Overview" && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={location === "/factory/daybook"}>
-                        <a href="/factory/daybook" data-testid="link-factory-daybook" className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" />
-                          <span>Daybook</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
+                      </SidebarMenuItem>
+                    )}
                   </Fragment>
                 );
               })}
 
-              {/* Chat — flat top-level button with unread badge */}
+              {/* Divider before utility items */}
+              <div className="my-1 mx-2 border-t border-sidebar-border/60" />
+
+              {/* Chat */}
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location === "/factory/chat"}>
-                  <a href="/factory/chat" data-testid="link-factory-chat" className="flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    <span className="flex-1">Chat</span>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/factory/chat"}
+                  className={`rounded-md transition-colors ${
+                    location === "/factory/chat"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : ""
+                  }`}
+                >
+                  <a href="/factory/chat" data-testid="link-factory-chat" className="flex items-center gap-2.5">
+                    <MessageCircle className={`h-4 w-4 shrink-0 ${location === "/factory/chat" ? "text-blue-500" : "text-muted-foreground"}`} />
+                    <span className="flex-1 text-sm">Chat</span>
                     {(chatUnread?.count || 0) > 0 && (
                       <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-factory-chat-unread">
                         {chatUnread?.count}
@@ -370,13 +417,13 @@ export function FactorySidebar({ user }: { user?: any }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Conflict Center — shows when there are unresolved conflicts */}
+              {/* Conflict Center */}
               {conflictCount > 0 && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location === "/factory/conflicts"}>
-                    <a href="/factory/conflicts" data-testid="link-factory-conflicts">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      <span className="flex-1">Conflicts</span>
+                  <SidebarMenuButton asChild isActive={location === "/factory/conflicts"} className="rounded-md">
+                    <a href="/factory/conflicts" data-testid="link-factory-conflicts" className="flex items-center gap-2.5">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-orange-500" />
+                      <span className="flex-1 text-sm">Conflicts</span>
                       <Badge
                         variant="outline"
                         className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
@@ -388,31 +435,43 @@ export function FactorySidebar({ user }: { user?: any }) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {/* Settings — flat top-level button (admin only) */}
+
+              {/* Settings (admin only) */}
               {isAdmin && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location === "/factory/settings"}>
-                    <a href="/factory/settings" data-testid="link-factory-settings" className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" />
-                      <span>Settings</span>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === "/factory/settings"}
+                    className={`rounded-md transition-colors ${
+                      location === "/factory/settings"
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : ""
+                    }`}
+                  >
+                    <a href="/factory/settings" data-testid="link-factory-settings" className="flex items-center gap-2.5">
+                      <Settings className={`h-4 w-4 shrink-0 ${location === "/factory/settings" ? "text-blue-500" : "text-muted-foreground"}`} />
+                      <span className="text-sm">Settings</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+
+      {/* Footer */}
+      <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback>{initials}</AvatarFallback>
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="text-xs font-medium bg-orange-600/10 text-orange-700 dark:text-orange-400">
+              {initials}
+            </AvatarFallback>
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium truncate">{user?.username || "User"}</span>
-            <span className="text-xs text-muted-foreground truncate">
-              {user?.role || "Role"}
-            </span>
+            <span className="text-sm font-medium leading-tight truncate">{user?.username || "User"}</span>
+            <span className="text-xs text-muted-foreground leading-tight truncate">{user?.role || "Admin"}</span>
           </div>
         </div>
       </SidebarFooter>
