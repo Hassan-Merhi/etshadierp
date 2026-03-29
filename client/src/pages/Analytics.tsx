@@ -2004,7 +2004,7 @@ export default function Analytics() {
                       </span>
                       <span className="font-mono">
                         {appMode === "factory"
-                          ? formatAmount((plStartDate || plEndDate) ? 0 : (factoryStockSummary?.openingStock ?? 0))
+                          ? formatAmount(factoryStockSummary?.openingStock ?? 0)
                           : formatAmount(netProfitData.leftPane.openingStock.value)}
                       </span>
                     </div>
@@ -2216,8 +2216,8 @@ export default function Analytics() {
                       </span>
                     </div>
 
-                    {/* Opening Stock (period-filtered only: moved from expense to income side) */}
-                    {(plStartDate || plEndDate) && (
+                    {/* Opening Stock (ERP + period-filtered only: moved from expense to income side) */}
+                    {(plStartDate || plEndDate) && appMode !== "factory" && (
                       <div
                         className="flex justify-between items-center p-3"
                         data-testid="row-right-opening-stock"
