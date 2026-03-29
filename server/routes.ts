@@ -19556,6 +19556,22 @@ if (asOfDate) {
         .leftJoin(locations, eq(vouchers.locationId, locations.id))
         .where(and(...conditions));
 
+      // Fetch total bale quantity per voucher from salesItems
+      const qtyRows = await db
+        .select({
+          voucherId: salesItems.voucherId,
+          totalQuantity: sql<string>`COALESCE(SUM(${salesItems.quantity}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(...conditions))
+        .groupBy(salesItems.voucherId);
+
+      const quantityByVoucher = new Map<number, number>();
+      for (const row of qtyRows) {
+        quantityByVoucher.set(row.voucherId, parseFloat(row.totalQuantity));
+      }
+
       const CREDIT_SALES_ID = -1;
 
       // Group by location; credit sales go into a dedicated synthetic group
@@ -19567,17 +19583,20 @@ if (asOfDate) {
           locationCode: string;
           totalSales: number;
           totalTransactions: number;
+          totalQuantity: number;
         }
       >();
 
       for (const sale of salesVouchers) {
         const amount = parseFloat(sale.totalAmount || "0");
+        const qty = quantityByVoucher.get(sale.voucherId) ?? 0;
 
         if (sale.isCreditSale) {
           const existing = salesByLocation.get(CREDIT_SALES_ID);
           if (existing) {
             existing.totalSales += amount;
             existing.totalTransactions += 1;
+            existing.totalQuantity += qty;
           } else {
             salesByLocation.set(CREDIT_SALES_ID, {
               locationId: CREDIT_SALES_ID,
@@ -19585,6 +19604,7 @@ if (asOfDate) {
               locationCode: "CREDIT",
               totalSales: amount,
               totalTransactions: 1,
+              totalQuantity: qty,
             });
           }
         } else {
@@ -19593,6 +19613,7 @@ if (asOfDate) {
           if (existing) {
             existing.totalSales += amount;
             existing.totalTransactions += 1;
+            existing.totalQuantity += qty;
           } else {
             salesByLocation.set(sale.locationId, {
               locationId: sale.locationId,
@@ -19600,6 +19621,7 @@ if (asOfDate) {
               locationCode: sale.locationCode || "",
               totalSales: amount,
               totalTransactions: 1,
+              totalQuantity: qty,
             });
           }
         }

@@ -58,6 +58,7 @@ interface LocationSales {
   locationCode: string;
   totalSales: number;
   totalTransactions: number;
+  totalQuantity: number;
 }
 
 interface POSTransaction {
@@ -1402,6 +1403,7 @@ export default function Analytics() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Bales Sold</TableHead>
                     <TableHead className="text-right">Total Sales</TableHead>
                     <TableHead className="text-right">Transactions</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -1411,6 +1413,9 @@ export default function Analytics() {
                   {salesData.map((location) => (
                     <TableRow key={location.locationId}>
                       <TableCell className="font-medium">{location.locationName}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatNumber(location.totalQuantity ?? 0)}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatAmount(location.totalSales)}
                       </TableCell>
@@ -1429,6 +1434,21 @@ export default function Analytics() {
                     </TableRow>
                   ))}
                 </TableBody>
+                <TableBody className="font-semibold border-t-2 bg-muted/40">
+                  <TableRow>
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {salesData.reduce((s, l) => s + l.totalTransactions, 0)}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                </TableBody>
               </Table>
               </div>
               <div className="md:hidden space-y-3">
@@ -1439,13 +1459,25 @@ export default function Analytics() {
                         <span className="font-medium">{location.locationName}</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center justify-between mt-2 text-sm">
+                      <div className="grid grid-cols-3 mt-2 text-sm gap-2">
+                        <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground">{formatNumber(location.totalQuantity ?? 0)}</span></span>
                         <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground">{formatAmount(location.totalSales)}</span></span>
-                        <span className="text-muted-foreground">Txns: <span className="text-foreground">{location.totalTransactions}</span></span>
+                        <span className="text-muted-foreground text-right">Txns: <span className="text-foreground">{location.totalTransactions}</span></span>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
+                {/* Mobile totals card */}
+                <Card className="bg-muted/40">
+                  <CardContent className="p-4">
+                    <div className="font-semibold mb-2">Total</div>
+                    <div className="grid grid-cols-3 text-sm gap-2">
+                      <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground font-semibold">{formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}</span></span>
+                      <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground font-semibold">{formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}</span></span>
+                      <span className="text-muted-foreground text-right">Txns: <span className="text-foreground font-semibold">{salesData.reduce((s, l) => s + l.totalTransactions, 0)}</span></span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
               </>
             )}
