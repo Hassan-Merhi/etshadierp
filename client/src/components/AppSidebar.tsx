@@ -16,131 +16,102 @@ import {
   Search,
   PieChart,
   Ship,
-  ArrowLeftRight,
-  Factory,
-  Barcode,
-  ChevronRight,
-  Eye,
   Boxes,
   Calculator,
   Store,
   TrendingUp,
-  Upload,
   MessageCircle,
   TableProperties,
   ExternalLink,
   AlertTriangle,
   Tag,
   UserRound,
+  Eye,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarHeader,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
-import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
-import { useState, useEffect, useRef } from "react";
+import { ROUTE_TO_FEATURE } from "@shared/schema";
+import { useRef, useEffect } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-interface MenuItem {
+interface NavItem {
   title: string;
   url: string;
   icon: any;
 }
 
-interface MenuGroup {
-  title: string;
-  icon: any;
-  items: MenuItem[];
+interface NavSection {
+  label: string;
+  color: string;
+  items: NavItem[];
 }
 
-type NavEntry =
-  | ({ kind: "group" } & MenuGroup)
-  | ({ kind: "item" } & MenuItem);
+// Pinned top-level items (always visible outside sections)
+const pinnedItems: NavItem[] = [
+  { title: "Tracking",  url: "/",                  icon: Ship          },
+  { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
+  { title: "Daybook",   url: "/daybook",            icon: Book          },
+  { title: "Vouchers",  url: "/vouchers",           icon: Receipt       },
+];
 
-const navEntries: NavEntry[] = [
+const navSections: NavSection[] = [
   {
-    kind: "group",
-    title: "Overview",
-    icon: Eye,
+    label: "Inventory",
+    color: "#a855f7",
     items: [
-      { title: "Tracking", url: "/", icon: Ship },
-      { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
+      { title: "Location Inventory",  url: "/location-inventory",  icon: MapPin   },
+      { title: "Stock OTW",           url: "/stock-otw",           icon: Ship     },
+      { title: "Containers",          url: "/containers",          icon: Container},
+      { title: "Stock Items",         url: "/stock-items",         icon: Package  },
+      { title: "Stock Query",         url: "/stock-query",         icon: Search   },
+      { title: "Optional Vouchers",   url: "/optional-vouchers",   icon: FileText },
     ],
   },
   {
-    kind: "group",
-    title: "Inventory",
-    icon: Boxes,
+    label: "Sales & POS",
+    color: "#22c55e",
     items: [
-      { title: "Location Inventory", url: "/location-inventory", icon: MapPin },
-      { title: "Stock OTW", url: "/stock-otw", icon: Ship },
-      { title: "Containers", url: "/containers", icon: Container },
-      { title: "Stock Items", url: "/stock-items", icon: Package },
-      { title: "Stock Query", url: "/stock-query", icon: Search },
-      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
+      { title: "POS",        url: "/pos",          icon: ShoppingCart },
+      { title: "POS Daybook",url: "/pos-daybook",  icon: Book         },
+      { title: "Price List", url: "/price-list",   icon: Tag          },
     ],
   },
   {
-    kind: "group",
-    title: "Accounting",
-    icon: Calculator,
+    label: "Accounting",
+    color: "#f59e0b",
     items: [
-      { title: "Accounts", url: "/accounts", icon: Wallet },
-      { title: "Agents", url: "/agents", icon: UserRound },
-      { title: "Suppliers", url: "/suppliers", icon: Users },
-      { title: "Customers", url: "/customers", icon: Users },
-      { title: "Payroll", url: "/payroll", icon: UserCheck },
-    ],
-  },
-  { kind: "item", title: "Daybook", url: "/daybook", icon: Book },
-  { kind: "item", title: "Vouchers", url: "/vouchers", icon: Receipt },
-  {
-    kind: "group",
-    title: "Sales & POS",
-    icon: Store,
-    items: [
-      { title: "POS", url: "/pos", icon: ShoppingCart },
-      { title: "POS Daybook", url: "/pos-daybook", icon: Book },
-      { title: "Price List", url: "/price-list", icon: Tag },
+      { title: "Accounts",  url: "/accounts",  icon: Wallet    },
+      { title: "Agents",    url: "/agents",    icon: UserRound },
+      { title: "Suppliers", url: "/suppliers", icon: Users     },
+      { title: "Customers", url: "/customers", icon: Users     },
+      { title: "Payroll",   url: "/payroll",   icon: UserCheck },
     ],
   },
   {
-    kind: "group",
-    title: "Analytics",
-    icon: TrendingUp,
+    label: "Analytics",
+    color: "#06b6d4",
     items: [
-      { title: "Sales Report", url: "/sales-report", icon: PieChart },
-      { title: "Analytics", url: "/analytics", icon: BarChart3 },
-      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
+      { title: "Sales Report",      url: "/sales-report",      icon: PieChart    },
+      { title: "Analytics",         url: "/analytics",         icon: BarChart3   },
+      { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp  },
     ],
   },
-  { kind: "item", title: "Create", url: "/create", icon: FolderPlus },
-  { kind: "item", title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
-  { kind: "item", title: "Live Sheets", url: "/live-sheets", icon: ExternalLink },
-  { kind: "item", title: "Chat", url: "/chat", icon: MessageCircle },
-  { kind: "item", title: "Settings", url: "/settings", icon: Settings },
+];
+
+// Utility items rendered in the bottom section
+const utilityItems: NavItem[] = [
+  { title: "Create",      url: "/create",      icon: FolderPlus      },
+  { title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
+  { title: "Live Sheets", url: "/live-sheets", icon: ExternalLink    },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
@@ -154,26 +125,12 @@ export function AppSidebar({ user }: { user?: any }) {
 
   useEffect(() => {
     const count = chatUnread?.count || 0;
-    if (prevUnreadRef.current === -1) {
-      prevUnreadRef.current = count;
-      return;
-    }
+    if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
     if (count > prevUnreadRef.current) {
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     }
     prevUnreadRef.current = count;
   }, [chatUnread?.count]);
-
-  // Auto-collapse: only keep the group containing current route open
-  useEffect(() => {
-    const activeGroup = navEntries.find(
-      (entry): entry is ({ kind: "group" } & MenuGroup) =>
-        entry.kind === "group" && entry.items.some(item => location === item.url)
-    );
-    if (activeGroup) {
-      setOpenGroups([activeGroup.title]);
-    }
-  }, [location]);
 
   const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
     queryKey: ["/api/my-erp-pages"],
@@ -185,202 +142,175 @@ export function AppSidebar({ user }: { user?: any }) {
     enabled: !!selectedCompany?.id,
     queryFn: async () => {
       const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
+      return res.ok ? res.json() : null;
     },
   });
 
   const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
 
-  const isItemVisible = (item: MenuItem) => {
-    const isPOSUser = user?.role?.startsWith("POS");
-    const isAdmin = user?.role === "Admin";
-    const isDeveloper = user?.role === "Developer";
-    const featureKey = ROUTE_TO_FEATURE[item.url];
+  const isItemVisible = (item: NavItem): boolean => {
+    const isPOSUser     = user?.role?.startsWith("POS");
+    const isAdmin       = user?.role === "Admin";
+    const isDeveloper   = user?.role === "Developer";
+    const featureKey    = ROUTE_TO_FEATURE[item.url];
 
     if (item.url === "/factory/raw-stock") {
-      const isFactoryCompany = selectedCompany?.companyType === "factory";
-      if (!isFactoryCompany) return false;
+      if (selectedCompany?.companyType !== "factory") return false;
     }
-
-    // Net Profit Report is dev-only until finalized
-    if (item.url === "/net-profit-report") {
-      return isDeveloper;
-    }
-
-    // Chat is always visible to all non-POS users
-    if (item.url === "/chat") {
-      return !isPOSUser;
-    }
-
-    // Price List is visible to all non-POS users
-    if (item.url === "/price-list") {
-      return !isPOSUser;
-    }
+    if (item.url === "/net-profit-report") return isDeveloper;
+    if (item.url === "/chat")       return !isPOSUser;
+    if (item.url === "/price-list") return !isPOSUser;
 
     if (isDeveloper || isAdmin || myErpPages?.fullAccess) return true;
 
     if (isPOSUser) {
       const posRoutes = ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"];
-      if (companySettings?.posExcelImportEnabled) {
-        posRoutes.push("/pos-import");
-      }
+      if (companySettings?.posExcelImportEnabled) posRoutes.push("/pos-import");
       return posRoutes.includes(item.url);
     }
 
-    if (featureKey && allowedPages.size > 0) {
-      return allowedPages.has(featureKey);
-    }
-
-    if (allowedPages.size === 0 && myErpPages) {
-      return false;
-    }
-
-    if (item.url === "/settings") return false;
-    if (item.url === "/pos-daybook") return isPOSUser;
+    if (featureKey && allowedPages.size > 0) return allowedPages.has(featureKey);
+    if (allowedPages.size === 0 && myErpPages)  return false;
+    if (item.url === "/settings")   return false;
+    if (item.url === "/pos-daybook")return isPOSUser;
 
     return true;
   };
 
-  const toggleGroup = (groupTitle: string) => {
-    setOpenGroups((prev) =>
-      prev.includes(groupTitle)
-        ? prev.filter((g) => g !== groupTitle)
-        : [...prev, groupTitle]
+  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
+
+  // Reusable nav link
+  const NavLink = ({ item, color }: { item: NavItem; color: string }) => {
+    const isActive = location === item.url;
+    const unread   = item.url === "/chat" ? (chatUnread?.count || 0) : 0;
+    return (
+      <a
+        href={item.url}
+        data-testid={`link-${item.url}`}
+        className={`
+          flex items-center gap-2.5 rounded-md py-1.5 text-sm transition-colors
+          ${isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+            : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"}
+        `}
+        style={{
+          borderLeft: `2px solid ${isActive ? color : "transparent"}`,
+          paddingLeft: "8px",
+          paddingRight: "10px",
+        }}
+      >
+        <item.icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
+        <span className="flex-1 leading-tight">{item.title}</span>
+        {unread > 0 && (
+          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
+            {unread}
+          </Badge>
+        )}
+      </a>
     );
   };
 
-  const isGroupActive = (group: MenuGroup) => {
-    return group.items.some((item) => location === item.url);
-  };
-
-  const initials = user?.username
-    ? user.username.substring(0, 2).toUpperCase()
-    : "AD";
-
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+      {/* ── Header ─────────────────────────────── */}
+      <SidebarHeader className="px-4 py-3 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Package className="h-5 w-5" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-base font-semibold">ERP POS</span>
-            <span className="text-xs text-muted-foreground">
-              Warehouse Management
-            </span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold leading-tight">ERP POS</span>
+            <span className="text-xs text-muted-foreground leading-tight">Warehouse Management</span>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navEntries.map((entry) => {
-                if (entry.kind === "group") {
-                  const visibleItems = entry.items.filter(isItemVisible);
-                  if (visibleItems.length === 0) return null;
 
-                  const isOpen = openGroups.includes(entry.title);
-                  const hasActiveItem = isGroupActive(entry);
+      {/* ── Scrollable nav ──────────────────────── */}
+      <SidebarContent className="px-3 py-2 overflow-y-auto">
 
-                  return (
-                    <Collapsible
-                      key={entry.title}
-                      open={isOpen || hasActiveItem}
-                      onOpenChange={() => toggleGroup(entry.title)}
-                      className="group/collapsible"
-                    >
-                      <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuButton
-                            className="w-full justify-between"
-                            isActive={hasActiveItem && !isOpen}
-                          >
-                            <div className="flex items-center gap-2">
-                              <entry.icon className="h-4 w-4" />
-                              <span>{entry.title}</span>
-                            </div>
-                            <ChevronRight
-                              className={`h-4 w-4 transition-transform duration-200 ${
-                                isOpen || hasActiveItem ? "rotate-90" : ""
-                              }`}
-                            />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {visibleItems.map((item) => {
-                              const isActive = location === item.url;
-                              return (
-                                <SidebarMenuSubItem key={item.title}>
-                                  <SidebarMenuSubButton asChild isActive={isActive}>
-                                    <a href={item.url} data-testid={`link-${item.url}`}>
-                                      <item.icon className="h-4 w-4" />
-                                      <span>{item.title}</span>
-                                    </a>
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                              );
-                            })}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </SidebarMenuItem>
-                    </Collapsible>
-                  );
-                }
+        {/* Pinned top-level items */}
+        <div className="space-y-0.5 mb-1">
+          {pinnedItems.filter(isItemVisible).map(item => (
+            <NavLink key={item.url} item={item} color="#3b82f6" />
+          ))}
+        </div>
 
-                if (!isItemVisible(entry)) return null;
-                const isActive = location === entry.url;
-                const unreadCount = entry.title === "Chat" ? (chatUnread?.count || 0) : 0;
-                return (
-                  <SidebarMenuItem key={entry.title}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <a href={entry.url} data-testid={`link-${entry.url}`}>
-                        <entry.icon className="h-4 w-4" />
-                        <span className="flex-1">{entry.title}</span>
-                        {unreadCount > 0 && (
-                          <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread">
-                            {unreadCount}
-                          </Badge>
-                        )}
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-              {conflictCount > 0 && (
-                <SidebarMenuItem key="conflicts">
-                  <SidebarMenuButton asChild isActive={location === "/conflicts"}>
-                    <a href="/conflicts" data-testid="link-conflicts">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      <span className="flex-1">Conflicts</span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
-                        data-testid="badge-conflict-count"
-                      >
-                        {conflictCount}
-                      </Badge>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Sectioned nav */}
+        {navSections.map((section, idx) => {
+          const visible = section.items.filter(isItemVisible);
+          if (visible.length === 0) return null;
+          return (
+            <div key={section.label} className={idx === 0 ? "mt-3" : "mt-4"}>
+              <p
+                className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: section.color, opacity: 0.7 }}
+              >
+                {section.label}
+              </p>
+              <div className="space-y-0.5">
+                {visible.map(item => (
+                  <NavLink key={item.url} item={item} color={section.color} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Utility links */}
+        {utilityItems.filter(isItemVisible).length > 0 && (
+          <div className="mt-4">
+            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              Tools
+            </p>
+            <div className="space-y-0.5">
+              {utilityItems.filter(isItemVisible).map(item => (
+                <NavLink key={item.url} item={item} color="#6b7280" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bottom utility strip */}
+        <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
+          {isItemVisible({ title: "Chat", url: "/chat", icon: MessageCircle }) && (
+            <NavLink item={{ title: "Chat", url: "/chat", icon: MessageCircle }} color="#3b82f6" />
+          )}
+          {conflictCount > 0 && (
+            <a
+              href="/conflicts"
+              data-testid="link-conflicts"
+              className="flex items-center gap-2.5 rounded-md py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
+              style={{ borderLeft: "2px solid transparent", paddingLeft: "8px", paddingRight: "10px" }}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+              <span className="flex-1 leading-tight">Conflicts</span>
+              <Badge
+                variant="outline"
+                className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
+                data-testid="badge-conflict-count"
+              >
+                {conflictCount}
+              </Badge>
+            </a>
+          )}
+          {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
+            <NavLink item={{ title: "Settings", url: "/settings", icon: Settings }} color="#6b7280" />
+          )}
+        </div>
+
       </SidebarContent>
-      <SidebarFooter className="p-4">
+
+      {/* ── Footer ─────────────────────────────── */}
+      <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback>{initials}</AvatarFallback>
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
+              {initials}
+            </AvatarFallback>
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium truncate">{user?.username || "User"}</span>
-            <span className="text-xs text-muted-foreground truncate">
-              {user?.role || "Role"}
-            </span>
+            <span className="text-sm font-medium leading-tight truncate">{user?.username || "User"}</span>
+            <span className="text-xs text-muted-foreground leading-tight">{user?.role || "Role"}</span>
           </div>
         </div>
       </SidebarFooter>
