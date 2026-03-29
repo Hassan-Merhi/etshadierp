@@ -254,6 +254,9 @@ interface NetProfitStatementData {
     closingStock: {
       value: number;
     };
+    openingStock?: {
+      value: number;
+    };
     tradingTotal: number;
     grossProfitBf: number;
     indirectIncomes: {
@@ -2001,7 +2004,7 @@ export default function Analytics() {
                       </span>
                       <span className="font-mono">
                         {appMode === "factory"
-                          ? formatAmount(factoryStockSummary?.openingStock ?? 0)
+                          ? formatAmount((plStartDate || plEndDate) ? 0 : (factoryStockSummary?.openingStock ?? 0))
                           : formatAmount(netProfitData.leftPane.openingStock.value)}
                       </span>
                     </div>
@@ -2212,6 +2215,24 @@ export default function Analytics() {
                           : formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}
                       </span>
                     </div>
+
+                    {/* Opening Stock (period-filtered only: moved from expense to income side) */}
+                    {(plStartDate || plEndDate) && (
+                      <div
+                        className="flex justify-between items-center p-3"
+                        data-testid="row-right-opening-stock"
+                      >
+                        <span className="flex items-center gap-2">
+                          <ChevronRight className="h-4 w-4" />
+                          Opening Stock
+                        </span>
+                        <span className="font-mono">
+                          {appMode === "factory"
+                            ? formatAmount(factoryStockSummary?.openingStock ?? 0)
+                            : formatAmount(netProfitData.rightPane?.openingStock?.value || 0)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Empty spacer rows to match left pane */}
                     <div className="h-10 bg-muted/10"></div>

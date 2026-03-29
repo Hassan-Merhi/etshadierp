@@ -26978,11 +26978,12 @@ if (asOfDate) {
       // - Gross Profit = Credit side - Debit side
       const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
       const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
-      // For period-filtered views (e.g. "Today", "This Week"), opening/closing stock are all-time
-      // values — including them distorts the result. Only apply the Trading Account stock adjustment
-      // for "All Time" (no startDate filter). Period-filtered P&L uses simple revenue minus expenses.
+      // For period-filtered views (day/week/month): both opening AND closing stock appear on the
+      // income/credit side. Opening stock is moved OUT of expenses and treated as value-on-hand
+      // alongside closing stock. Debit side only has purchases + direct expenses.
+      // For "All Time" (no startDate): traditional Tally format — opening on debit, closing on credit.
       const grossProfit = startDate
-        ? salesAccountsTotal + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
+        ? salesAccountsTotal + closingStockValue + openingStockValue + directIncomesTotal - purchaseAccountsTotal - directExpensesTotal
         : tradingCreditSide - tradingDebitSide;
 
       // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
@@ -27159,10 +27160,14 @@ if (asOfDate) {
       const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
 
       // Calculate totals for panes (Tally Trading Account format)
-      // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
-      // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
-      const leftPaneTotal = tradingDebitSide; // Opening Stock + Purchases + Direct Expenses
-      const rightTradingTotal = tradingCreditSide; // Sales + Closing Stock + Direct Incomes
+      // All Time → Left: Opening + Purchases + Direct Expenses | Right: Sales + Closing + Direct Incomes
+      // Period   → Left: Purchases + Direct Expenses           | Right: Sales + Closing + Opening + Direct Incomes
+      const leftPaneTotal = startDate
+        ? purchaseAccountsTotal + directExpensesTotal
+        : tradingDebitSide;
+      const rightTradingTotal = startDate
+        ? salesAccountsTotal + closingStockValue + openingStockValue + directIncomesTotal
+        : tradingCreditSide;
 
       // === RIGHT PANE DATA ===
       // Note: salesAccountsTotal, closingStockValue, directIncomesTotal already calculated above for Gross Profit
@@ -27221,7 +27226,10 @@ if (asOfDate) {
             count: directIncomeAccounts.length,
           },
           closingStock: {
-            value: startDate ? 0 : closingStockValue,
+            value: closingStockValue,
+          },
+          openingStock: {
+            value: startDate ? openingStockValue : 0,
           },
           tradingTotal: rightTradingTotal, // Sum of credit side
           grossProfitBf: grossProfitBf,
