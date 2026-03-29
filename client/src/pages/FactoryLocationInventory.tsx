@@ -64,6 +64,7 @@ interface ProformaSelection {
   articleCode: string;
   productName: string;
   availableBales: number;
+  totalWeight: number;
   selectedQty: number;
   pricePerBale: string;
 }
@@ -325,6 +326,7 @@ export default function FactoryLocationInventory() {
           articleCode: prod.articleCode,
           productName: prod.productName,
           availableBales: prod.baleCount,
+          totalWeight: prod.totalWeight,
           selectedQty: Math.min(line.quantity, prod.baleCount),
           pricePerBale: line.pricePerBale,
         });
@@ -475,6 +477,7 @@ export default function FactoryLocationInventory() {
             articleCode: prod.articleCode,
             productName: prod.productName,
             availableBales: prod.baleCount,
+            totalWeight: prod.totalWeight,
             selectedQty: prod.baleCount,
             pricePerBale: prod.sellingPrice || "0",
           });
@@ -504,6 +507,7 @@ export default function FactoryLocationInventory() {
           articleCode: prod.articleCode,
           productName: prod.productName,
           availableBales: prod.baleCount,
+          totalWeight: prod.totalWeight,
           selectedQty: prod.baleCount,
           pricePerBale: prod.sellingPrice || "0",
         });
@@ -569,6 +573,10 @@ export default function FactoryLocationInventory() {
   const selectedItems = Array.from(selections.values()).filter((s) => s.selectedQty > 0);
   const grandTotal = selectedItems.reduce((sum, item) => sum + item.selectedQty * parseFloat(item.pricePerBale || "0"), 0);
   const totalSelectedBales = selectedItems.reduce((sum, item) => sum + item.selectedQty, 0);
+  const totalSelectedKg = selectedItems.reduce((sum, item) => {
+    const weightPerBale = item.availableBales > 0 ? item.totalWeight / item.availableBales : 0;
+    return sum + item.selectedQty * weightPerBale;
+  }, 0);
 
   const handleFinalize = () => {
     if (selectedItems.length === 0) {
@@ -1896,6 +1904,9 @@ export default function FactoryLocationInventory() {
               </Badge>
               <span className="text-sm font-mono font-medium">
                 {totalSelectedBales} bales
+              </span>
+              <span className="text-sm font-mono text-muted-foreground">
+                {fmt(totalSelectedKg)} KG
               </span>
               <span className="text-sm font-mono text-muted-foreground">
                 {formatAmount(grandTotal)} total
