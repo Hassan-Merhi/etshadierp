@@ -1346,7 +1346,7 @@ export default function FactoryLocationInventory() {
   const colSpanAll = proformaMode
     ? (isAllItems ? 9 : 8) + (!hideAvgRate ? 1 : 0) + 1
     : (isAllItems ? 7 : 6) + (!hideAvgRate ? 2 : 0) + (!hideTotalValue ? 2 : 0);
-  const colSpanLabel = isAllItems ? (proformaMode ? 4 : 3) : (proformaMode ? 3 : 2);
+  const colSpanLabel = isAllItems ? 3 : 2;
 
   return (
     <div className={`p-4 md:p-6 max-w-6xl mx-auto ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
