@@ -798,36 +798,34 @@ export default function Containers() {
                   : `Save All (${Object.keys(trackingEdits).length})`}
               </Button>
             )}
-            <Button
-              onClick={exportOtwToExcel}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-export-otw"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export OTW</span>
-              <span className="sm:hidden">Export</span>
-            </Button>
-            <Button
-              onClick={downloadImportTemplate}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-download-template"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className="hidden sm:inline">Template</span>
-            </Button>
-            <Button
-              onClick={handleImportClick}
-              disabled={isImporting}
-              variant="outline"
-              className="gap-2"
-              data-testid="button-import-otw"
-            >
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">{isImporting ? "Importing..." : "Import Excel"}</span>
-              <span className="sm:hidden">{isImporting ? "..." : "Import"}</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" data-testid="button-export-import-dropdown">
+                  <Download className="h-4 w-4" />
+                  Export / Import
+                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportOtwToExcel} data-testid="button-export-otw">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export OTW
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={downloadImportTemplate} data-testid="button-download-template">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Download Template
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  data-testid="button-import-otw"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isImporting ? "Importing..." : "Import Excel"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <input
               ref={fileInputRef}
               type="file"
