@@ -212,6 +212,9 @@ export default function FactorySuppliers() {
   // Broker statement view toggle: "broker-only" shows only the broker's own balance;
   // "combined" adds linked supplier exposure to each KPI card.
   const [brokerView, setBrokerView] = useState<"broker-only" | "combined">("broker-only");
+  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["howToRead"]));
+  const toggleStmtSection = (key: string) =>
+    setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
@@ -1268,16 +1271,23 @@ export default function FactorySuppliers() {
 
                   {/* ── Plain-English explanation (broker only) ───────────── */}
                   {isBrokerStatement && (
-                    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-                      <div className="flex items-center gap-2 font-medium text-foreground">
+                    <div className="rounded-md border bg-muted/30 text-sm">
+                      <button
+                        className="flex items-center gap-2 w-full p-3 font-medium text-foreground hover-elevate text-left"
+                        onClick={() => toggleStmtSection("howToRead")}
+                        data-testid="button-how-to-read-toggle"
+                      >
                         <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        How to read this statement
-                      </div>
-                      <ul className="pl-6 space-y-0.5 text-muted-foreground list-disc text-xs">
-                        <li><span className="font-medium text-foreground">Broker Net Balance</span> — amounts the broker itself owes or is owed (direct containers, commissions received, settlements made).</li>
-                        <li><span className="font-medium text-foreground">Linked Supplier Exposure</span> — balances of suppliers managed under this broker. Informational only — these are NOT broker-owned debts.</li>
-                        <li><span className="font-medium text-foreground">Combined Exposure</span> — broker balance + all linked supplier balances (toggle above to see this view).</li>
-                      </ul>
+                        <span className="flex-1">How to read this statement</span>
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${collapsedStmtSections.has("howToRead") ? "" : "rotate-180"}`} />
+                      </button>
+                      {!collapsedStmtSections.has("howToRead") && (
+                        <ul className="px-3 pb-3 pl-9 space-y-0.5 text-muted-foreground list-disc text-xs">
+                          <li><span className="font-medium text-foreground">Broker Net Balance</span> — amounts the broker itself owes or is owed (direct containers, commissions received, settlements made).</li>
+                          <li><span className="font-medium text-foreground">Linked Supplier Exposure</span> — balances of suppliers managed under this broker. Informational only — these are NOT broker-owned debts.</li>
+                          <li><span className="font-medium text-foreground">Combined Exposure</span> — broker balance + all linked supplier balances (toggle above to see this view).</li>
+                        </ul>
+                      )}
                     </div>
                   )}
 
@@ -1411,10 +1421,13 @@ export default function FactorySuppliers() {
 
             {statementData.supplier && (
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Supplier Details</CardTitle>
+                <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-md" onClick={() => toggleStmtSection("supplierDetails")}>
+                  <CardTitle className="text-base flex items-center justify-between gap-2">
+                    <span>Supplier Details</span>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`} />
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                {!collapsedStmtSections.has("supplierDetails") && <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     {statementData.supplier.contactPerson && (
                       <div className="flex items-center gap-2">
@@ -1447,7 +1460,7 @@ export default function FactorySuppliers() {
                       </div>
                     )}
                   </div>
-                </CardContent>
+                </CardContent>}
               </Card>
             )}
 
@@ -1455,9 +1468,13 @@ export default function FactorySuppliers() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
-                    <span className="flex items-center gap-2">
+                    <span
+                      className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
+                      onClick={() => toggleStmtSection("currencyPools")}
+                    >
                       <Globe className="h-4 w-4" />
                       Currency Pools
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("currencyPools") ? "" : "rotate-180"}`} />
                     </span>
                     {statementData.supplier.parentId && statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
                       <Button
@@ -1479,7 +1496,7 @@ export default function FactorySuppliers() {
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
+                {!collapsedStmtSections.has("currencyPools") && <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -1609,24 +1626,29 @@ export default function FactorySuppliers() {
                       </TableBody>
                     </Table>
                   </div>
-                </CardContent>
+                </CardContent>}
               </Card>
             )}
 
             {/* Linked Supplier Exposure detail — informational, not broker-owned */}
             {statementData.linkedSupplierGroups && statementData.linkedSupplierGroups.length > 0 && (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Link2 className="h-4 w-4" />
-                    Linked Supplier Exposure
+                <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-md" onClick={() => toggleStmtSection("linkedExposureDetail")}>
+                  <CardTitle className="text-base flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <Link2 className="h-4 w-4" />
+                      Linked Supplier Exposure
+                    </span>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${collapsedStmtSections.has("linkedExposureDetail") ? "" : "rotate-180"}`} />
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Informational only — these are balances owed to linked suppliers, not amounts owed by or to the broker.
-                    They do not add to Broker Net Balance.
-                  </p>
+                  {!collapsedStmtSections.has("linkedExposureDetail") && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Informational only — these are balances owed to linked suppliers, not amounts owed by or to the broker.
+                      They do not add to Broker Net Balance.
+                    </p>
+                  )}
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {!collapsedStmtSections.has("linkedExposureDetail") && <CardContent className="space-y-4">
                   {statementData.linkedSupplierGroups.map(group => (
                     <div key={group.supplierId} className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -1682,7 +1704,7 @@ export default function FactorySuppliers() {
                       ))}
                     </div>
                   ))}
-                </CardContent>
+                </CardContent>}
               </Card>
             )}
 
@@ -1691,9 +1713,13 @@ export default function FactorySuppliers() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
-                    <span className="flex items-center gap-2">
+                    <span
+                      className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
+                      onClick={() => toggleStmtSection("brokerActivityLedger")}
+                    >
                       <BookOpen className="h-4 w-4" />
                       Broker Activity Ledger
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("brokerActivityLedger") ? "" : "rotate-180"}`} />
                     </span>
                     <Button
                       variant="outline"
@@ -1708,12 +1734,14 @@ export default function FactorySuppliers() {
                       Export Excel
                     </Button>
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
-                    Grouped by currency. Does not include linked supplier activity.
-                  </p>
+                  {!collapsedStmtSections.has("brokerActivityLedger") && (
+                    <p className="text-xs text-muted-foreground">
+                      All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
+                      Grouped by currency. Does not include linked supplier activity.
+                    </p>
+                  )}
                 </CardHeader>
-                <CardContent className="space-y-6 pt-0">
+                {!collapsedStmtSections.has("brokerActivityLedger") && <CardContent className="space-y-6 pt-0">
                   {brokerStatementLoading ? (
                     <div className="space-y-2">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
@@ -1740,21 +1768,28 @@ export default function FactorySuppliers() {
                         if (t === "freight") return "text-orange-600 dark:text-orange-400";
                         return "";
                       };
+                      const ledgerKey = `ledger-${section.currencyCode}`;
+                      const ledgerCollapsed = collapsedStmtSections.has(ledgerKey);
                       return (
                         <div key={section.currencyCode} className="space-y-2">
-                          <div className="flex items-center gap-2">
+                          <button
+                            className="flex items-center gap-2 w-full text-left hover-elevate rounded-md px-1 py-0.5"
+                            onClick={() => toggleStmtSection(ledgerKey)}
+                            data-testid={`button-ledger-toggle-${section.currencyCode}`}
+                          >
                             <Badge variant={section.isBrokerPool ? "default" : "secondary"} className="text-sm px-3 py-1 font-bold">
                               {section.currencyCode}
                             </Badge>
                             {section.isBrokerPool ? (
-                              <span className="text-xs text-muted-foreground">Broker USD Pool — received from FX settlements &amp; transfers</span>
+                              <span className="text-xs text-muted-foreground flex-1">Broker USD Pool — received from FX settlements &amp; transfers</span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground flex-1">
                                 {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
                               </span>
                             )}
-                          </div>
-                          <div className="overflow-x-auto rounded-md border">
+                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${ledgerCollapsed ? "" : "rotate-180"}`} />
+                          </button>
+                          {!ledgerCollapsed && <div className="overflow-x-auto rounded-md border">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/50">
@@ -1801,8 +1836,8 @@ export default function FactorySuppliers() {
                                 })}
                               </TableBody>
                             </Table>
-                          </div>
-                          {/* Section totals */}
+                          </div>}
+                          {/* Section totals — always visible */}
                           <div className="flex justify-end">
                             <div className="text-xs space-y-0.5 text-right min-w-56 pr-1">
                               {!section.isBrokerPool && parseFloat(section.totalValue) > 0 && (
@@ -1875,19 +1910,25 @@ export default function FactorySuppliers() {
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-4">No data found for this broker.</p>
                   )}
-                </CardContent>
+                </CardContent>}
               </Card>
             )}
 
             {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Activity Ledger
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span
+                    className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
+                    onClick={() => toggleStmtSection("activityLedger")}
+                  >
+                    <Package className="h-4 w-4" />
+                    Activity Ledger
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("activityLedger") ? "" : "rotate-180"}`} />
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              {!collapsedStmtSections.has("activityLedger") && <CardContent>
                 {(() => {
                   type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge" | "freight";
                   const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
@@ -2187,7 +2228,7 @@ export default function FactorySuppliers() {
                     </div>
                   );
                 })()}
-              </CardContent>
+              </CardContent>}
             </Card>
 
           </>
