@@ -22036,6 +22036,17 @@ if (asOfDate) {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
+      // Opening stock — initial inventory cost entered outside the double-entry ledger.
+      // Not an expense: it is the cost basis of goods brought into the system at setup.
+      const dashStockItems = await storage.getAllStockItems(companyId);
+      let dashOpeningStock = 0;
+      for (const item of dashStockItems) dashOpeningStock += parseFloat((item as any).openingValue || '0');
+      if (dashOpeningStock > 0) {
+        forUsTotal += dashOpeningStock;
+        categoryTotals["asset_Opening Stock"] = dashOpeningStock;
+        forUsAccounts.push({ name: "Opening Stock (Initial Inventory)", code: "COMPUTED", value: dashOpeningStock, category: "Opening Stock" });
+      }
+
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
       // At that point, they increase inventory (asset) and create supplier/agent liabilities
@@ -27054,6 +27065,12 @@ if (asOfDate) {
       // ledger account balances + supplier balances which ARE properly bounded by endDate.
       const stmtIsAllTime = !endDate;
       if (stmtIsAllTime) {
+        // Add opening stock as an asset (entered outside ledger via stockItems.openingValue)
+        // This is NOT an expense — it is the initial cost basis of inventory brought into the system
+        if (openingStockValue > 0) {
+          stmtNpForUs += openingStockValue;
+        }
+
         // Add stock on floor (inventory) as asset
         stmtNpForUs += closingStockValue;
 
@@ -27076,6 +27093,7 @@ if (asOfDate) {
       // Add suppliers (parent company only) - always included since stmtSupplierBals is already bounded by endDate
       const stmtParentCompanyId = await storage.getParentCompanyId();
       const stmtShouldIncludeSuppliers = stmtParentCompanyId === null || companyId === stmtParentCompanyId;
+      let stmtSupplierTotal = 0;
       if (stmtShouldIncludeSuppliers) {
         const stmtAllSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
         for (const sup of stmtAllSuppliers) {
@@ -27083,11 +27101,38 @@ if (asOfDate) {
           if (balance) {
             const opening = parseFloat((sup as any).openingBalance || '0');
             const netBalance = opening + balance.credit - balance.debit;
-            if (netBalance > 0) stmtNpOnUs += netBalance;
-            else if (netBalance < 0) stmtNpForUs += Math.abs(netBalance);
+            if (netBalance > 0) { stmtNpOnUs += netBalance; stmtSupplierTotal += netBalance; }
+            else if (netBalance < 0) { stmtNpForUs += Math.abs(netBalance); stmtSupplierTotal -= Math.abs(netBalance); }
           }
         }
       }
+
+      // Debug: log net position components so discrepancies can be traced
+      const stmtAccountsForUs: string[] = [], stmtAccountsOnUs: string[] = [];
+      for (const acc of companyAccounts) {
+        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
+        if (acc.accountType === 'Income') continue;
+        if (isExcludedFromStmtNp(acc)) continue;
+        const opening = parseFloat(acc.openingBalance || '0');
+        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const net = openingSigned + bal.debit - bal.credit;
+        if (Math.abs(net) > 0.01) {
+          const entry = `${acc.name} (${acc.code}/${acc.accountType}): ${net > 0 ? '+' : ''}${net.toFixed(2)}`;
+          if (net > 0) stmtAccountsForUs.push(entry);
+          else stmtAccountsOnUs.push(entry);
+        }
+      }
+      console.log('[NET POSITION BREAKDOWN]', {
+        openingStock: openingStockValue,
+        closingStock: closingStockValue,
+        supplierNetBalance: stmtSupplierTotal,
+        accountsForUs: stmtAccountsForUs,
+        accountsOnUs: stmtAccountsOnUs,
+        stmtNpForUs,
+        stmtNpOnUs,
+        netPositionBeforeRound: stmtNpForUs - stmtNpOnUs,
+      });
 
       const netPositionValue = npRound2Stmt(stmtNpForUs - stmtNpOnUs);
 
