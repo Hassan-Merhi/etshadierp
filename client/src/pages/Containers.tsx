@@ -838,8 +838,30 @@ export default function Containers() {
         )}
       </PageHeader>
 
+      {/* Mobile section selector */}
+      <div className="md:hidden">
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="w-full" data-testid="select-container-section">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {sidebarGroups.flatMap((g) => g.items).map((item) => {
+              const Icon = item.icon;
+              return (
+                <SelectItem key={item.key} value={item.key}>
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex gap-6">
-        <nav className="w-56 shrink-0 space-y-4">
+        <nav className="hidden md:block w-56 shrink-0 space-y-4">
           {sidebarGroups.map((group) => (
             <div key={group.label}>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
