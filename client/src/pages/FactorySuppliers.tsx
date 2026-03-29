@@ -951,25 +951,32 @@ export default function FactorySuppliers() {
 
         {/* ── Linked Supplier Exposure ──────────────────────────────────────── */}
         {activeExposure.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-foreground">Linked Supplier Exposure</h2>
-              <span className="text-xs text-muted-foreground">— supplier-owned balances (not broker-owned)</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {activeExposure.map((b) => (
-                <Card key={b.currencyCode} className="border-dashed">
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Exposure {b.currencyCode}</div>
-                    <div className={`text-2xl font-bold mt-1 tabular-nums ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : ""}`}>
+          <Card className="border-dashed">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+                <div className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Linked Supplier Exposure</div>
+                    <div className="text-xs text-muted-foreground">supplier-owned balances · not broker-owned</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {children.length} supplier{children.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+              <div className="divide-y">
+                {activeExposure.map((b, i) => (
+                  <div key={b.currencyCode} className={`flex items-center justify-between gap-4 ${i === 0 ? "pb-2.5" : i === activeExposure.length - 1 ? "pt-2.5" : "py-2.5"}`}>
+                    <span className="text-xs font-medium text-muted-foreground tracking-wider uppercase">{b.currencyCode}</span>
+                    <span className={`tabular-nums font-bold ${i === 0 ? "text-2xl" : "text-lg"} ${b.currencyCode !== "USD" ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
                       {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(b.balance.toFixed(2))}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Linked supplier funds</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Linked Suppliers list */}
