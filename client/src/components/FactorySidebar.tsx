@@ -84,6 +84,7 @@ interface MenuGroup {
 
 const allMenuGroups: MenuGroup[] = [
   {
+    // Dashboard access — admin or explicitly granted
     title: "Overview",
     icon: LayoutDashboard,
     color: "text-blue-500",
@@ -92,44 +93,57 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
+    // Pure production floor activities
     title: "Operations",
     icon: Factory,
     color: "text-orange-500",
     items: [
       { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
-      { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
-      { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
     ],
   },
   {
+    // Everything bale-specific: lookup, catalog, ledger, relabeling
+    title: "Bales",
+    icon: Boxes,
+    color: "text-yellow-500",
+    items: [
+      { title: "Bales & Lookup", url: "/factory/bales-hub", icon: History },
+      { title: "Bale Products", url: "/factory/bale-products", icon: Tags },
+      { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
+      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: RefreshCw },
+    ],
+  },
+  {
+    // All commercial & customer-facing activities
     title: "Sales",
     icon: ShoppingCart,
     color: "text-green-500",
     items: [
       { title: "Factory POS", url: "/factory/pos", icon: ShoppingCart },
       { title: "Customers", url: "/factory/customers", icon: Users },
-      { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
       { title: "Price List", url: "/factory/price-list", icon: DollarSign },
       { title: "Proformas", url: "/factory/sales/proformas", icon: FileText },
+      { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
       { title: "Pending Invoices", url: "/factory/sales/pending-invoices", icon: ClipboardCheck },
       { title: "Invoices", url: "/factory/sales/invoices", icon: ClipboardList },
     ],
   },
   {
+    // Stock, location tracking, containers in transit
     title: "Inventory",
     icon: MapPin,
     color: "text-purple-500",
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
-      { title: "Bale Ledger", url: "/factory/bale-ledger", icon: Layers },
       { title: "Stock OTW", url: "/factory/stock-otw", icon: Ship },
       { title: "Stock Query", url: "/factory/stock-query", icon: Database },
-      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: RefreshCw },
+      { title: "Containers", url: "/factory/containers", icon: Container },
     ],
   },
   {
+    // People & external partners: payroll, HR, suppliers
     title: "Finance",
     icon: Wallet,
     color: "text-emerald-500",
@@ -137,10 +151,10 @@ const allMenuGroups: MenuGroup[] = [
       { title: "Workers", url: "/factory/workers", icon: HardHat },
       { title: "Employees", url: "/factory/employees", icon: Users },
       { title: "Suppliers", url: "/factory/suppliers", icon: UserRound },
-      { title: "Containers", url: "/factory/containers", icon: Container },
     ],
   },
   {
+    // Double-entry bookkeeping: vouchers, chart of accounts, agents
     title: "Accounting",
     icon: Landmark,
     color: "text-amber-500",
@@ -151,6 +165,7 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
+    // Output reports & financial analytics
     title: "Reports",
     icon: ClipboardCheck,
     color: "text-cyan-500",
@@ -163,6 +178,7 @@ const allMenuGroups: MenuGroup[] = [
     ],
   },
   {
+    // Feature-flagged intelligence modules (hidden unless enabled in settings)
     title: "Intelligence",
     icon: Gauge,
     color: "text-rose-500",
@@ -309,7 +325,7 @@ export function FactorySidebar({ user }: { user?: any }) {
                 return (
                   <Fragment key={group.title}>
                     {/* Subtle separator between major sections */}
-                    {groupIdx > 0 && ["Operations", "Finance", "Reports"].includes(group.title) && (
+                    {groupIdx > 0 && ["Operations", "Sales", "Finance", "Reports"].includes(group.title) && (
                       <div className="my-1 mx-2 border-t border-sidebar-border/60" />
                     )}
 
