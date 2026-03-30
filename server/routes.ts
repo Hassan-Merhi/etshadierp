@@ -11803,25 +11803,36 @@ if (asOfDate) {
             return null;
           };
 
+          // Sanitise numeric cell values — reject "[object Object]" strings that can come from ExcelJS
+          const normNum = (v: any): string | null => {
+            if (v === null || v === undefined || v === "") return null;
+            const s = String(v).trim();
+            if (!s || s === "[object Object]") return null;
+            const n = parseFloat(s.replace(/,/g, ""));
+            return isNaN(n) ? null : String(n);
+          };
+
           // Build update object
           const updateData: any = {};
-          if (data.shopName) updateData.shopName = data.shopName;
+          if (data.shopName && String(data.shopName) !== "[object Object]") updateData.shopName = String(data.shopName);
           const etaDate = normDate(data.eta);
           if (etaDate) updateData.eta = etaDate;
-          if (data.transporter) updateData.transporter = data.transporter;
-          if (data.transportFee) updateData.transportFee = data.transportFee;
-          if (data.numberPlate) updateData.numberPlate = data.numberPlate;
-          if (data.trackingLocation) updateData.trackingLocation = data.trackingLocation;
+          if (data.transporter && String(data.transporter) !== "[object Object]") updateData.transporter = String(data.transporter);
+          const tFee = normNum(data.transportFee);
+          if (tFee !== null) updateData.transportFee = tFee;
+          if (data.numberPlate && String(data.numberPlate) !== "[object Object]") updateData.numberPlate = String(data.numberPlate);
+          if (data.trackingLocation && String(data.trackingLocation) !== "[object Object]") updateData.trackingLocation = String(data.trackingLocation);
           const borderDateVal = normDate(data.borderDate);
           if (borderDateVal) updateData.borderDate = borderDateVal;
           const offloadDateVal = normDate(data.offloadDate);
           if (offloadDateVal) updateData.offloadDate = offloadDateVal;
-          if (data.agent) updateData.agent = data.agent;
-          if (data.dutyFee) updateData.dutyFee = data.dutyFee;
+          if (data.agent && String(data.agent) !== "[object Object]") updateData.agent = String(data.agent);
+          const dFee = normNum(data.dutyFee);
+          if (dFee !== null) updateData.dutyFee = dFee;
           if (data.docReceived !== undefined) {
             updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "YES" || data.docReceived === "TRUE" || data.docReceived === "true";
           }
-          if (data.trackingDescription) updateData.trackingDescription = data.trackingDescription;
+          if (data.trackingDescription && String(data.trackingDescription) !== "[object Object]") updateData.trackingDescription = String(data.trackingDescription);
           
           if (Object.keys(updateData).length > 0) {
             await db

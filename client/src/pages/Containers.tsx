@@ -422,8 +422,36 @@ export default function Containers() {
     await writeFile(workbook, "otw_containers.xlsx");
   };
 
-  // Helper function to convert Excel date serial numbers to date strings
-  // Always returns YYYY-MM-DD (required by PostgreSQL date columns) or "" if empty
+  // Safely extract a primitive value from an ExcelJS cell (which can return rich objects)
+  const cellVal = (value: any): any => {
+    if (value === null || value === undefined) return "";
+    if (typeof value !== "object") return value;
+    if (value instanceof Date) return value;
+    // Formula cell: { result, formula }
+    if ("result" in value) return value.result ?? "";
+    // Rich-text cell: { richText: [...] }
+    if ("richText" in value && Array.isArray(value.richText))
+      return value.richText.map((r: any) => r.text ?? "").join("");
+    // Shared-string / cell-model: { text }
+    if ("text" in value) return value.text ?? "";
+    // Hyperlink cell: { text, hyperlink }
+    if ("hyperlink" in value) return value.text ?? "";
+    return "";
+  };
+
+  const cellStr = (value: any): string => {
+    const v = cellVal(value);
+    if (v === null || v === undefined) return "";
+    return String(v);
+  };
+
+  const cellNum = (value: any): string => {
+    const v = cellVal(value);
+    if (v === null || v === undefined || v === "") return "";
+    const n = parseFloat(String(v).replace(/,/g, ""));
+    return isNaN(n) ? "" : String(n);
+  };
+
   const excelDateToString = (value: any): string => {
     if (!value) return "";
 
@@ -549,33 +577,30 @@ export default function Containers() {
 
       // Map Excel columns to API fields (convert Excel date serials to strings)
       const rows = jsonData.map((row: any) => ({
-        containerNumber: String(
+        containerNumber: cellStr(
           row["Container #"] ||
             row["Container Number"] ||
-            row["containerNumber"] ||
-            "",
+            row["containerNumber"],
         ),
-        shopName: String(
-          row["Shop"] || row["Shop Name"] || row["shopName"] || "",
+        shopName: cellStr(row["Shop"] || row["Shop Name"] || row["shopName"]),
+        eta: excelDateToString(cellVal(row["ETA"] || row["eta"])),
+        transporter: cellStr(row["Transporter"] || row["transporter"]),
+        transportFee: cellNum(row["Transport Fee"] || row["transportFee"]),
+        numberPlate: cellStr(
+          row["Number Plate"] || row["Plate"] || row["numberPlate"],
         ),
-        eta: excelDateToString(row["ETA"] || row["eta"]),
-        transporter: String(row["Transporter"] || row["transporter"] || ""),
-        transportFee: String(row["Transport Fee"] || row["transportFee"] || ""),
-        numberPlate: String(
-          row["Number Plate"] || row["Plate"] || row["numberPlate"] || "",
+        trackingLocation: cellStr(
+          row["Location"] || row["trackingLocation"],
         ),
-        trackingLocation: String(
-          row["Location"] || row["trackingLocation"] || "",
-        ),
-        borderDate: excelDateToString(row["Border Date"] || row["borderDate"]),
-        offloadDate: excelDateToString(
+        borderDate: excelDateToString(cellVal(row["Border Date"] || row["borderDate"])),
+        offloadDate: excelDateToString(cellVal(
           row["Offload Date"] || row["offloadDate"],
-        ),
-        agent: String(row["Agent"] || row["agent"] || ""),
-        dutyFee: String(row["Duty Fee"] || row["dutyFee"] || ""),
-        docReceived: String(row["Doc Received"] || row["docReceived"] || ""),
-        trackingDescription: String(
-          row["Description"] || row["trackingDescription"] || "",
+        )),
+        agent: cellStr(row["Agent"] || row["agent"]),
+        dutyFee: cellNum(row["Duty Fee"] || row["dutyFee"]),
+        docReceived: cellStr(row["Doc Received"] || row["docReceived"]),
+        trackingDescription: cellStr(
+          row["Description"] || row["trackingDescription"],
         ),
       }));
 
