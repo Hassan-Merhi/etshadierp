@@ -526,7 +526,7 @@ export default function FactoryPOS() {
               <SelectContent>
                 {(allCustomers || []).map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name || `Customer #${c.id}`}
+                    {c.legalName || c.name || `Customer #${c.id}`}
                   </SelectItem>
                 ))}
               </SelectContent>

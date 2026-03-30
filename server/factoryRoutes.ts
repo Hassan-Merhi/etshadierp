@@ -12063,15 +12063,47 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         ))
         .groupBy(customerBalances.customerId);
 
+      // Fetch net voucher entries for customers that have a linked ledger account.
+      // This picks up manual accounting vouchers (journal / payment-receipt) that don't
+      // flow through customerBalances.
+      // Exclude CHARGE-* vouchers: those charge amounts are already included in
+      // customerOrders.grandTotal (salesTotal) via the invoice finalization flow.
+      const ledgerAccountIds = allCustomers
+        .filter((c) => c.ledgerAccountId)
+        .map((c) => c.ledgerAccountId!);
+
+      const voucherNetByLedger = new Map<number, number>();
+      if (ledgerAccountIds.length > 0) {
+        const voucherNetRows = await db.select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+        })
+          .from(voucherEntries)
+          .innerJoin(vouchers, and(
+            eq(voucherEntries.voucherId, vouchers.id),
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+          ))
+          .where(inArray(voucherEntries.ledgerAccountId as any, ledgerAccountIds))
+          .groupBy(voucherEntries.ledgerAccountId);
+
+        for (const row of voucherNetRows) {
+          if (row.ledgerAccountId) {
+            voucherNetByLedger.set(row.ledgerAccountId, parseFloat(row.net || "0"));
+          }
+        }
+      }
+
       const salesMap = new Map(salesRows.map((r) => [r.customerId, parseFloat(r.total || "0")]));
       const nonInvMap = new Map(nonInvRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
 
       const customersWithBalances = allCustomers.map((customer) => {
         const salesTotal = salesMap.get(customer.id) ?? 0;
         const nonInvNet = nonInvMap.get(customer.id) ?? 0;
+        const voucherNet = customer.ledgerAccountId ? (voucherNetByLedger.get(customer.ledgerAccountId) ?? 0) : 0;
         const openingBalance = parseFloat(customer.openingBalance || "0");
         const openingSide = customer.openingBalanceSide || "Dr";
-        const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet;
+        const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet + voucherNet;
         return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
       });
 
