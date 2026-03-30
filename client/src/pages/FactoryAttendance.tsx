@@ -108,9 +108,29 @@ function generateDateRange(start: string, end: string): string[] {
   return dates;
 }
 
+function getInitialMode(): ViewMode {
+  const p = new URLSearchParams(window.location.search);
+  return p.get("mode") === "perWorker" ? "perWorker" : "daily";
+}
+
+function setModeInUrl(mode: ViewMode) {
+  const url = new URL(window.location.href);
+  if (mode === "daily") {
+    url.searchParams.delete("mode");
+  } else {
+    url.searchParams.set("mode", mode);
+  }
+  window.history.replaceState(null, "", url.toString());
+}
+
 export default function FactoryAttendance() {
   const { toast } = useToast();
-  const [mode, setMode] = useState<ViewMode>("daily");
+  const [mode, setMode] = useState<ViewMode>(getInitialMode);
+
+  const handleSetMode = (m: ViewMode) => {
+    setMode(m);
+    setModeInUrl(m);
+  };
 
   // ── Daily view state ──────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
@@ -240,7 +260,7 @@ export default function FactoryAttendance() {
           variant={mode === "daily" ? "default" : "outline"}
           size="default"
           data-testid="button-mode-daily"
-          onClick={() => setMode("daily")}
+          onClick={() => handleSetMode("daily")}
         >
           <CalendarDays className="h-4 w-4 mr-2" />
           Daily View
@@ -249,7 +269,7 @@ export default function FactoryAttendance() {
           variant={mode === "perWorker" ? "default" : "outline"}
           size="default"
           data-testid="button-mode-per-worker"
-          onClick={() => setMode("perWorker")}
+          onClick={() => handleSetMode("perWorker")}
         >
           <User className="h-4 w-4 mr-2" />
           Per Worker

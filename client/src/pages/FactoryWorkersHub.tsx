@@ -19,11 +19,31 @@ function getInitialTab(): TabValue {
   return "workers";
 }
 
+function setTabInUrl(tab: TabValue) {
+  const url = new URL(window.location.href);
+  if (tab === "workers") {
+    url.searchParams.delete("tab");
+  } else {
+    url.searchParams.set("tab", tab);
+  }
+  // Clear attendance mode when leaving attendance tab
+  if (tab !== "attendance") {
+    url.searchParams.delete("mode");
+  }
+  window.history.replaceState(null, "", url.toString());
+}
+
 export default function FactoryWorkersHub() {
   const [tab, setTab] = useState<TabValue>(getInitialTab);
 
+  const handleTabChange = (v: string) => {
+    const newTab = v as TabValue;
+    setTab(newTab);
+    setTabInUrl(newTab);
+  };
+
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
+    <Tabs value={tab} onValueChange={handleTabChange}>
       <TabsList className="mb-4 flex flex-wrap gap-1">
         <TabsTrigger value="workers" data-testid="tab-workers">
           <HardHat className="h-4 w-4 mr-2" />
