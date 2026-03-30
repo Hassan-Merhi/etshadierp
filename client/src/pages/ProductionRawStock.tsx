@@ -2843,17 +2843,17 @@ export default function ProductionRawStock() {
                       <SelectValue placeholder="Select existing supplier…" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No Supplier (standalone entry)</SelectItem>
+                      <SelectItem value="__none__">No Supplier (standalone entry)</SelectItem>
                       {factorySuppliers.map((s) => (
                         <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {adjSupplierId && (
+                  {adjSupplierId && adjSupplierId !== "__none__" && (
                     <p className="text-xs text-muted-foreground">A journal voucher (Dr Raw Material / Cr Supplier) will be created when cost &gt; 0.</p>
                   )}
                 </div>
-                {!adjSupplierId && (
+                {(!adjSupplierId || adjSupplierId === "__none__") && (
                   <div className="space-y-1">
                     <Label>Material Name <span className="text-muted-foreground text-xs">(required when no supplier)</span></Label>
                     <Input
@@ -2959,7 +2959,7 @@ export default function ProductionRawStock() {
                   toast({ title: "Error", description: "Please enter a valid kg amount.", variant: "destructive" });
                   return;
                 }
-                if (adjIsNewMaterial && !adjSupplierId && !adjMaterialLabel.trim()) {
+                if (adjIsNewMaterial && (!adjSupplierId || adjSupplierId === "__none__") && !adjMaterialLabel.trim()) {
                   toast({ title: "Error", description: "Please choose a supplier or enter a material name.", variant: "destructive" });
                   return;
                 }
@@ -2968,7 +2968,7 @@ export default function ProductionRawStock() {
                   return;
                 }
                 const resolvedSupplierId = adjIsNewMaterial
-                  ? (adjSupplierId ? parseInt(adjSupplierId) : null)
+                  ? (adjSupplierId && adjSupplierId !== "__none__" ? parseInt(adjSupplierId) : null)
                   : (adjustingRow?.supplierId ?? null);
                 createAdjustmentMutation.mutate({
                   type: adjType,
@@ -2976,10 +2976,10 @@ export default function ProductionRawStock() {
                   costPerKg: adjCostPerKg || "0",
                   currencyCode: adjCurrency,
                   supplierId: resolvedSupplierId,
-                  materialLabel: (!adjSupplierId && adjIsNewMaterial) ? adjMaterialLabel.trim() : undefined,
+                  materialLabel: ((!adjSupplierId || adjSupplierId === "__none__") && adjIsNewMaterial) ? adjMaterialLabel.trim() : undefined,
                   notes: adjNotes || undefined,
                   date: adjDate,
-                  createVoucher: adjIsNewMaterial && !!adjSupplierId && adjType === "ADD" && parseFloat(adjCostPerKg || "0") > 0,
+                  createVoucher: adjIsNewMaterial && !!adjSupplierId && adjSupplierId !== "__none__" && adjType === "ADD" && parseFloat(adjCostPerKg || "0") > 0,
                 });
               }}
               disabled={createAdjustmentMutation.isPending}
