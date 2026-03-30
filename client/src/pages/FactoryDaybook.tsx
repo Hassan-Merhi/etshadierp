@@ -1151,10 +1151,9 @@ export default function FactoryDaybook() {
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                         {hasNonUsdC && <TableHead className="text-right">FX Rate</TableHead>}
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1173,15 +1172,14 @@ export default function FactoryDaybook() {
                                 <div className="flex items-center gap-2">
                                   {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                                   <div>
-                                    <div className="font-medium text-sm">{formatDisplayDate(row.date + "T00:00:00")}</div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{formatDisplayDate(row.date + "T00:00:00")}</span>
+                                      <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
+                                    </div>
                                     <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.count} {row.count === 1 ? "entry" : "entries"}</div>
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="py-4">
-                                <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
-                              </TableCell>
-                              <TableCell className="py-4 text-muted-foreground text-sm" />
                               <TableCell className="py-4 text-right">
                                 <div className="font-mono font-semibold">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
                                 {row.currencyCode !== "USD" && (
@@ -1193,6 +1191,7 @@ export default function FactoryDaybook() {
                                   {row.currencyCode === "USD" ? "—" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
                                 </TableCell>
                               )}
+                              <TableCell />
                             </TableRow>
                             {isExpanded && expandedEntries.map((entry) => {
                               const isBaleTransfer = entry.txType === "BALE_TRANSFER";
@@ -1206,24 +1205,23 @@ export default function FactoryDaybook() {
                                   className={`bg-muted/30 ${isBaleTransfer ? "cursor-pointer" : ""}`}
                                   onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
                                 >
-                                  <TableCell className="pl-8 font-mono text-sm whitespace-nowrap">
-                                    {formatDisplayDate(entry.txDate + "T00:00:00")}
+                                  <TableCell className="pl-8 py-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant={ev} className={cn(ec, "whitespace-nowrap")}>{formatTxType(entry.txType)}</Badge>
+                                      <span className="text-sm text-muted-foreground truncate max-w-xs" title={formatDaybookDescription(entry)}>
+                                        {formatDaybookDescription(entry)}
+                                      </span>
+                                    </div>
                                   </TableCell>
-                                  <TableCell>
-                                    <Badge variant={ev} className={ec}>{formatTxType(entry.txType)}</Badge>
-                                  </TableCell>
-                                  <TableCell className="max-w-xs truncate" title={formatDaybookDescription(entry)}>
-                                    {formatDaybookDescription(entry)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono font-medium">
+                                  <TableCell className="py-2 text-right font-mono font-medium">
                                     {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
                                   </TableCell>
                                   {hasNonUsdC && (
-                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                    <TableCell className="py-2 text-right font-mono text-muted-foreground">
                                       {entry.currencyCode === "USD" ? "-" : entry.fxRateToUsd ? parseFloat(entry.fxRateToUsd).toFixed(4) : "-"}
                                     </TableCell>
                                   )}
-                                  <TableCell>
+                                  <TableCell className="py-2">
                                     <div className="flex gap-1">
                                       <Button size="icon" variant="ghost" title="View details"
                                         onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
