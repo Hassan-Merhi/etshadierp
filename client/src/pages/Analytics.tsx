@@ -815,13 +815,14 @@ export default function Analytics() {
   const totalExpenses = totalDirectExpense + totalIndirectExpense;
   const netProfit = totalIncome - totalExpenses;
 
-  const goToStatement = (accountId: number, customerId?: number) => {
+  const goToStatement = (accountId: number, customerId?: number, accountType?: string) => {
     if (customerId && appMode === "factory") {
       navigate(`/factory/customers/${customerId}`);
       return;
     }
     const basePath = appMode === "factory" ? "/factory" : "";
-    navigate(`${basePath}/ledger-monthly/${accountId}`);
+    const typeParam = accountType ? `&accountType=${encodeURIComponent(accountType.toLowerCase())}` : "";
+    navigate(`${basePath}/accounts?accountId=${accountId}${typeParam}`);
   };
 
   // Render hierarchical accounts (filters out zero-balance accounts)
@@ -849,7 +850,7 @@ export default function Analytics() {
               <TableRow 
                 data-testid={`row-account-${parent.id}`}
                 className={`hover-elevate cursor-pointer font-medium`}
-                onClick={() => hasChildren ? toggleAccount(parent.accountId) : goToStatement(parent.accountId, parent.customerId)}
+                onClick={() => hasChildren ? toggleAccount(parent.accountId) : goToStatement(parent.accountId, parent.customerId, parent.type)}
               >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
@@ -860,7 +861,7 @@ export default function Analytics() {
                     )}
                     <span
                       className="hover:underline"
-                      onClick={(e) => { e.stopPropagation(); goToStatement(parent.accountId, parent.customerId); }}
+                      onClick={(e) => { e.stopPropagation(); goToStatement(parent.accountId, parent.customerId, parent.type); }}
                     >{parent.name}</span>
                   </div>
                 </TableCell>
@@ -873,7 +874,7 @@ export default function Analytics() {
                   key={child.id}
                   data-testid={`row-account-${child.id}`}
                   className="hover-elevate cursor-pointer"
-                  onClick={() => goToStatement(child.accountId, child.customerId)}
+                  onClick={() => goToStatement(child.accountId, child.customerId, child.type)}
                 >
                   <TableCell className="pl-8 text-muted-foreground hover:underline">
                     {child.name}
@@ -925,7 +926,7 @@ export default function Analytics() {
               <TableRow
                 key={account.id}
                 className="hover-elevate cursor-pointer"
-                onClick={() => goToStatement(account.accountId, account.customerId)}
+                onClick={() => goToStatement(account.accountId, account.customerId, account.type)}
               >
                 <TableCell className="hover:underline">{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
