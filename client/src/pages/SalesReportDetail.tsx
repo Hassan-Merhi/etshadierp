@@ -282,7 +282,7 @@ export default function SalesReportDetail() {
                 onClick={() => setPlBasis("config")}
                 data-testid="button-basis-config"
               >
-                Config P/L
+                Hassan's P/L
               </Button>
               <Button
                 variant="ghost"
@@ -370,11 +370,13 @@ export default function SalesReportDetail() {
                       <TableHead>Item / Location</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Total Sales</TableHead>
+                      <TableHead className="text-right">Price / Bale</TableHead>
+                      <TableHead className="text-right">Hassan's Price</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
                       <TableHead className="text-right">Cost %</TableHead>
-                      <TableHead className="text-right">Config Profit</TableHead>
-                      <TableHead className="text-right">Config %</TableHead>
+                      <TableHead className="text-right">Hassan's Profit</TableHead>
+                      <TableHead className="text-right">Hassan's %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -423,6 +425,12 @@ export default function SalesReportDetail() {
                             </TableCell>
                             <TableCell className="text-right font-mono py-2">{formatNumber(group.totalQty)}</TableCell>
                             <TableCell className="text-right font-mono py-2">{formatAmount(group.totalSales)}</TableCell>
+                            <TableCell className="text-right font-mono py-2">
+                              {group.totalQty > 0 ? formatAmount(group.totalSales / group.totalQty) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono py-2">
+                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
+                            </TableCell>
                             <TableCell className="text-right font-mono py-2">{formatAmount(group.totalCost)}</TableCell>
                             <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>
                               {formatAmount(Math.abs(group.costProfit))}
@@ -483,6 +491,12 @@ export default function SalesReportDetail() {
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatNumber(loc.totalQty)}</TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalSales)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1.5">
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalSales / loc.totalQty) : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono py-1.5">
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
+                                  </TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalCost)}</TableCell>
                                   <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>
                                     {formatAmount(Math.abs(loc.costProfit))}
@@ -511,6 +525,8 @@ export default function SalesReportDetail() {
                                     </TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.actualSellingPrice)}</TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.totalCost)}</TableCell>
                                     <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
                                       {formatAmount(Math.abs(parseFloat(item.costProfit)))}
@@ -542,6 +558,8 @@ export default function SalesReportDetail() {
                       </TableCell>
                       <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(totalSales)}</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(totalCost)}</TableCell>
                       <TableCell className={`text-right font-mono ${profitColor(costProfit)}`}>
                         {formatAmount(Math.abs(costProfit))}
@@ -603,7 +621,7 @@ export default function SalesReportDetail() {
                               Cost P/L: {formatAmount(Math.abs(group.costProfit))}
                             </span>
                             <span className={`font-mono font-semibold ${profitColor(group.configuredProfit)}`}>
-                              Config P/L: {formatAmount(Math.abs(group.configuredProfit))}
+                              Hassan's P/L: {formatAmount(Math.abs(group.configuredProfit))}
                             </span>
                           </div>
                         </CardContent>
@@ -653,7 +671,7 @@ export default function SalesReportDetail() {
                                         Cost: {formatAmount(Math.abs(loc.costProfit))}
                                       </span>
                                       <span className={`font-mono ${profitColor(loc.configuredProfit)}`}>
-                                        Config: {formatAmount(Math.abs(loc.configuredProfit))}
+                                        Hassan's: {formatAmount(Math.abs(loc.configuredProfit))}
                                       </span>
                                     </div>
                                   </CardContent>
