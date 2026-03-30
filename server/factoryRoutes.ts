@@ -6415,7 +6415,17 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             _avgCostPerKg: costPerKgAdj,
             _avgCostPerKgUsd: costPerKgAdj,
             lastOffloaded: adj.createdAt,
+            _adjustmentIds: [adj.id],
           });
+        }
+
+        // Track adjustment IDs on existing MANUAL entries too
+        if (supplierMap.has(key)) {
+          const entry = supplierMap.get(key)!;
+          if (entry.sourceType === "MANUAL") {
+            entry._adjustmentIds = entry._adjustmentIds || [];
+            if (!entry._adjustmentIds.includes(adj.id)) entry._adjustmentIds.push(adj.id);
+          }
         }
       }
 
@@ -6458,6 +6468,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           valueRemaining: valueRemaining.toFixed(2),
           valueRemainingUsd: valueRemainingUsd.toFixed(2),
           lastOffloaded: s.lastOffloaded,
+          adjustmentIds: s._adjustmentIds || [],
         };
       });
 

@@ -1272,6 +1272,24 @@ export default function ProductionRawStock() {
                             Edit
                           </Button>
                         )}
+                        {row.sourceType === "MANUAL" && (row.adjustmentIds?.length ?? 0) > 0 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`button-delete-manual-${row.supplierId || idx}`}
+                            onClick={() => {
+                              const ids: number[] = row.adjustmentIds || [];
+                              if (ids.length === 1) {
+                                setConfirmDeleteAdjId(ids[0]);
+                              } else {
+                                toast({ title: "Multiple adjustments", description: "Open 'Show Manual Stock Adjustments History' below to delete individual adjustments.", variant: "default" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1 text-destructive" />
+                            Delete
+                          </Button>
+                        )}
                         {isOB && (
                           <Button
                             size="sm"
