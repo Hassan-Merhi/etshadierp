@@ -2430,7 +2430,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (c.otherChargesSupplierId !== sid) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
-          const ocCcy = (c as any).otherChargesCurrencyCode || c.currencyCode || "USD";
+          const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
           const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
           return sum + oc * fx;
         }, 0);
@@ -2581,7 +2581,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
-          const ocCcy = (c as any).otherChargesCurrencyCode || c.currencyCode || "USD";
+          const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
           const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
           return sum + oc * fx;
         }, 0);
@@ -2634,7 +2634,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           if ((c as any).otherChargesSupplierId !== s.id) continue;
           const oc = parseFloat((c as any).otherCharges || "0");
           if (oc <= 0) continue;
-          const cc = (c as any).otherChargesCurrencyCode || (c as any).currencyCode || "USD";
+          const cc = (c as any).otherChargesCurrencyCode || "USD";
           byCurrency[cc] = (byCurrency[cc] || 0) + oc;
         }
         const currencyBalances = Object.entries(byCurrency)
@@ -2869,11 +2869,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           sql`${factoryContainers.otherCharges}::numeric > 0`
         ));
       // Merge into supplierOffloadCharges list for unified processing below
-      // Use otherChargesCurrencyCode when set, otherwise fall back to container currency
+      // Use otherChargesCurrencyCode when set, otherwise default to USD
       const allSupplierCharges = [...supplierOffloadCharges as any[], ...(containerColCharges as any[]).map((c: any) => ({
         ...c,
         amount: c.amount,
-        currencyCode: c.otherChargesCurrencyCode || c.containerCurrencyCode || "USD",
+        currencyCode: c.otherChargesCurrencyCode || "USD",
       }))];
 
       const statement = containers.map((c: any) => {
@@ -3767,7 +3767,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       : [];
 
     for (const c of containerColOtherCharges as any[]) {
-      const cc = c.otherChargesCurrencyCode || c.containerCurrencyCode || "USD";
+      const cc = c.otherChargesCurrencyCode || "USD";
       const amt = parseFloat(c.otherCharges || "0");
       const chargeSupplierName = supplierNameMap[c.otherChargesSupplierId] || "Unknown";
       const containerSupplierName = supplierNameMap[c.supplierId] || "Unknown";
