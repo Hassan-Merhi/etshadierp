@@ -18350,7 +18350,8 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
   app.post("/api/factory/pos/sale", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const userId = (req.session as any).userId;
+      const rawUserId = (req.session as any).userId;
+      const userId: number | null = rawUserId && !isNaN(Number(rawUserId)) ? Number(rawUserId) : null;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { locationId, customerName, notes, txDate, currencyCode, cashAccountId, items, expenses } = req.body;
