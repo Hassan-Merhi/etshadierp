@@ -11773,16 +11773,49 @@ if (asOfDate) {
             continue;
           }
           
+          // Normalise any date string to YYYY-MM-DD; return null for invalid values
+          const normDate = (v: any): string | null => {
+            if (!v) return null;
+            if (v instanceof Date) {
+              if (isNaN(v.getTime())) return null;
+              const y = v.getFullYear();
+              const m = String(v.getMonth() + 1).padStart(2, "0");
+              const d = String(v.getDate()).padStart(2, "0");
+              return `${y}-${m}-${d}`;
+            }
+            const s = String(v).trim();
+            if (!s || s === "[object Object]") return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            // MM/DD/YY or MM/DD/YYYY
+            const sl = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+            if (sl) {
+              const [, mo, dy, yr] = sl;
+              const fullYr = yr.length === 2 ? (parseInt(yr) >= 50 ? `19${yr}` : `20${yr}`) : yr;
+              return `${fullYr}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}`;
+            }
+            const parsed = new Date(s);
+            if (!isNaN(parsed.getTime())) {
+              const y = parsed.getFullYear();
+              const m = String(parsed.getMonth() + 1).padStart(2, "0");
+              const d = String(parsed.getDate()).padStart(2, "0");
+              return `${y}-${m}-${d}`;
+            }
+            return null;
+          };
+
           // Build update object
           const updateData: any = {};
           if (data.shopName) updateData.shopName = data.shopName;
-          if (data.eta) updateData.eta = data.eta;
+          const etaDate = normDate(data.eta);
+          if (etaDate) updateData.eta = etaDate;
           if (data.transporter) updateData.transporter = data.transporter;
           if (data.transportFee) updateData.transportFee = data.transportFee;
           if (data.numberPlate) updateData.numberPlate = data.numberPlate;
           if (data.trackingLocation) updateData.trackingLocation = data.trackingLocation;
-          if (data.borderDate) updateData.borderDate = data.borderDate;
-          if (data.offloadDate) updateData.offloadDate = data.offloadDate;
+          const borderDateVal = normDate(data.borderDate);
+          if (borderDateVal) updateData.borderDate = borderDateVal;
+          const offloadDateVal = normDate(data.offloadDate);
+          if (offloadDateVal) updateData.offloadDate = offloadDateVal;
           if (data.agent) updateData.agent = data.agent;
           if (data.dutyFee) updateData.dutyFee = data.dutyFee;
           if (data.docReceived !== undefined) {
