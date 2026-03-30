@@ -6220,21 +6220,28 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         let supplierName: string;
         let supplierId: number | null = null;
         if (adj.supplierId) {
-          // Find supplier name from existing map entries or fetch inline
-          const existingEntry = Array.from(supplierMap.entries()).find(([, v]) => v.supplierId === adj.supplierId);
-          if (existingEntry) {
-            key = existingEntry[0];
-            supplierName = existingEntry[1].supplierName;
-            supplierId = adj.supplierId;
+          supplierId = adj.supplierId;
+          const allEntries = Array.from(supplierMap.entries()).filter(([, v]) => v.supplierId === adj.supplierId);
+          // Prefer merging into an existing non-OB row (container stock).
+          // If the only row is OPENING_BALANCE, keep adjustments as a separate MANUAL row
+          // so manual additions are never silently absorbed into the opening balance.
+          const nonOBEntry = allEntries.find(([, v]) => v.sourceType !== "OPENING_BALANCE");
+          if (nonOBEntry) {
+            key = nonOBEntry[0];
+            supplierName = nonOBEntry[1].supplierName;
           } else {
-            // Supplier exists in adjustments but no container raw stock yet - create new row
-            const [sup] = await db.select({ name: factorySuppliers.name })
-              .from(factorySuppliers)
-              .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
-              .limit(1);
-            supplierName = sup?.name || `Supplier #${adj.supplierId}`;
+            // No non-OB entry: create (or reuse) a dedicated MANUAL row for this supplier
+            const anyEntry = allEntries[0];
+            if (anyEntry) {
+              supplierName = anyEntry[1].supplierName;
+            } else {
+              const [sup] = await db.select({ name: factorySuppliers.name })
+                .from(factorySuppliers)
+                .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
+                .limit(1);
+              supplierName = sup?.name || `Supplier #${adj.supplierId}`;
+            }
             key = `${supplierName}__ADJ_${adj.supplierId}`;
-            supplierId = adj.supplierId;
           }
         } else {
           // Standalone manual material (no supplier)
@@ -6250,7 +6257,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             existing._totalReceived += kg;
             existing._avgCostPerKg = existing._totalReceived > 0
               ? (prevCost + newCost) / existing._totalReceived : 0;
-            existing._avgCostPerKgUsd = existing._avgCostPerKg; // use same for manual
+            existing._avgCostPerKgUsd = existing._avgCostPerKg;
           } else {
             existing._totalUsed += kg;
           }
@@ -6288,12 +6295,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
       }
 
+      // Build aggregated rows (reservedKg / freeKg will be fixed below for multi-row suppliers)
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
         const valueRemaining = remainingKg * s._avgCostPerKg;
         const valueRemainingUsd = remainingKg * s._avgCostPerKgUsd;
-        const reservedKg = s.supplierId ? (reservedBySupplierId.get(s.supplierId) || 0) : 0;
-        const freeKg = Math.max(0, remainingKg - reservedKg);
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
@@ -6302,8 +6308,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           receivedKg: s._totalReceived.toFixed(3),
           usedKg: s._totalUsed.toFixed(3),
           remainingKg: remainingKg.toFixed(3),
-          reservedKg: reservedKg.toFixed(3),
-          freeKg: freeKg.toFixed(3),
+          reservedKg: "0.000",
+          freeKg: "0.000",
           costPerKg: s._avgCostPerKg.toFixed(4),
           costPerKgUsd: s._avgCostPerKgUsd.toFixed(4),
           valueRemaining: valueRemaining.toFixed(2),
@@ -6311,6 +6317,34 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           lastOffloaded: s.lastOffloaded,
         };
       });
+
+      // Distribute reserved kg across rows for the same supplier proportionally.
+      // A supplier may have multiple rows (e.g. OPENING_BALANCE + MANUAL) — the total
+      // reserved amount is shared across those rows so free kg remains correct.
+      const rowsBySupplierId = new Map<number, typeof aggregated>();
+      for (const row of aggregated) {
+        if (row.supplierId) {
+          if (!rowsBySupplierId.has(row.supplierId)) rowsBySupplierId.set(row.supplierId, []);
+          rowsBySupplierId.get(row.supplierId)!.push(row);
+        }
+      }
+      for (const [suppId, rows] of rowsBySupplierId) {
+        const reserved = reservedBySupplierId.get(suppId) || 0;
+        const totalRemaining = rows.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0);
+        const totalFree = Math.max(0, totalRemaining - reserved);
+        if (rows.length === 1) {
+          rows[0].reservedKg = reserved.toFixed(3);
+          rows[0].freeKg = totalFree.toFixed(3);
+        } else {
+          // Proportional distribution across multiple rows
+          for (const row of rows) {
+            const rem = parseFloat(row.remainingKg);
+            const proportion = totalRemaining > 0 ? rem / totalRemaining : 0;
+            row.reservedKg = (reserved * proportion).toFixed(3);
+            row.freeKg = (totalFree * proportion).toFixed(3);
+          }
+        }
+      }
 
       res.json(aggregated);
     } catch (error: any) {
