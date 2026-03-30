@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -979,7 +979,7 @@ export default function FactoryDaybook() {
             <div className="space-y-2">
               <Label>Type</Label>
               <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
-                <SelectTrigger className="w-48" data-testid="select-tx-type">
+                <SelectTrigger className="w-40" data-testid="select-tx-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1008,7 +1008,7 @@ export default function FactoryDaybook() {
             <div className="space-y-2">
               <Label>Currency</Label>
               <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-                <SelectTrigger className="w-32" data-testid="select-currency-filter">
+                <SelectTrigger className="w-28" data-testid="select-currency-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1024,7 +1024,7 @@ export default function FactoryDaybook() {
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-36" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1050,7 +1050,7 @@ export default function FactoryDaybook() {
                 data-testid="input-max-amount" className="w-[110px]"
               />
             </div>
-            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
+            <div className="space-y-2 flex-1 min-w-[180px]">
               <Label>Search</Label>
               <Input
                 placeholder="Description or type..."
@@ -1095,17 +1095,6 @@ export default function FactoryDaybook() {
               <div className="flex items-center border rounded-md overflow-hidden">
                 <Button
                   variant="ghost" size="sm"
-                  onClick={() => setIsDetailed(false)}
-                  data-testid="button-view-condensed"
-                  className={cn("rounded-none h-8 px-3 gap-1", !isDetailed && "bg-muted")}
-                  title="Condensed view"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Condensed</span>
-                </Button>
-                <div className="w-px bg-border h-6" />
-                <Button
-                  variant="ghost" size="sm"
                   onClick={() => setIsDetailed(true)}
                   data-testid="button-view-detailed"
                   className={cn("rounded-none h-8 px-3 gap-1", isDetailed && "bg-muted")}
@@ -1114,9 +1103,21 @@ export default function FactoryDaybook() {
                   <LayoutList className="w-4 h-4" />
                   <span className="hidden sm:inline text-xs">Detailed</span>
                 </Button>
+                <div className="w-px bg-border h-6" />
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => setIsDetailed(false)}
+                  data-testid="button-view-condensed"
+                  className={cn("rounded-none h-8 px-3 gap-1", !isDetailed && "bg-muted")}
+                  title="Condensed view"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Condensed</span>
+                </Button>
               </div>
             </div>
           </div>
+          <CardDescription>All factory transactions in one view</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
