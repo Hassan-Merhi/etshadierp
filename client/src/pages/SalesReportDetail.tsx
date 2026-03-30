@@ -403,9 +403,6 @@ export default function SalesReportDetail() {
                             <TableCell className="py-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{group.stockItemName}</span>
-                                {group.stockItemCode && (
-                                  <span className="text-xs text-muted-foreground font-normal">{group.stockItemCode}</span>
-                                )}
                                 {multipleLocations && group.locationBreakdown.length > 1 ? (
                                   <div className="flex items-center gap-1">
                                     {group.locationBreakdown.map((loc) => {
