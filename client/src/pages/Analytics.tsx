@@ -821,7 +821,7 @@ export default function Analytics() {
   };
 
   // Render hierarchical accounts (filters out zero-balance accounts)
-  const renderHierarchicalAccounts = (accountList: Account[], showSide: boolean = false) => {
+  const renderHierarchicalAccounts = (accountList: Account[]) => {
     const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
 
     return (
@@ -860,14 +860,9 @@ export default function Analytics() {
                     >{parent.name}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono font-medium">
+                <TableCell className={`text-right font-mono font-medium ${drCrClass(parent.balanceSide || "Dr")}`}>
                   {formatSmartCurrency(displayBalance)}
                 </TableCell>
-                {showSide && (
-                  <TableCell className={`text-right text-sm font-semibold ${drCrClass(parent.balanceSide || "Dr")}`}>
-                    {parent.balanceSide || "Dr"}
-                  </TableCell>
-                )}
               </TableRow>
               {hasChildren && isExpanded && nonZeroChildren.map((child) => (
                 <TableRow
@@ -879,14 +874,9 @@ export default function Analytics() {
                   <TableCell className="pl-8 text-muted-foreground hover:underline">
                     {child.name}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className={`text-right font-mono ${drCrClass(child.balanceSide || "Dr")}`}>
                     {formatSmartCurrency(parseBalance(child.balance))}
                   </TableCell>
-                  {showSide && (
-                    <TableCell className={`text-right text-sm font-semibold ${drCrClass(child.balanceSide || "Dr")}`}>
-                      {child.balanceSide || "Dr"}
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </Fragment>
@@ -1142,11 +1132,10 @@ export default function Analytics() {
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
-                        <TableHead className="text-right">Side</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {renderHierarchicalAccounts(cashAccounts, true)}
+                      {renderHierarchicalAccounts(cashAccounts)}
                     </TableBody>
                   </Table>
                 </div>
@@ -1187,11 +1176,10 @@ export default function Analytics() {
                       <TableRow>
                         <TableHead>Account Name</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
-                        <TableHead className="text-right">Side</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {renderHierarchicalAccounts(loansBanksAccounts, true)}
+                      {renderHierarchicalAccounts(loansBanksAccounts)}
                     </TableBody>
                   </Table>
                 </div>
