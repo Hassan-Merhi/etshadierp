@@ -2770,7 +2770,21 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
         }, 0);
         const approxFxRate = fxWeightBase > 0 ? fxWeightedSum / fxWeightBase : 0;
 
-        return { totalContainers, totalKg, containerValue, commissionValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers, approxFxRate };
+        // Cross-currency freight that auto-flows into the broker pool for linked suppliers.
+        // e.g. USD freight on an AUD container for a supplier whose parent is a broker.
+        // This amount is "auto-settled" from the supplier's perspective — the broker absorbs it.
+        const autoSettledFreightUsd = (s.parentId !== null && s.parentId !== undefined)
+          ? supplierContainers.reduce((sum: number, c: any) => {
+              const freightCc = c.freightCurrencyCode || c.currencyCode || "USD";
+              const containerCc = c.currencyCode || "USD";
+              if (freightCc === "USD" && containerCc !== "USD") {
+                return sum + parseFloat(c.freight || "0");
+              }
+              return sum;
+            }, 0)
+          : 0;
+
+        return { totalContainers, totalKg, containerValue, commissionValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers, approxFxRate, autoSettledFreightUsd };
       };
 
       // First pass: compute each supplier's own stats
@@ -2800,6 +2814,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
             currencyBalances: own.currencyBalances,
             dueContainers: own.dueContainers,
             dueContainersCount: own.dueContainers.length,
+            autoSettledFreightUsd: own.autoSettledFreightUsd.toFixed(2),
           };
         }
 
@@ -2822,14 +2837,22 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           supplierId: c.id,
           supplierName: c.name,
           currencyBalances: childStats[i].currencyBalances,
+          autoSettledFreightUsd: childStats[i].autoSettledFreightUsd.toFixed(2),
         }));
 
-        // Aggregate exposure totals for summary display (informational only)
+        // Aggregate exposure totals for summary display (informational only).
+        // Auto-settled cross-currency freight (e.g. USD freight on AUD containers) flows into
+        // the broker's own USD pool automatically — exclude it from the linked exposure aggregate
+        // so it doesn't appear as an unresolved obligation.
         const exposureCurrencyMap: Record<string, number> = {};
         for (const cs of childStats) {
+          const autoFreight = cs.autoSettledFreightUsd || 0;
           for (const cb of cs.currencyBalances) {
-            if (cb.balance > 0) {
-              exposureCurrencyMap[cb.currencyCode] = (exposureCurrencyMap[cb.currencyCode] || 0) + cb.balance;
+            // For USD balances on a linked supplier, subtract auto-settled freight so the broker
+            // card doesn't show it as an open exposure (it's already in the broker pool).
+            const effectiveBal = cb.currencyCode === "USD" ? cb.balance - autoFreight : cb.balance;
+            if (effectiveBal > 0) {
+              exposureCurrencyMap[cb.currencyCode] = (exposureCurrencyMap[cb.currencyCode] || 0) + effectiveBal;
             }
           }
         }
