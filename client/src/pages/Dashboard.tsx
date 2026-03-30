@@ -177,9 +177,7 @@ export default function Dashboard() {
   } = useQuery<ProfitData>({
     queryKey: ["/api/stats/net-profit", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/stats/net-profit", {
-        credentials: "include",
-      });
+      const response = await modeApiRequest("GET", "/api/stats/net-profit");
       if (!response.ok) throw new Error("Failed to fetch net profit");
       return await response.json();
     },
@@ -201,7 +199,7 @@ export default function Dashboard() {
   const { data: factoryKPIs } = useQuery<FactoryDashboardKPIs>({
     queryKey: ["/api/factory/dashboard-kpis", selectedCompany?.id],
     queryFn: async () => {
-      const res = await fetch("/api/factory/dashboard-kpis", { credentials: "include" });
+      const res = await modeApiRequest("GET", "/api/factory/dashboard-kpis");
       if (!res.ok) throw new Error("Failed to fetch factory KPIs");
       return res.json();
     },
@@ -227,9 +225,7 @@ export default function Dashboard() {
   const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/accounts/all", {
-        credentials: "include",
-      });
+      const response = await modeApiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
       const allAccounts = await response.json();
       // Filter to show only payable/liability type accounts

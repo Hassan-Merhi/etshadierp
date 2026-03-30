@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
 import { Clock, Package, Play } from "lucide-react";
 
@@ -20,17 +19,10 @@ interface PendingLoad {
 }
 
 export default function PendingLoadings() {
-  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
-    queryKey: ["/api/factory/customer-orders", "LOADING"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/customer-orders?status=LOADING", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch pending loads");
-      return res.json();
-    },
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customer-orders?status=LOADING"],
     refetchInterval: 30000,
   });
 

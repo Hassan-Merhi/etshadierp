@@ -57,7 +57,7 @@ export default function FactoryInvoices() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
-  const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
+  const { data: customers = [], isLoading: customersLoading, isError: customersError } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
 
@@ -66,7 +66,7 @@ export default function FactoryInvoices() {
   if (statusFilter !== "all") queryParams.set("status", statusFilter);
   const queryString = queryParams.toString();
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery<CustomerOrder[]>({
+  const { data: orders = [], isLoading: ordersLoading, isError: ordersError } = useQuery<CustomerOrder[]>({
     queryKey: [`/api/factory/customer-orders?${queryString}`, statusFilter, customerFilter],
   });
 
@@ -174,6 +174,12 @@ export default function FactoryInvoices() {
           </Select>
         </div>
       </div>
+
+      {(customersError || ordersError) && (
+        <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-testid="error-invoices-load">
+          Failed to load data. Please check your connection or try refreshing the page.
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">

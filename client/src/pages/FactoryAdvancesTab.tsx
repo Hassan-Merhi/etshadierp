@@ -131,19 +131,11 @@ function AdvancesView() {
   });
 
   const { data: workers } = useQuery<FactoryWorker[]>({
-    queryKey: ["/api/factory/workers"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/workers?active=true", { credentials: "include" });
-      return res.json();
-    },
+    queryKey: ["/api/factory/workers?active=true"],
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
-      return res.json();
-    },
   });
 
   const { data: unvouchered, isLoading: unvoucheredLoading, refetch: refetchUnvouchered } = useQuery<AdvanceRecord[]>({

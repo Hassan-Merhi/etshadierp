@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useCompany } from "@/contexts/CompanyContext";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
@@ -41,7 +40,6 @@ interface CustomerOrder {
 }
 
 export default function FactoryPendingInvoices() {
-  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
@@ -50,23 +48,11 @@ export default function FactoryPendingInvoices() {
   const { toast } = useToast();
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
-    queryKey: ["/api/factory/customer-orders", "pending-verification"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/customer-orders?status=PENDING_VERIFICATION", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch pending orders");
-      return res.json();
-    },
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION"],
   });
 
   const { data: verifiedOrders = [], isLoading: verifiedLoading } = useQuery<CustomerOrder[]>({
-    queryKey: ["/api/factory/customer-orders", "verified"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/customer-orders?status=VERIFIED", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch verified orders");
-      return res.json();
-    },
-    enabled: !!selectedCompany?.id,
+    queryKey: ["/api/factory/customer-orders?status=VERIFIED"],
   });
 
   const deleteMutation = useMutation({

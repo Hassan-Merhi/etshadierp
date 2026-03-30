@@ -404,7 +404,7 @@ function AuthenticatedApp() {
   });
   const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
 
-  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean }>({
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string }>({
     queryKey: ["/api/factory/my-access"],
     enabled: !!user && !isPOS,
     staleTime: 30000,
@@ -611,6 +611,9 @@ function AuthenticatedApp() {
                   <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-orange-600/10 border border-orange-600/20">
                     <Factory className="h-4 w-4 text-orange-600" />
                     <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Factory Mode</span>
+                    {myAccess?.companyName && (
+                      <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">{myAccess.companyName}</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">

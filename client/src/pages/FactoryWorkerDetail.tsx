@@ -96,10 +96,6 @@ interface AdvanceRowProps {
 function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDate, fmt }: AdvanceRowProps) {
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
-      return res.json();
-    },
     enabled: isLoan && isExpanded,
   });
 
@@ -317,10 +313,6 @@ export default function FactoryWorkerDetail() {
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
-    queryFn: async () => {
-      const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
-      return res.json();
-    },
   });
 
   const createAdvanceMutation = useMutation({

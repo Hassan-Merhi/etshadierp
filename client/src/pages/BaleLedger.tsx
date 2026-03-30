@@ -332,11 +332,6 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
 export default function BaleLedger() {
   const { data, isLoading, refetch, isFetching } = useQuery<LedgerData>({
     queryKey: ["/api/factory/bale-ledger"],
-    queryFn: async () => {
-      const r = await fetch("/api/factory/bale-ledger", { credentials: "include" });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json();
-    },
     staleTime: 30_000,
   });
 

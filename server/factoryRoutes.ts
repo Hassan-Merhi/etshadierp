@@ -15825,17 +15825,65 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const userId = (req.session as any).userId;
+      const currentCompanyId = (req.session as any).currentCompanyId;
+      const pinnedFactoryId = (req.session as any).factoryCompanyId;
+
+      // Resolve the factory company ID:
+      // Priority 1: already-pinned factoryCompanyId — but only if it points to a factory-type company
+      // Priority 2: currentCompanyId if it is factory type
+      // Priority 3: first active factory-type company in the DB
+      // Priority 4: fall back to currentCompanyId (legacy / single-company setups)
+      let companyId: number | null = null;
+      let companyName: string = "";
+
+      if (pinnedFactoryId) {
+        const [pinned] = await db.select({ id: companies.id, name: companies.name, companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, pinnedFactoryId));
+        if (pinned?.companyType === "factory") {
+          companyId = pinned.id;
+          companyName = pinned.name;
+        }
+      }
+
+      if (!companyId && currentCompanyId) {
+        const [current] = await db.select({ id: companies.id, name: companies.name, companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, currentCompanyId));
+        if (current?.companyType === "factory") {
+          companyId = current.id;
+          companyName = current.name;
+        }
+      }
+
+      if (!companyId) {
+        const [factoryComp] = await db.select({ id: companies.id, name: companies.name })
+          .from(companies)
+          .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
+          .limit(1);
+        if (factoryComp) {
+          companyId = factoryComp.id;
+          companyName = factoryComp.name;
+        }
+      }
+
+      if (!companyId) {
+        // Last resort: use currentCompanyId (single-company or legacy setups)
+        companyId = currentCompanyId;
+        if (currentCompanyId) {
+          const [c] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, currentCompanyId));
+          companyName = c?.name ?? "";
+        }
+      }
+
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
 
-      // Pin the factory company ID to the session so cross-tab ERP company switches
-      // don't corrupt factory API calls made after the ERP tab changes company.
+      // Pin the resolved factory company ID to the session so cross-tab ERP company
+      // switches don't corrupt factory API calls made from other tabs.
       (req.session as any).factoryCompanyId = companyId;
 
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner") {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [] });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [], companyId, companyName });
       }
 
       const [profile] = await db.select({
@@ -15855,7 +15903,7 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
       if (access.length === 0) {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields });
+        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields, companyId, companyName });
       }
 
       res.json({
@@ -15864,6 +15912,8 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
         hasErpAccess,
         hasFactoryAccess,
         hiddenCostFields,
+        companyId,
+        companyName,
       });
     } catch (error: any) {
       console.error("Error fetching my access:", error);
