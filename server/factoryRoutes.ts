@@ -11778,35 +11778,49 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const allCustomers = await db.select().from(customers)
         .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`));
 
-      const customersWithBalances = await Promise.all(
-        allCustomers.map(async (customer) => {
-          // Compute balance from actual FINALIZED invoice grand totals (not stale customerBalances.debitAmount)
-          // plus any non-invoice ledger adjustments (payments, credit notes, etc.)
-          const [salesRow] = await db.select({ total: sql<string>`COALESCE(SUM(CAST(grand_total AS numeric)), 0)` })
-            .from(customerOrders)
-            .where(and(
-              eq(customerOrders.customerId, customer.id),
-              eq(customerOrders.companyId, companyId),
-              eq(customerOrders.status, "FINALIZED"),
-            ));
-          const salesTotal = parseFloat(salesRow?.total || "0");
+      if (allCustomers.length === 0) {
+        return res.json([]);
+      }
 
-          // Non-invoice entries: payments received, manual adjustments, opening balance entries
-          const [nonInvRow] = await db.select({ net: sql<string>`COALESCE(SUM(CAST(debit_amount AS numeric) - CAST(credit_amount AS numeric)), 0)` })
-            .from(customerBalances)
-            .where(and(
-              eq(customerBalances.customerId, customer.id),
-              eq(customerBalances.companyId, companyId),
-              sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
-            ));
-          const nonInvNet = parseFloat(nonInvRow?.net || "0");
+      const customerIds = allCustomers.map((c) => c.id);
 
-          const openingBalance = parseFloat(customer.openingBalance || "0");
-          const openingSide = customer.openingBalanceSide || "Dr";
-          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet;
-          return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
-        })
-      );
+      // Fetch all sales totals in one query
+      const salesRows = await db.select({
+        customerId: customerOrders.customerId,
+        total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
+      })
+        .from(customerOrders)
+        .where(and(
+          inArray(customerOrders.customerId, customerIds),
+          eq(customerOrders.companyId, companyId),
+          eq(customerOrders.status, "FINALIZED"),
+        ))
+        .groupBy(customerOrders.customerId);
+
+      // Fetch all non-invoice balance adjustments in one query
+      const nonInvRows = await db.select({
+        customerId: customerBalances.customerId,
+        net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+      })
+        .from(customerBalances)
+        .where(and(
+          inArray(customerBalances.customerId, customerIds),
+          eq(customerBalances.companyId, companyId),
+          sql`${customerBalances.referenceType} IS DISTINCT FROM 'INVOICE'`,
+        ))
+        .groupBy(customerBalances.customerId);
+
+      const salesMap = new Map(salesRows.map((r) => [r.customerId, parseFloat(r.total || "0")]));
+      const nonInvMap = new Map(nonInvRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
+
+      const customersWithBalances = allCustomers.map((customer) => {
+        const salesTotal = salesMap.get(customer.id) ?? 0;
+        const nonInvNet = nonInvMap.get(customer.id) ?? 0;
+        const openingBalance = parseFloat(customer.openingBalance || "0");
+        const openingSide = customer.openingBalanceSide || "Dr";
+        const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + salesTotal + nonInvNet;
+        return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
+      });
 
       res.json(customersWithBalances);
     } catch (error: any) {

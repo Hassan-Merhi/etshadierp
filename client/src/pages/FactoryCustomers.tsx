@@ -41,7 +41,7 @@ export default function FactoryCustomers() {
     openingBalanceSide: "Dr",
   });
 
-  const { data: customers = [], isLoading } = useQuery<Customer[]>({
+  const { data: customers = [], isLoading, isError, error } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
 
@@ -146,6 +146,17 @@ export default function FactoryCustomers() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col h-full p-6 gap-4">
+        <h1 className="text-2xl font-bold">Customers</h1>
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          Failed to load customers: {(error as any)?.message || "Unknown error"}
+        </div>
       </div>
     );
   }
