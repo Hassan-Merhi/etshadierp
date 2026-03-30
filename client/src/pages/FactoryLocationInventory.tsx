@@ -154,6 +154,13 @@ export default function FactoryLocationInventory() {
   const [editProformaLines, setEditProformaLines] = useState<Array<{ articleCode: string; quantity: number; pricePerBale: string }>>([]);
   const [editModeInitialized, setEditModeInitialized] = useState(false);
 
+  // Overload warning dialog state
+  const [overloadWarning, setOverloadWarning] = useState<{
+    open: boolean;
+    items: Array<{ articleCode: string; productName: string; requested: number; available: number }>;
+    pendingFn: (() => void) | null;
+  }>({ open: false, items: [], pendingFn: null });
+
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -522,7 +529,7 @@ export default function FactoryLocationInventory() {
       const existing = next.get(productId);
       if (existing) {
         const parsed = parseInt(qty);
-        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, Math.min(parsed, existing.availableBales)) });
+        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, parsed) });
       }
       return next;
     });
@@ -556,7 +563,7 @@ export default function FactoryLocationInventory() {
       const existing = next.get(productId);
       if (existing) {
         const parsed = parseInt(qty);
-        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, Math.min(parsed, existing.availableBales)) });
+        next.set(productId, { ...existing, selectedQty: isNaN(parsed) ? 0 : Math.max(0, parsed) });
       }
       return next;
     });
@@ -578,24 +585,26 @@ export default function FactoryLocationInventory() {
     return sum + item.selectedQty * weightPerBale;
   }, 0);
 
+  const getOverloadedItems = () =>
+    selectedItems
+      .filter((i) => i.selectedQty > i.availableBales)
+      .map((i) => ({ articleCode: i.articleCode, productName: i.productName, requested: i.selectedQty, available: i.availableBales }));
+
   const handleFinalize = () => {
     if (selectedItems.length === 0) {
       toast({ title: "No items selected", description: "Select at least one item with quantity > 0", variant: "destructive" });
+      return;
+    }
+    const overloaded = getOverloadedItems();
+    if (overloaded.length > 0) {
+      setOverloadWarning({ open: true, items: overloaded, pendingFn: () => { setSavedProformaId(null); setFinalizeOpen(true); } });
       return;
     }
     setSavedProformaId(null);
     setFinalizeOpen(true);
   };
 
-  const handleSaveProforma = () => {
-    if (!selectedCustomerId) {
-      toast({ title: "Select a customer", variant: "destructive" });
-      return;
-    }
-    if (!proformaName.trim()) {
-      toast({ title: "Enter a proforma name", variant: "destructive" });
-      return;
-    }
+  const doSaveProforma = () => {
     const lines = selectedItems.map((item) => ({
       articleCode: item.articleCode,
       productName: item.productName,
@@ -612,6 +621,23 @@ export default function FactoryLocationInventory() {
         lines,
       });
     }
+  };
+
+  const handleSaveProforma = () => {
+    if (!selectedCustomerId) {
+      toast({ title: "Select a customer", variant: "destructive" });
+      return;
+    }
+    if (!proformaName.trim()) {
+      toast({ title: "Enter a proforma name", variant: "destructive" });
+      return;
+    }
+    const overloaded = getOverloadedItems();
+    if (overloaded.length > 0) {
+      setOverloadWarning({ open: true, items: overloaded, pendingFn: doSaveProforma });
+      return;
+    }
+    doSaveProforma();
   };
 
   const handleExportExcel = () => {
@@ -765,7 +791,6 @@ export default function FactoryLocationInventory() {
                               onChange={(e) => updateFinalizeQty(item.productId, e.target.value)}
                               className="w-[80px] text-right ml-auto"
                               min={1}
-                              max={item.availableBales}
                               data-testid={`input-finalize-qty-${item.productId}`}
                             />
                           </TableCell>
@@ -1542,7 +1567,6 @@ export default function FactoryLocationInventory() {
                           onChange={(e) => updateSelectionQty(prod.productId, e.target.value)}
                           className="w-20 text-right"
                           min={1}
-                          max={prod.baleCount}
                           data-testid={`input-qty-mobile-${prod.productId}`}
                         />
                         <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
@@ -1624,7 +1648,7 @@ export default function FactoryLocationInventory() {
                         {proformaMode && isSelected && selection && (
                           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-muted-foreground">Qty:</span>
-                            <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} max={prod.baleCount} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
+                            <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-20 text-right" min={1} data-testid={`input-qty-mobile-sp-${prod.productId}`} />
                             <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
                             <span className="text-xs text-muted-foreground ml-2">Price:</span>
                             <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile-sp-${prod.productId}`} />
@@ -1716,7 +1740,7 @@ export default function FactoryLocationInventory() {
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (
-                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} max={prod.baleCount} data-testid={`input-qty-${prod.productId}`} />
+                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} data-testid={`input-qty-${prod.productId}`} />
                               ) : (<span className="text-muted-foreground">-</span>)}
                             </td>
                           )}
@@ -1833,7 +1857,7 @@ export default function FactoryLocationInventory() {
                           {proformaMode && (
                             <td className="text-right px-3">
                               {isSelected && selection ? (
-                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} max={prod.baleCount} data-testid={`input-qty-sp-${prod.productId}`} />
+                                <Input type="number" value={selection.selectedQty} onChange={(e) => updateSelectionQty(prod.productId, e.target.value)} className="w-[70px] text-right ml-auto" min={1} data-testid={`input-qty-sp-${prod.productId}`} />
                               ) : (<span className="text-muted-foreground">-</span>)}
                             </td>
                           )}
@@ -1925,6 +1949,62 @@ export default function FactoryLocationInventory() {
       )}
 
       {renderFinalizeDialog()}
+
+      <Dialog
+        open={overloadWarning.open}
+        onOpenChange={(open) => { if (!open) setOverloadWarning({ open: false, items: [], pendingFn: null }); }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle data-testid="text-overload-warning-title">Stock Overload Warning</DialogTitle>
+            <DialogDescription>
+              The following items exceed available stock. You can still proceed, but the proforma will contain more bales than currently in stock.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[300px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Requested</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {overloadWarning.items.map((item) => (
+                  <TableRow key={item.articleCode} data-testid={`row-overload-${item.articleCode}`}>
+                    <TableCell className="font-mono text-xs">{item.articleCode}</TableCell>
+                    <TableCell className="text-sm">{item.productName}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold text-destructive">{item.requested}</TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">{item.available}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setOverloadWarning({ open: false, items: [], pendingFn: null })}
+              data-testid="button-overload-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const fn = overloadWarning.pendingFn;
+                setOverloadWarning({ open: false, items: [], pendingFn: null });
+                fn?.();
+              }}
+              data-testid="button-overload-proceed"
+            >
+              Proceed Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!open) { setDeleteDialogOpen(false); setDeleteProduct(null); setDeleteSupervisorUser(""); setDeleteSupervisorPass(""); setDeleteReason(""); } }}>
         <DialogContent>
