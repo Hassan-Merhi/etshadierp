@@ -210,6 +210,7 @@ const VOUCHER_TX_TYPES: Record<string, string> = {
   JOURNAL: "journal",
   INVOICE: "receipt",
   FREIGHT_PAYMENT: "payment",
+  BALE_SALE: "factory_pos",
 };
 
 // ─── Factory Daybook sessionStorage persistence ───────────────────────────────
@@ -857,6 +858,10 @@ export default function FactoryDaybook() {
     if (entry.txType === "BALE_STOCK_ENTRY") return;
     if (entry.txType === "INVOICE" && entry.referenceId) {
       navigate(`/factory/sales/invoices/${entry.referenceId}`);
+      return;
+    }
+    if (entry.txType === "BALE_SALE" && entry.referenceId) {
+      navigate(`/factory/pos?edit=${entry.referenceId}`);
       return;
     }
     const tab = VOUCHER_TX_TYPES[entry.txType];

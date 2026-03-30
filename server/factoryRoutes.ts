@@ -18851,6 +18851,248 @@ ${charges.length > 0 ? `<h3>Charges</h3><table><thead><tr><th>Name</th><th>Type<
     }
   });
 
+  // PUT /api/factory/pos/sales/:id — edit an existing factory POS sale
+  app.put("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const saleId = parseInt(req.params.id);
+
+      const [existingSale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      if (!existingSale) return res.status(404).json({ message: "Sale not found" });
+      if (existingSale.status === "VOIDED") return res.status(400).json({ message: "Cannot edit a voided sale" });
+
+      const { locationId, customerName, customerId, notes, txDate, currencyCode, cashAccountId, paymentType, depositAmount, items, expenses } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      const isCredit = (paymentType || "CASH") === "CREDIT";
+      const parsedCustomerId = customerId ? parseInt(customerId) : null;
+      const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
+      const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
+
+      const expenseRows: Array<{ accountId: number; description: string; amount: number }> = [];
+      if (Array.isArray(expenses)) {
+        for (const exp of expenses) {
+          const amt = parseFloat(exp.amount || "0");
+          if (amt > 0 && exp.accountId) {
+            expenseRows.push({ accountId: parseInt(exp.accountId), description: exp.description || "", amount: amt });
+          }
+        }
+      }
+      const totalExpenses = expenseRows.reduce((s, e) => s + e.amount, 0);
+      const netCash = isCredit ? depositAmt - totalExpenses : totalAmount - totalExpenses;
+
+      const result = await db.transaction(async (tx: any) => {
+        // Step 1: Restore bales for old items
+        const oldItems = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
+        for (const oldItem of oldItems) {
+          if (oldItem.productId && existingSale.locationId) {
+            const soldBales = await tx
+              .select({ id: factoryBales.id })
+              .from(factoryBales)
+              .where(and(
+                eq(factoryBales.companyId, companyId),
+                eq(factoryBales.productId, oldItem.productId),
+                eq(factoryBales.erpLocationId, existingSale.locationId),
+                eq(factoryBales.status, "SOLD"),
+              ))
+              .orderBy(desc(factoryBales.id))
+              .limit(oldItem.quantity);
+            const baleIds = soldBales.map((b: any) => b.id);
+            if (baleIds.length > 0) {
+              await tx.update(factoryBales)
+                .set({ status: "IN_STOCK", updatedAt: new Date() })
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+            }
+          }
+        }
+
+        // Step 2: Delete old items
+        await tx.delete(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
+
+        // Step 3: Update sale record
+        const [updatedSale] = await tx.update(factoryPosSales)
+          .set({
+            txDate: txDate || existingSale.txDate,
+            locationId: locationId || null,
+            customerName: customerName || null,
+            customerId: parsedCustomerId,
+            notes: notes || null,
+            totalAmount: totalAmount.toFixed(2),
+            currencyCode: currencyCode || "USD",
+            cashAccountId: cashAccountId || null,
+            paymentType: isCredit ? "CREDIT" : "CASH",
+            depositAmount: isCredit ? depositAmt.toFixed(2) : "0",
+            expensesJson: expenseRows.length > 0 ? JSON.stringify(expenseRows) : null,
+          })
+          .where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)))
+          .returning();
+
+        // Step 4: Insert new items and mark bales as SOLD
+        for (const item of items) {
+          const qty = parseInt(item.quantity || "1");
+          const price = parseFloat(item.unitPrice || "0");
+          await tx.insert(factoryPosSaleItems).values({
+            saleId,
+            companyId,
+            productId: item.productId || null,
+            productName: item.productName,
+            articleCode: item.articleCode || null,
+            quantity: qty,
+            unitPrice: price.toFixed(2),
+            totalAmount: (price * qty).toFixed(2),
+            currencyCode: currencyCode || "USD",
+          });
+
+          if (item.productId && locationId) {
+            const availableBales = await tx
+              .select({ id: factoryBales.id })
+              .from(factoryBales)
+              .where(and(
+                eq(factoryBales.companyId, companyId),
+                eq(factoryBales.productId, item.productId),
+                eq(factoryBales.erpLocationId, locationId),
+                or(eq(factoryBales.status, "IN_STOCK"), eq(factoryBales.status, "FINALIZED")),
+              ))
+              .orderBy(factoryBales.id)
+              .limit(qty);
+            const baleIds = availableBales.map((b: any) => b.id);
+            if (baleIds.length > 0) {
+              await tx.update(factoryBales)
+                .set({ status: "SOLD", updatedAt: new Date() })
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+            }
+          }
+        }
+
+        // Step 5: Update factory daybook entry amount and date
+        await tx.update(factoryDaybookEntries)
+          .set({
+            amountCurrency: totalAmount.toFixed(2),
+            amountUsd: totalAmount.toFixed(2),
+            txDate: txDate || existingSale.txDate,
+            description: `Factory POS Sale ${existingSale.saleNumber}${customerName ? ` – ${customerName}` : ""}${isCredit ? " [CREDIT]" : ""}`,
+          })
+          .where(and(
+            eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
+            eq(factoryDaybookEntries.referenceId, saleId),
+          ));
+
+        // Step 6: Update customer balance entries if applicable
+        if (isCredit && parsedCustomerId) {
+          // Remove old SALE and DEPOSIT balance entries for this sale
+          await tx.delete(customerBalances)
+            .where(and(
+              eq(customerBalances.referenceId, saleId),
+              eq(customerBalances.companyId, companyId),
+              or(
+                eq(customerBalances.referenceType, "FACTORY_POS_SALE"),
+                eq(customerBalances.referenceType, "FACTORY_POS_DEPOSIT"),
+              ),
+            ));
+
+          // Re-compute running balance and re-insert
+          const [balRow] = await tx
+            .select({ net: sql<string>`COALESCE(SUM(debit_amount::numeric - credit_amount::numeric), 0)` })
+            .from(customerBalances)
+            .where(and(eq(customerBalances.customerId, parsedCustomerId), eq(customerBalances.companyId, companyId)));
+          const runningBefore = parseFloat(balRow?.net || "0");
+          const balAfterSale = runningBefore + totalAmount;
+          await tx.insert(customerBalances).values({
+            companyId,
+            customerId: parsedCustomerId,
+            transactionDate: txDate || existingSale.txDate,
+            transactionType: "SALE",
+            referenceId: saleId,
+            referenceType: "FACTORY_POS_SALE",
+            debitAmount: totalAmount.toFixed(2),
+            creditAmount: "0",
+            balance: balAfterSale.toFixed(2),
+            currency: currencyCode || "USD",
+            description: `POS Sale ${existingSale.saleNumber} (edited)`,
+          });
+          if (depositAmt > 0) {
+            const balAfterDeposit = balAfterSale - depositAmt;
+            await tx.insert(customerBalances).values({
+              companyId,
+              customerId: parsedCustomerId,
+              transactionDate: txDate || existingSale.txDate,
+              transactionType: "PAYMENT",
+              referenceId: saleId,
+              referenceType: "FACTORY_POS_DEPOSIT",
+              debitAmount: "0",
+              creditAmount: depositAmt.toFixed(2),
+              balance: balAfterDeposit.toFixed(2),
+              currency: currencyCode || "USD",
+              description: `Deposit on POS Sale ${existingSale.saleNumber} (edited)`,
+            });
+          }
+        }
+
+        // Step 7: Update the ERP receipt voucher if it exists
+        const existingVouchers = await tx.select().from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY_POS"),
+            sql`voucher_number LIKE ${'FPOS-' + saleId + '-%'}`,
+          ));
+        if (existingVouchers.length > 0) {
+          const vchId = existingVouchers[0].id;
+          const voucherCashAmt = isCredit ? depositAmt : totalAmount;
+          if (cashAccountId && voucherCashAmt > 0) {
+            await tx.update(vouchers)
+              .set({
+                voucherDate: txDate || existingSale.txDate,
+                description: `Factory POS Sale ${existingSale.saleNumber}${customerName ? ` – ${customerName}` : ""}`,
+                totalAmount: voucherCashAmt.toFixed(2),
+                currency: currencyCode || "USD",
+              })
+              .where(eq(vouchers.id, vchId));
+
+            // Replace voucher entries
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, vchId));
+            const netDeposit = Math.max(0, netCash);
+            if (netDeposit > 0) {
+              await tx.insert(voucherEntries).values({
+                voucherId: vchId,
+                ledgerAccountId: parseInt(cashAccountId),
+                debitAmount: netDeposit.toFixed(2),
+                creditAmount: "0",
+                narration: isCredit ? `Deposit on credit sale – ${existingSale.saleNumber}` : `Factory POS cash receipt – ${existingSale.saleNumber}`,
+              });
+            }
+            for (const exp of expenseRows) {
+              await tx.insert(voucherEntries).values({
+                voucherId: vchId,
+                ledgerAccountId: exp.accountId,
+                debitAmount: exp.amount.toFixed(2),
+                creditAmount: "0",
+                narration: exp.description || `POS deduction – ${existingSale.saleNumber}`,
+              });
+            }
+            const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
+            await tx.insert(voucherEntries).values({
+              voucherId: vchId,
+              ledgerAccountId: salesIncomeAccId,
+              debitAmount: "0",
+              creditAmount: voucherCashAmt.toFixed(2),
+              narration: `Factory POS sales income – ${existingSale.saleNumber}`,
+            });
+          }
+        }
+
+        return updatedSale;
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error editing factory POS sale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // DELETE /api/factory/pos/sales/:id — void a factory POS sale
   app.delete("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
     try {

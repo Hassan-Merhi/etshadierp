@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +38,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/PageHeader";
 import {
   ShoppingCart, Printer, Plus, Trash2, Search, Package, History,
-  X, Check, MapPin, Wallet, User, ChevronRight, CreditCard, Banknote, AlertCircle,
+  X, Check, MapPin, Wallet, User, ChevronRight, CreditCard, Banknote, AlertCircle, Pencil,
 } from "lucide-react";
 
 interface CartRow {
@@ -98,8 +99,15 @@ const COLUMNS = [
 export default function FactoryPOS() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+  // Edit mode — populated from ?edit=<id> query param
+  const editSaleId = (() => {
+    const p = new URLSearchParams(window.location.search).get("edit");
+    return p ? parseInt(p) : null;
+  })();
 
   const [locationId, setLocationId]     = useState<string>("");
   const [customerName, setCustomerName] = useState("");
@@ -119,6 +127,7 @@ export default function FactoryPOS() {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [voidId, setVoidId]             = useState<number | null>(null);
   const [showHistory, setShowHistory]   = useState(false);
+  const [editLoaded, setEditLoaded]     = useState(false);
 
   // Mobile state
   const [mobileRowEditOpen, setMobileRowEditOpen] = useState(false);
@@ -148,6 +157,55 @@ export default function FactoryPOS() {
   });
   const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "User";
+
+  // Fetch existing sale when in edit mode
+  const { data: editSaleData } = useQuery<any>({
+    queryKey: ["/api/factory/pos/sales", editSaleId],
+    queryFn: async () => {
+      if (!editSaleId) return null;
+      const res = await fetch(`/api/factory/pos/sales/${editSaleId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Sale not found");
+      return res.json();
+    },
+    enabled: !!editSaleId,
+  });
+
+  // Populate form when edit data loads
+  useEffect(() => {
+    if (!editSaleData || editLoaded) return;
+    setLocationId(editSaleData.locationId ? String(editSaleData.locationId) : "");
+    setCustomerName(editSaleData.customerName || "");
+    setPaymentType((editSaleData.paymentType as "CASH" | "CREDIT") || "CASH");
+    setSelectedCustomerId(editSaleData.customerId ? String(editSaleData.customerId) : "");
+    setNotes(editSaleData.notes || "");
+    setTxDate(editSaleData.txDate || new Date().toISOString().split("T")[0]);
+    setCurrencyCode(editSaleData.currencyCode || "USD");
+    setCashAccountId(editSaleData.cashAccountId ? String(editSaleData.cashAccountId) : "");
+    if (editSaleData.items && editSaleData.items.length > 0) {
+      setRows(editSaleData.items.map((it: any) => ({
+        id: String(it.id),
+        productId: it.productId || null,
+        productName: it.productName,
+        articleCode: it.articleCode || "",
+        availableQty: 9999,
+        quantity: parseInt(it.quantity) || 1,
+        unitPrice: parseFloat(it.unitPrice) || 0,
+        weightPerBale: 0,
+      })));
+    }
+    if (editSaleData.expensesJson) {
+      try {
+        const expArr = JSON.parse(editSaleData.expensesJson);
+        setExpenseRows(expArr.map((e: any) => ({
+          id: String(Date.now() + Math.random()),
+          accountId: String(e.accountId),
+          description: e.description || "",
+          amount: String(e.amount),
+        })));
+      } catch { /* ignore */ }
+    }
+    setEditLoaded(true);
+  }, [editSaleData, editLoaded]);
 
   const filteredInventory = (inventory || []).filter(item =>
     !search ||
@@ -337,7 +395,6 @@ export default function FactoryPOS() {
       setCustomerName("");
       setPaymentType("CASH");
       setSelectedCustomerId("");
-      setDepositAmount("");
       setNotes("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
@@ -345,6 +402,22 @@ export default function FactoryPOS() {
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message || "Failed to create sale", variant: "destructive" });
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", `/api/factory/pos/sales/${editSaleId}`, data),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales", editSaleId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory", locationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      toast({ title: "Sale updated", description: `${data.saleNumber || editSaleData?.saleNumber} saved` });
+      navigate("/factory/daybook");
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update sale", variant: "destructive" });
     },
   });
 
@@ -369,7 +442,7 @@ export default function FactoryPOS() {
     if (paymentType === "CREDIT" && !selectedCustomerId) {
       return toast({ title: "Select a customer for credit sale", variant: "destructive" });
     }
-    saleMutation.mutate({
+    const payload = {
       locationId: parseInt(locationId),
       customerName: customerName || null,
       customerId: paymentType === "CREDIT" && selectedCustomerId ? parseInt(selectedCustomerId) : null,
@@ -391,7 +464,12 @@ export default function FactoryPOS() {
         description: e.description,
         amount: e.amount,
       })),
-    });
+    };
+    if (editSaleId) {
+      editMutation.mutate(payload);
+    } else {
+      saleMutation.mutate(payload);
+    }
   };
 
   // Mobile row being edited
@@ -399,25 +477,41 @@ export default function FactoryPOS() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Factory POS">
+      <PageHeader title={editSaleId ? `Editing ${editSaleData?.saleNumber || "Sale"}` : "Factory POS"}>
         <div className="flex flex-wrap gap-1 sm:gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowHistory(h => !h)}
-            data-testid="button-toggle-history"
-          >
-            <History className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">History</span>
-          </Button>
+          {editSaleId ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/factory/pos")}
+              data-testid="button-new-sale"
+            >
+              <Plus className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">New Sale</span>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHistory(h => !h)}
+              data-testid="button-toggle-history"
+            >
+              <History className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">History</span>
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={handleSubmit}
-            disabled={validRows.length === 0 || saleMutation.isPending}
+            disabled={validRows.length === 0 || saleMutation.isPending || editMutation.isPending}
             className="gap-1 sm:gap-2"
             data-testid="button-complete-sale"
           >
-            {saleMutation.isPending ? "..." : <><span className="hidden sm:inline">Save</span><Check className="h-4 w-4" /></>}
+            {(saleMutation.isPending || editMutation.isPending) ? "..." : (
+              editSaleId
+                ? <><span className="hidden sm:inline">Update</span><Pencil className="h-4 w-4" /></>
+                : <><span className="hidden sm:inline">Save</span><Check className="h-4 w-4" /></>
+            )}
           </Button>
         </div>
       </PageHeader>
