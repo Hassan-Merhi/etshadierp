@@ -105,7 +105,6 @@ export default function FactoryPOS() {
   const [customerName, setCustomerName] = useState("");
   const [paymentType, setPaymentType]   = useState<"CASH" | "CREDIT">("CASH");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [depositAmount, setDepositAmount] = useState<string>("");
   const [notes, setNotes]               = useState("");
   const [txDate, setTxDate]             = useState(new Date().toISOString().split("T")[0]);
   const [currencyCode, setCurrencyCode] = useState("USD");
@@ -370,16 +369,12 @@ export default function FactoryPOS() {
     if (paymentType === "CREDIT" && !selectedCustomerId) {
       return toast({ title: "Select a customer for credit sale", variant: "destructive" });
     }
-    const depositAmt = paymentType === "CREDIT" ? parseFloat(depositAmount || "0") : 0;
-    if (paymentType === "CREDIT" && depositAmt > total) {
-      return toast({ title: "Deposit cannot exceed total", variant: "destructive" });
-    }
     saleMutation.mutate({
       locationId: parseInt(locationId),
       customerName: customerName || null,
       customerId: paymentType === "CREDIT" && selectedCustomerId ? parseInt(selectedCustomerId) : null,
       paymentType,
-      depositAmount: depositAmt > 0 ? String(depositAmt) : "0",
+      depositAmount: "0",
       notes: notes || null,
       txDate,
       currencyCode,
@@ -490,7 +485,7 @@ export default function FactoryPOS() {
           <Button
             variant={paymentType === "CASH" ? "default" : "outline"}
             size="sm"
-            onClick={() => { setPaymentType("CASH"); setSelectedCustomerId(""); setDepositAmount(""); }}
+            onClick={() => { setPaymentType("CASH"); setSelectedCustomerId(""); }}
             data-testid="button-payment-type-cash"
             className="gap-1"
           >
@@ -531,33 +526,11 @@ export default function FactoryPOS() {
               <SelectContent>
                 {(allCustomers || []).map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                    {parseFloat(c.balance || "0") > 0.001 && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        ({c.balanceSide || "Dr"} {ccPrefix}{formatNum(c.balance)})
-                      </span>
-                    )}
+                    {c.name || `Customer #${c.id}`}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        )}
-
-        {/* Deposit — only for credit sales */}
-        {paymentType === "CREDIT" && (
-          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
-            <Banknote className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Deposit (optional)"
-              value={depositAmount}
-              onChange={e => setDepositAmount(e.target.value)}
-              className="w-full sm:w-36"
-              data-testid="input-deposit-amount"
-            />
           </div>
         )}
 
@@ -802,8 +775,7 @@ export default function FactoryPOS() {
                   const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
                   const prevBalSide = custObj?.balanceSide || "Dr";
                   const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
-                  const depositNum = parseFloat(depositAmount || "0");
-                  const afterSale = prevNet + total - depositNum;
+                  const afterSale = prevNet + total;
                   return (
                     <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm" data-testid="credit-sale-summary">
                       <div className="flex items-center gap-1.5 font-medium text-xs text-muted-foreground uppercase tracking-wide mb-1">
@@ -820,12 +792,6 @@ export default function FactoryPOS() {
                         <span className="text-muted-foreground">This sale (Dr)</span>
                         <span className="font-mono">+{ccPrefix}{formatNum(total)}</span>
                       </div>
-                      {depositNum > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Deposit (Cr)</span>
-                          <span className="font-mono text-green-600 dark:text-green-400">-{ccPrefix}{formatNum(depositNum)}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between font-semibold border-t border-border pt-1.5">
                         <span>Balance after sale</span>
                         <span className="font-mono" data-testid="text-balance-after-sale">
@@ -1243,19 +1209,9 @@ export default function FactoryPOS() {
                     {/* Total Paid / Net Cash */}
                     {savedSale?.paymentType === "CREDIT" ? (
                       <>
-                        <div style={{ fontSize: "9pt", fontWeight: "700", marginTop: "4px", paddingTop: "4px", borderTop: "1px solid #ccc", display: "flex", justifyContent: "space-between", color: "#555" }}>
-                          <span>SALE TOTAL:</span>
-                          <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
-                        </div>
-                        {parseFloat(savedSale?.depositAmount || "0") > 0 && (
-                          <div style={{ fontSize: "9pt", fontWeight: "700", display: "flex", justifyContent: "space-between", color: "#555" }}>
-                            <span>DEPOSIT RECEIVED:</span>
-                            <span>{fmtPrintAmt(parseFloat(savedSale.depositAmount))}</span>
-                          </div>
-                        )}
-                        <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "3px", paddingTop: "3px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between", color: "#a00" }}>
+                        <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "4px", paddingTop: "4px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between", color: "#a00" }}>
                           <span>BALANCE DUE:</span>
-                          <span>{fmtPrintAmt((savedSale?.total ?? 0) - parseFloat(savedSale?.depositAmount || "0"))}</span>
+                          <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                         </div>
                         <div style={{ textAlign: "center", fontSize: "7.5pt", fontWeight: "700", marginTop: "3px", color: "#a00" }}>
                           *** CREDIT SALE ***
