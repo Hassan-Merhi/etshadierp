@@ -223,6 +223,49 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     return bcrypt.compare(password, hash);
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FACTORY COMPANY RESOLUTION MIDDLEWARE
+  // Ensures req.session.factoryCompanyId always points to a factory-type company
+  // before any factory route handler runs. This eliminates the race condition
+  // where parallel data queries arrive before /my-access sets the session value,
+  // causing them to fall back to currentCompanyId (an ERP company) and return empty data.
+  // ─────────────────────────────────────────────────────────────────────────────
+  app.use("/api/factory", async (req: any, res: any, next: any) => {
+    try {
+      const session = req.session as any;
+      if (!session?.userId) return next(); // unauthenticated — let requireAuth handle it
+      if (session.factoryCompanyId) return next(); // already resolved
+
+      const currentCompanyId = session.currentCompanyId;
+
+      // Priority 1: currentCompanyId if it is factory-type
+      if (currentCompanyId) {
+        const [co] = await db.select({ id: companies.id, companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, currentCompanyId));
+        if (co?.companyType === "factory") {
+          session.factoryCompanyId = co.id;
+          return next();
+        }
+      }
+
+      // Priority 2: first active factory-type company in the DB
+      const [factoryComp] = await db.select({ id: companies.id })
+        .from(companies)
+        .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
+        .limit(1);
+      if (factoryComp) {
+        session.factoryCompanyId = factoryComp.id;
+        return next();
+      }
+
+      // Priority 3: fall back to currentCompanyId (single-company / legacy setup)
+      if (currentCompanyId) session.factoryCompanyId = currentCompanyId;
+      next();
+    } catch {
+      next();
+    }
+  });
+
   // ───────────────────────────────────────────────
   // STOCK ENTRY - Direct to stock (replaces pressing/finalize)
   // ───────────────────────────────────────────────
